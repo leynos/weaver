@@ -8,11 +8,12 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 import re
 import subprocess
-from typing import Sequence
+import sys
 
 import generate_typos_config as generator
 import typos_rollout as rollout
@@ -226,10 +227,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     repository = parser.parse_args(argv).repository
-    findings = check_phrase_corrections(
-        repository,
-        generator.dictionary_from_cache(repository),
-    )
+    try:
+        dictionary = generator.dictionary_from_cache(repository)
+    except OSError as error:
+        print(
+            f"Spelling policy unavailable: {error}. "
+            "Run 'make spelling-config' to refresh the shared dictionary cache.",
+            file=sys.stderr,
+        )
+        return 2
+    findings = check_phrase_corrections(repository, dictionary)
     for item in findings:
         print(
             f"{item.path}:{item.line}:{item.column}: {item.phrase} -> {item.correction}"

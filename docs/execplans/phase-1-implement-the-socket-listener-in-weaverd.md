@@ -254,7 +254,7 @@ re-run the same command. If a Unix socket file is left behind by a failed run,
 remove it and rerun the listener test; the implementation should also attempt
 safe cleanup on startup.
 
-## Artefacts and Notes
+## Artefacts and notes
 
 Example Gherkin snippet for the listener behaviour:
 

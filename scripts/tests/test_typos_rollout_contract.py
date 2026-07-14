@@ -1,4 +1,8 @@
-"""Integration-contract tests for the spelling-policy rollout."""
+"""Integration-contract tests for the spelling-policy rollout.
+
+This module verifies Python syntax and the Makefile generated-configuration
+drift contract. Run it with pytest from the repository root.
+"""
 
 from __future__ import annotations
 
@@ -17,9 +21,20 @@ def test_rollout_integration_contract() -> None:
             feature_version=(3, 13),
         )
     makefile = SCRIPT_DIRECTORY.parent.joinpath("Makefile").read_text(encoding="utf-8")
-    assert "git ls-files --error-unmatch typos.toml >/dev/null" in makefile, (
-        "spelling gate no longer requires an indexed generated config"
+    spelling_config_recipe = makefile.split("spelling-config:", maxsplit=1)[1].split(
+        "\n\n", maxsplit=1
+    )[0]
+    required_commands = (
+        "$(UV_ENV) $(UV) run scripts/generate_typos_config.py",
+        "git ls-files --error-unmatch typos.toml >/dev/null",
+        "git diff --exit-code -- typos.toml",
     )
-    assert "git diff --exit-code -- typos.toml" in makefile, (
-        "spelling gate no longer rejects generated-config drift"
+    command_positions = tuple(
+        spelling_config_recipe.find(command) for command in required_commands
+    )
+    assert all(position >= 0 for position in command_positions), (
+        "spelling-config no longer contains every generated-config safeguard"
+    )
+    assert command_positions == tuple(sorted(command_positions)), (
+        "spelling-config safeguards no longer follow generation"
     )

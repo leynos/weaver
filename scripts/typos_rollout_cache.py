@@ -20,7 +20,7 @@ class RefreshResult:
     status
         Stable refresh outcome such as ``current`` or ``refreshed``.
     cache
-        Validated cache or tracked configuration used for the outcome.
+        Validated untracked cache used for the outcome.
 
     Examples
     --------

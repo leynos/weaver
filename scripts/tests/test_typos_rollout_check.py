@@ -118,3 +118,23 @@ def test_main_reports(
 
     assert status == 2, "the command accepted a prohibited phrase"
     assert "README.md:1:8:" in output, "the diagnostic omitted its source position"
+
+
+def test_main_reports_missing_policy_cache(
+    modules: tuple[types.ModuleType, types.ModuleType],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The CLI reports an actionable error when no policy cache is available."""
+    _, check = modules
+
+    status = check.main(["--repository", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    assert status == 2, "the command accepted a missing spelling-policy cache"
+    assert "Spelling policy unavailable:" in captured.err, (
+        "the diagnostic omitted the policy failure"
+    )
+    assert "make spelling-config" in captured.err, (
+        "the diagnostic omitted the cache-refresh action"
+    )

@@ -21,11 +21,11 @@ then applies Weaver's narrow repository policy in `typos.local.toml`. Edit the
 local policy and regenerate the configuration rather than changing generated
 entries by hand or duplicating generally valid vocabulary locally.
 
-When an HTTPS authority is unreachable, the generator may reuse the existing
-tracked `typos.toml`. That connectivity-only fallback deliberately does not
-apply `typos.local.toml`, so local policy edits remain unapplied until a
-successful refresh regenerates the tracked configuration. HTTP status and
-local persistence failures still fail the gate.
+When an HTTPS authority is unreachable, the generator may reuse a valid stale
+copy of the untracked shared dictionary cache. Without a valid cache, the
+`spelling-config` stage fails before phrase checking because tracked
+`typos.toml` cannot represent the shared phrase-correction policy. HTTP status
+and local persistence failures also fail the gate.
 
 The shared `[phrases.corrections]` table covers punctuation-separated forms
 that Typos tokenizes as independent valid words. The companion

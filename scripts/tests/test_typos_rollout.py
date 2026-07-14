@@ -14,8 +14,7 @@ import pytest
 
 from typos_rollout_test_support import dictionary_text as _dictionary_text
 
-SCRIPT_DIRECTORY = Path(__file__).resolve().parents[1]
-RolloutModules = tuple[
+type RolloutModules = tuple[
     types.ModuleType,
     types.ModuleType,
     types.ModuleType,
@@ -25,21 +24,11 @@ RolloutModules = tuple[
 
 @pytest.fixture(name="rollout_modules")
 def rollout_modules_fixture(
-    monkeypatch: pytest.MonkeyPatch,
+    rollout_modules: tuple[types.ModuleType, types.ModuleType, types.ModuleType],
 ) -> RolloutModules:
-    """Import scripts through the top-level paths used at runtime."""
-    monkeypatch.syspath_prepend(str(SCRIPT_DIRECTORY))
-    names = (
-        "typos_rollout_cache",
-        "typos_rollout_http",
-        "typos_rollout",
-        "generate_typos_config",
-    )
-    importlib.invalidate_caches()
-    cache, refresh, rollout, generator = (
-        importlib.import_module(name) for name in names
-    )
-    return cache, refresh, rollout, generator
+    """Add the generator module to the shared rollout fixture."""
+    generator = importlib.import_module("generate_typos_config")
+    return (*rollout_modules, generator)
 
 
 def test_rollout_generates_oxford_corrections(
@@ -60,20 +49,16 @@ def test_rollout_generates_oxford_corrections(
     )
 
 
-def test_connectivity_failure_reuses_unchanged_tracked_config(
+def test_connectivity_failure_without_cache_raises_domain_error(
     rollout_modules: RolloutModules,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Tracked fallback preserves its reviewed config without merging local policy."""
+    """A tracked config cannot hide an authority outage without a valid cache."""
     _, _, rollout, generator = rollout_modules
     tracked_config = tmp_path / "typos.toml"
     reviewed = '[default]\nlocale = "en-gb"\n'
     tracked_config.write_text(reviewed, encoding="utf-8")
-    (tmp_path / "typos.local.toml").write_text(
-        _dictionary_text("replacement"),
-        encoding="utf-8",
-    )
 
     def unavailable(*_args: object, **_kwargs: object) -> None:
         """Model an unavailable HTTPS authority."""
@@ -84,17 +69,14 @@ def test_connectivity_failure_reuses_unchanged_tracked_config(
 
     monkeypatch.setattr(rollout, "refresh_base", unavailable)
 
-    result = generator.main(
-        repository=tmp_path,
-        source="https://example.invalid/base",
-    )
+    with pytest.raises(rollout.NetworkUnavailableError, match="offline"):
+        generator.main(
+            repository=tmp_path,
+            source="https://example.invalid/base",
+        )
 
-    assert result.status == "tracked-config", (
-        "connectivity fallback did not reuse the reviewed config"
-    )
-    assert result.cache == tracked_config, "fallback returned the wrong tracked path"
     assert tracked_config.read_text(encoding="utf-8") == reviewed, (
-        "connectivity fallback unexpectedly applied local policy"
+        "failed refresh unexpectedly changed the tracked config"
     )
 
 
