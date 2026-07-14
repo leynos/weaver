@@ -179,6 +179,11 @@ pub struct WhereClause {
 }
 
 /// A normalized `where` constraint payload.
+///
+/// `Constraint` is a domain type rather than a serialized rule fragment. The
+/// `sempai` adapter crate is responsible for parsing YAML-backed JSON values
+/// into these variants before the formula reaches semantic validation or plan
+/// compilation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Constraint {
     /// A metavariable must match the given regular expression.
@@ -196,5 +201,9 @@ pub enum Constraint {
         pattern: String,
     },
     /// A currently unmodelled constraint, preserved lossily as JSON text.
+    ///
+    /// This is the sole format-aware exception in the core constraint model so
+    /// adapters can retain unknown shapes. New constraint variants must remain
+    /// format-agnostic domain types.
     Other(String),
 }

@@ -20,7 +20,7 @@ use sempai_yaml::{Rule, RulePrincipal, parse_rule_file};
 use crate::{
     mode_validation::validate_supported_modes,
     normalize::normalize_search_principal,
-    semantic_check::validate_formula,
+    semantic_check::{validate_constraints, validate_formula},
 };
 
 /// A compiled query plan for one rule and target language.
@@ -126,6 +126,7 @@ impl Engine {
 
                 tracing::debug!(rule_id = rule.id(), "validating normalized formula");
                 validate_formula(&formula)?;
+                validate_constraints(&formula)?;
 
                 tracing::debug!(
                     rule_id = rule.id(),

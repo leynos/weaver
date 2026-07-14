@@ -1,6 +1,7 @@
 //! Unit tests for the `sempai` facade crate.
 
 mod behaviour;
+mod constraint_walker_proptest;
 mod diagnostic_snapshot_tests;
 mod engine_integration_tests;
 mod engine_tests;
