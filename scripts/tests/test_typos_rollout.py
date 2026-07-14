@@ -126,6 +126,26 @@ def test_generator_propagates_non_connectivity_failures(
     )
 
 
+def test_generator_writes_config_from_valid_untracked_cache(
+    rollout_modules: RolloutModules,
+    tmp_path: Path,
+) -> None:
+    """The generator renders a real validated cache into tracked configuration."""
+    _, _, _, generator = rollout_modules
+    (tmp_path / ".typos-oxendict-base.toml").write_text(
+        _dictionary_text(),
+        encoding="utf-8",
+    )
+
+    result = generator.main(repository=tmp_path, offline=True)
+
+    rendered = tomllib.loads((tmp_path / "typos.toml").read_text(encoding="utf-8"))
+    assert result.status == "offline-cache", "generator did not reuse the valid cache"
+    assert rendered["default"]["extend-words"]["organise"] == "organize", (
+        "generated configuration omitted the cache's Oxford correction"
+    )
+
+
 def test_render_and_write_are_deterministic_valid_toml(
     rollout_modules: RolloutModules,
     tmp_path: Path,
@@ -149,8 +169,15 @@ def test_render_and_write_are_deterministic_valid_toml(
     assert output.read_text(encoding="utf-8") == first, (
         "atomic write changed rendered configuration"
     )
-    assert tomllib.loads(first)["default"]["locale"] == "en-gb", (
+    parsed = tomllib.loads(first)
+    assert parsed["default"]["locale"] == "en-gb", (
         "rendered configuration lost the British locale"
+    )
+    assert parsed["default"]["extend-ignore-re"] == ["https?://"], (
+        "rendered configuration lost the ignore patterns"
+    )
+    assert parsed["files"]["extend-exclude"] == ["target"], (
+        "rendered configuration lost the file exclusions"
     )
     assert list(output.parent.glob(".typos.toml.*")) == [], (
         "successful atomic write left a temporary file"
