@@ -31,6 +31,7 @@ TYPOS_VERSION ?= 1.48.0
 SPELLING_PY_SRCS := scripts/generate_typos_config.py scripts/typos_rollout_check.py scripts/typos_rollout.py \
 	scripts/typos_rollout_cache.py scripts/typos_rollout_http.py \
 	scripts/tests/conftest.py scripts/tests/test_typos_rollout.py scripts/tests/test_typos_rollout_check.py \
+	scripts/tests/test_typos_rollout_policy.py \
 	scripts/tests/test_typos_rollout_contract.py \
 	scripts/tests/test_typos_rollout_refresh.py \
 	scripts/tests/typos_rollout_test_support.py

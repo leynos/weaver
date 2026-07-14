@@ -144,59 +144,6 @@ def test_generator_propagates_non_connectivity_failures(
     )
 
 
-INVALID_DOCUMENTS = (
-    pytest.param(
-        _dictionary_text().replace("schema = 1", "schema = 2"),
-        id="schema",
-    ),
-    pytest.param(
-        _dictionary_text().replace(
-            '[oxford]\nstems = ["organ"]',
-            'oxford = "bad"',
-        ),
-        id="table",
-    ),
-    pytest.param(
-        _dictionary_text().replace('stems = ["organ"]', "stems = [1]"),
-        id="string-list",
-    ),
-    pytest.param(
-        _dictionary_text().replace(
-            "[words.corrections]",
-            "[words.corrections]\nteh = 1",
-        ),
-        id="correction",
-    ),
-)
-
-
-@pytest.mark.parametrize("document", INVALID_DOCUMENTS)
-def test_dictionary_validation_rejects_invalid_documents(
-    rollout_modules: RolloutModules,
-    tmp_path: Path,
-    document: str,
-) -> None:
-    """Schema, table, string-list and correction types remain validated."""
-    _, _, rollout, _ = rollout_modules
-    source = tmp_path / "base.toml"
-    source.write_text(document, encoding="utf-8")
-
-    with pytest.raises((TypeError, ValueError)):
-        rollout.load_dictionary(source)
-
-
-def test_merge_rejects_conflicting_corrections(
-    rollout_modules: RolloutModules,
-) -> None:
-    """A local overlay cannot silently weaken a shared correction."""
-    _, _, rollout, _ = rollout_modules
-    base = rollout.Dictionary(corrections=(("teh", "the"),))
-    local = rollout.Dictionary(corrections=(("teh", "ten"),))
-
-    with pytest.raises(ValueError, match="conflicting correction"):
-        rollout.merge_dictionaries(base, local)
-
-
 def test_render_and_write_are_deterministic_valid_toml(
     rollout_modules: RolloutModules,
     tmp_path: Path,
