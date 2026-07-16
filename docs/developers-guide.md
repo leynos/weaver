@@ -246,7 +246,7 @@ per-language query plans for later execution.
 
 ### Constraint boundary and validation passes
 
-`crates/sempai/src/normalize_constraints.rs` is the serialisation boundary for
+`crates/sempai/src/normalize_constraints.rs` is the serialization boundary for
 rule `where` clauses. It receives raw YAML-backed JSON values from the parser
 and converts them into `sempai_core::formula::Constraint` domain values so that
 core formula types can remain independent of transport formats.
@@ -260,7 +260,7 @@ core formula types can remain independent of transport formats.
 The `Other` variant is the only format-aware exception. It preserves unknown
 constraint shapes as JSON text so adapters can round-trip unsupported input,
 while any new domain variants are expected to be pure model types without
-serialisation-format concerns.
+serialization-format concerns.
 
 Engine validation runs in two stages after normalization:
 
