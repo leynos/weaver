@@ -135,7 +135,7 @@ jobs:
       - name: Stage weaver-cli artefacts for macOS
         if: inputs.platform == 'macos'
         id: stage-weaver-cli
-        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@e0d9b652b137eb15314fff188f09e1ba18d3cc5b
         with:
           config-file: .github/release-staging.toml
           target: ${{ steps.macos-target.outputs.target }}
@@ -167,7 +167,7 @@ jobs:
       - name: Stage weaverd artefacts for macOS
         if: inputs.platform == 'macos'
         id: stage-weaverd
-        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@e0d9b652b137eb15314fff188f09e1ba18d3cc5b
         with:
           config-file: .github/release-staging-weaverd.toml
           target: ${{ steps.macos-target.outputs.target }}
