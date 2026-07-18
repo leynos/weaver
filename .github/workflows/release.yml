@@ -60,13 +60,13 @@ jobs:
         run: echo "value=${GITHUB_REPOSITORY#*/}" >>"$GITHUB_OUTPUT"
       - id: release_modes
         name: Determine release modes
-        uses: leynos/shared-actions/.github/actions/determine-release-modes@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
+        uses: leynos/shared-actions/.github/actions/determine-release-modes@18bed1ca49a6de3d8882bd72635a32ae3f023d57
         with:
           dry-run: ${{ inputs.dry-run }}
           publish: ${{ inputs.publish }}
       - id: ensure_version
         name: Read package version from Cargo.toml
-        uses: leynos/shared-actions/.github/actions/ensure-cargo-version@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
+        uses: leynos/shared-actions/.github/actions/ensure-cargo-version@18bed1ca49a6de3d8882bd72635a32ae3f023d57
         with:
           check-tag: ${{ fromJSON(steps.release_modes.outputs.should-publish) }}
           manifests: crates/weaver-cli/Cargo.toml
@@ -153,7 +153,7 @@ jobs:
           pattern: ${{ needs.metadata.outputs.repo_name }}-*
       - id: upload_assets
         name: Upload artefacts to release
-        uses: leynos/shared-actions/.github/actions/upload-release-assets@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
+        uses: leynos/shared-actions/.github/actions/upload-release-assets@18bed1ca49a6de3d8882bd72635a32ae3f023d57
         with:
           release-tag: ${{ github.ref_name }}
           bin-name: weaver
