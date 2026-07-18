@@ -143,7 +143,7 @@ jobs:
       - name: Build weaver-cli macOS installer package
         if: inputs.platform == 'macos'
         id: package-weaver-cli-macos
-        uses: leynos/shared-actions/.github/actions/macos-package@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/macos-package@e0d9b652b137eb15314fff188f09e1ba18d3cc5b
         with:
           name: weaver-cli
           identifier: ${{ env.MAC_IDENTIFIER }}.cli
@@ -175,7 +175,7 @@ jobs:
       - name: Build weaverd macOS installer package
         if: inputs.platform == 'macos'
         id: package-weaverd-macos
-        uses: leynos/shared-actions/.github/actions/macos-package@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/macos-package@e0d9b652b137eb15314fff188f09e1ba18d3cc5b
         with:
           name: weaverd
           identifier: ${{ env.MAC_IDENTIFIER }}.daemon
