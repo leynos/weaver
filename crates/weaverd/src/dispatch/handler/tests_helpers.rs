@@ -8,16 +8,18 @@ use std::{
     collections::BTreeMap,
     io::{BufRead, BufReader, Write},
     net::{SocketAddr, TcpListener, TcpStream},
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex},
     thread::{self, JoinHandle},
 };
 
 use rstest::fixture;
 use tempfile::TempDir;
 use tracing::{
+    Dispatch,
     Event,
     Level,
     Subscriber,
+    dispatcher,
     field::{Field, Visit},
 };
 use tracing_subscriber::{
@@ -31,10 +33,6 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
 use super::*;
 use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
-
-static CAPTURED_EVENTS: OnceLock<Arc<Mutex<Vec<CapturedEvent>>>> = OnceLock::new();
-static CAPTURE_WINDOW_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
-static RECORDING_SUBSCRIBER_INSTALLED: OnceLock<()> = OnceLock::new();
 
 /// Backend manager test fixture that keeps socket paths alive.
 pub(crate) struct BackendManagerFixture {
@@ -184,9 +182,12 @@ where
 /// Runs `action` while recording all emitted tracing events.
 ///
 /// Use this helper when asserting on structured dispatch logging without wiring
-/// a bespoke subscriber in each test. The recording layer is installed as the
-/// process-wide test subscriber, so events emitted by the server thread spawned
-/// by [`harness`] are captured as well as events emitted on the calling thread.
+/// a bespoke subscriber in each test. The recording layer is installed as a
+/// scoped dispatcher rather than the process-wide default, so parallel tests
+/// (and the daemon's own telemetry initialization) never contend for the
+/// global dispatcher. Threads spawned inside `action` via [`harness`] inherit
+/// the recording dispatcher, so events emitted by the server thread are
+/// captured as well as events emitted on the calling thread.
 ///
 /// # Examples
 ///
@@ -197,52 +198,24 @@ where
 /// assert_eq!(events.len(), 1);
 /// ```
 pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
-    let _capture_window = capture_window_mutex()
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let events = captured_events();
-    clear_events(&events);
-    install_recording_subscriber(&events);
-    action();
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let subscriber = Registry::default().with(RecordingLayer {
+        events: Arc::clone(&events),
+    });
+    dispatcher::with_default(&Dispatch::new(subscriber), action);
     let mut events = events
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     events.drain(..).collect()
 }
 
-fn captured_events() -> Arc<Mutex<Vec<CapturedEvent>>> {
-    CAPTURED_EVENTS
-        .get_or_init(|| Arc::new(Mutex::new(Vec::new())))
-        .clone()
-}
-
-fn capture_window_mutex() -> &'static Mutex<()> {
-    CAPTURE_WINDOW_MUTEX.get_or_init(|| Mutex::new(()))
-}
-
-fn clear_events(events: &Arc<Mutex<Vec<CapturedEvent>>>) {
-    events
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .clear();
-}
-
-fn install_recording_subscriber(events: &Arc<Mutex<Vec<CapturedEvent>>>) {
-    RECORDING_SUBSCRIBER_INSTALLED.get_or_init(|| {
-        let subscriber = Registry::default().with(RecordingLayer {
-            events: Arc::clone(events),
-        });
-        if let Err(error) = tracing::subscriber::set_global_default(subscriber) {
-            panic!("failed to set global tracing subscriber: {error}");
-        }
-    });
-}
-
 /// Creates a connected dispatch handler harness with a temporary workspace.
 ///
 /// The returned harness owns the temporary directory for the listener,
 /// workspace root, and runtime socket path so tests can interact with the
-/// handler over a real TCP connection.
+/// handler over a real TCP connection. The server thread inherits the
+/// spawning thread's tracing dispatcher, so a harness created inside
+/// [`capture_events`] records events emitted while handling the connection.
 #[fixture]
 pub(crate) fn harness(
     backend_manager: Result<BackendManagerFixture, String>,
@@ -253,8 +226,10 @@ pub(crate) fn harness(
     let workspace_root = temp_dir.path().join("weaverd-test-workspace");
     let endpoint = temp_dir.path().join("weaverd-test/socket.sock");
     let runtime_dir = temp_dir.path().to_path_buf();
+    let dispatch = dispatcher::get_default(Dispatch::clone);
 
     let server_handle = thread::spawn(move || {
+        let _dispatch_guard = dispatcher::set_default(&dispatch);
         let (stream, _) = listener
             .accept()
             .map_err(|error| format!("accept: {error}"))?;
