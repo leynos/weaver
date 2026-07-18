@@ -184,7 +184,7 @@ where
 /// Use this helper when asserting on structured dispatch logging without wiring
 /// a bespoke subscriber in each test. The recording layer is installed as a
 /// scoped dispatcher rather than the process-wide default, so parallel tests
-/// (and the daemon's own telemetry initialisation) never contend for the
+/// (and the daemon's own telemetry initialization) never contend for the
 /// global dispatcher. Threads spawned inside `action` via [`harness`] inherit
 /// the recording dispatcher, so events emitted by the server thread are
 /// captured as well as events emitted on the calling thread.

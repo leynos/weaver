@@ -16,7 +16,13 @@ mod receive_request_tests;
 #[path = "tests_helpers.rs"]
 mod tests_helpers;
 
-use tests_helpers::{HandlerTestHarness, capture_events, harness};
+use tests_helpers::{
+    BackendManagerFixture,
+    HandlerTestHarness,
+    backend_manager,
+    capture_events,
+    harness,
+};
 
 use super::{
     structured_event::{format_structured_event, serialize_structured_event},
@@ -268,6 +274,35 @@ fn emit_structured_event_returns_payload_without_sensitive_request_data() {
     let emitted_value = serde_json::from_str::<serde_json::Value>(emitted_payload)
         .expect("emitted payload should be JSON");
     assert_eq!(emitted_value["patch"], serde_json::json!("<redacted>"));
+}
+
+#[rstest]
+fn capture_events_records_server_thread_events(
+    backend_manager: Result<BackendManagerFixture, String>,
+) -> Result<(), String> {
+    let mut outcome: Result<(), String> = Ok(());
+    let events = capture_events(|| {
+        outcome = (|| {
+            let mut harness = tests_helpers::harness(backend_manager)?;
+            harness.send_and_collect(
+                b"{\"command\":{\"domain\":\"observe\",\"operation\":\"get-definition\"}}\n",
+            )?;
+            harness.join()
+        })();
+    });
+    outcome?;
+
+    assert!(
+        events.iter().any(|event| {
+            event.target == DISPATCH_TARGET
+                && event
+                    .fields
+                    .get("event")
+                    .is_some_and(|value| value == "dispatching_request")
+        }),
+        "expected a server-emitted dispatching_request event; captured: {events:?}",
+    );
+    Ok(())
 }
 
 #[test]
