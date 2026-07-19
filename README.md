@@ -1,5 +1,8 @@
 # Weaver
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](
+https://deepwiki.com/leynos/weaver)
+
 A human-friendly, agent-native semantic command-line tool.
 
 Weaver is your AI agent's best friend when it comes to understanding and
