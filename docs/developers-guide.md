@@ -36,8 +36,8 @@ identifier, fixture, or quoted-source spelling that must remain unchanged.
 
 `scripts/typos_rollout_http.py` owns spelling-cache freshness, HTTPS transport
 security, and refresh persistence coordination. Only `scripts/typos_rollout.py`
-may compose that helper with dictionary validation; other project code must
-not reuse its infrastructure internals. This boundary keeps the public
+may compose that helper with dictionary validation; other project code must not
+reuse its infrastructure internals. This boundary keeps the public
 dictionary-rendering API stable while each Python source remains below the
 repository's 400-line limit.
 
@@ -47,15 +47,15 @@ The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
 
 ## Workflow pins and Dependabot
 
-Dependabot owns the upgrade of GitHub Actions and reusable workflows,
-including calls into `leynos/shared-actions`. Contract tests that assert a
-caller's exact commit SHA create a lockstep dependency: every time Dependabot
-opens a bump PR, the test fails until a human edits the pinned constant to
-match. That defeats the purpose of automated dependency updates and turns a
-routine bump into a manual chore.
+Dependabot owns the upgrade of GitHub Actions and reusable workflows, including
+calls into `leynos/shared-actions`. Contract tests that assert a caller's exact
+commit SHA create a lockstep dependency: every time Dependabot opens a bump PR,
+the test fails until a human edits the pinned constant to match. That defeats
+the purpose of automated dependency updates and turns a routine bump into a
+manual chore.
 
-Contract tests may still verify the *shape* of a reusable-workflow caller.
-They must not verify the specific SHA value.
+Contract tests may still verify the *shape* of a reusable-workflow caller. They
+must not verify the specific SHA value.
 
 - Do assert the workflow references the correct reusable workflow path.
 - Do assert the ref is pinned to a full 40-character commit SHA, not a
