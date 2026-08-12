@@ -1,164 +1,89 @@
 #![cfg(feature = "cli")]
 
-use std::{
-    ffi::OsString,
-    sync::{LockResult, Mutex, MutexGuard, OnceLock},
-};
+use std::cell::RefCell;
 
-use cap_std::fs::Dir;
+use googletest::prelude::*;
+use ortho_config::MergeComposer;
+use pretty_assertions::assert_eq;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
-use tempfile::TempDir;
-use weaver_config::{
-    Config,
-    SocketEndpoint,
-    default_log_filter,
-    default_log_format,
-    default_socket_endpoint,
-};
+use serde_json::{Value, json};
+use weaver_config::{Config, default_log_filter, default_log_format, default_socket_endpoint};
 use weaver_test_macros::allow_fixture_expansion_lints;
 
-/// Serialises environment mutations across test threads.
-///
-/// `std::env` is a global mutable resource. `ENV_LOCK` coordinates every
-/// `set_env` and `remove_var` call so concurrent test threads cannot observe
-/// each other's temporary environment changes.
-static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-
 struct Harness {
-    temp_dir: TempDir,
-    cli_args: std::cell::RefCell<Vec<OsString>>,
-    env_guard: std::cell::RefCell<Option<EnvGuard>>,
-    env_overrides: std::cell::RefCell<Vec<(String, Option<OsString>)>>,
-    loaded: std::cell::RefCell<Option<Config>>,
-    error: std::cell::RefCell<Option<String>>,
+    defaults: Value,
+    file: RefCell<Option<Value>>,
+    environment: RefCell<Option<Value>>,
+    cli: RefCell<Option<Value>>,
+    resolved: RefCell<Option<Result<Config, String>>>,
 }
 
-/// Serialises environment mutations across test threads.
-///
-/// `std::env` is a global mutable resource. `EnvGuard` acquires a process-wide
-/// `Mutex` before any `set_env` / `remove_var` call and releases it when
-/// dropped, ensuring that concurrent test threads cannot observe each other's
-/// temporary environment changes.
-///
-/// The inner `MutexGuard` is retained for the lifetime of `EnvGuard` so the
-/// lock is held until the harness `Drop` impl has restored all overrides.
-struct EnvGuard {
-    _lock: MutexGuard<'static, ()>,
-}
-
-impl EnvGuard {
-    fn acquire() -> Self {
-        let lock = ENV_LOCK.get_or_init(|| Mutex::new(()));
-        // Recover from a poisoned mutex: if a previous test panicked while
-        // holding the environment lock, the mutex is poisoned but the
-        // underlying data (the unit value) is still valid. Recovering here
-        // prevents a cascade failure where all subsequent env-mutating tests
-        // fail with an unrelated "poisoned" error rather than the original
-        // assertion failure.
-        let guard = recover_env_lock(lock.lock());
-        Self { _lock: guard }
-    }
-}
-
-fn recover_env_lock(result: LockResult<MutexGuard<'static, ()>>) -> MutexGuard<'static, ()> {
-    result.unwrap_or_else(|e| e.into_inner())
-}
 impl Harness {
     fn new() -> Self {
-        let temp_dir = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(error) => panic!("failed to create temporary directory: {error}"),
-        };
         Self {
-            temp_dir,
-            cli_args: std::cell::RefCell::new(vec![OsString::from("weaver")]),
-            env_guard: std::cell::RefCell::new(None),
-            env_overrides: std::cell::RefCell::new(Vec::new()),
-            loaded: std::cell::RefCell::new(None),
-            error: std::cell::RefCell::new(None),
+            defaults: json!({
+                "daemon_socket": default_socket_endpoint(),
+                "log_filter": default_log_filter(),
+                "log_format": default_log_format(),
+                "capability_overrides": [],
+                "locale": "en-US",
+            }),
+            file: RefCell::new(None),
+            environment: RefCell::new(None),
+            cli: RefCell::new(None),
+            resolved: RefCell::new(None),
         }
     }
 
-    fn write_config(&self, socket: &SocketEndpoint) {
-        self.write_config_contents(match socket {
-            SocketEndpoint::Unix { path } => {
-                format!(
-                    "daemon_socket = {{ transport = \"unix\", path = \"{}\" }}\n",
-                    path
-                )
-            }
-            SocketEndpoint::Tcp { host, port } => format!(
-                "daemon_socket = {{ transport = \"tcp\", host = \"{}\", port = {} }}\n",
-                host, port
-            ),
-        });
-    }
+    fn set_file(&self, layer: Value) { self.file.replace(Some(layer)); }
 
-    fn set_env(&self, key: &str, value: &str) {
-        let mut guard = self.env_guard.borrow_mut();
-        if guard.is_none() {
-            *guard = Some(EnvGuard::acquire());
-        }
+    fn set_environment(&self, layer: Value) { self.environment.replace(Some(layer)); }
 
-        let previous = std::env::var_os(key);
-        // The nightly toolchain marks environment mutation as `unsafe` while the
-        // API stabilises. The harness restores overrides in `Drop` to keep the
-        // wider process environment unchanged.
-        unsafe { std::env::set_var(key, value) };
-        self.env_overrides
-            .borrow_mut()
-            .push((key.to_string(), previous));
-    }
+    fn set_cli(&self, layer: Value) { self.cli.replace(Some(layer)); }
 
-    fn push_cli_arg(&self, arg: impl Into<OsString>) {
-        self.cli_args.borrow_mut().push(arg.into());
-    }
-
-    fn load(&self) {
-        if self.loaded.borrow().is_some() || self.error.borrow().is_some() {
+    fn resolve(&self) {
+        if self.resolved.borrow().is_some() {
             return;
         }
 
-        let args = self.cli_args.borrow().clone();
-        match Config::load_from_iter(args) {
-            Ok(config) => {
-                *self.loaded.borrow_mut() = Some(config);
-            }
-            Err(error) => {
-                *self.error.borrow_mut() = Some(error.to_string());
-            }
+        let mut composer = MergeComposer::with_capacity(4);
+        composer.push_defaults(self.defaults.clone());
+        if let Some(layer) = self.file.borrow().clone() {
+            composer.push_file(layer, None);
         }
-    }
-
-    fn write_locale_config(&self, locale: &str) {
-        self.write_config_contents(format!("locale = \"{locale}\"\n"));
-    }
-
-    fn write_config_contents(&self, contents: String) {
-        let path = self.temp_dir.path().join("weaver.toml");
-        let dir = Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
-            .expect("open temp dir");
-        if let Err(error) = dir.write("weaver.toml", contents) {
-            panic!("failed to write configuration: {error}");
+        if let Some(layer) = self.environment.borrow().clone() {
+            composer.push_environment(layer);
+        }
+        if let Some(layer) = self.cli.borrow().clone() {
+            composer.push_cli(layer);
         }
 
-        let mut args = self.cli_args.borrow_mut();
-        args.push(OsString::from("--config-path"));
-        args.push(path.into_os_string());
+        self.resolved.replace(Some(
+            Config::merge_from_layers(composer.layers()).map_err(|error| error.to_string()),
+        ));
     }
-}
 
-impl Drop for Harness {
-    fn drop(&mut self) {
-        let mut overrides = self.env_overrides.borrow_mut();
-        while let Some((key, value)) = overrides.pop() {
-            if let Some(os_value) = value {
-                unsafe { std::env::set_var(&key, os_value) };
-            } else {
-                unsafe { std::env::remove_var(&key) };
-            }
-        }
+    fn config(&self) -> Config {
+        self.resolve();
+        self.resolved
+            .borrow()
+            .as_ref()
+            .expect("configuration result should be present")
+            .as_ref()
+            .expect("configuration should resolve")
+            .clone()
+    }
+
+    fn error(&self) -> String {
+        self.resolve();
+        self.resolved
+            .borrow()
+            .as_ref()
+            .expect("configuration result should be present")
+            .as_ref()
+            .expect_err("configuration should fail")
+            .clone()
     }
 }
 
@@ -166,119 +91,79 @@ impl Drop for Harness {
 #[fixture]
 fn harness() -> Harness { Harness::new() }
 
-#[given("a configuration file setting the daemon socket to \"{socket}\"")]
-fn given_configuration_file(harness: &Harness, socket: String) {
-    let endpoint = match socket.parse::<SocketEndpoint>() {
-        Ok(endpoint) => endpoint,
-        Err(error) => panic!("invalid socket '{socket}': {error}"),
-    };
-    harness.write_config(&endpoint);
-}
-
-#[given("the environment overrides the daemon socket to \"{socket}\"")]
-fn given_environment_override(harness: &Harness, socket: String) {
-    harness.set_env("WEAVER_DAEMON_SOCKET", &socket);
-}
-
 #[given("a configuration file setting the locale to \"{locale}\"")]
-fn given_configuration_file_locale(harness: &Harness, locale: String) {
-    harness.write_locale_config(&locale);
+fn given_file_locale(harness: &Harness, locale: String) {
+    harness.set_file(json!({ "locale": locale }));
 }
 
-#[given("the environment overrides the locale to \"{locale}\"")]
-fn given_environment_locale_override(harness: &Harness, locale: String) {
-    harness.set_env("WEAVER_LOCALE", &locale);
+#[given("an environment layer setting the locale to \"{locale}\"")]
+fn given_environment_locale(harness: &Harness, locale: String) {
+    harness.set_environment(json!({ "locale": locale }));
 }
 
-#[when("the CLI sets the daemon socket to \"{socket}\"")]
-fn when_cli_override(harness: &Harness, socket: String) {
-    harness.push_cli_arg("--daemon-socket");
-    harness.push_cli_arg(OsString::from(&socket));
+#[given("lower layers allow the Rust rename capability")]
+fn given_lower_layers_allow_rename(harness: &Harness) {
+    harness.set_file(json!({
+        "capability_overrides": [{
+            "language": "Rust",
+            "capability": "observe.rename",
+            "directive": "allow",
+        }],
+    }));
 }
 
-#[when("the CLI sets the locale to \"{locale}\"")]
-fn when_cli_locale_override(harness: &Harness, locale: String) {
-    harness.push_cli_arg("--locale");
-    harness.push_cli_arg(OsString::from(&locale));
+#[when("a CLI layer sets the locale to \"{locale}\"")]
+fn when_cli_locale(harness: &Harness, locale: String) {
+    harness.set_cli(json!({ "locale": locale }));
 }
 
-#[when("the configuration loads without overrides")]
-fn when_load_without_overrides(harness: &Harness) { harness.load(); }
+#[when("the configuration layers are merged without overrides")]
+fn when_defaults_merge(harness: &Harness) { harness.resolve(); }
 
-#[then("loading the configuration resolves the daemon socket to \"{socket}\"")]
-fn then_resolved_socket(harness: &Harness, socket: String) {
-    harness.load();
-
-    if let Some(error) = harness.error.borrow().as_ref() {
-        panic!("configuration failed to load: {error}");
-    }
-
-    let loaded = harness.loaded.borrow();
-    let config = match loaded.as_ref() {
-        Some(config) => config,
-        None => panic!("configuration was not loaded"),
-    };
-
-    let expected = match socket.parse::<SocketEndpoint>() {
-        Ok(endpoint) => endpoint,
-        Err(error) => panic!("invalid expected socket '{socket}': {error}"),
-    };
-
-    assert_eq!(config.daemon_socket(), &expected);
+#[when("an environment layer sets the locale to \"{locale}\"")]
+fn when_invalid_environment_locale(harness: &Harness, locale: String) {
+    harness.set_environment(json!({ "locale": locale }));
+    harness.resolve();
 }
 
-#[then("loading the configuration applies the built-in defaults")]
-fn then_defaults_applied(harness: &Harness) {
-    harness.load();
+#[when("a CLI layer denies the Rust rename capability")]
+fn when_cli_denies_rename(harness: &Harness) {
+    harness.set_cli(json!({
+        "capability_overrides": [{
+            "language": "rust",
+            "capability": "observe.rename",
+            "directive": "deny",
+        }],
+    }));
+}
 
-    if let Some(error) = harness.error.borrow().as_ref() {
-        panic!("configuration failed to load: {error}");
-    }
+#[then("the resolved locale is \"{locale}\"")]
+fn then_locale_is(harness: &Harness, locale: String) {
+    assert_eq!(harness.config().locale().to_string(), locale);
+}
 
-    let loaded = harness.loaded.borrow();
-    let config = match loaded.as_ref() {
-        Some(config) => config,
-        None => panic!("configuration was not loaded"),
-    };
-
+#[then("the built-in Weaver defaults are returned")]
+fn then_defaults_are_returned(harness: &Harness) {
+    let config = harness.config();
     assert_eq!(config.daemon_socket(), &default_socket_endpoint());
     assert_eq!(config.log_filter(), default_log_filter());
     assert_eq!(config.log_format(), default_log_format());
     assert_eq!(config.locale().to_string(), "en-US");
+    assert_that!(config.capability_matrix().languages, is_empty());
+}
 
-    let matrix = config.capability_matrix();
-    assert!(
-        matrix.languages.is_empty(),
-        "expected no capability overrides"
+#[then("configuration loading reports an invalid locale")]
+fn then_invalid_locale_is_reported(harness: &Harness) {
+    assert_that!(harness.error().as_str(), contains_substring("locale"));
+}
+
+#[then("the resolved capability matrix denies the Rust rename capability")]
+fn then_rename_is_denied(harness: &Harness) {
+    let matrix = harness.config().capability_matrix();
+    assert_eq!(
+        matrix.override_for("rust", "observe.rename"),
+        Some(weaver_config::CapabilityOverride::Deny)
     );
-}
-
-#[then("loading the configuration resolves the locale to \"{locale}\"")]
-fn then_resolved_locale(harness: &Harness, locale: String) {
-    harness.load();
-
-    if let Some(error) = harness.error.borrow().as_ref() {
-        panic!("configuration failed to load: {error}");
-    }
-
-    let loaded = harness.loaded.borrow();
-    let config = match loaded.as_ref() {
-        Some(config) => config,
-        None => panic!("configuration was not loaded"),
-    };
-
-    assert_eq!(config.locale().to_string(), locale);
-}
-
-#[test]
-fn env_guard_recovers_from_poisoned_lock() {
-    use std::sync::PoisonError;
-
-    let lock: &'static Mutex<()> = Box::leak(Box::new(Mutex::new(())));
-    let guard = lock.lock().expect("fresh mutex should lock");
-    let poisoned = Err(PoisonError::new(guard));
-
-    let _guard = recover_env_lock(poisoned);
 }
 
 #[scenario(path = "tests/features/configuration_precedence.feature")]

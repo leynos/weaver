@@ -63,12 +63,12 @@ Because plugin execution is sandboxed, the plugin cannot assume unrestricted
 filesystem access. The daemon must provide all file payloads required for
 analysis and patch generation.
 
-## ortho_config v0.8.0 impacts
+## ortho_config v0.9.0 impacts
 
-The Rust extricate flow inherits Weaver's current `ortho_config` v0.8.0
+The Rust extricate flow inherits Weaver's current `ortho_config` v0.9.0
 behaviour model:
 
-- dependency-graph updates in v0.8.0 align parser features with the runtime and
+- dependency-graph updates in v0.9.0 align parser features with the runtime and
   macro contract,
 - discovery is fail-fast when discovered files are invalid, so configuration
   load errors must stop orchestration immediately,
@@ -85,12 +85,12 @@ These behaviours directly affect payload and transaction handling:
   preconditions, not recoverable warnings.
 
 Authoritative runbook:
-[Migration guide: Weaver adoption of v0.8.0](ortho-config-v0-8-0-migration-guide.md),
+[Migration guide: Weaver adoption of v0.9.0](ortho-config-v0-9-0-migration-guide.md),
 especially sections:
 
-- [Required migration steps](ortho-config-v0-8-0-migration-guide.md#required-migration-steps)
-- [YAML semantics changed, even though Weaver runtime config is TOML-first](ortho-config-v0-8-0-migration-guide.md#4-yaml-semantics-changed-even-though-weaver-runtime-config-is-toml-first)
-- [Documentation policy for this migration](ortho-config-v0-8-0-migration-guide.md#documentation-policy-for-this-migration)
+- [Required migration steps](ortho-config-v0-9-0-migration-guide.md#required-migration-steps)
+- [New declarative merge helpers](ortho-config-v0-9-0-migration-guide.md#2-new-declarative-merge-helpers)
+- [Documentation policy for this migration](ortho-config-v0-9-0-migration-guide.md#documentation-policy-for-this-migration)
 
 ## Capability and request contract
 

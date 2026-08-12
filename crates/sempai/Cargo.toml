@@ -11,6 +11,7 @@ serde_json = { workspace = true }
 tracing = "0.1"
 
 [dev-dependencies]
+anyhow = { workspace = true }
 insta = "1"
 proptest = "1.5"
 sempai_core = { path = "../sempai-core", features = ["test-support"] }

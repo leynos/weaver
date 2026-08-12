@@ -259,23 +259,26 @@ fn write_workspace_file_creates_nested_parent_directories() {
 // stdin/stdout dispatch layer tests (run_with_adapter)
 // ---------------------------------------------------------------------------
 
-fn valid_request_json() -> String {
+fn valid_request_json() -> serde_json::Result<String> {
     let request = request_with_args(rename_arguments());
-    serde_json::to_string(&request).expect("serialize request")
+    serde_json::to_string(&request)
 }
 
 /// Dispatches `input` through `run_with_adapter` and parses the response.
-fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> weaver_plugins::protocol::PluginResponse {
+fn dispatch_stdin(
+    input: &[u8],
+    adapter: &MockAdapter,
+) -> anyhow::Result<weaver_plugins::protocol::PluginResponse> {
     let mut stdin = std::io::Cursor::new(input.to_vec());
     let mut stdout = Vec::new();
-    run_with_adapter(&mut stdin, &mut stdout, adapter).expect("dispatch should succeed");
-    let output = String::from_utf8(stdout).expect("utf8 stdout");
-    serde_json::from_str(output.trim()).expect("parse response")
+    run_with_adapter(&mut stdin, &mut stdout, adapter)?;
+    let output = String::from_utf8(stdout)?;
+    Ok(serde_json::from_str(output.trim())?)
 }
 
 #[rstest]
 #[case::success(
-    format!("{}\n", valid_request_json()).into_bytes(),
+    format!("{}\n", valid_request_json().expect("request serialization should succeed")).into_bytes(),
     adapter_returning(Ok(String::from("def new_name():\n    return 1\n"))),
     true
 )]
@@ -286,6 +289,6 @@ fn run_with_adapter_dispatch_layer(
     #[case] adapter: MockAdapter,
     #[case] expect_success: bool,
 ) {
-    let response = dispatch_stdin(&input, &adapter);
+    let response = dispatch_stdin(&input, &adapter).expect("stdin dispatch should succeed");
     assert_eq!(response.is_success(), expect_success);
 }

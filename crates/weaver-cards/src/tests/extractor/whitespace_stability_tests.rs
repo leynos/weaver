@@ -19,7 +19,8 @@ fn rust_comment_bundling_is_stable_under_whitespace_edits() {
         line: 3,
         column: 4,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("baseline Rust card extraction should succeed");
     let edited = extract(ExtractRequest {
         path: Path::new("fixture.rs"),
         source: concat!(
@@ -32,7 +33,8 @@ fn rust_comment_bundling_is_stable_under_whitespace_edits() {
         line: 3,
         column: 4,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("edited Rust card extraction should succeed");
 
     assert_eq!(baseline.attachments, edited.attachments);
     assert_eq!(baseline.doc, edited.doc);
@@ -46,14 +48,16 @@ fn decorator_bundling_is_stable_under_whitespace_edits() {
         line: 2,
         column: 7,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("baseline TypeScript card extraction should succeed");
     let edited = extract(ExtractRequest {
         path: Path::new("fixture.ts"),
         source: "   @sealed   \nclass Widget {\n  render(): void {}\n}\n",
         line: 2,
         column: 7,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("edited TypeScript card extraction should succeed");
 
     assert_eq!(baseline.attachments, edited.attachments);
 }

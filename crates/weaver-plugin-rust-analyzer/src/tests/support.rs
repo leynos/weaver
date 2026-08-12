@@ -98,11 +98,14 @@ pub(crate) fn request_with_path(path: &str) -> PluginRequest {
 }
 
 fn file_uri_for_path(path: &str) -> String {
-    let mut url = Url::parse("file:///").expect("static file URL should parse");
+    let mut url = match Url::parse("file:///") {
+        Ok(url) => url,
+        Err(error) => panic!("static file URL should parse: {error}"),
+    };
     {
-        let mut segments = url
-            .path_segments_mut()
-            .expect("file URL should accept path segments");
+        let Ok(mut segments) = url.path_segments_mut() else {
+            panic!("file URL should accept path segments");
+        };
         segments.extend(path.split('/'));
     }
     url.to_string()

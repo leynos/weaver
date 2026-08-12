@@ -19,17 +19,19 @@ use crate::normalize::normalize_search_principal;
 /// Helper to normalize a legacy formula and extract the node.
 fn normalize_legacy(formula: LegacyFormula) -> Formula {
     let principal = SearchQueryPrincipal::Legacy(formula);
-    normalize_search_principal(&principal, None)
-        .expect("legacy formula should normalize")
-        .node
+    match normalize_search_principal(&principal, None) {
+        Ok(normalized_formula) => normalized_formula.node,
+        Err(error) => panic!("legacy formula should normalize: {error}"),
+    }
 }
 
 /// Helper to normalize a v2 match formula and extract the node.
 fn normalize_v2(formula: MatchFormula) -> Formula {
     let principal = SearchQueryPrincipal::Match(formula);
-    normalize_search_principal(&principal, None)
-        .expect("v2 formula should normalize")
-        .node
+    match normalize_search_principal(&principal, None) {
+        Ok(normalized_formula) => normalized_formula.node,
+        Err(error) => panic!("v2 formula should normalize: {error}"),
+    }
 }
 
 /// Asserts that a `Decorated<Formula>` wraps a `Pattern` atom with the given text.
@@ -52,8 +54,12 @@ fn assert_two_pattern_branches(
     second_text: &str,
 ) {
     assert_eq!(branches.len(), 2);
-    let first = branches.first().expect("expected first branch");
-    let second = branches.get(1).expect("expected second branch");
+    let Some(first) = branches.first() else {
+        panic!("expected first branch");
+    };
+    let Some(second) = branches.get(1) else {
+        panic!("expected second branch");
+    };
     assert!(
         matches!(&first.node, Formula::Atom(Atom::Pattern(p)) if p.text == first_text),
         "expected first branch Pattern(\"{first_text}\"), got {:?}",

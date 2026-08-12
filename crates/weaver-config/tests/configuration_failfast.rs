@@ -1,58 +1,23 @@
 #![cfg(feature = "cli")]
 
-use std::{
-    ffi::{OsStr, OsString},
-    sync::{Mutex, MutexGuard},
-};
+use std::ffi::OsString;
 
 use cap_std::fs::Dir;
-use once_cell::sync::Lazy;
+use googletest::prelude::*;
 use ortho_config::OrthoError;
+use pretty_assertions::assert_eq;
+use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_config::Config;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-static ENV_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+#[allow_fixture_expansion_lints]
+#[fixture]
+fn temp_dir() -> TempDir { TempDir::new().expect("create temporary directory") }
 
-struct EnvOverride {
-    key: &'static str,
-    previous: Option<OsString>,
-    guard: Option<MutexGuard<'static, ()>>,
-}
-
-impl EnvOverride {
-    fn set_var(key: &'static str, value: &OsStr) -> Self {
-        let guard = ENV_MUTEX.lock().expect("env mutex poisoned");
-        let previous = std::env::var_os(key);
-        // Nightly currently marks environment mutation as unsafe while the API
-        // stabilises, so mirror the pattern used in other tests.
-        unsafe { std::env::set_var(key, value) };
-        Self {
-            key,
-            previous,
-            guard: Some(guard),
-        }
-    }
-}
-
-impl Drop for EnvOverride {
-    fn drop(&mut self) {
-        // Restore any previous value (or remove the override) so other tests
-        // inherit a clean environment.
-        match self.previous.take() {
-            Some(value) => unsafe { std::env::set_var(self.key, value) },
-            None => unsafe { std::env::remove_var(self.key) },
-        }
-        drop(self.guard.take());
-    }
-}
-
-#[test]
-fn malformed_configs_return_aggregated_error() {
-    let temp_dir = TempDir::new().expect("create temp dir");
+#[rstest]
+fn malformed_explicit_config_returns_file_error(temp_dir: TempDir) {
     let cli_path = temp_dir.path().join("cli_weaver.toml");
-    let env_path = temp_dir.path().join("env_weaver.toml");
-
-    // Open the temp directory with capability-based access
     let dir = Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
         .expect("open temp dir");
 
@@ -61,13 +26,6 @@ fn malformed_configs_return_aggregated_error() {
         r#"daemon_socket = { transport = "tcp" host = "127.0.0.1" }"#,
     )
     .expect("write malformed cli config");
-    dir.write(
-        "env_weaver.toml",
-        r#"daemon_socket = { transport = "tcp", port = not_a_number }"#,
-    )
-    .expect("write malformed env config");
-
-    let _env = EnvOverride::set_var("WEAVER_CONFIG_PATH", env_path.as_os_str());
 
     let args = vec![
         OsString::from("weaver"),
@@ -77,36 +35,46 @@ fn malformed_configs_return_aggregated_error() {
 
     let error = Config::load_from_iter(args).expect_err("loading must fail");
     let message = error.to_string();
-    assert!(
-        message.contains("multiple configuration errors"),
-        "expected aggregate message, got {message:?}"
+    assert_that!(
+        message.as_str(),
+        contains_substring("Configuration file error")
     );
 
     match error.as_ref() {
-        OrthoError::Aggregate(aggregate) => {
-            let mut mentioned_paths = aggregate
-                .iter()
-                .filter_map(|err| match err {
-                    OrthoError::File { path, .. } => Some(path.clone()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
-            mentioned_paths.sort();
-
-            assert_eq!(
-                mentioned_paths.len(),
-                2,
-                "expected both failing files to be reported, got {mentioned_paths:?}"
-            );
-            assert!(
-                mentioned_paths.contains(&cli_path),
-                "missing CLI path in aggregate: {mentioned_paths:?}"
-            );
-            assert!(
-                mentioned_paths.contains(&env_path),
-                "missing env path in aggregate: {mentioned_paths:?}"
-            );
-        }
-        other => panic!("expected aggregated error, got {other:?}"),
+        OrthoError::File { path, .. } => assert_eq!(path, &cli_path),
+        other => panic!("expected file error, got {other:?}"),
     }
+}
+
+#[rstest]
+fn missing_extends_reports_referencing_and_resolved_paths(temp_dir: TempDir) {
+    let config_path = temp_dir.path().join("weaver.toml");
+    let missing_parent_path = temp_dir.path().join("missing.toml");
+    let dir = Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
+        .expect("open temp dir");
+
+    dir.write("weaver.toml", "extends = \"missing.toml\"\n")
+        .expect("write extending config");
+
+    let args = vec![
+        OsString::from("weaver"),
+        OsString::from("--config-path"),
+        config_path.clone().into_os_string(),
+    ];
+
+    let error = Config::load_from_iter(args).expect_err("missing parent must fail");
+    let message = error.to_string();
+    let referencing_path = config_path.display().to_string();
+    let missing_parent = missing_parent_path.display().to_string();
+    let normalized_message = message.replace(&temp_dir.path().display().to_string(), "<TEMP>");
+
+    assert_that!(
+        message.as_str(),
+        contains_substring(referencing_path.as_str())
+    );
+    assert_that!(
+        message.as_str(),
+        contains_substring(missing_parent.as_str())
+    );
+    insta::assert_snapshot!(normalized_message);
 }

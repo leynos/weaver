@@ -932,7 +932,7 @@ and message IDs. The router, contextual-help renderer, `weaver help` topics,
 and test fixtures should all read from that catalogue so adding an operation
 updates validation, localization, and help output in one place.
 
-To take advantage of `ortho_config` v0.8.0 beyond runtime help, `weaver-config`
+To take advantage of `ortho_config` v0.9.0 beyond runtime help, `weaver-config`
 should annotate config-backed fields with stable documentation IDs and expose
 `OrthoConfigDocs` metadata. Once the schema-backed operation-help work in the
 roadmap lands, `cargo orthohelp` can render localized intermediate
@@ -1322,20 +1322,19 @@ Configuration is layered with `ortho-config`, producing the precedence order
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
 
-The workspace now targets `ortho_config` v0.8.0 and Rust 1.88. The
-`ortho_config` v0.8.0 switch lets `weaver_config::Config` declare its discovery
-policy inline through the `#[ortho_config(discovery(...))]` attribute. The app
-name, dotfile, project file, and `--config-path` flag are all defined next to
-the struct, so every consumer shares the same generated loader without bespoke
-builders.
+The workspace targets `ortho_config` v0.9.0 and Rust 1.89. The `ortho_config`
+v0.9.0 release lets `weaver_config::Config` retain its discovery policy inline
+through the `#[ortho_config(discovery(...))]` attribute. The app name, dotfile,
+project file, and `--config-path` flag are all defined next to the struct, so
+every consumer shares the same generated loader without bespoke builders.
 
-The `ortho_config` v0.8.0 loader preserves the stricter discovery and parsing
+The `ortho_config` v0.9.0 loader preserves the stricter discovery and parsing
 model adopted in earlier releases: if any discovered configuration file fails
 to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
 Both the CLI and daemon bubble that error to the user instead of quietly
 falling back to defaults, making misconfigurations immediately visible.
 
-`ortho_config` v0.8.0 also resolves layered and overriding configuration
+`ortho_config` v0.9.0 also resolves layered and overriding configuration
 sources through its dependency-graph model, so the effective merge order remains
 `defaults < files < environment < CLI` even when multiple discovered files and
 overrides participate in the same load. Later sources shadow earlier values
@@ -2816,6 +2815,17 @@ incremental progression.
 - C# Project. (n.d.). `csharp/language-server`: Issue #2612.
 
 ### C. Design Decision Log
+
+#### 2026-08-12: Adopt `ortho_config` v0.9.0 without widening adapters
+
+Weaver replaces the temporary v0.8.0 Git revision with the published v0.9.0
+release and raises its Rust floor to 1.89. `weaver-config::Config` remains the
+owner of configuration policy; the existing CLI and daemon `ConfigLoader` seams
+remain the only adapter boundaries. The new `post_merge_hook` keeps
+capability-directive normalization invariant whether configuration comes from
+the generated loader or declarative test layers. Optional OrthoConfig command,
+agent-context, metrics, and YAML capabilities remain governed by ADR 007 and
+are not consumed by this migration.
 
 #### 2025-11-12: Adopt `rstest-bdd` 0.1.0 for scenario tests
 

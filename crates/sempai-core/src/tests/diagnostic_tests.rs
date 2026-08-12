@@ -135,10 +135,9 @@ struct ExpectedDiagnosticCase {
 
 fn assert_single_diagnostic_report(report: &DiagnosticReport, expected: &ExpectedDiagnostic<'_>) {
     assert_eq!(report.len(), 1);
-    let first = report
-        .diagnostics()
-        .first()
-        .expect("at least one diagnostic");
+    let Some(first) = report.diagnostics().first() else {
+        panic!("at least one diagnostic should be present");
+    };
     assert_eq!(first.code(), expected.code);
     assert_eq!(first.primary_span(), expected.primary_span.as_ref());
     assert_eq!(first.message(), expected.message);

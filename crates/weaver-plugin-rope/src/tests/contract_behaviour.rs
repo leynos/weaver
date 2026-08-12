@@ -1,5 +1,6 @@
 //! Behaviour-driven checks for the shared `rename-symbol` contract fixtures.
 
+use anyhow::{Context, Result, ensure};
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_plugins::{
@@ -47,34 +48,47 @@ fn given_non_diff_response_fixture(world: &mut World) {
 }
 
 #[when("the rope crate validates the shared request fixture")]
-fn when_validating_request_fixture(world: &mut World) {
-    let fixture = world.request_fixture.as_ref().expect("request fixture");
+fn when_validating_request_fixture(world: &mut World) -> Result<()> {
+    let fixture = world.request_fixture.as_ref().context("request fixture")?;
     world.validation_result = Some(validate_rename_symbol_request_fixture(fixture));
+    Ok(())
 }
 
 #[when("the rope crate validates the shared response fixture")]
-fn when_validating_response_fixture(world: &mut World) {
-    let fixture = world.response_fixture.as_ref().expect("response fixture");
+fn when_validating_response_fixture(world: &mut World) -> Result<()> {
+    let fixture = world
+        .response_fixture
+        .as_ref()
+        .context("response fixture")?;
     world.validation_result = Some(validate_rename_symbol_response_fixture(fixture));
+    Ok(())
 }
 
 #[then("the shared fixture passes contract validation")]
-fn then_fixture_passes(world: &mut World) {
-    let result = world.validation_result.as_ref().expect("validation result");
-    assert!(result.is_ok(), "expected valid fixture, got: {result:?}");
+fn then_fixture_passes(world: &mut World) -> Result<()> {
+    let result = world
+        .validation_result
+        .as_ref()
+        .context("validation result")?;
+    ensure!(result.is_ok(), "expected valid fixture, got: {result:?}");
+    Ok(())
 }
 
 #[then("the shared fixture fails with a message containing {text}")]
-fn then_fixture_fails_with_message(world: &mut World, text: String) {
-    let result = world.validation_result.as_ref().expect("validation result");
-    let error = result
+fn then_fixture_fails_with_message(world: &mut World, text: String) -> Result<()> {
+    let result = world
+        .validation_result
         .as_ref()
-        .expect_err("expected invalid fixture to fail contract validation");
+        .context("validation result")?;
+    let Err(error) = result else {
+        anyhow::bail!("expected invalid fixture to fail contract validation");
+    };
     let needle = text.trim_matches('"');
-    assert!(
+    ensure!(
         error.to_string().contains(needle),
         "expected contract failure to mention '{needle}', got: {error}"
     );
+    Ok(())
 }
 
 #[scenario(path = "tests/features/rename_symbol_contract.feature")]

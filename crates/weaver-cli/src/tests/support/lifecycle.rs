@@ -67,15 +67,20 @@ impl TestLifecycle {
 /// and the derived `RuntimePaths`.
 #[fixture]
 pub(crate) fn temp_paths() -> (TempDir, RuntimePaths) {
-    let dir = TempDir::new().expect("failed to create temporary directory for test fixture");
+    let dir = match TempDir::new() {
+        Ok(dir) => dir,
+        Err(error) => panic!("failed to create temporary directory for test fixture: {error}"),
+    };
     let socket = dir.path().join("daemon.sock");
     let socket = socket.to_string_lossy().to_string();
     let config = Config {
         daemon_socket: SocketEndpoint::unix(socket),
         ..Config::default()
     };
-    let paths = RuntimePaths::from_config(&config)
-        .expect("failed to construct RuntimePaths from test config");
+    let paths = match RuntimePaths::from_config(&config) {
+        Ok(paths) => paths,
+        Err(error) => panic!("failed to construct RuntimePaths from test config: {error}"),
+    };
     (dir, paths)
 }
 

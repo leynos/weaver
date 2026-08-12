@@ -2,7 +2,7 @@
 use std::{
     ffi::OsString,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
 };
 
 use ortho_config::OrthoError;
@@ -20,7 +20,10 @@ pub struct TestConfigLoader {
 impl TestConfigLoader {
     #[must_use]
     pub fn new() -> Self {
-        let dir = TempDir::new().expect("failed to create temporary directory for socket");
+        let dir = match TempDir::new() {
+            Ok(dir) => dir,
+            Err(error) => panic!("create temporary directory for socket: {error}"),
+        };
         Self {
             socket_dir: Arc::new(Mutex::new(dir)),
         }
@@ -31,7 +34,7 @@ impl TestConfigLoader {
     pub fn runtime_dir(&self) -> PathBuf {
         self.socket_dir
             .lock()
-            .expect("temporary directory mutex poisoned")
+            .unwrap_or_else(PoisonError::into_inner)
             .path()
             .to_path_buf()
     }
@@ -41,11 +44,9 @@ impl TestConfigLoader {
         let dir = self
             .socket_dir
             .lock()
-            .expect("temporary directory mutex poisoned");
+            .unwrap_or_else(PoisonError::into_inner);
         let path = dir.path().join("weaverd.sock");
-        path.to_str()
-            .expect("temporary socket path was not valid UTF-8")
-            .to_owned()
+        path.to_string_lossy().into_owned()
     }
 }
 

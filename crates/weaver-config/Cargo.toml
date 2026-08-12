@@ -28,6 +28,9 @@ dirs.workspace = true
 libc = "0.2"
 
 [dev-dependencies]
+googletest.workspace = true
+insta.workspace = true
+pretty_assertions.workspace = true
 rstest.workspace = true
 rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true

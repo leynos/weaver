@@ -20,11 +20,11 @@ id = "12.1.1"
 gist = "Track the downstream consumer boundary."
 state = "consumes"
 upstream = [{ task = "OrthoConfig 5.2.3 / design §2.1", role = "boundary" }]
-shipped_in = "4339a6f3c61dc4fed86493d99ffb05230bee2a1b"
+shipped_in = "v0.9.0"
 removal_gate = ""
 adr_anchor = ""
 next_review_by = ""
-last_reviewed = "2026-06-14"
+last_reviewed = "2026-08-12"
 
 [[task]]
 id = "12.1.2"

@@ -56,7 +56,7 @@ impl Subscriber for SpanCountingSubscriber {
         event.record(&mut fields);
         self.debug_events
             .lock()
-            .expect("debug event storage should not be poisoned")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(RecordedEvent {
                 target: event.metadata().target().to_owned(),
                 fields: fields.into_fields(),
@@ -148,7 +148,7 @@ fn compile_yaml_emits_observable_compile_span() {
 fn assert_compile_yaml_debug_events(debug_events: &Arc<Mutex<Vec<RecordedEvent>>>) {
     let recorded_events = debug_events
         .lock()
-        .expect("debug event storage should not be poisoned");
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     assert_event(
         &recorded_events,
         "sempai::engine",

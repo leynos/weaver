@@ -15,6 +15,7 @@ url = { workspace = true }
 weaver-syntax = { path = "../weaver-syntax" }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 rstest = { workspace = true }
 rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }

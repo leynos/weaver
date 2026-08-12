@@ -27,7 +27,7 @@ impl ConfigLoader for PanickingLoader {
     }
 }
 
-fn run_with_args(args: &[&str]) -> (ExitCode, String, String) {
+fn run_with_args(args: &[&str]) -> anyhow::Result<(ExitCode, String, String)> {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut stdin = Cursor::new(Vec::new());
@@ -37,11 +37,7 @@ fn run_with_args(args: &[&str]) -> (ExitCode, String, String) {
         .map(|value| OsString::from(*value))
         .collect::<Vec<_>>();
     let exit = run_with_loader(owned_args, &mut io, &PanickingLoader);
-    (
-        exit,
-        String::from_utf8(stdout).expect("stdout utf8"),
-        String::from_utf8(stderr).expect("stderr utf8"),
-    )
+    Ok((exit, String::from_utf8(stdout)?, String::from_utf8(stderr)?))
 }
 
 fn assert_config_flags_present(text: &str) {
@@ -56,7 +52,7 @@ fn assert_config_flags_present(text: &str) {
 #[case(&["weaver", "--config-path", "dummy.toml", "--help"])]
 #[case(&["weaver", "--log-format", "JSON", "--help"])]
 fn help_lists_shared_config_flags_without_loading_config(#[case] argv: &[&str]) {
-    let (exit, stdout, stderr) = run_with_args(argv);
+    let (exit, stdout, stderr) = run_with_args(argv).expect("help command output must be UTF-8");
     assert_eq!(exit, ExitCode::SUCCESS);
     assert!(stderr.is_empty(), "help output must not write to stderr");
     assert_config_flags_present(&stdout);

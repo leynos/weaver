@@ -17,16 +17,27 @@ use crate::run_with_adapter;
 
 fn valid_request_json() -> String {
     let request = request_with_args(rename_arguments());
-    serde_json::to_string(&request).expect("serialize request")
+    match serde_json::to_string(&request) {
+        Ok(serialized_request) => serialized_request,
+        Err(error) => panic!("serialize request: {error}"),
+    }
 }
 
 /// Dispatches `input` through `run_with_adapter` and parses the response.
 fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> PluginResponse {
     let mut stdin = std::io::Cursor::new(input.to_vec());
     let mut stdout = Vec::new();
-    run_with_adapter(&mut stdin, &mut stdout, adapter).expect("dispatch should succeed");
-    let output = String::from_utf8(stdout).expect("utf8 stdout");
-    serde_json::from_str(output.trim()).expect("parse response")
+    if let Err(error) = run_with_adapter(&mut stdin, &mut stdout, adapter) {
+        panic!("dispatch should succeed: {error}");
+    }
+    let output = match String::from_utf8(stdout) {
+        Ok(output) => output,
+        Err(error) => panic!("utf8 stdout: {error}"),
+    };
+    match serde_json::from_str(output.trim()) {
+        Ok(response) => response,
+        Err(error) => panic!("parse response: {error}"),
+    }
 }
 
 #[rstest]

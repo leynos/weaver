@@ -12,6 +12,7 @@ use std::{
     thread,
 };
 
+use anyhow::{Result, ensure};
 use clap::Parser;
 use rstest::rstest;
 use weaver_config::{Config, SocketEndpoint};
@@ -282,16 +283,13 @@ fn run_with_loader_filters_configuration_arguments() {
     assert!(stdout.is_empty());
 }
 
-/// Exercises a full daemon connection cycle: connect, write JSONL request,
-/// read daemon messages, and verify exit status. The caller provides a setup
-/// closure that spawns a listener thread and returns the endpoint.
-fn test_daemon_connection<F>(setup_listener: F)
+fn test_daemon_connection<F>(setup_listener: F) -> Result<()>
 where
     F: FnOnce() -> (SocketEndpoint, thread::JoinHandle<()>),
 {
     let (endpoint, handle) = setup_listener();
 
-    let mut connection = connect(&endpoint).expect("connect to daemon");
+    let mut connection = connect(&endpoint)?;
     let request = CommandRequest {
         command: CommandDescriptor {
             domain: "observe".into(),
@@ -300,7 +298,7 @@ where
         arguments: Vec::new(),
         patch: None,
     };
-    request.write_jsonl(&mut connection).expect("write request");
+    request.write_jsonl(&mut connection)?;
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -314,11 +312,13 @@ where
             format: ResolvedOutputFormat::Json,
             context: &context,
         },
-    )
-    .expect("read responses");
-    assert_eq!(status, 17);
+    )?;
+    ensure!(status == 17, "daemon exit status was {status}, expected 17");
 
-    handle.join().expect("listener thread panicked");
+    handle
+        .join()
+        .map_err(|_| anyhow::anyhow!("listener thread panicked"))?;
+    Ok(())
 }
 #[test]
 fn connect_successfully_establishes_tcp_connection() {
@@ -333,7 +333,8 @@ fn connect_successfully_establishes_tcp_connection() {
         });
 
         (SocketEndpoint::tcp("127.0.0.1", port), handle)
-    });
+    })
+    .expect("TCP daemon connection must complete");
 }
 #[cfg(unix)]
 #[test]
@@ -358,7 +359,8 @@ fn connect_supports_unix_sockets() {
         });
 
         (SocketEndpoint::unix(socket_display), handle)
-    });
+    })
+    .expect("Unix daemon connection must complete");
 }
 #[rstest]
 #[case(io::ErrorKind::ConnectionRefused, true, "connection refused")]

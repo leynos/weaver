@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 
+use anyhow::{Context, Result, bail, ensure};
 use lsp_types::{
     CallHierarchyIncomingCall,
     CallHierarchyIncomingCallsParams,
@@ -39,12 +40,12 @@ struct TestClient {
 }
 
 impl TestClient {
-    fn simple_chain() -> Self {
-        Self {
-            prepare: Response::Ok(Some(vec![item("main", 1, 1)])),
-            incoming: Response::Ok(Some(vec![incoming_call("caller", 3, 0)])),
-            outgoing: Response::Ok(Some(vec![outgoing_call("helper", 5, 0)])),
-        }
+    fn simple_chain() -> Result<Self, GraphError> {
+        Ok(Self {
+            prepare: Response::Ok(Some(vec![item("main", 1, 1)?])),
+            incoming: Response::Ok(Some(vec![incoming_call("caller", 3, 0)?])),
+            outgoing: Response::Ok(Some(vec![outgoing_call("helper", 5, 0)?])),
+        })
     }
 
     fn no_symbol() -> Self {
@@ -90,8 +91,9 @@ impl CallHierarchyClient for TestClient {
 fn strip_quotes(value: &str) -> &str { value.trim_matches('"') }
 
 #[given("a call hierarchy client with a simple call chain")]
-fn given_simple_chain(world: &RefCell<TestWorld>) {
-    world.borrow_mut().provider = Some(LspCallGraphProvider::new(TestClient::simple_chain()));
+fn given_simple_chain(world: &RefCell<TestWorld>) -> Result<()> {
+    world.borrow_mut().provider = Some(LspCallGraphProvider::new(TestClient::simple_chain()?));
+    Ok(())
 }
 
 #[given("a call hierarchy client with no matching symbol")]
@@ -105,88 +107,105 @@ fn given_erroring_client(world: &RefCell<TestWorld>) {
 }
 
 #[when("a call graph is built with depth {depth}")]
-fn when_build_graph(world: &RefCell<TestWorld>, depth: u32) {
+fn when_build_graph(world: &RefCell<TestWorld>, depth: u32) -> Result<()> {
     let mut world_state = world.borrow_mut();
     let provider = world_state
         .provider
         .as_mut()
-        .expect("provider should be configured");
+        .context("provider should be configured")?;
     let position = SourcePosition::new("/src/main.rs", 1, 1);
     let result = provider.build_graph(&position, depth);
     world_state.result = Some(result);
+    Ok(())
 }
 
 #[then("the graph has {node_count} nodes and {edge_count} edges")]
-fn then_graph_counts(world: &RefCell<TestWorld>, node_count: usize, edge_count: usize) {
+fn then_graph_counts(
+    world: &RefCell<TestWorld>,
+    node_count: usize,
+    edge_count: usize,
+) -> Result<()> {
     let world_state = world.borrow();
     let graph = world_state
         .result
         .as_ref()
-        .expect("result missing")
+        .context("result missing")?
         .as_ref()
-        .expect("graph build failed");
-    assert_eq!(graph.node_count(), node_count);
-    assert_eq!(graph.edge_count(), edge_count);
+        .map_err(|error| anyhow::anyhow!("graph build failed: {error}"))?;
+    ensure!(
+        graph.node_count() == node_count,
+        "expected {node_count} nodes"
+    );
+    ensure!(
+        graph.edge_count() == edge_count,
+        "expected {edge_count} edges"
+    );
+    Ok(())
 }
 
 #[then("the graph includes node {name}")]
-fn then_graph_includes_node(world: &RefCell<TestWorld>, name: String) {
+fn then_graph_includes_node(world: &RefCell<TestWorld>, name: String) -> Result<()> {
     let world_state = world.borrow();
     let graph = world_state
         .result
         .as_ref()
-        .expect("result missing")
+        .context("result missing")?
         .as_ref()
-        .expect("graph build failed");
+        .map_err(|error| anyhow::anyhow!("graph build failed: {error}"))?;
     let node_name = strip_quotes(&name);
-    assert!(
+    ensure!(
         graph.find_by_name(node_name).is_some(),
         "node {node_name} missing"
     );
+    Ok(())
 }
 
 #[then("the graph includes an edge from {caller} to {callee}")]
-fn then_graph_includes_edge(world: &RefCell<TestWorld>, caller: String, callee: String) {
+fn then_graph_includes_edge(
+    world: &RefCell<TestWorld>,
+    caller: String,
+    callee: String,
+) -> Result<()> {
     let world_state = world.borrow();
     let graph = world_state
         .result
         .as_ref()
-        .expect("result missing")
+        .context("result missing")?
         .as_ref()
-        .expect("graph build failed");
+        .map_err(|error| anyhow::anyhow!("graph build failed: {error}"))?;
     let caller_name = strip_quotes(&caller);
     let callee_name = strip_quotes(&callee);
     let caller_node = graph
         .find_by_name(caller_name)
-        .expect("caller node missing");
+        .context("caller node missing")?;
     let callee_node = graph
         .find_by_name(callee_name)
-        .expect("callee node missing");
+        .context("callee node missing")?;
     let has_edge = graph
         .edges()
         .any(|edge| edge.caller() == caller_node.id() && edge.callee() == callee_node.id());
-    assert!(has_edge, "edge {caller_name} -> {callee_name} missing");
+    ensure!(has_edge, "edge {caller_name} -> {callee_name} missing");
+    Ok(())
 }
 
 #[then("the graph build fails with {error_kind}")]
-fn then_graph_build_fails(world: &RefCell<TestWorld>, error_kind: String) {
+fn then_graph_build_fails(world: &RefCell<TestWorld>, error_kind: String) -> Result<()> {
     let world_state = world.borrow();
-    let err = world_state
-        .result
-        .as_ref()
-        .expect("result missing")
-        .as_ref()
-        .expect_err("expected graph build to fail");
+    let result = world_state.result.as_ref().context("result missing")?;
+    let Err(err) = result else {
+        bail!("expected graph build to fail");
+    };
     let expected_kind = strip_quotes(&error_kind);
     match expected_kind {
         "symbol_not_found" => {
-            assert!(matches!(err, GraphError::SymbolNotFound { .. }));
+            ensure!(matches!(err, GraphError::SymbolNotFound { .. }));
         }
         "validation_error" => {
-            assert!(matches!(err, GraphError::Validation(_)));
+            ensure!(matches!(err, GraphError::Validation(_)));
         }
-        other => panic!("unknown error kind: {other}"),
+        other => bail!("unknown error kind: {other}"),
     }
+    Ok(())
 }
 
 #[scenario(path = "tests/features/weaver_graph.feature")]

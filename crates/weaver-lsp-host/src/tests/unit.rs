@@ -304,8 +304,9 @@ fn assert_server_error_propagates<T, F>(
     T: std::fmt::Debug,
 {
     let mut host = crate::LspHost::new(CapabilityMatrix::default());
-    host.register_language(Language::Rust, Box::new(server))
-        .expect("registration failed");
+    if let Err(error) = host.register_language(Language::Rust, Box::new(server)) {
+        panic!("registration failed: {error}");
+    }
 
     match call(&mut host) {
         Err(LspHostError::Server {

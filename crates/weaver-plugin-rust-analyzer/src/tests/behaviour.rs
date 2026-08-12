@@ -134,7 +134,9 @@ fn given_no_change_adapter(world: &mut World) { world.adapter_mode = AdapterMode
 
 #[when("the plugin executes the request")]
 fn when_execute(world: &mut World) {
-    let request = world.request.as_ref().expect("request should be present");
+    let Some(request) = world.request.as_ref() else {
+        panic!("request should be present");
+    };
     let mut adapter = MockBehaviourAdapter::new();
     if should_invoke_rename(request) {
         configure_adapter_for_mode(&mut adapter, world.adapter_mode);
@@ -145,11 +147,10 @@ fn when_execute(world: &mut World) {
 /// Resolves the world's execute result to a `PluginResponse`, converting
 /// `Err` outcomes to failure responses for assertion consistency.
 fn resolved_response(world: &World) -> PluginResponse {
-    match world
-        .execute_result
-        .as_ref()
-        .expect("execute result should be present")
-    {
+    let Some(execute_result) = world.execute_result.as_ref() else {
+        panic!("execute result should be present");
+    };
+    match execute_result {
         Ok(resp) => resp.clone(),
         Err(failure) => failure_response(failure.clone()),
     }

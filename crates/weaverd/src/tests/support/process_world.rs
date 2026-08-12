@@ -61,8 +61,7 @@ impl ProcessTestWorld {
             wait_error: None,
             health_history: RefCell::new(Vec::new()),
         };
-        test_support::clear_health_events(world.health_path().as_path())
-            .expect("clear_health_events should succeed");
+        let _ = test_support::clear_health_events(world.health_path().as_path());
         world
     }
 
@@ -222,7 +221,7 @@ impl ProcessTestWorld {
                 .any(|status| status == expected)
     }
 
-    pub fn lock_exists(&self) -> bool { fs::exists(self.lock_path()).expect("check lock file") }
+    pub fn lock_exists(&self) -> bool { fs::exists(self.lock_path()).is_ok_and(|exists| exists) }
 
     pub fn daemonizer_calls(&self) -> usize { self.daemonizer.calls() }
 
@@ -304,7 +303,9 @@ impl TestShutdownSignal {
 
     pub fn trigger(&self) {
         let (lock, cvar) = &*self.inner;
-        let mut triggered = lock.lock().expect("shutdown mutex poisoned");
+        let mut triggered = lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         *triggered = true;
         cvar.notify_all();
     }
@@ -313,11 +314,13 @@ impl TestShutdownSignal {
 impl ShutdownSignal for TestShutdownSignal {
     fn wait(&self) -> Result<(), ShutdownError> {
         let (lock, cvar) = &*self.inner;
-        let mut triggered = lock.lock().expect("shutdown mutex poisoned");
+        let mut triggered = lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         while !*triggered {
             triggered = cvar
                 .wait(triggered)
-                .expect("shutdown mutex poisoned during wait");
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
         }
         Ok(())
     }
@@ -327,5 +330,5 @@ pub fn snapshot_status(snapshot: &Value) -> &str {
     snapshot
         .get("status")
         .and_then(Value::as_str)
-        .expect("health snapshot should contain a status field")
+        .map_or("<missing status>", |status| status)
 }

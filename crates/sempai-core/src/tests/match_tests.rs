@@ -95,8 +95,14 @@ fn round_trip_match_with_captures() -> Match {
         captures,
     );
 
-    let json = serde_json::to_string(&m).expect("serialize with captures");
-    serde_json::from_str(&json).expect("deserialize with captures")
+    let serialized_match = match serde_json::to_string(&m) {
+        Ok(serialized_match) => serialized_match,
+        Err(error) => panic!("match with captures should serialize: {error}"),
+    };
+    match serde_json::from_str(&serialized_match) {
+        Ok(deserialized_match) => deserialized_match,
+        Err(error) => panic!("match with captures should deserialize: {error}"),
+    }
 }
 
 #[test]

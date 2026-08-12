@@ -48,7 +48,7 @@ pub use defaults::{
 };
 pub use locale::{Locale, LocaleParseError};
 pub use logging::{LogFormat, LogFormatParseError};
-use ortho_config::OrthoConfig;
+use ortho_config::{OrthoConfig, OrthoResult, PostMergeContext, PostMergeHook};
 pub use runtime::{RuntimePaths, RuntimePathsError};
 use serde::{Deserialize, Serialize};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
@@ -102,6 +102,7 @@ pub fn config_field_help(help_id: &str) -> &'static str {
 #[serde(default)]
 #[ortho_config(
     prefix = "WEAVER",
+    post_merge_hook,
     discovery(
         app_name = "weaver",
         config_file_name = "config.toml",
@@ -162,11 +163,7 @@ impl Config {
     /// This wrapper does not introduce its own panic paths, but the
     /// `ortho_config` generated loader may panic if its generated discovery or
     /// CLI metadata trips an internal debug assertion.
-    pub fn load() -> ortho_config::OrthoResult<Self> {
-        let mut config = <Self as OrthoConfig>::load()?;
-        config.normalise_capability_overrides();
-        Ok(config)
-    }
+    pub fn load() -> ortho_config::OrthoResult<Self> { <Self as OrthoConfig>::load() }
 
     /// Loads configuration using a custom iterator of CLI arguments.
     ///
@@ -180,9 +177,7 @@ impl Config {
         I: IntoIterator<Item = T>,
         T: Into<std::ffi::OsString> + Clone,
     {
-        let mut config = <Self as OrthoConfig>::load_from_iter(iter)?;
-        config.normalise_capability_overrides();
-        Ok(config)
+        <Self as OrthoConfig>::load_from_iter(iter)
     }
 
     /// Accessor for the configured daemon socket.
@@ -209,6 +204,13 @@ impl Config {
 
     fn normalise_capability_overrides(&mut self) {
         deduplicate_directives(&mut self.capability_overrides);
+    }
+}
+
+impl PostMergeHook for Config {
+    fn post_merge(&mut self, _context: &PostMergeContext) -> OrthoResult<()> {
+        self.normalise_capability_overrides();
+        Ok(())
     }
 }
 

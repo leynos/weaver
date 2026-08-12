@@ -50,28 +50,37 @@ fn given_non_diff_response_fixture(world: &mut World) {
 
 #[when("the rust-analyzer crate validates the shared request fixture")]
 fn when_validating_request_fixture(world: &mut World) {
-    let fixture = world.request_fixture.as_ref().expect("request fixture");
+    let Some(fixture) = world.request_fixture.as_ref() else {
+        panic!("request fixture");
+    };
     world.validation_result = Some(validate_rename_symbol_request_fixture(fixture));
 }
 
 #[when("the rust-analyzer crate validates the shared response fixture")]
 fn when_validating_response_fixture(world: &mut World) {
-    let fixture = world.response_fixture.as_ref().expect("response fixture");
+    let Some(fixture) = world.response_fixture.as_ref() else {
+        panic!("response fixture");
+    };
     world.validation_result = Some(validate_rename_symbol_response_fixture(fixture));
 }
 
 #[then("the shared fixture passes contract validation")]
 fn then_fixture_passes(world: &mut World) {
-    let result = world.validation_result.as_ref().expect("validation result");
+    let Some(result) = world.validation_result.as_ref() else {
+        panic!("validation result");
+    };
     assert!(result.is_ok(), "expected valid fixture, got: {result:?}");
 }
 
 #[then("the shared fixture fails with a message containing {text}")]
 fn then_fixture_fails_with_message(world: &mut World, text: String) {
-    let result = world.validation_result.as_ref().expect("validation result");
-    let error = result
-        .as_ref()
-        .expect_err("expected invalid fixture to fail contract validation");
+    let Some(result) = world.validation_result.as_ref() else {
+        panic!("validation result");
+    };
+    let error = match result {
+        Ok(()) => panic!("expected invalid fixture to fail contract validation"),
+        Err(error) => error,
+    };
     let needle = text.trim_matches('"');
     assert!(
         error.to_string().contains(needle),

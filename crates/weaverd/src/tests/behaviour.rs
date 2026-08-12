@@ -79,20 +79,26 @@ fn then_no_backend_started(world: &RefCell<TestWorld>) {
 }
 
 #[then("starting the backend fails")]
-fn then_backend_start_fails(world: &RefCell<TestWorld>) {
+fn then_backend_start_fails(world: &RefCell<TestWorld>) -> Result<(), String> {
     let borrow = world.borrow();
-    let result = borrow.backend_result().expect("backend result missing");
+    let result = borrow
+        .backend_result()
+        .ok_or_else(|| String::from("backend result missing"))?;
     assert!(result.is_err(), "backend start succeeded unexpectedly");
+    Ok(())
 }
 
 #[then("starting the backend succeeds")]
-fn then_backend_start_succeeds(world: &RefCell<TestWorld>) {
+fn then_backend_start_succeeds(world: &RefCell<TestWorld>) -> Result<(), String> {
     let borrow = world.borrow();
-    let result = borrow.backend_result().expect("backend result missing");
+    let result = borrow
+        .backend_result()
+        .ok_or_else(|| String::from("backend result missing"))?;
     assert!(
         result.is_ok(),
         "backend start failed unexpectedly: {result:?}"
     );
+    Ok(())
 }
 
 /// Ensures the recording reporter captured the expected health event.

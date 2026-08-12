@@ -176,18 +176,25 @@ fn snapshot_spillover_with_frontier() {
 // Component unit tests
 // -----------------------------------------------------------------------
 
-fn assert_serializes_as<T: serde::Serialize>(value: &T, expected: &str) {
-    assert_eq!(serde_json::to_string(value).expect("serialize"), expected);
+fn serialize<T: serde::Serialize>(value: &T) -> serde_json::Result<String> {
+    serde_json::to_string(value)
 }
 
 #[test]
 fn resolution_scope_serializes_as_snake_case() {
-    assert_serializes_as(&ResolutionScope::FullSymbolTable, "\"full_symbol_table\"");
-    assert_serializes_as(
-        &ResolutionScope::PartialSymbolTable,
-        "\"partial_symbol_table\"",
+    assert_eq!(
+        serialize(&ResolutionScope::FullSymbolTable).expect("serialize full symbol table scope"),
+        "\"full_symbol_table\""
     );
-    assert_serializes_as(&ResolutionScope::Lsp, "\"lsp\"");
+    assert_eq!(
+        serialize(&ResolutionScope::PartialSymbolTable)
+            .expect("serialize partial symbol table scope"),
+        "\"partial_symbol_table\""
+    );
+    assert_eq!(
+        serialize(&ResolutionScope::Lsp).expect("serialize LSP scope"),
+        "\"lsp\""
+    );
 }
 
 #[rstest]
@@ -195,7 +202,10 @@ fn resolution_scope_serializes_as_snake_case() {
 #[case(SliceDirection::Out, "\"out\"")]
 #[case(SliceDirection::Both, "\"both\"")]
 fn slice_direction_serializes_as_snake_case(#[case] value: SliceDirection, #[case] expected: &str) {
-    assert_serializes_as(&value, expected);
+    assert_eq!(
+        serialize(&value).expect("serialize slice direction"),
+        expected
+    );
 }
 
 #[rstest]
@@ -203,7 +213,10 @@ fn slice_direction_serializes_as_snake_case(#[case] value: SliceDirection, #[cas
 #[case(SliceEdgeType::Import, "\"import\"")]
 #[case(SliceEdgeType::Config, "\"config\"")]
 fn slice_edge_type_serializes_as_snake_case(#[case] value: SliceEdgeType, #[case] expected: &str) {
-    assert_serializes_as(&value, expected);
+    assert_eq!(
+        serialize(&value).expect("serialize slice edge type"),
+        expected
+    );
 }
 
 #[test]
