@@ -122,6 +122,20 @@ fn first_compiled_plan(world: &TestWorld) -> Result<&QueryPlan> {
     plans.first().context("expected at least one query plan")
 }
 
+fn assert_first_plan_formula_atom(
+    world: &TestWorld,
+    expected: &str,
+    predicate: impl FnOnce(&Formula) -> bool,
+) -> Result<()> {
+    let first = first_compiled_plan(world)?;
+    let formula = &first.formula().node;
+    ensure!(
+        predicate(formula),
+        "expected first query plan formula to be {expected}, got {formula:?}"
+    );
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Then steps
 // ---------------------------------------------------------------------------
@@ -191,14 +205,12 @@ fn then_first_plan_formula_is_pattern_atom(
     world: &mut TestWorld,
     text: QuotedString,
 ) -> Result<()> {
-    let first = first_compiled_plan(world)?;
-    ensure!(
-        matches!(&first.formula().node, Formula::Atom(Atom::Pattern(pattern)) if pattern.text == text.as_str()),
-        "expected first query plan formula to be Pattern({:?}), got {:?}",
-        text.as_str(),
-        first.formula().node
-    );
-    Ok(())
+    let expected = format!("Pattern({:?})", text.as_str());
+    assert_first_plan_formula_atom(
+        world,
+        &expected,
+        |formula| matches!(formula, Formula::Atom(Atom::Pattern(pattern)) if pattern.text == text.as_str()),
+    )
 }
 
 #[then("the first query plan formula is Tree-sitter query atom {query}")]
@@ -206,14 +218,12 @@ fn then_first_plan_formula_is_tree_sitter_query_atom(
     world: &mut TestWorld,
     query: QuotedString,
 ) -> Result<()> {
-    let first = first_compiled_plan(world)?;
-    ensure!(
-        matches!(&first.formula().node, Formula::Atom(Atom::TreeSitterQuery(atom)) if atom.query == query.as_str()),
-        "expected first query plan formula to be TreeSitterQuery({:?}), got {:?}",
-        query.as_str(),
-        first.formula().node
-    );
-    Ok(())
+    let expected = format!("TreeSitterQuery({:?})", query.as_str());
+    assert_first_plan_formula_atom(
+        world,
+        &expected,
+        |formula| matches!(formula, Formula::Atom(Atom::TreeSitterQuery(atom)) if atom.query == query.as_str()),
+    )
 }
 
 #[then("execution fails with code {code}")]
