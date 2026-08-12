@@ -52,6 +52,39 @@ struct CapabilityWorld {
     version_b: Option<ContractVersion>,
 }
 
+fn manifest_with_cap(cap: &QuotedString, name: &str, kind: PluginKind) -> PluginManifest {
+    let capability_id: CapabilityId = match serde_json::from_str(&format!("\"{}\"", cap.as_str())) {
+        Ok(capability_id) => capability_id,
+        Err(error) => panic!("valid capability id: {error}"),
+    };
+    let metadata = PluginMetadata::new(name, "1.0", kind);
+    PluginManifest::new(
+        metadata,
+        vec!["python".into()],
+        PathBuf::from("/usr/bin/test"),
+    )
+    .with_capabilities(vec![capability_id])
+}
+
+fn assert_versions_compatible(world: &CapabilityWorld, expected: bool) {
+    let Some(version_a) = world.version_a.as_ref() else {
+        panic!("version_a must be set");
+    };
+    let Some(version_b) = world.version_b.as_ref() else {
+        panic!("version_b must be set");
+    };
+    let is_compatible = version_a.is_compatible_with(version_b);
+    let expected_compatibility = if expected {
+        "compatible"
+    } else {
+        "incompatible"
+    };
+    assert_eq!(
+        is_compatible, expected,
+        "expected {version_a} to be {expected_compatibility} with {version_b}"
+    );
+}
+
 #[allow_fixture_expansion_lints]
 #[fixture]
 fn world() -> CapabilityWorld { CapabilityWorld::default() }
@@ -121,28 +154,12 @@ fn given_failure_with_reason(world: &mut CapabilityWorld, code: QuotedString) {
 
 #[given("an actuator manifest with capability {cap}")]
 fn given_actuator_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) {
-    let cap_id: CapabilityId = match serde_json::from_str(&format!("\"{}\"", cap.as_str())) {
-        Ok(capability_id) => capability_id,
-        Err(error) => panic!("valid capability id: {error}"),
-    };
-    let meta = PluginMetadata::new("test-plugin", "1.0", PluginKind::Actuator);
-    world.manifest = Some(
-        PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/test"))
-            .with_capabilities(vec![cap_id]),
-    );
+    world.manifest = Some(manifest_with_cap(&cap, "test-plugin", PluginKind::Actuator));
 }
 
 #[given("a sensor manifest with capability {cap}")]
 fn given_sensor_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) {
-    let cap_id: CapabilityId = match serde_json::from_str(&format!("\"{}\"", cap.as_str())) {
-        Ok(capability_id) => capability_id,
-        Err(error) => panic!("valid capability id: {error}"),
-    };
-    let meta = PluginMetadata::new("test-sensor", "1.0", PluginKind::Sensor);
-    world.manifest = Some(
-        PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/test"))
-            .with_capabilities(vec![cap_id]),
-    );
+    world.manifest = Some(manifest_with_cap(&cap, "test-sensor", PluginKind::Sensor));
 }
 
 #[given("contract version {major}.{minor}")]
@@ -223,30 +240,12 @@ fn then_validation_fails_with(world: &mut CapabilityWorld, substring: QuotedStri
 
 #[then("the versions are compatible")]
 fn then_versions_compatible(world: &mut CapabilityWorld) {
-    let Some(a) = world.version_a.as_ref() else {
-        panic!("version_a must be set");
-    };
-    let Some(b) = world.version_b.as_ref() else {
-        panic!("version_b must be set");
-    };
-    assert!(
-        a.is_compatible_with(b),
-        "expected {a} to be compatible with {b}"
-    );
+    assert_versions_compatible(world, true);
 }
 
 #[then("the versions are incompatible")]
 fn then_versions_incompatible(world: &mut CapabilityWorld) {
-    let Some(a) = world.version_a.as_ref() else {
-        panic!("version_a must be set");
-    };
-    let Some(b) = world.version_b.as_ref() else {
-        panic!("version_b must be set");
-    };
-    assert!(
-        !a.is_compatible_with(b),
-        "expected {a} to be incompatible with {b}"
-    );
+    assert_versions_compatible(world, false);
 }
 
 // ---------------------------------------------------------------------------
