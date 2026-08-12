@@ -64,27 +64,18 @@ impl Harness {
         ));
     }
 
-    fn config(&self) -> Config {
+    fn resolution(&self) -> Result<Config, String> {
         self.resolve();
         self.resolved
             .borrow()
             .as_ref()
             .expect("configuration result should be present")
-            .as_ref()
-            .expect("configuration should resolve")
             .clone()
     }
 
-    fn error(&self) -> String {
-        self.resolve();
-        self.resolved
-            .borrow()
-            .as_ref()
-            .expect("configuration result should be present")
-            .as_ref()
-            .expect_err("configuration should fail")
-            .clone()
-    }
+    fn config(&self) -> Config { self.resolution().expect("configuration should resolve") }
+
+    fn error(&self) -> String { self.resolution().expect_err("configuration should fail") }
 }
 
 #[allow_fixture_expansion_lints]
