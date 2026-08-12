@@ -42,6 +42,13 @@ const SAMPLE_PATCH: &str = concat!(
     ">>>>>>> REPLACE\n",
 );
 
+#[derive(Clone, Copy)]
+enum OutputAssertion {
+    Equals,
+    Contains,
+    DoesNotContain,
+}
+
 fn run_command_with_source_uri(
     world: &RefCell<TestWorld>,
     command_template: &str,
@@ -55,45 +62,45 @@ fn run_command_with_source_uri(
         .map_err(|error| anyhow::anyhow!("{error_msg}: {error}"))
 }
 
-fn assert_output_contains<F>(
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the shared BDD assertion contract has five independent inputs"
+)]
+fn assert_output<F>(
     world: &RefCell<TestWorld>,
     output_getter: F,
-    snippet: String,
+    expected: String,
     output_name: &str,
+    assertion: OutputAssertion,
 ) -> Result<()>
 where
     F: FnOnce(&TestWorld) -> anyhow::Result<String>,
 {
     let world = world.borrow();
-    let text = output_getter(&world)?;
-    let snippet = snippet.trim_matches('"').replace("\\n", "\n");
-    ensure!(
-        text.contains(&snippet),
-        "{output_name} {:?} did not contain {:?}",
-        text,
-        snippet
-    );
-    Ok(())
-}
+    let actual = output_getter(&world)?;
+    let expected = expected.trim_matches('"');
+    let expected = match assertion {
+        OutputAssertion::Equals => expected.to_owned(),
+        OutputAssertion::Contains | OutputAssertion::DoesNotContain => {
+            expected.replace("\\n", "\n")
+        }
+    };
 
-fn assert_output_does_not_contain<F>(
-    world: &RefCell<TestWorld>,
-    output_getter: F,
-    snippet: String,
-    output_name: &str,
-) -> Result<()>
-where
-    F: FnOnce(&TestWorld) -> anyhow::Result<String>,
-{
-    let world = world.borrow();
-    let text = output_getter(&world)?;
-    let snippet = snippet.trim_matches('"').replace("\\n", "\n");
-    ensure!(
-        !text.contains(&snippet),
-        "{output_name} {:?} unexpectedly contained {:?}",
-        text,
-        snippet
-    );
+    match assertion {
+        OutputAssertion::Equals => ensure!(
+            actual == expected,
+            "{output_name} was {actual:?}, expected {expected:?}"
+        ),
+        OutputAssertion::Contains => ensure!(
+            actual.contains(&expected),
+            "{output_name} {actual:?} did not contain {expected:?}"
+        ),
+        OutputAssertion::DoesNotContain => ensure!(
+            !actual.contains(&expected),
+            "{output_name} {actual:?} unexpectedly contained {expected:?}"
+        ),
+    }
+
     Ok(())
 }
 
@@ -272,36 +279,46 @@ fn then_lifecycle_recorded(world: &RefCell<TestWorld>, operation: String) -> Res
 
 #[then("stdout is {expected}")]
 fn then_stdout_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
-    let world = world.borrow();
-    let expected = expected.trim_matches('"');
-    let actual = world.stdout_text()?;
-    ensure!(
-        actual == expected,
-        "stdout was {actual:?}, expected {expected:?}"
-    );
-    Ok(())
+    assert_output(
+        world,
+        |world| world.stdout_text(),
+        expected,
+        "stdout",
+        OutputAssertion::Equals,
+    )
 }
 
 #[then("stderr is {expected}")]
 fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
-    let world = world.borrow();
-    let expected = expected.trim_matches('"');
-    let actual = world.stderr_text()?;
-    ensure!(
-        actual == expected,
-        "stderr was {actual:?}, expected {expected:?}"
-    );
-    Ok(())
+    assert_output(
+        world,
+        |world| world.stderr_text(),
+        expected,
+        "stderr",
+        OutputAssertion::Equals,
+    )
 }
 
 #[then("stderr contains {snippet}")]
 fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<()> {
-    assert_output_contains(world, |world| world.stderr_text(), snippet, "stderr")
+    assert_output(
+        world,
+        |world| world.stderr_text(),
+        snippet,
+        "stderr",
+        OutputAssertion::Contains,
+    )
 }
 
 #[then("stdout contains {snippet}")]
 fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<()> {
-    assert_output_contains(world, |world| world.stdout_text(), snippet, "stdout")
+    assert_output(
+        world,
+        |world| world.stdout_text(),
+        snippet,
+        "stdout",
+        OutputAssertion::Contains,
+    )
 }
 
 #[then("stdout contains the shared configuration flags")]
@@ -316,7 +333,13 @@ fn then_stdout_contains_shared_config_flags(world: &RefCell<TestWorld>) -> Resul
 
 #[then("stdout does not contain {snippet}")]
 fn then_stdout_does_not_contain(world: &RefCell<TestWorld>, snippet: String) -> Result<()> {
-    assert_output_does_not_contain(world, |world| world.stdout_text(), snippet, "stdout")
+    assert_output(
+        world,
+        |world| world.stdout_text(),
+        snippet,
+        "stdout",
+        OutputAssertion::DoesNotContain,
+    )
 }
 
 #[then("the CLI exits with code {status}")]
