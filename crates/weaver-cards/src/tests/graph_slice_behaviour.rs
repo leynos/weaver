@@ -29,6 +29,26 @@ struct TestWorld {
 #[fixture]
 fn world() -> TestWorld { TestWorld::default() }
 
+fn graph_slice_args(optional_argument: Option<(&str, &str)>) -> Vec<String> {
+    let mut args = vec![
+        String::from("--uri"),
+        String::from("file:///src/main.rs"),
+        String::from("--position"),
+        String::from("10:5"),
+    ];
+    if let Some((flag, value)) = optional_argument {
+        args.extend([String::from(flag), String::from(value)]);
+    }
+    args
+}
+
+fn parse_graph_slice_request(world: &mut TestWorld, args: &[String]) {
+    match GraphSliceRequest::parse(args) {
+        Ok(request) => world.request = Some(request),
+        Err(error) => world.request_error = Some(error.to_string()),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Given steps
 // ---------------------------------------------------------------------------
@@ -60,46 +80,21 @@ fn given_refusal(world: &mut TestWorld, reason: QuotedString) -> Result<()> {
 
 #[given("a graph-slice request with no optional flags")]
 fn given_default_request(world: &mut TestWorld) -> Result<()> {
-    let args = vec![
-        String::from("--uri"),
-        String::from("file:///src/main.rs"),
-        String::from("--position"),
-        String::from("10:5"),
-    ];
+    let args = graph_slice_args(None);
     world.request = Some(GraphSliceRequest::parse(&args).context("default request is valid")?);
     Ok(())
 }
 
 #[given("a graph-slice request with edge types {types}")]
 fn given_request_with_edge_types(world: &mut TestWorld, types: QuotedString) {
-    let args = vec![
-        String::from("--uri"),
-        String::from("file:///src/main.rs"),
-        String::from("--position"),
-        String::from("10:5"),
-        String::from("--edge-types"),
-        String::from(types.as_str()),
-    ];
-    match GraphSliceRequest::parse(&args) {
-        Ok(request) => world.request = Some(request),
-        Err(error) => world.request_error = Some(error.to_string()),
-    }
+    let args = graph_slice_args(Some(("--edge-types", types.as_str())));
+    parse_graph_slice_request(world, &args);
 }
 
 #[given("a graph-slice request with depth {depth}")]
 fn given_request_with_depth(world: &mut TestWorld, depth: QuotedString) {
-    let args = vec![
-        String::from("--uri"),
-        String::from("file:///src/main.rs"),
-        String::from("--position"),
-        String::from("10:5"),
-        String::from("--depth"),
-        String::from(depth.as_str()),
-    ];
-    match GraphSliceRequest::parse(&args) {
-        Ok(request) => world.request = Some(request),
-        Err(error) => world.request_error = Some(error.to_string()),
-    }
+    let args = graph_slice_args(Some(("--depth", depth.as_str())));
+    parse_graph_slice_request(world, &args);
 }
 
 #[given("a graph-slice response with all resolution scopes")]
