@@ -30,6 +30,11 @@ extend-exclude = [
 [default]
 locale = "en-gb"
 extend-ignore-re = [
+    "-fuse-ld=mold",
+    "mold linker",
+    "Cranelift \\+ mold",
+    "Cranelift and mold",
+    "`mold`",
     "(?m)^          inputs\\.should-upload-workflow-artifacts &&$",
     "(?m)^        value: \\$\\{\\{ jobs\\.metadata\\.outputs\\.should_upload_workflow_artifacts \\}\\}$",
     "(?m)^      should-upload-workflow-artifacts: \\$\\{\\{ fromJSON\\(needs\\.metadata\\.outputs\\.should_upload_workflow_artifacts\\) \\}\\}$",
