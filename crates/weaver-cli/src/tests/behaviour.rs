@@ -49,6 +49,12 @@ enum OutputAssertion {
     DoesNotContain,
 }
 
+struct OutputExpectation {
+    expected: String,
+    output_name: &'static str,
+    assertion: OutputAssertion,
+}
+
 fn run_command_with_source_uri(
     world: &RefCell<TestWorld>,
     command_template: &str,
@@ -62,22 +68,21 @@ fn run_command_with_source_uri(
         .map_err(|error| anyhow::anyhow!("{error_msg}: {error}"))
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the shared BDD assertion contract has five independent inputs"
-)]
 fn assert_output<F>(
     world: &RefCell<TestWorld>,
     output_getter: F,
-    expected: String,
-    output_name: &str,
-    assertion: OutputAssertion,
+    expectation: OutputExpectation,
 ) -> Result<()>
 where
     F: FnOnce(&TestWorld) -> anyhow::Result<String>,
 {
     let world = world.borrow();
     let actual = output_getter(&world)?;
+    let OutputExpectation {
+        expected,
+        output_name,
+        assertion,
+    } = expectation;
     let expected = expected.trim_matches('"');
     let expected = match assertion {
         OutputAssertion::Equals => expected.to_owned(),
@@ -282,9 +287,11 @@ fn then_stdout_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
     assert_output(
         world,
         |world| world.stdout_text(),
-        expected,
-        "stdout",
-        OutputAssertion::Equals,
+        OutputExpectation {
+            expected,
+            output_name: "stdout",
+            assertion: OutputAssertion::Equals,
+        },
     )
 }
 
@@ -293,9 +300,11 @@ fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
     assert_output(
         world,
         |world| world.stderr_text(),
-        expected,
-        "stderr",
-        OutputAssertion::Equals,
+        OutputExpectation {
+            expected,
+            output_name: "stderr",
+            assertion: OutputAssertion::Equals,
+        },
     )
 }
 
@@ -304,9 +313,11 @@ fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<(
     assert_output(
         world,
         |world| world.stderr_text(),
-        snippet,
-        "stderr",
-        OutputAssertion::Contains,
+        OutputExpectation {
+            expected: snippet,
+            output_name: "stderr",
+            assertion: OutputAssertion::Contains,
+        },
     )
 }
 
@@ -315,9 +326,11 @@ fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<(
     assert_output(
         world,
         |world| world.stdout_text(),
-        snippet,
-        "stdout",
-        OutputAssertion::Contains,
+        OutputExpectation {
+            expected: snippet,
+            output_name: "stdout",
+            assertion: OutputAssertion::Contains,
+        },
     )
 }
 
@@ -336,9 +349,11 @@ fn then_stdout_does_not_contain(world: &RefCell<TestWorld>, snippet: String) -> 
     assert_output(
         world,
         |world| world.stdout_text(),
-        snippet,
-        "stdout",
-        OutputAssertion::DoesNotContain,
+        OutputExpectation {
+            expected: snippet,
+            output_name: "stdout",
+            assertion: OutputAssertion::DoesNotContain,
+        },
     )
 }
 

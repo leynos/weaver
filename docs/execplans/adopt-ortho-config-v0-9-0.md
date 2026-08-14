@@ -213,9 +213,9 @@ Observable success means all of the following are true:
   `cargo test -p weaverd --lib --all-features` (290 tests) and the targeted
   Whitaker run now pass.
 - [x] (2026-08-12 22:28Z) Convert `sempai-yaml` BDD steps to return errors for
-  absent scenario state, unexpected diagnostics, and invalid feature data.
-  Its 34 tests, two doctests, strict Clippy, and targeted Whitaker run pass
-  after its shared parser-test helpers began returning `Result` values.
+  absent scenario state, unexpected diagnostics, and invalid feature data. Its
+  34 tests, two doctests, strict Clippy, and targeted Whitaker run pass after
+  its shared parser-test helpers began returning `Result` values.
 - [x] (2026-08-12 23:04Z) Convert `weaver-plugin-rope` BDD steps, contract
   checks, and stdin/stdout dispatch helpers to return errors. Its 23 tests,
   strict Clippy, and targeted Whitaker run pass.
@@ -447,8 +447,8 @@ Observable success means all of the following are true:
   to repair the existing Whitaker failures that prevent completion. Rationale:
   the lint violations are deliberate house policy, cannot be configured away,
   and reproduce on `origin/main`; changing test support to return `Result` is
-  the smallest durable repair. Keep this prerequisite as a distinct pass and
-  do not weaken the lint or conflate it with OrthoConfig behaviour. Date/Author:
+  the smallest durable repair. Keep this prerequisite as a distinct pass and do
+  not weaken the lint or conflate it with OrthoConfig behaviour. Date/Author:
   2026-08-12, Codex.
 
 ## Outcomes & retrospective

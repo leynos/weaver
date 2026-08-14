@@ -910,6 +910,15 @@ tolerates socket-bind lag after daemon startup, and `write_error_and_fail`, a
 small helper that writes a display message to `stderr` and returns
 `ExitCode::FAILURE`.
 
+### 2.6 CLI BDD output expectations
+
+`crates/weaver-cli/src/tests/behaviour.rs` keeps `OutputExpectation` private to
+the feature-bound CLI BDD steps. It groups an expected value, stream name, and
+comparison kind before `assert_output` reads the selected stream. The type does
+not own setup or output extraction; callers continue to provide the stream
+query. Do not promote it to shared test support unless a second CLI BDD module
+needs this exact contract.
+
 ## Test infrastructure for rename-symbol coverage
 
 ### `test-support` feature (`weaver-plugins`)
