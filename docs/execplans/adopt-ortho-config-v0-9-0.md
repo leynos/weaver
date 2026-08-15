@@ -187,15 +187,18 @@ Observable success means all of the following are true:
   `make markdownlint nixie` gate.
 - [x] (2026-08-12 18:52Z) Obtain explicit approval for this draft through the
   implementation request.
-- [x] (2026-08-15) Capture the current deterministic gate baseline: `make
-  check-fmt`, `make typecheck`, `make lint`, `make test`, `make markdownlint`,
-  and `make nixie` all pass. The baseline retains 13 existing Python
-  graph-slice `lsp_hover` snapshot failures; these remain a review exception
-  outside this migration's scope.
-- [x] (2026-08-15) Reconcile the pre-existing snapshot and Whitaker findings
-  before final validation. The required deterministic gates pass, while the 13
-  Python graph-slice `lsp_hover` snapshot failures remain recorded as an
-  existing review exception.
+- [x] (2026-08-15) Capture the pre-review deterministic gate baseline:
+      `make check-fmt`, `make typecheck`, `make lint`, `make test`,
+      `make markdownlint`, and `make nixie` all pass. A separate baseline
+      review run recorded 13 existing Python graph-slice `lsp_hover` snapshot
+      failures as an exception outside this migration's scope.
+- [x] (2026-08-15) Complete final review validation after reconciling the
+  pre-existing snapshot and Whitaker findings. `make check-fmt`, `make lint`,
+  `make typecheck`, and `make test` pass; `make test` reports 1,474 nextest
+  tests passed and four skipped, with doctests passing. `make markdownlint`
+  reports 45 Python and 0 Markdown errors, and `make nixie` passes. The 13
+  snapshot failures recorded in the pre-review baseline are absent from this
+  validation.
 - [x] (2026-08-12 21:05Z) Remediate the prerequisite Whitaker
   `no_expect_outside_tests` failures as a separate fallibility pass, beginning
   with `weaver-cards` graph-slice steps and helpers. Each affected test-support
@@ -451,27 +454,30 @@ Observable success means all of the following are true:
   not weaken the lint or conflate it with OrthoConfig behaviour. Date/Author:
   2026-08-12, Codex.
 
-- Decision: retain the 13 existing Python graph-slice `lsp_hover` snapshot
-  failures as a review exception. Rationale: the full deterministic gate set
-  passes, and these baseline failures are outside the OrthoConfig migration's
-  scope; neither the snapshots nor their behaviour are changed here. Date/
-  Author: 2026-08-15, Codex.
+- Decision: preserve the historical record of the 13 existing Python
+  graph-slice `lsp_hover` snapshot failures as a pre-review exception.
+  Rationale: the failures were outside the OrthoConfig migration's scope and
+  were not reproduced by final review validation; neither the snapshots nor
+  their behaviour are changed here. Date/Author: 2026-08-15, Codex.
 
 - Decision: keep PR #225 under review after the deterministic gates passed.
   Rationale: implementation, focused validation, and documentation are
-  complete, while the baseline exception remains explicitly visible for
-  reviewers. Date/Author: 2026-08-15, Codex.
+  complete, while the historical baseline exception remains explicitly visible
+  for reviewers. Date/Author: 2026-08-15, Codex.
 
 ## Outcomes & retrospective
 
 The dependency, hermetic test, and documentation changes are implemented and
 their focused tests pass. The boundary-manifest test, formatting, type
-checking, and focused Clippy checks also pass. The full deterministic gate set
-(`make check-fmt`, `make typecheck`, `make lint`, `make test`,
-`make markdownlint`, and `make nixie`) passes. The current baseline retains 13
-existing Python graph-slice `lsp_hover` snapshot failures; they are recorded as
-a review exception and remain outside this migration's scope. PR #225 is under
-review, with all completed work checked in `Progress` above.
+checking, and focused Clippy checks also pass. Final review validation passed
+the full deterministic gate set (`make check-fmt`, `make lint`,
+`make typecheck`, and `make test`); `make test` reported 1,474 nextest tests
+passed, four skipped, and passing doctests. `make markdownlint` reported 45
+Python and 0 Markdown errors, and `make nixie` passed. The pre-review baseline
+recorded 13 existing Python graph-slice `lsp_hover` snapshot failures as a
+review exception, but current validation did not reproduce them. They remain
+historical context outside this migration's scope. PR #225 is under review,
+with all completed work checked in `Progress` above.
 
 ## Context and orientation
 
@@ -1046,8 +1052,8 @@ presented as control over the full configuration-value environment layer.
 ## Revision note
 
 This plan entered execution on 2026-08-12 after explicit approval. A selective
-lockfile update replaced a broad regeneration attempt. The baseline gates still
-expose unrelated E2E snapshots and BDD-step lint failures. The plan is paused
-before a completed implementation milestone or CodeRabbit review until the user
-decides whether those out-of-scope artefacts should be remediated, accepted, or
-excluded from the migration baseline.
+lockfile update replaced a broad regeneration attempt. The pre-review baseline
+recorded unrelated E2E snapshots and BDD-step lint findings, including the 13
+Python graph-slice `lsp_hover` snapshot failures, as review exceptions. Final
+review validation passed the required gates; the recorded snapshot failures
+were absent from that validation. PR #225 remains under review.

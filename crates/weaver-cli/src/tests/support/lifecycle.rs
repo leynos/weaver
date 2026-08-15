@@ -66,22 +66,17 @@ impl TestLifecycle {
 /// Returns both the `TempDir` (which must be kept alive to preserve the directory)
 /// and the derived `RuntimePaths`.
 #[fixture]
-pub(crate) fn temp_paths() -> (TempDir, RuntimePaths) {
-    let dir = match TempDir::new() {
-        Ok(dir) => dir,
-        Err(error) => panic!("failed to create temporary directory for test fixture: {error}"),
-    };
+pub(crate) fn temp_paths() -> Result<(TempDir, RuntimePaths)> {
+    let dir = TempDir::new().context("create temporary directory for test fixture")?;
     let socket = dir.path().join("daemon.sock");
     let socket = socket.to_string_lossy().to_string();
     let config = Config {
         daemon_socket: SocketEndpoint::unix(socket),
         ..Config::default()
     };
-    let paths = match RuntimePaths::from_config(&config) {
-        Ok(paths) => paths,
-        Err(error) => panic!("failed to construct RuntimePaths from test config: {error}"),
-    };
-    (dir, paths)
+    let paths = RuntimePaths::from_config(&config)
+        .context("construct RuntimePaths from test configuration")?;
+    Ok((dir, paths))
 }
 
 // ── Health snapshot utilities ──────────────────────────────────────────────────

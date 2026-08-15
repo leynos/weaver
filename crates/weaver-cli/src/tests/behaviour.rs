@@ -49,9 +49,30 @@ enum OutputAssertion {
     DoesNotContain,
 }
 
-struct OutputExpectation {
-    expected: String,
-    output_name: &'static str,
+#[derive(Clone, Copy)]
+enum OutputStream {
+    Stdout,
+    Stderr,
+}
+
+impl OutputStream {
+    fn text(self, world: &TestWorld) -> anyhow::Result<String> {
+        match self {
+            Self::Stdout => world.stdout_text(),
+            Self::Stderr => world.stderr_text(),
+        }
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Stdout => "stdout",
+            Self::Stderr => "stderr",
+        }
+    }
+}
+
+struct OutputCheck {
+    stream: OutputStream,
     assertion: OutputAssertion,
 }
 
@@ -68,30 +89,19 @@ fn run_command_with_source_uri(
         .map_err(|error| anyhow::anyhow!("{error_msg}: {error}"))
 }
 
-fn assert_output<F>(
-    world: &RefCell<TestWorld>,
-    output_getter: F,
-    expectation: OutputExpectation,
-) -> Result<()>
-where
-    F: FnOnce(&TestWorld) -> anyhow::Result<String>,
-{
+fn assert_output(world: &RefCell<TestWorld>, expected: String, check: OutputCheck) -> Result<()> {
     let world = world.borrow();
-    let actual = output_getter(&world)?;
-    let OutputExpectation {
-        expected,
-        output_name,
-        assertion,
-    } = expectation;
+    let actual = check.stream.text(&world)?;
+    let output_name = check.stream.name();
     let expected = expected.trim_matches('"');
-    let expected = match assertion {
+    let expected = match check.assertion {
         OutputAssertion::Equals => expected.to_owned(),
         OutputAssertion::Contains | OutputAssertion::DoesNotContain => {
             expected.replace("\\n", "\n")
         }
     };
 
-    match assertion {
+    match check.assertion {
         OutputAssertion::Equals => ensure!(
             actual == expected,
             "{output_name} was {actual:?}, expected {expected:?}"
@@ -286,10 +296,9 @@ fn then_lifecycle_recorded(world: &RefCell<TestWorld>, operation: String) -> Res
 fn then_stdout_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
     assert_output(
         world,
-        |world| world.stdout_text(),
-        OutputExpectation {
-            expected,
-            output_name: "stdout",
+        expected,
+        OutputCheck {
+            stream: OutputStream::Stdout,
             assertion: OutputAssertion::Equals,
         },
     )
@@ -299,10 +308,9 @@ fn then_stdout_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
 fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
     assert_output(
         world,
-        |world| world.stderr_text(),
-        OutputExpectation {
-            expected,
-            output_name: "stderr",
+        expected,
+        OutputCheck {
+            stream: OutputStream::Stderr,
             assertion: OutputAssertion::Equals,
         },
     )
@@ -312,10 +320,9 @@ fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
 fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<()> {
     assert_output(
         world,
-        |world| world.stderr_text(),
-        OutputExpectation {
-            expected: snippet,
-            output_name: "stderr",
+        snippet,
+        OutputCheck {
+            stream: OutputStream::Stderr,
             assertion: OutputAssertion::Contains,
         },
     )
@@ -325,10 +332,9 @@ fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<(
 fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<()> {
     assert_output(
         world,
-        |world| world.stdout_text(),
-        OutputExpectation {
-            expected: snippet,
-            output_name: "stdout",
+        snippet,
+        OutputCheck {
+            stream: OutputStream::Stdout,
             assertion: OutputAssertion::Contains,
         },
     )
@@ -348,10 +354,9 @@ fn then_stdout_contains_shared_config_flags(world: &RefCell<TestWorld>) -> Resul
 fn then_stdout_does_not_contain(world: &RefCell<TestWorld>, snippet: String) -> Result<()> {
     assert_output(
         world,
-        |world| world.stdout_text(),
-        OutputExpectation {
-            expected: snippet,
-            output_name: "stdout",
+        snippet,
+        OutputCheck {
+            stream: OutputStream::Stdout,
             assertion: OutputAssertion::DoesNotContain,
         },
     )

@@ -7,6 +7,7 @@ use std::{
         Mutex,
         atomic::{AtomicU64, AtomicUsize, Ordering},
     },
+    thread::ThreadId,
 };
 
 use tracing::{
@@ -16,25 +17,43 @@ use tracing::{
     Subscriber,
     field::{Field, Visit},
     span::{Attributes, Id, Record},
+    subscriber::Interest,
 };
 
 use crate::{Engine, EngineConfig};
 
-#[derive(Default)]
 struct SpanCountingSubscriber {
+    trace_thread_id: ThreadId,
     compile_yaml_spans: Arc<AtomicUsize>,
     debug_events: Arc<Mutex<Vec<RecordedEvent>>>,
     next_id: AtomicU64,
 }
 
 impl SpanCountingSubscriber {
+    fn for_current_thread() -> Self {
+        Self {
+            trace_thread_id: std::thread::current().id(),
+            compile_yaml_spans: Arc::default(),
+            debug_events: Arc::default(),
+            next_id: AtomicU64::default(),
+        }
+    }
+
     fn compile_yaml_spans(&self) -> Arc<AtomicUsize> { Arc::clone(&self.compile_yaml_spans) }
 
     fn debug_events(&self) -> Arc<Mutex<Vec<RecordedEvent>>> { Arc::clone(&self.debug_events) }
+
+    fn records_current_thread(&self) -> bool { std::thread::current().id() == self.trace_thread_id }
 }
 
 impl Subscriber for SpanCountingSubscriber {
-    fn enabled(&self, metadata: &Metadata<'_>) -> bool { metadata.target().starts_with("sempai") }
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        self.records_current_thread() && metadata.target().starts_with("sempai")
+    }
+
+    fn register_callsite(&self, _metadata: &'static Metadata<'static>) -> Interest {
+        Interest::sometimes()
+    }
 
     fn new_span(&self, attributes: &Attributes<'_>) -> Id {
         let metadata = attributes.metadata();
@@ -126,16 +145,19 @@ fn compile_yaml_emits_observable_compile_span() {
         "    severity: ERROR\n",
         "    pattern: foo($X)\n",
     );
-    let subscriber = SpanCountingSubscriber::default();
+    let subscriber = SpanCountingSubscriber::for_current_thread();
     let compile_yaml_spans = subscriber.compile_yaml_spans();
     let debug_events = subscriber.debug_events();
 
-    tracing::subscriber::with_default(subscriber, || {
-        let engine = Engine::new(EngineConfig::default());
-        engine
-            .compile_yaml(yaml)
-            .expect("valid rule should compile");
-    });
+    // The test harness runs Sempai tests concurrently. A global subscriber
+    // keeps callsite registration stable, while the thread filter prevents
+    // unrelated test activity from contributing to this assertion.
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("tracing subscriber must not already be configured");
+    let engine = Engine::new(EngineConfig::default());
+    engine
+        .compile_yaml(yaml)
+        .expect("valid rule should compile");
 
     assert_eq!(
         compile_yaml_spans.load(Ordering::Relaxed),

@@ -47,8 +47,9 @@ fn assert_schema_invalid_normalization(constraint: Value, expected_message: &str
     let principal =
         SearchQueryPrincipal::Legacy(make_legacy_patterns_with_constraints([constraint]));
 
-    let report =
-        normalize_search_principal(&principal, None).expect_err("known malformed constraint fails");
+    let Err(report) = normalize_search_principal(&principal, None) else {
+        return Err(anyhow::anyhow!("known malformed constraint succeeded"));
+    };
 
     ensure!(
         first_diagnostic_code(&report)? == DiagnosticCode::ESempaiSchemaInvalid,
@@ -63,7 +64,9 @@ fn assert_schema_invalid_normalization(constraint: Value, expected_message: &str
 }
 
 fn assert_missing_positive_term_in_and_for_decorated(decorated: &Decorated<Formula>) -> Result<()> {
-    let err = validate_formula(decorated).expect_err("constraint-only And should fail");
+    let Err(err) = validate_formula(decorated) else {
+        return Err(anyhow::anyhow!("constraint-only And validation succeeded"));
+    };
     let first = err
         .diagnostics()
         .first()
@@ -76,9 +79,11 @@ fn assert_missing_positive_term_in_and_for_decorated(decorated: &Decorated<Formu
 }
 
 fn assert_compile_yaml_schema_invalid(yaml: &str, expected_message: &str) -> Result<()> {
-    let report = Engine::new(EngineConfig::default())
-        .compile_yaml(yaml)
-        .expect_err("malformed known constraint should fail");
+    let Err(report) = Engine::new(EngineConfig::default()).compile_yaml(yaml) else {
+        return Err(anyhow::anyhow!(
+            "malformed known constraint compiled successfully"
+        ));
+    };
 
     ensure!(
         first_diagnostic_code(&report)? == DiagnosticCode::ESempaiSchemaInvalid,

@@ -912,12 +912,12 @@ small helper that writes a display message to `stderr` and returns
 
 ### 2.6 CLI BDD output expectations
 
-`crates/weaver-cli/src/tests/behaviour.rs` keeps `OutputExpectation` private to
-the feature-bound CLI BDD steps. It groups an expected value, stream name, and
-comparison kind before `assert_output` reads the selected stream. The type does
-not own setup or output extraction; callers continue to provide the stream
-query. Do not promote it to shared test support unless a second CLI BDD module
-needs this exact contract.
+`crates/weaver-cli/src/tests/behaviour.rs` keeps `OutputStream` and
+`OutputCheck` private to the feature-bound CLI BDD steps. `OutputStream`
+selects stdout or stderr and reads its text, while `OutputCheck` pairs that
+stream with the unchanged `OutputAssertion` comparison kind before
+`assert_output` reads the selected stream. Do not promote these types to shared
+test support unless a second CLI BDD module needs this exact contract.
 
 ## Test infrastructure for rename-symbol coverage
 

@@ -221,7 +221,9 @@ impl ProcessTestWorld {
                 .any(|status| status == expected)
     }
 
-    pub fn lock_exists(&self) -> bool { fs::exists(self.lock_path()).is_ok_and(|exists| exists) }
+    pub fn lock_exists(&self) -> Result<bool, String> {
+        fs::exists(self.lock_path()).map_err(|error| format!("check lock file: {error}"))
+    }
 
     pub fn daemonizer_calls(&self) -> usize { self.daemonizer.calls() }
 

@@ -1,3 +1,5 @@
+//! Integration tests for Weaver configuration layer merging and precedence through the CLI.
+
 #![cfg(feature = "cli")]
 
 use std::cell::RefCell;

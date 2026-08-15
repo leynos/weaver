@@ -1,3 +1,5 @@
+//! Integration tests for Weaver configuration loading failures through the CLI boundary.
+
 #![cfg(feature = "cli")]
 
 use std::ffi::OsString;

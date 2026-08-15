@@ -193,11 +193,12 @@ fn then_stale_pid_replaced(world: &RefCell<ProcessTestWorld>) -> Result<(), Stri
 }
 
 #[then("the lock file remains in place")]
-fn then_lock_remains(world: &RefCell<ProcessTestWorld>) {
+fn then_lock_remains(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
     assert!(
-        world.borrow().lock_exists(),
+        world.borrow().lock_exists()?,
         "lock file should remain when launch is still in progress",
     );
+    Ok(())
 }
 
 #[then("starting the daemon again fails with already running")]
