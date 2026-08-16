@@ -12,15 +12,15 @@ This RFC proposes a deliberately narrow first executable Sempai slice:
 
 ```text
 positive structural query
-    -> versioned selector records
+    -> completed versioned selector stream
     -> ordinary shell pipeline
     -> an explicit Weaver consumer or actuator
 ```
 
 The first public producer is `weaver symbols list`. A bare `--query` value is a
 positive host-language structural pattern. Rich Sempai expressions use
-`--expr`. File and standard-input counterparts support scripts and later
-heredoc workflows without embedding shell syntax in Sempai.
+`--expr`. File and standard-input counterparts support scripts and heredoc
+workflows without embedding shell syntax in Sempai.
 
 The slice compiles positive patterns into the existing canonical Sempai formula
 model and executes them initially through an explicitly labelled
@@ -28,18 +28,23 @@ model and executes them initially through an explicitly labelled
 not wait for the complete Semgrep-compatible matcher, every query operator, Go,
 optional HashiCorp Configuration Language (HCL), or deep ellipsis.
 
-Matches are emitted as deterministic JSON Lines (JSONL) selector records.
-Every selector contains the source identity needed for a downstream command to
-reject stale ranges. Mutation commands consume selector streams through an
-explicit typed input such as `--selectors -`; they do not depend on hidden
-daemon state.
+Matches are emitted as deterministic JSON Lines (JSONL) selector records,
+followed by an in-band completion record. Every selector contains the source
+identity needed for a downstream command to reject stale ranges. A selector
+actuator reads the complete bounded stream and refuses to plan if the
+completion record is absent, so an upstream failure cannot turn a valid-looking
+prefix into an unintended mutation.
+
+Mutation commands consume selector streams through an explicit typed input such
+as `--selectors -`; they do not depend on hidden daemon state.
 
 Two architectural decisions refine the public command contract:
 
 - [ADR 011](../adr-011-sempai-query-input-syntax.md) defines `--query`,
   `--expr`, their file forms, and YAML rule inputs; and
-- [ADR 012](../adr-012-versioned-selector-streams.md) defines selector JSONL,
-  standard-input ownership, deterministic ordering, and stale-source refusal.
+- [ADR 012](../adr-012-versioned-selector-streams.md) defines completed selector
+  JSONL, standard-input ownership, deterministic ordering, and stale-source
+  refusal.
 
 ## 2. Problem
 
@@ -58,7 +63,7 @@ product until most of the full engine exists.
 Meanwhile, `weaver-syntax` already provides a narrower structural matcher. It
 can compile positive patterns with metavariables, parse Rust, Python, and
 TypeScript through Tree-sitter, walk source syntax trees, unify repeated
-captures, and return all matching ranges. Its syntax and semantics are not the
+captures, and return matching ranges. Its syntax and semantics are not the
 complete Sempai contract, but they are enough to prove the first vertical path
 if the compatibility boundary remains explicit.
 
@@ -67,12 +72,18 @@ The missing product is therefore not another schema layer. It is this:
 ```sh
 weaver symbols list \
   --lang rust \
-  --query 'fn $NAME($...ARGS) { ... }' \
+  --query 'fn $NAME($...ARGS) { $...BODY }' \
   --json
 ```
 
-followed by a stable stream that a human, `jq`, another Weaver command, or an
+followed by a stable stream which a human, `jq`, another Weaver command, or an
 agent can consume.
+
+A raw list of records is not sufficient for safe actuation. If a producer emits
+some matches and then fails, the downstream process receives end-of-file but
+cannot portably inspect the producer's exit status. The machine protocol needs
+an in-band completion signal, and a mutation consumer must wait for that signal
+before it plans changes.
 
 ## 3. Current state
 
@@ -109,8 +120,10 @@ layer.
 - Build the recovering Logos and Chumsky parser without making it a tollbooth
   for bare positive patterns.
 - Reuse `weaver-syntax` only behind an explicit compatibility adapter.
-- Emit deterministic, bounded, versioned selector records.
-- Make selector output safe to carry through `jq`, files, and standard input.
+- Emit deterministic, bounded, versioned selector streams.
+- Detect incomplete upstream streams before any actuator plans a mutation.
+- Make selector output safe to carry through completion-preserving `jq`
+  filters, files, and standard input.
 - Ensure actuators reject stale selectors before planning or committing edits.
 - Preserve human-readable output while making JSONL the pipeline contract.
 - Leave a measured replacement path from the compatibility adapter to the full
@@ -121,14 +134,16 @@ layer.
 - Claim full Semgrep compatibility in the first executable slice.
 - Execute taint, join, or extract modes.
 - Implement Go or optional HCL before the first positive query works.
-- Implement ordinary ellipsis, deep ellipsis, every `where` constraint, or raw
-  Tree-sitter query input in the compatibility executor.
+- Implement every ellipsis form, deep ellipsis, every `where` constraint, or
+  raw Tree-sitter query input in the compatibility executor.
 - Apply `fix` directly inside Sempai.
 - Let parser recovery silently change the query that executes.
 - Define one mutation policy for every actuator.
 - Share hidden selector state between producer and consumer.
 - Make a probabilistic confidence score where the matcher has no calibrated
   probability model.
+- Protect against a malicious intermediate process which fabricates protocol
+  records.
 
 ## 5. Terminology and invariants
 
@@ -144,29 +159,39 @@ provenance.
 **Selector record:** A versioned, self-contained description of one match and
 its source identity.
 
+**Completion record:** The terminal protocol record proving that the producer
+reached a successful end state.
+
+**Selector stream:** Zero or more selector records followed by exactly one
+completion record.
+
 **Compatibility executor:** The first positive-pattern executor backed by
 `weaver-syntax`, with explicit subset metadata.
 
-**Selector consumer:** A command that validates and reads selector records
+**Selector consumer:** A command that validates and reads selector streams
 without necessarily mutating.
 
-**Selector actuator:** A mutation command that resolves validated selectors
-into a shared mutation plan.
+**Selector actuator:** A mutation command that resolves a validated, completed
+selector stream into a shared mutation plan.
 
 The following invariants are normative:
 
 1. Parse recovery may produce additional diagnostics and a partial syntax tree,
    but no query with error-severity diagnostics is executed.
-2. A selector is self-contained. Correct consumption does not require daemon
-   memory from the producing command.
+2. A selector stream is self-contained. Correct consumption does not require
+   daemon memory from the producing command.
 3. Every selector identifies the source contents or workspace revision against
    which its ranges were calculated.
-4. A mutating consumer validates source identity before planning and again at
+4. Every selector record carries one stream identity and sequence number.
+5. A selector actuator validates the terminal completion record before
+   planning and never mutates while input is still arriving.
+6. A mutating consumer validates source identity before planning and again at
    the shared mutation engine's commit boundary.
-5. Multi-record output has deterministic order.
-6. A backend or compatibility fallback is visible in machine provenance.
-7. Zero matches are a successful query result, not a parser or execution error.
-8. No command guesses whether a multi-match mutation is intended.
+7. Selector records have deterministic order.
+8. A backend or compatibility fallback is visible in machine provenance.
+9. Zero matches are a successful query result represented by a completion-only
+   machine stream.
+10. No command guesses whether a multi-match mutation is intended.
 
 ## 6. Proposed design
 
@@ -206,7 +231,9 @@ but the public API and CLI must retain the input kind.
 The common path is:
 
 ```sh
-weaver symbols list --lang rust --query 'fn $NAME($...ARGS) { ... }'
+weaver symbols list \
+  --lang rust \
+  --query 'fn $NAME($...ARGS) { $...BODY }'
 ```
 
 The complete argument is host-language pattern text. It is not shell code and
@@ -217,8 +244,8 @@ The first compatibility subset supports:
 
 - ordinary metavariables such as `$NAME`;
 - anonymous metavariables such as `$_`; and
-- the subset of metavariable ellipsis that can be translated safely to the
-  existing `weaver-syntax` representation.
+- metavariable ellipsis forms which translate safely to the existing
+  `weaver-syntax` representation.
 
 The adapter rejects unsupported or lexically unsafe constructs with stable
 diagnostics. It must not reinterpret unsupported public syntax as a different
@@ -283,11 +310,13 @@ backend replacement does not change pipeline shape.
 ### 6.5. Selector record version 1
 
 `weaver symbols list --json` emits one JSON object per line. A representative
-record is:
+selector record is:
 
 ```json
 {
   "schema": "weaver.selector.v1",
+  "stream_id": "stream_...",
+  "sequence": 0,
   "selector_id": "sel_...",
   "workspace_id": "ws_...",
   "uri": "file:///workspace/src/lib.rs",
@@ -331,8 +360,7 @@ record is:
 The exact field spelling is ratified by schema fixtures, but version 1 must
 contain:
 
-- schema identity;
-- stable selector identity;
+- schema, stream, sequence, and selector identity;
 - workspace and URI identity;
 - language;
 - complete match span;
@@ -349,29 +377,84 @@ provenance. A future calibrated matcher may add a separately versioned score.
 Capture text is optional and bounded. Omission includes a reason so consumers
 can distinguish a deliberate cap from a missing capture.
 
-### 6.6. Streaming semantics
+### 6.6. Completion record version 1
+
+The producer emits exactly one terminal record after the final selector:
+
+```json
+{
+  "schema": "weaver.selector-stream-end.v1",
+  "stream_id": "stream_...",
+  "complete": true,
+  "emitted_selectors": 7,
+  "query_digest": "sha256:...",
+  "workspace_id": "ws_...",
+  "provider": {
+    "capability": "symbol.query",
+    "id": "weaver-syntax-compat-v1"
+  },
+  "truncated": false
+}
+```
+
+The terminal record proves producer completion. Its count describes the
+producer's original output. A filter may intentionally drop selectors, so a
+consumer does not require the received selector count to equal that field.
+
+A stream is invalid when:
+
+- the completion record is absent;
+- there is more than one completion record;
+- records appear after completion;
+- stream identities disagree; or
+- selector sequence numbers are invalid before filtering.
+
+### 6.7. Streaming semantics
 
 Machine output follows these rules:
 
-- stdout contains only selector JSONL records;
-- records sort by canonical URI, start byte, end byte, then selector identity;
-- zero matches produce zero stdout records and exit successfully;
-- syntax, validation, execution, or schema errors produce no selectors;
+- stdout contains selector records followed by one completion record;
+- selector records sort by canonical URI, start byte, end byte, then selector
+  identity;
+- zero matches produce a completion-only stream and a successful query exit;
+- syntax, validation, or execution failure produces no completion record;
 - structured diagnostics go to stderr with a stable non-zero exit class;
-- warnings that do not invalidate matches go to stderr and remain bounded;
-- no summary object is mixed into the selector stream; and
-- `jq -c` and other line-preserving filters may transform or reduce the stream.
+- warnings which do not invalidate matches go to stderr and remain bounded;
+- localized prose never enters machine records; and
+- consumers read to completion before producing effects.
+
+A completion-preserving filter looks like:
+
+```sh
+jq -c '
+  if .schema == "weaver.selector.v1" then
+    select(.captures.NAME.text | startswith("old_"))
+  else
+    .
+  end
+'
+```
+
+A naive filter which drops the completion record creates an invalid selector
+stream. This failure is preferable to an actuator mistaking a truncated prefix
+for an intentional subset.
 
 Human output may summarize and decorate matches, but it is not the stable
 pipeline protocol.
 
-### 6.7. Selector consumption and actuation
+### 6.8. Selector consumption and actuation
 
 A selector-aware command accepts an explicit typed source:
 
 ```sh
 weaver symbols list --lang rust --query 'fn $NAME($...ARGS)' --json \
-  | jq -c 'select(.captures.NAME.text | startswith("old_"))' \
+  | jq -c '
+      if .schema == "weaver.selector.v1" then
+        select(.captures.NAME.text | startswith("old_"))
+      else
+        .
+      end
+    ' \
   | weaver symbols rename --selectors - --new-name run
 ```
 
@@ -379,9 +462,11 @@ weaver symbols list --lang rust --query 'fn $NAME($...ARGS)' --json \
 `--selectors -` reads it from standard input. Generic `--from-stdin` is not the
 canonical selector flag because it does not identify the expected schema.
 
-A consumer validates:
+A consumer first reads or spools the complete bounded stream. It performs no
+mutation planning until it validates the completion record. It then validates:
 
-- selector schema version;
+- selector and completion schema versions;
+- stream and sequence structure;
 - workspace identity;
 - URI and language;
 - range ordering and bounds;
@@ -390,16 +475,16 @@ A consumer validates:
 - provider compatibility where relevant; and
 - command-specific zero-, one-, and many-match policy.
 
-The first mutation consumer should be `weaver symbols rename`, because an LSP
-rename naturally consumes a focus or match position. The shared selector
-contract remains suitable for later regex substitution, patch templating, and
-other LSP operations.
+The first mutation consumer should be `weaver symbols rename`, because a
+Language Server Protocol (LSP) rename naturally consumes a focus or match
+position. The shared selector contract remains suitable for later regular
+expression substitution, patch templating, and other LSP operations.
 
 Mutation commands default to refusal when several selectors would make intent
 ambiguous. An explicit command-specific option may authorize applying the same
 operation to all matches. Filtering the stream is also an explicit policy.
 
-### 6.8. Stale-source handling
+### 6.9. Stale-source handling
 
 A selector is an optimistic reference into mutable source. Its content digest
 and workspace revision are preconditions, not informational decorations.
@@ -413,7 +498,7 @@ to rerun the query.
 `--force` does not erase this precondition. Any override must identify the
 specific newly accepted source version.
 
-### 6.9. Heredocs and multiline input
+### 6.10. Heredocs and multiline input
 
 Heredoc support is input plumbing, not a second grammar. File-form flags accept
 `-` for standard input:
@@ -432,7 +517,7 @@ Diagnostics retain byte spans and source labels appropriate to the input
 origin.
 
 Because one process owns standard input once, mutually exclusive CLI validation
-rejects combinations that request more than one standard-input payload.
+rejects combinations which request more than one standard-input payload.
 
 ## 7. Delivery sequence
 
@@ -450,23 +535,25 @@ Observable result: a library caller compiles and executes a positive query.
 ### 7.2. Plateau B: public selector stream
 
 - Add the ADR 011 input flags to `weaver symbols list`.
-- Add the ADR 012 JSONL schema and deterministic renderer.
-- Include source identity and provider provenance.
+- Add ADR 012 selector and completion schemas.
+- Include source identity, stream identity, sequence, and provider provenance.
 - Add human diagnostics and stable machine diagnostics.
-- Prove zero, one, many, malformed, unsupported, and bounded cases.
+- Prove zero, one, many, malformed, unsupported, bounded, and truncated cases.
 
-Observable result: the public CLI emits useful selector records.
+Observable result: the public CLI emits useful completed selector streams.
 
 ### 7.3. Plateau C: pipeline handoff
 
 - Add a selector stream validator shared by consumers.
 - Accept `--selectors <path>|-` on the first selector-aware actuator.
+- Require successful completion before mutation planning.
 - Reject stale, malformed, cross-workspace, and unsupported selectors.
-- Prove `symbols list | jq -c | symbols rename --dry-run`.
+- Prove a completion-preserving
+  `symbols list | jq -c | symbols rename --dry-run` pipeline.
 - Commit only through the shared mutation engine from phase 16.
 
-Observable result: the same selector record crosses a process boundary and
-drives a safe mutation plan without hidden state.
+Observable result: the same selector records cross a process boundary and drive
+a safe mutation plan without hidden state.
 
 ### 7.4. Plateau D: replace the compatibility executor
 
@@ -514,12 +601,20 @@ Rejected by ADR 011.
 
 ### 8.5. Emit one JSON array
 
-An array is easy to deserialize but prevents natural streaming, increases peak
-memory, and makes ordinary line-oriented filters clumsier.
+An array makes completion obvious but prevents natural streaming, increases
+peak memory, and makes ordinary line-oriented filters clumsier.
 
 Rejected by ADR 012.
 
-### 8.6. Keep selectors in daemon memory
+### 8.6. Emit unframed JSONL selectors
+
+This is the simplest line protocol but cannot distinguish successful
+end-of-stream from a producer which failed after emitting a valid prefix. Shell
+`pipefail` does not expose the upstream status to the actuator process.
+
+Rejected by ADR 012.
+
+### 8.7. Keep selectors in daemon memory
 
 Opaque handles can be compact, but they do not survive process restart, cannot
 be inspected or filtered, and couple a consumer to the producer's daemon
@@ -559,14 +654,31 @@ A pipeline may pause while another agent or editor changes source files.
 Mitigation: source digests and workspace revisions travel with each selector;
 consumers and the shared mutation engine enforce them.
 
-### 9.5. Selector records become oversized
+### 9.5. Truncated streams appear valid
+
+A producer may fail after emitting several valid matches.
+
+Mitigation: successful output ends with a completion record, and actuators read
+the complete stream before planning. Missing or malformed completion refuses
+the whole input.
+
+### 9.6. Filters discard protocol control records
+
+A naive `jq 'select(...)'` expression may drop the completion record.
+
+Mitigation: documentation uses schema-aware pass-through filters, consumers
+refuse incomplete streams, and a future `weaver selectors filter` helper may
+cover common transformations.
+
+### 9.7. Selector records become oversized
 
 Capture text and many matches can flood agent context or pipes.
 
-Mitigation: match caps, capture-text caps, deterministic truncation diagnostics,
-and optional text omission are part of the first stream contract.
+Mitigation: match caps, capture-text caps, deterministic truncation metadata,
+and optional text omission are part of the first stream contract. Consumers
+spool bounded streams above their in-memory threshold.
 
-### 9.6. Two input syntaxes confuse users
+### 9.8. Two input syntaxes confuse users
 
 Bare patterns and expressions have different quoting and capabilities.
 
@@ -584,24 +696,30 @@ The RFC is satisfied when all of the following are true:
 4. `Engine::execute` returns real Rust, Python, and TypeScript matches for the
    documented compatibility subset.
 5. `weaver symbols list --query` emits deterministic human results.
-6. `weaver symbols list --query --json` emits one valid
-   `weaver.selector.v1` record per match.
-7. Zero matches produce no selector records and a successful query exit.
+6. `weaver symbols list --query --json` emits valid
+   `weaver.selector.v1` records followed by one
+   `weaver.selector-stream-end.v1` record.
+7. Zero matches produce a completion-only stream and a successful query exit.
 8. Selector records include source identity and visible backend provenance.
-9. `--query-file -` and `--expr-file -` accept multiline standard input.
-10. Invalid flag combinations enumerate the accepted alternatives.
-11. A selector validator accepts producer output after `jq -c` filtering.
-12. The first actuator accepts `--selectors -`, rejects stale records, and
-    produces a shared mutation plan under `--dry-run`.
-13. Full Sempai executor fixtures can replace the compatibility adapter without
+9. Selector and completion records share one stream identity.
+10. A producer failure never emits a successful completion record.
+11. `--query-file -` and `--expr-file -` accept multiline standard input.
+12. Invalid flag combinations enumerate the accepted alternatives.
+13. A selector validator accepts producer output after a
+    completion-preserving `jq -c` filter.
+14. The first actuator accepts `--selectors -`, reads the complete stream,
+    rejects absent completion and stale records, and produces a shared mutation
+    plan under `--dry-run`.
+15. Full Sempai executor fixtures can replace the compatibility adapter without
     changing selector schema or ordering.
-14. Documentation distinguishes implemented, compatibility-subset, parse-only,
+16. Documentation distinguishes implemented, compatibility-subset, parse-only,
     unsupported, and planned behaviour.
 
 ## 11. Outstanding decisions
 
 - Select the stable digest algorithm and selector identifier derivation.
 - Decide whether query file diagnostics use filesystem paths or file URIs.
+- Select the consumer in-memory threshold and spool format.
 - Decide whether a future `--require-match` producer option is useful, while
   retaining successful zero-match semantics by default.
 - Select the first non-rename selector consumer after the LSP rename pilot.
