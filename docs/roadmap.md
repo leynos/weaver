@@ -601,7 +601,14 @@ command-contract tasks are tracked in the
       patch contract.
   - Requires 16.1.1 and depends on OrthoConfig 7.2.1.
   - Success: repeated equivalent submissions return the existing transaction
-    or refusal instead of duplicating work, including after process restart.
+    or refusal instead of duplicating work, including after process restart;
+    atomically persist the idempotency record before patch commit, recover
+    incomplete records crash-consistently, and retain successful records for a
+    configured bounded window beginning only after the patch commit is durable.
+    Retain refusals for a separately configured bounded window beginning when
+    the refusal becomes terminal, and scope after-restart duplicate prevention
+    to the applicable window.
+    Duplicate prevention does not rely on 19.1.2.
 - [ ] 16.1.3. Standardize mutation `--dry-run`, `--force`, and structured
       safety metadata.
   - Requires 16.1.2 and depends on OrthoConfig 7.2.1.
@@ -615,7 +622,7 @@ command-contract tasks are tracked in the
     consumers submit one shared mutation-plan type; adapters do not duplicate
     verification, conflict detection, commit, or rollback behaviour.
 - [ ] 16.1.5. Verify complete workspace deltas through both safety locks.
-  - Requires 16.1.4 and 12.3.4.
+  - Requires 16.1.4, 12.3.4, and 12.3.5.
   - Success: create, replace, delete, and move operations enter one staged
     workspace view; Tree-sitter validates final content; Language Server
     Protocol (LSP) verification observes the complete proposed delta and
