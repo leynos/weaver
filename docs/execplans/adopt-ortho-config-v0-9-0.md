@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: IN REVIEW — PR #225 is under review
+Status: IN REVIEW — PR `#225` is under review
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root. Drafting this plan does not authorize implementation. Await
@@ -42,9 +42,11 @@ Observable success means all of the following are true:
   normalization without mutating the test process environment.
 - A binary-level test proves that child-process environment configuration and
   CLI override precedence still pass through the real `weaver` composition root.
-- `make check-fmt`, `make typecheck`, `make lint`, and `make test` pass after
-  each completed major milestone. Documentation milestones additionally pass
-  `make markdownlint` and `make nixie`.
+- The current validation result is: `make check-fmt`, `make typecheck`,
+  `make lint`, `make markdownlint`, and `make nixie` pass. `make test` remains
+  unresolved with 13 existing Python graph-slice snapshot failures involving
+  unaccepted `lsp_hover` output in
+  `crates/weaver-e2e/tests/snapshots/graph_slice_python_*.snap.new`.
 
 ## Constraints
 
@@ -188,17 +190,19 @@ Observable success means all of the following are true:
 - [x] (2026-08-12 18:52Z) Obtain explicit approval for this draft through the
   implementation request.
 - [x] (2026-08-15) Capture the pre-review deterministic gate baseline:
-      `make check-fmt`, `make typecheck`, `make lint`, `make test`,
-      `make markdownlint`, and `make nixie` all pass. A separate baseline
-      review run recorded 13 existing Python graph-slice `lsp_hover` snapshot
-      failures as an exception outside this migration's scope.
+      `make check-fmt`, `make typecheck`, `make lint`, `make markdownlint`,
+      and `make nixie` pass. `make test` remains unresolved: it reports 13
+      existing Python graph-slice snapshot failures involving unaccepted
+      `lsp_hover` output in
+      `crates/weaver-e2e/tests/snapshots/graph_slice_python_*.snap.new`.
+      No snapshot changes are included in this PR.
 - [x] (2026-08-15) Complete final review validation after reconciling the
   pre-existing snapshot and Whitaker findings. `make check-fmt`, `make lint`,
-  `make typecheck`, and `make test` pass; `make test` reports 1,474 nextest
-  tests passed and four skipped, with doctests passing. `make markdownlint`
-  reports 45 Python and 0 Markdown errors, and `make nixie` passes. The 13
-  snapshot failures recorded in the pre-review baseline are absent from this
-  validation.
+  `make typecheck`, `make markdownlint`, and `make nixie` pass. `make test`
+  remains unresolved with the same 13 existing Python graph-slice snapshot
+  failures involving unaccepted `lsp_hover` output in
+  `crates/weaver-e2e/tests/snapshots/graph_slice_python_*.snap.new`. No
+  snapshot changes are included in this PR.
 - [x] (2026-08-12 21:05Z) Remediate the prerequisite Whitaker
   `no_expect_outside_tests` failures as a separate fallibility pass, beginning
   with `weaver-cards` graph-slice steps and helpers. Each affected test-support
@@ -247,7 +251,7 @@ Observable success means all of the following are true:
   its dedicated manifest test.
 - [x] (2026-08-15) Complete final validation, review the diff for scope and
   architecture drift, and update the living sections and retrospective. PR
-  #225 is under review.
+  `#225` is under review; `make test` remains unresolved as recorded above.
 
 ## Surprises & discoveries
 
@@ -311,14 +315,19 @@ Observable success means all of the following are true:
   documentation milestone must make the new guide discoverable while preserving
   the older guides as history.
 
-- Observation: the mandatory pre-migration `make test` gate produced 17
-  unaccepted `insta` snapshot candidates in
+- Observation: `make test` reports 13 existing Python graph-slice snapshot
+  failures involving unaccepted `lsp_hover` output in
   `crates/weaver-e2e/tests/snapshots/graph_slice_python_*.snap.new`. Evidence:
-  the clean starting worktree gained those files while `make test` ran, so the
-  test gate was not green even though its captured output was truncated.
-  Impact: the baseline tolerance applies. Do not alter or accept those
-  unrelated snapshots as part of this configuration migration without explicit
-  direction.
+  the test gate remains unresolved with those unaccepted snapshot candidates.
+  No snapshot changes are included in this PR. Impact: do not alter or accept
+  those snapshot candidates as part of this configuration migration without
+  explicit direction.
+
+- Observation: GitHub searches for `lsp_hover`, `lsp hover`, `graph-slice`,
+  `graph slice snapshot`, and `graph_slice_python` found no issue tracking
+  these 13 failures. Issue `#130` concerns backend-lock duration and LSP
+  enrichment, not this snapshot failure. Impact: do not link issue `#130` as a
+  tracker and do not create an issue for these failures.
 
 - Observation: full lockfile regeneration updated 807 lines of `Cargo.lock`,
   including many unrelated SemVer-compatible packages. A selective update now
@@ -454,30 +463,31 @@ Observable success means all of the following are true:
   not weaken the lint or conflate it with OrthoConfig behaviour. Date/Author:
   2026-08-12, Codex.
 
-- Decision: preserve the historical record of the 13 existing Python
-  graph-slice `lsp_hover` snapshot failures as a pre-review exception.
-  Rationale: the failures were outside the OrthoConfig migration's scope and
-  were not reproduced by final review validation; neither the snapshots nor
-  their behaviour are changed here. Date/Author: 2026-08-15, Codex.
+- Decision: preserve the 13 existing Python graph-slice `lsp_hover` snapshot
+  failures as an unresolved validation exception. Rationale: the failures are
+  outside the OrthoConfig migration's scope, no snapshot changes are included
+  in this PR, and no GitHub issue tracks them. Do not link unrelated issue
+  `#130` or create a new issue. Date/Author: 2026-08-15, Codex.
 
-- Decision: keep PR #225 under review after the deterministic gates passed.
-  Rationale: implementation, focused validation, and documentation are
-  complete, while the historical baseline exception remains explicitly visible
-  for reviewers. Date/Author: 2026-08-15, Codex.
+- Decision: keep PR `#225` under review after the named non-test validation
+  gates passed. Rationale: implementation, focused validation, and
+  documentation are complete, while `make test` remains unresolved because of
+  the 13 existing snapshot failures. Date/Author: 2026-08-15, Codex.
 
 ## Outcomes & retrospective
 
 The dependency, hermetic test, and documentation changes are implemented and
 their focused tests pass. The boundary-manifest test, formatting, type
 checking, and focused Clippy checks also pass. Final review validation passed
-the full deterministic gate set (`make check-fmt`, `make lint`,
-`make typecheck`, and `make test`); `make test` reported 1,474 nextest tests
-passed, four skipped, and passing doctests. `make markdownlint` reported 45
-Python and 0 Markdown errors, and `make nixie` passed. The pre-review baseline
-recorded 13 existing Python graph-slice `lsp_hover` snapshot failures as a
-review exception, but current validation did not reproduce them. They remain
-historical context outside this migration's scope. PR #225 is under review,
-with all completed work checked in `Progress` above.
+`make check-fmt`, `make lint`, `make typecheck`, `make markdownlint`, and
+`make nixie`. `make test` remains unresolved: it reports 13 existing Python
+graph-slice snapshot failures involving unaccepted `lsp_hover` output in
+`crates/weaver-e2e/tests/snapshots/graph_slice_python_*.snap.new`. No snapshot
+changes are included in this PR, and the full workspace test gate is not
+claimed as passing. GitHub searches found no issue tracking these failures;
+issue `#130` concerns backend-lock duration and LSP enrichment, not this
+snapshot failure. PR `#225` is under review, with all completed work checked in
+`Progress` above.
 
 ## Context and orientation
 
@@ -930,10 +940,14 @@ The migration is accepted only when a reviewer can observe all of the following:
   is required unless production logic changes beyond this plan.
 - `rg -n 'std::env::(set_var|remove_var)' crates/weaver-config --glob '*.rs'`
   returns no matches.
-- `make check-fmt`, `make typecheck`, `make lint`, `make test`,
-  `make markdownlint`, and `make nixie` all exit zero at final validation.
+- The prospective final-validation criterion is that `make check-fmt`,
+  `make typecheck`, `make lint`, `make test`, `make markdownlint`, and
+  `make nixie` all exit zero. The current result does not meet this criterion:
+  `make test` remains unresolved as recorded in `Progress` and
+  `Outcomes & Retrospective`.
 
-Expected final gate transcript shape is:
+The expected final gate transcript shape below is prospective, not the current
+result:
 
 ```plaintext
 make check-fmt    exit 0
@@ -1052,8 +1066,11 @@ presented as control over the full configuration-value environment layer.
 ## Revision note
 
 This plan entered execution on 2026-08-12 after explicit approval. A selective
-lockfile update replaced a broad regeneration attempt. The pre-review baseline
-recorded unrelated E2E snapshots and BDD-step lint findings, including the 13
-Python graph-slice `lsp_hover` snapshot failures, as review exceptions. Final
-review validation passed the required gates; the recorded snapshot failures
-were absent from that validation. PR #225 remains under review.
+lockfile update replaced a broad regeneration attempt. Final review validation
+passed `make check-fmt`, `make lint`, `make typecheck`, `make markdownlint`, and
+`make nixie`. `make test` remains unresolved: it reports 13 existing Python
+graph-slice snapshot failures involving unaccepted `lsp_hover` output in
+`crates/weaver-e2e/tests/snapshots/graph_slice_python_*.snap.new`. No snapshot
+changes are included in this PR. GitHub searches found no issue tracking these
+failures; issue `#130` concerns backend-lock duration and LSP enrichment, not
+this snapshot failure. PR `#225` remains under review.
