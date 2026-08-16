@@ -24,7 +24,11 @@ use rstest::fixture;
 use weaver_test_macros::allow_fixture_expansion_lints;
 pub use world::{TestServerConfig, TestWorld};
 
-/// Common URI used by host tests.
+/// Returns the sample file URI used by tests.
+///
+/// # Panics
+///
+/// Panics if the fixed sample URI is invalid.
 #[allow_fixture_expansion_lints]
 #[fixture]
 pub fn sample_uri() -> Uri {

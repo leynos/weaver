@@ -61,7 +61,7 @@ impl ProcessTestWorld {
             wait_error: None,
             health_history: RefCell::new(Vec::new()),
         };
-        let _ = test_support::clear_health_events(world.health_path().as_path());
+        test_support::clear_health_events(world.health_path().as_path()).ok();
         world
     }
 
@@ -159,7 +159,7 @@ impl ProcessTestWorld {
         self.wait_error = None;
         self.health_history.borrow_mut().clear();
         self.shutdown = TestShutdownSignal::new();
-        let _ = test_support::clear_health_events(self.health_path().as_path());
+        test_support::clear_health_events(self.health_path().as_path()).ok();
     }
 
     pub fn record_wait_for_status(&mut self, expected: &str) {

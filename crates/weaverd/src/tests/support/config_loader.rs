@@ -5,6 +5,7 @@ use std::{
     sync::{Arc, Mutex, PoisonError},
 };
 
+use camino::Utf8PathBuf;
 use ortho_config::OrthoError;
 use tempfile::TempDir;
 use weaver_config::{Config, SocketEndpoint};
@@ -39,21 +40,26 @@ impl TestConfigLoader {
             .to_path_buf()
     }
 
-    #[must_use]
-    fn socket_path(&self) -> String {
+    fn socket_path(&self) -> Result<Utf8PathBuf, PathBuf> {
         let dir = self
             .socket_dir
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         let path = dir.path().join("weaverd.sock");
-        path.to_string_lossy().into_owned()
+        Utf8PathBuf::from_path_buf(path)
     }
 }
 
 impl ConfigLoader for TestConfigLoader {
     fn load(&self) -> Result<Config, Arc<OrthoError>> {
+        let socket_path = self.socket_path().map_err(|path| {
+            Arc::new(OrthoError::Validation {
+                key: String::from("daemon_socket"),
+                message: format!("test socket path is not valid UTF-8: {path:?}"),
+            })
+        })?;
         Ok(Config {
-            daemon_socket: SocketEndpoint::unix(self.socket_path()),
+            daemon_socket: SocketEndpoint::unix(socket_path.into_string()),
             ..Config::default()
         })
     }

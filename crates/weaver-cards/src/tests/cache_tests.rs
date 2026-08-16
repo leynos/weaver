@@ -255,11 +255,11 @@ fn extractor_reuses_parser_and_cache_for_identical_requests() {
     let parser_before = extractor
         .parser_identity(SupportedLanguage::Rust)
         .expect("parser identity should resolve");
-    let _ = extract_card(&extractor, &source).expect("first card extraction should succeed");
+    extract_card(&extractor, &source).expect("first card extraction should succeed");
     let parser_after_first = extractor
         .parser_identity(SupportedLanguage::Rust)
         .expect("parser identity should resolve");
-    let _ = extract_card(&extractor, &source).expect("second card extraction should succeed");
+    extract_card(&extractor, &source).expect("second card extraction should succeed");
     let parser_after_second = extractor
         .parser_identity(SupportedLanguage::Rust)
         .expect("parser identity should resolve");

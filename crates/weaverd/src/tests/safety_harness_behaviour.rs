@@ -276,63 +276,67 @@ fn when_edit_creates(
     world.borrow_mut().execute_transaction()
 }
 
-// ---- Then steps ----
-
-/// Helper for outcome assertion steps that execute the transaction if needed.
-fn assert_outcome<F>(world: &RefCell<SafetyHarnessWorld>, assertion: F)
+/// Executes the transaction, if needed, before asserting its outcome.
+fn assert_outcome<F>(world: &RefCell<SafetyHarnessWorld>, assertion: F) -> Result<(), String>
 where
     F: FnOnce(&Result<TransactionOutcome, SafetyHarnessError>),
 {
     if world.borrow().outcome().is_none() {
-        let _did_fail = world.borrow_mut().execute_transaction().is_err();
+        world.borrow_mut().execute_transaction()?;
     }
     let world = world.borrow();
     let Some(outcome) = world.outcome() else {
-        panic!("outcome should exist");
+        return Err("outcome should exist".to_string());
     };
     assertion(outcome);
+    Ok(())
 }
 
 #[then("the transaction commits successfully")]
-fn then_commits(world: &RefCell<SafetyHarnessWorld>) {
+fn then_commits(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
     assert_outcome(world, |outcome| {
         assert!(
             outcome.as_ref().is_ok_and(|o| o.committed()),
             "transaction should commit: {outcome:?}"
         );
-    });
+    })?;
+    Ok(())
 }
 
 #[then("the transaction fails with a syntactic lock error")]
-fn then_syntactic_fails(world: &RefCell<SafetyHarnessWorld>) {
+fn then_syntactic_fails(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
         Ok(TransactionOutcome::SyntacticLockFailed { .. }) => {}
         other => panic!("expected syntactic lock failure, got {other:?}"),
-    });
+    })?;
+    Ok(())
 }
 
 #[then("the transaction fails with a semantic lock error")]
-fn then_semantic_fails(world: &RefCell<SafetyHarnessWorld>) {
+fn then_semantic_fails(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
         Ok(TransactionOutcome::SemanticLockFailed { .. }) => {}
         other => panic!("expected semantic lock failure, got {other:?}"),
-    });
+    })?;
+    Ok(())
 }
 
 #[then("the transaction fails with a backend error")]
-fn then_backend_error(world: &RefCell<SafetyHarnessWorld>) {
+fn then_backend_error(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
         Err(SafetyHarnessError::SemanticBackendUnavailable { .. }) => {}
         other => panic!("expected backend error, got {other:?}"),
-    });
+    })?;
+    Ok(())
 }
 
 #[then("the transaction reports no changes")]
-fn then_no_changes(world: &RefCell<SafetyHarnessWorld>) {
+fn then_no_changes(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
         Ok(TransactionOutcome::NoChanges) => {}
         other => panic!("expected no changes, got {other:?}"),
-    });
+    })?;
+    Ok(())
 }
 
 #[then("the file contains {expected}")]

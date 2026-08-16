@@ -33,7 +33,8 @@ fn isolated_command(temp_dir: &TempDir) -> assert_cmd::Command {
 
 #[test]
 fn capabilities_probe_succeeds() {
-    let mut command = cargo_bin_cmd!("weaver");
+    let temp_dir = TempDir::new().expect("create temporary home");
+    let mut command = isolated_command(&temp_dir);
     command.arg("--capabilities");
     command.assert().success();
 }

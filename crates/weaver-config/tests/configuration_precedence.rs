@@ -10,7 +10,14 @@ use pretty_assertions::assert_eq;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use serde_json::{Value, json};
-use weaver_config::{Config, default_log_filter, default_log_format, default_socket_endpoint};
+use weaver_config::{
+    CapabilityDirective,
+    CapabilityOverride,
+    Config,
+    default_log_filter,
+    default_log_format,
+    default_socket_endpoint,
+};
 use weaver_test_macros::allow_fixture_expansion_lints;
 
 struct Harness {
@@ -152,7 +159,16 @@ fn then_invalid_locale_is_reported(harness: &Harness) {
 
 #[then("the resolved capability matrix denies the Rust rename capability")]
 fn then_rename_is_denied(harness: &Harness) {
-    let matrix = harness.config().capability_matrix();
+    let config = harness.config();
+    assert_eq!(
+        config.capability_overrides,
+        vec![CapabilityDirective::new(
+            "rust",
+            "observe.rename",
+            CapabilityOverride::Deny,
+        )]
+    );
+    let matrix = config.capability_matrix();
     assert_eq!(
         matrix.override_for("rust", "observe.rename"),
         Some(weaver_config::CapabilityOverride::Deny)
