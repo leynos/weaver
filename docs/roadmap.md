@@ -515,14 +515,14 @@ classifications for these tasks are tracked in the
 
 - [ ] 15.3.1. Add Sempai execution routing in `weaverd` for selector-backed
       `symbols list`.
-  - Requires 15.1.2, 14.3.1, and 12.3.3.
+  - Requires 15.1.2 and 12.3.3.
   - Success: positive Rust, Python, and TypeScript plans execute through an
     explicitly labelled `weaver-syntax` compatibility adapter; unsupported
     constructs refuse rather than drift semantically; and daemon execution
     returns canonical matches with visible capability and provider provenance.
 - [ ] 15.3.2. Add `weaver symbols list --query` with `--lang`, `--uri`, and
       explicit query-source inputs.
-  - Requires 15.3.1 and 14.2.1.
+  - Requires 15.3.1 and phase 13.
   - Success: the CLI implements ADR 011 with mutually exclusive
     `--query|--query-file|--expr|--expr-file|--rule|--rule-file` inputs,
     accepts `-` on file forms for standard input, enumerates invalid
