@@ -132,6 +132,6 @@ readers can find the source of truth without scanning the whole tree.
 - [Weaver `act refactor` rename position migration guide](weaver-act-refactor-rename-position-migration-guide.md)
   - Migration notes for moving `act refactor` rename from `offset=` to
     `--position LINE:COL`.
-- [Weaver LSP host v0.1.0 migration guide](weaver-lsp-host-v0.1.0-migration-guide.md)
+- [Weaver LSP host v0.1.0 migration guide](weaver-lsp-host-v0-1-0-migration-guide.md)
   - Migration details for Language Server Protocol (LSP) host capability and
     API changes.
