@@ -11,21 +11,32 @@ use crate::{
     tests::support::{ProcessTestWorld, fs as test_fs, snapshot_status},
 };
 
+type ProcessWorld = Result<RefCell<ProcessTestWorld>, String>;
+
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<ProcessTestWorld> { RefCell::new(ProcessTestWorld::new()) }
+fn world() -> ProcessWorld { Ok(RefCell::new(ProcessTestWorld::new()?)) }
+
+fn process_world(world: &ProcessWorld) -> Result<&RefCell<ProcessTestWorld>, String> {
+    world.as_ref().map_err(Clone::clone)
+}
 
 #[given("a fresh daemon process world")]
-fn given_world(world: &RefCell<ProcessTestWorld>) { let _ = world; }
+fn given_world(world: &ProcessWorld) -> Result<(), String> {
+    let _ = process_world(world)?;
+    Ok(())
+}
 
 #[when("the daemon starts in background mode")]
-fn when_daemon_starts_background(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn when_daemon_starts_background(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world.borrow_mut().start_background()?;
     Ok(())
 }
 
 #[when("the daemon starts in foreground mode")]
-fn when_daemon_starts_foreground(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn when_daemon_starts_foreground(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world
         .borrow_mut()
         .start_foreground(LaunchMode::Foreground, true)?;
@@ -33,46 +44,58 @@ fn when_daemon_starts_foreground(world: &RefCell<ProcessTestWorld>) -> Result<()
 }
 
 #[when("the daemon starts in foreground mode with invalid configuration")]
-fn when_daemon_starts_invalid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn when_daemon_starts_invalid(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world.borrow_mut().start_foreground_with_invalid_config()?;
     Ok(())
 }
 
 #[when("shutdown is triggered")]
-fn when_shutdown_triggered(world: &RefCell<ProcessTestWorld>) { world.borrow().trigger_shutdown(); }
+fn when_shutdown_triggered(world: &ProcessWorld) -> Result<(), String> {
+    process_world(world)?.borrow().trigger_shutdown();
+    Ok(())
+}
 
 #[when("we wait for the daemon to become ready")]
-fn when_wait_for_ready(world: &RefCell<ProcessTestWorld>) {
-    world.borrow_mut().record_wait_for_status("ready");
+fn when_wait_for_ready(world: &ProcessWorld) -> Result<(), String> {
+    process_world(world)?
+        .borrow_mut()
+        .record_wait_for_status("ready");
+    Ok(())
 }
 
 #[when("the daemon run completes")]
 #[then("the daemon run completes")]
-fn daemon_run_completes(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn daemon_run_completes(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world.borrow_mut().join_background()?;
     Ok(())
 }
 
 #[given("stale runtime artefacts exist")]
-fn given_stale_runtime(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn given_stale_runtime(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world.borrow().write_stale_runtime()?;
     Ok(())
 }
 
 #[given("stale runtime artefacts with invalid pid exist")]
-fn given_stale_runtime_invalid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn given_stale_runtime_invalid(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world.borrow().write_stale_runtime_with_invalid_pid(99999)?;
     Ok(())
 }
 
 #[given("a lock without a pid file exists")]
-fn given_lock_without_pid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn given_lock_without_pid(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world.borrow().write_lock_without_pid()?;
     Ok(())
 }
 
 #[then("daemonisation was requested")]
-fn then_daemonisation_requested(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_daemonisation_requested(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world
         .borrow()
         .wait_for_condition(
@@ -83,7 +106,8 @@ fn then_daemonisation_requested(world: &RefCell<ProcessTestWorld>) -> Result<(),
 }
 
 #[then("the daemon wrote the lock file")]
-fn then_lock_file_exists(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_lock_file_exists(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world
         .borrow()
         .wait_for_condition(
@@ -94,7 +118,8 @@ fn then_lock_file_exists(world: &RefCell<ProcessTestWorld>) -> Result<(), String
 }
 
 #[then("the daemon wrote the pid file")]
-fn then_pid_file_exists(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_pid_file_exists(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     {
         let world_ref = world.borrow();
         world_ref
@@ -121,7 +146,8 @@ fn then_pid_file_exists(world: &RefCell<ProcessTestWorld>) -> Result<(), String>
 }
 
 #[then("the daemon wrote the ready health snapshot")]
-fn then_health_ready(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_health_ready(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     {
         let world_ref = world.borrow();
         world_ref
@@ -137,7 +163,8 @@ fn then_health_ready(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
 }
 
 #[then("the daemon recorded the starting health snapshot")]
-fn then_health_starting(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_health_starting(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world
         .borrow()
         .wait_for_condition(
@@ -148,7 +175,8 @@ fn then_health_starting(world: &RefCell<ProcessTestWorld>) -> Result<(), String>
 }
 
 #[then("the daemon wrote the stopping health snapshot")]
-fn then_health_stopping(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_health_stopping(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world
         .borrow()
         .wait_for_condition(
@@ -159,7 +187,8 @@ fn then_health_stopping(world: &RefCell<ProcessTestWorld>) -> Result<(), String>
 }
 
 #[then("the runtime artefacts are removed")]
-fn then_runtime_removed(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_runtime_removed(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     let world = world.borrow();
     assert!(
         !test_fs::exists(world.lock_path()).map_err(|error| format!("check lock file: {error}"))?,
@@ -178,7 +207,8 @@ fn then_runtime_removed(world: &RefCell<ProcessTestWorld>) -> Result<(), String>
 }
 
 #[then("the stale runtime pid is replaced with the current process id")]
-fn then_stale_pid_replaced(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_stale_pid_replaced(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     let pid = world
         .borrow()
         .read_pid()
@@ -193,7 +223,8 @@ fn then_stale_pid_replaced(world: &RefCell<ProcessTestWorld>) -> Result<(), Stri
 }
 
 #[then("the lock file remains in place")]
-fn then_lock_remains(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_lock_remains(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     assert!(
         world.borrow().lock_exists()?,
         "lock file should remain when launch is still in progress",
@@ -202,7 +233,8 @@ fn then_lock_remains(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
 }
 
 #[then("starting the daemon again fails with already running")]
-fn then_duplicate_start_fails(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_duplicate_start_fails(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     world
         .borrow_mut()
         .start_foreground(LaunchMode::Foreground, false)
@@ -221,7 +253,8 @@ fn then_duplicate_start_fails(world: &RefCell<ProcessTestWorld>) -> Result<(), S
 }
 
 #[then("the daemon run succeeds")]
-fn then_daemon_succeeds(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_daemon_succeeds(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     let binding = world.borrow();
     let result = binding
         .last_result()
@@ -231,17 +264,18 @@ fn then_daemon_succeeds(world: &RefCell<ProcessTestWorld>) -> Result<(), String>
 }
 
 #[then("the daemon run fails with launch already in progress")]
-fn then_daemon_fails_launch_in_progress(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    assert_daemon_error_contains(world, "launch already in progress")
+fn then_daemon_fails_launch_in_progress(world: &ProcessWorld) -> Result<(), String> {
+    assert_daemon_error_contains(process_world(world)?, "launch already in progress")
 }
 
 #[then("the daemon run fails with invalid configuration")]
-fn then_daemon_fails_invalid_config(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    assert_daemon_error_contains(world, "invalid://socket")
+fn then_daemon_fails_invalid_config(world: &ProcessWorld) -> Result<(), String> {
+    assert_daemon_error_contains(process_world(world)?, "invalid://socket")
 }
 
 #[then("waiting for readiness fails")]
-fn then_wait_ready_fails(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+fn then_wait_ready_fails(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
     let error = world
         .borrow_mut()
         .take_wait_error()
@@ -278,4 +312,4 @@ fn assert_daemon_error_contains(
 }
 
 #[scenario(path = "tests/features/daemon_process.feature")]
-fn daemon_process(#[from(world)] _: RefCell<ProcessTestWorld>) {}
+fn daemon_process(#[from(world)] _: ProcessWorld) {}

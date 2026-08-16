@@ -19,15 +19,17 @@ pub struct TestConfigLoader {
 }
 
 impl TestConfigLoader {
-    #[must_use]
-    pub fn new() -> Self {
-        let dir = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(error) => panic!("create temporary directory for socket: {error}"),
-        };
-        Self {
+    /// Creates a loader backed by a fresh temporary runtime directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the temporary runtime directory cannot be created.
+    pub fn new() -> Result<Self, String> {
+        let dir = TempDir::new()
+            .map_err(|error| format!("create temporary directory for socket: {error}"))?;
+        Ok(Self {
             socket_dir: Arc::new(Mutex::new(dir)),
-        }
+        })
     }
 
     /// Returns the directory backing the temporary runtime.

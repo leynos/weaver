@@ -13,8 +13,8 @@ use super::support::{
 use crate::{BackendKind, bootstrap_with};
 
 #[rstest]
-fn bootstrap_does_not_eagerly_start_backends() {
-    let loader = TestConfigLoader::new();
+fn bootstrap_does_not_eagerly_start_backends() -> Result<(), String> {
+    let loader = TestConfigLoader::new()?;
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
 
@@ -24,11 +24,12 @@ fn bootstrap_does_not_eagerly_start_backends() {
     assert!(events.contains(&HealthEvent::BootstrapStarting));
     assert!(events.contains(&HealthEvent::BootstrapSucceeded));
     assert!(provider.recorded_starts().is_empty());
+    Ok(())
 }
 
 #[rstest]
-fn ensure_backend_starts_on_demand() {
-    let loader = TestConfigLoader::new();
+fn ensure_backend_starts_on_demand() -> Result<(), String> {
+    let loader = TestConfigLoader::new()?;
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
     let mut daemon = bootstrap_with(&loader, reporter.clone(), provider.clone())
@@ -41,11 +42,12 @@ fn ensure_backend_starts_on_demand() {
     let events = reporter.events();
     assert!(events.contains(&HealthEvent::BackendStarting(BackendKind::Semantic)));
     assert!(events.contains(&HealthEvent::BackendReady(BackendKind::Semantic)));
+    Ok(())
 }
 
 #[rstest]
-fn ensure_backend_propagates_failures() {
-    let loader = TestConfigLoader::new();
+fn ensure_backend_propagates_failures() -> Result<(), String> {
+    let loader = TestConfigLoader::new()?;
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
     provider.fail_on(BackendKind::Relational, "deliberate failure");
@@ -61,4 +63,5 @@ fn ensure_backend_propagates_failures() {
         kind: BackendKind::Relational,
         message: "deliberate failure".to_owned(),
     }));
+    Ok(())
 }

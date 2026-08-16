@@ -44,13 +44,9 @@ pub struct ProcessTestWorld {
     health_history: RefCell<Vec<String>>,
 }
 
-impl Default for ProcessTestWorld {
-    fn default() -> Self { Self::new() }
-}
-
 impl ProcessTestWorld {
-    pub fn new() -> Self {
-        let loader = TestConfigLoader::new();
+    pub fn new() -> Result<Self, String> {
+        let loader = TestConfigLoader::new()?;
         let world = Self {
             loader,
             reporter: Arc::new(RecordingHealthReporter::default()),
@@ -62,7 +58,7 @@ impl ProcessTestWorld {
             health_history: RefCell::new(Vec::new()),
         };
         test_support::clear_health_events(world.health_path().as_path()).ok();
-        world
+        Ok(world)
     }
 
     pub fn start_background(&mut self) -> StepResult {
