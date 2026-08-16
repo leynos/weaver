@@ -255,6 +255,10 @@ Observable success means all of the following are true:
   architecture drift, and update the living sections and retrospective. PR
   `#225` is under review; all named validation gates pass, with the historical
   snapshot baseline recorded above.
+- [x] (2026-08-16) Commit `3508a00` (`Harden review test support`) was
+  lease-pushed. The named final gates pass: `make check-fmt`, `make lint`,
+  `make typecheck`, `make test`, `make markdownlint`, and `make nixie`;
+  `make test` reports 1,474 passed and 4 skipped, with no snapshot artefacts.
 
 ## Surprises & discoveries
 
@@ -331,6 +335,18 @@ Observable success means all of the following are true:
   these 13 failures. Issue `#130` concerns backend-lock duration and LSP
   enrichment, not this snapshot failure. Impact: do not link issue `#130` as a
   tracker and do not create an issue for these failures.
+
+- Observation: the raw merged `Config.capability_overrides` assertion is
+  necessary because `capability_matrix` independently applies last-wins to raw
+  directives. Evidence: the matrix assertion can pass even if the post-merge
+  normalization hook is removed. Impact: retain the raw-vector assertion in the
+  precedence test as the non-vacuous normalization check.
+
+- Observation: a scoped tracing subscriber omitted the semantic-validation
+  event in the focused Sempai test. Evidence: the package test failed at that
+  assertion with the scoped subscriber. Impact: use an owned, once-installed
+  subscriber with serial capture and an RAII guard that resets state after each
+  test.
 
 - Observation: full lockfile regeneration updated 807 lines of `Cargo.lock`,
   including many unrelated SemVer-compatible packages. A selective update now
@@ -479,6 +495,22 @@ Observable success means all of the following are true:
   focused validation, and documentation are complete, while the earlier
   snapshot observation remains recorded as historical evidence. Date/Author:
   2026-08-16, Codex.
+
+- Decision: assert the raw merged `Config.capability_overrides` vector in
+  addition to `capability_matrix`. Rationale: the matrix helper independently
+  applies last-wins, so it does not prove that the post-merge normalization
+  hook retained one CLI override. Date/Author: 2026-08-16, Codex.
+
+- Decision: use an owned once-installed tracing subscriber with serial,
+  RAII-reset capture state. Rationale: the scoped subscriber experiment omitted
+  the semantic-validation event, while a process-wide subscriber without reset
+  would couple test state across cases. Date/Author: 2026-08-16, Codex.
+
+- Decision: route focused review setup failures through `Result` test
+  boundaries and keep the capabilities probe hermetic. Rationale: this
+  preserves non-UTF-8 temporary socket-path errors as configuration failures,
+  propagates operational setup errors, and excludes ambient configuration from
+  the binary probe. Date/Author: 2026-08-16, Codex.
 
 ## Outcomes & retrospective
 
@@ -1078,4 +1110,8 @@ failures involving unaccepted `lsp_hover` output recorded in the pre-review
 baseline, and produced no `.snap.new` artefacts. No snapshot changes are
 included in this PR. GitHub searches found no issue tracking the historical
 observation; issue `#130` concerns backend-lock duration and LSP enrichment,
-not this snapshot failure. PR `#225` remains under review.
+not this snapshot failure. PR `#225` remains under review. On 2026-08-16, commit
+`3508a00` (`Harden review test support`) captured the current review evidence:
+a raw merged capability assertion, serialized RAII-reset tracing capture, and
+fallible, hermetic test boundaries. This revision records that implementation
+provenance in the living plan.
