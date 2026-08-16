@@ -941,6 +941,31 @@ removing the current drift risk between clap-generated roff output and runtime
 help text. The packaging contract should still guarantee an `en-US` manpage,
 while allowing distributors to ship additional locales as optional artefacts.
 
+#### 2.1.12. Workspace identity and daemon tenancy
+
+The default `weaverd` endpoint is one local, per-user service boundary, not one
+repository boundary. Every routable CLI request must therefore carry a
+workspace locator derived from the invocation context or an explicit public
+override. The daemon validates and canonicalizes that locator before domain
+routing, then selects workspace-owned state using the resulting key. A client
+path is untrusted input; it does not become filesystem authority merely because
+the client calls it canonical.
+
+The current implementation still captures one startup directory and retains it
+as the request handler's workspace root. Until the workspace request contract
+and registry land, separate configured sockets remain the only safe way to run
+one daemon against each repository.
+[RFC 0002](rfcs/0002-multi-workspace-daemon.md) defines the migration from that
+implementation to the target per-user, multi-workspace service.
+[ADR 008](adr-008-workspace-scoped-daemon-tenancy.md) records the proposed
+tenancy boundary.
+
+The workspace key must be resolved before capability selection, cache lookup,
+language-server leasing, plugin execution, or mutation. Workspace-sensitive
+state never falls back to process working directory. Immutable registries may
+remain daemon-global, while path-, revision-, configuration-, document-, and
+toolchain-sensitive state belongs to one workspace.
+
 ### 2.2. Semantic, Syntactic, and Relational Fusion
 
 A core premise of `Weaver` is that a truly robust understanding of a codebase
@@ -1407,8 +1432,10 @@ through a `StructuredHealthReporter` that records `bootstrap_starting`,
 events are logged as structured traces, matching the roadmap's requirement for
 supervised backends.
 
-Process supervision now enforces the singleton contract described in the
-roadmap. A dedicated `ProcessGuard` claims a lock file (`weaverd.lock`) under
+Process supervision now enforces one daemon per user and configured runtime
+endpoint. This singleton process is intended to host several isolated
+workspaces; it is not evidence that the daemon owns only its bootstrap
+directory. A dedicated `ProcessGuard` claims a lock file (`weaverd.lock`) under
 the runtime directory before any work begins. If the lock already exists the
 guard first checks whether a PID file is present: the absence of `weaverd.pid`
 is treated as "launch already in progress" so a second invocation refuses to
@@ -1480,6 +1507,50 @@ a backend has already started and surfaces errors using a dedicated
 paths, ensuring that lazy initialization and error propagation behave as
 designed.
 
+#### 2.3.3. Workspace registry and execution boundary
+
+The target daemon replaces one request-wide backend owner with a
+`WorkspaceManager`. The manager maps daemon-resolved canonical roots to
+reference-counted `WorkspaceState` values. Its lock covers lookup,
+single-flight creation, retirement marking, and removal only. Routing,
+filesystem input/output, plugin execution, server startup, and queue waits all
+occur after that lock has been released.
+
+For screen readers: the following diagram shows daemon-global admission and
+immutable registries feeding a short-lived workspace lookup, after which work
+continues inside independent workspace states.
+
+```mermaid
+flowchart TB
+    A[Bounded daemon admission] --> M[Workspace manager]
+    M --> W1[Workspace A state]
+    M --> W2[Workspace B state]
+    G[Immutable daemon registries] --> W1
+    G --> W2
+    W1 --> P1[Language-server pool]
+    W1 --> C1[Caches and revision]
+    W1 --> X1[Mutation coordinator]
+    W2 --> P2[Language-server pool]
+    W2 --> C2[Caches and revision]
+    W2 --> X2[Mutation coordinator]
+```
+
+*Figure 1: Daemon-global admission and isolated workspace-owned state.*
+
+Each workspace state owns caches, the committed revision, language-server
+lifecycle, and mutation coordination. Its lifecycle is explicit: creation is
+single-flight, active leases prevent eviction, draining refuses new work, and
+retirement occurs only after outstanding leases finish or are cancelled within
+a bounded shutdown policy. Server and workspace budgets are independent so
+evicting one idle server does not require discarding all workspace metadata.
+
+Admission is bounded at daemon, workspace, and server scopes. Saturation should
+produce a structured, retryable reason whenever the transport can respond;
+queue wait, execution time, rejection, restart, and eviction are separate
+observability events governed by
+[RFC 0001](rfcs/0001-o11y.md). [ADR 010](adr-010-workspace-local-concurrency.md)
+records the proposed concurrency boundary.
+
 ## 3. Core Components: A Technical Deep Dive
 
 This section provides a detailed examination of the core technologies that
@@ -1549,6 +1620,36 @@ then explicitly requests a fresh set of diagnostics from the LSP server to
 verify the semantic state. This approach makes `Weaver` resilient to the
 inherent race conditions and state inconsistencies of the Language Server
 Protocol.
+
+#### 3.1.1. Workspace-scoped server lifecycle and execution identity
+
+The target `LspHost` is owned beneath one `WorkspaceState`. It may reuse a
+healthy server only while the server's complete execution identity remains
+equal: language, configured command and arguments, resolved executable or
+toolchain, server configuration, and adapter-declared environment inputs.
+Unrelated repositories never share a process merely because they use the same
+language or Rust toolchain.
+
+Every server starts in the selected workspace or adapter-selected project root
+and initializes with matching `rootUri` and `workspaceFolders` values when the
+server supports workspace folders. Open documents, document versions, pending
+diagnostics, and request correlation remain session-local. An adapter may
+select a nested project root inside a workspace, but it may not add an
+unrelated repository to the session.
+
+Rust server identity is resolved explicitly in the target workspace. When
+rustup manages the executable, Weaver records the active toolchain and launches
+`rustup run <toolchain> rust-analyzer`; it does not rely on the daemon's
+working directory or silently fall back when the selected toolchain lacks the
+component. Changes to toolchain files, Cargo configuration, Weaver adapter
+configuration, declared environment inputs, or bounded external override
+freshness retire the stale server before a replacement receives work.
+
+Health checks, bounded restart backoff, circuit breaking, process budgets, and
+idle eviction complete the lifecycle contract.
+[ADR 009](adr-009-workspace-scoped-language-server-lifecycle.md) records the
+proposed decision, and [RFC 0002](rfcs/0002-multi-workspace-daemon.md) defines
+its migration and verification requirements.
 
 ### 3.2. The Syntactic Scaffolding: Precision and Safety with Tree-sitter
 
@@ -2013,6 +2114,30 @@ routes the notifications to the appropriate server.
   request methods.
 - Failures in document sync map to `HostOperation::DidOpen`, `DidChange`, or
   `DidClose` for clearer error reporting in the safety harness.
+
+#### 4.2.3. Workspace-local mutation isolation
+
+The shared mutation engine belongs beneath one selected `WorkspaceState`. A
+mutation takes an exclusive workspace lease before capturing its baseline and
+holds that lease through staging, formatting, both safety locks,
+compare-and-swap checks, commit or rollback, and restoration of the shared LSP
+document view. Two workspaces may mutate concurrently; two mutations in one
+workspace may not commit concurrently.
+
+Read-only work may proceed concurrently when it observes the same committed
+revision and the selected backend supports concurrent requests. In the first
+implementation, reads in the same workspace wait while a mutation exposes
+staged documents to its live LSP session. This conservative rule prevents an
+unrelated reader from observing transaction-local `didChange` content.
+Transaction-scoped shadow servers remain a future optimization and require a
+separate decision if latency evidence justifies their process and lifecycle
+cost.
+
+Content digests and workspace revision checks remain the final commit guard;
+the mutation lease does not replace stale-base refusal. Disconnect and timeout
+handling must cancel queued work without abandoning a live commit or leaking a
+server lease. [ADR 010](adr-010-workspace-local-concurrency.md) records this
+proposed coordination model.
 
 ### 4.3. The current `act apply-patch` command and target patch surface
 
