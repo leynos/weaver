@@ -2,12 +2,16 @@
 
 This roadmap translates `docs/weaver-design.md`,
 `docs/adr-007-agent-native-command-surface.md`,
+`docs/adr-008-workspace-scoped-daemon-tenancy.md`,
+`docs/adr-009-workspace-scoped-language-server-lifecycle.md`,
+`docs/adr-010-workspace-local-concurrency.md`,
 `docs/sempai-query-language-design.md`,
 `docs/jacquard-card-first-symbol-graph-design.md`, `docs/rfcs/0001-o11y.md`,
-and the existing ADR set into an outcome-oriented delivery sequence. It does
-not promise dates. Phases carry testable product ideas, steps validate or
-falsify those ideas, and tasks are review-sized execution units with explicit
-dependencies and observable success criteria.
+`docs/rfcs/0002-multi-workspace-daemon.md`, and the existing ADR set into an
+outcome-oriented delivery sequence. It does not promise dates. Phases carry
+testable product ideas, steps validate or falsify those ideas, and tasks are
+review-sized execution units with explicit dependencies and observable success
+criteria.
 
 The current forward plan is the source of truth for future work. The historical
 ledger in [`docs/archive/prototype-roadmap.md`](archive/prototype-roadmap.md)
@@ -104,6 +108,59 @@ either hidden scope or a competing implementation plan.
   - Success: unchecked archive tasks that mention `observe`, `act`, `verify`,
     provider-first commands, or root `--output` are not executable backlog
     items; their product intent is carried by resource-first live tasks.
+
+### 12.3. Prove workspace-scoped daemon isolation and bounded execution
+
+This step answers whether one per-user daemon can safely amortize backend cost
+across several repositories before product slices depend on that service. It
+implements the boundaries proposed by:
+
+- [RFC 0002](rfcs/0002-multi-workspace-daemon.md);
+- [ADR 008](adr-008-workspace-scoped-daemon-tenancy.md);
+- [ADR 009](adr-009-workspace-scoped-language-server-lifecycle.md); and
+- [ADR 010](adr-010-workspace-local-concurrency.md).
+
+The work remains internal to the daemon protocol and runtime; it does not add
+an OrthoConfig command-contract consumer.
+
+- [ ] 12.3.1. Ratify the multi-workspace daemon contracts.
+  - Requires 12.2.3.
+  - Success: RFC 0002 and ADRs 008 through 010 are accepted or revised with no
+    unresolved contradiction between workspace identity, language-server
+    lifecycle, mutation isolation, and bounded admission.
+- [ ] 12.3.2. Carry canonical workspace identity across the daemon protocol.
+  - Requires 12.3.1.
+  - Success: every routable request carries a versioned workspace locator; the
+    daemon validates and canonicalizes it before routing, rejects incompatible
+    clients explicitly, and proves that aliases do not create duplicate mutable
+    state.
+- [ ] 12.3.3. Introduce workspace-owned state and lifecycle.
+  - Requires 12.3.2.
+  - Success: a `WorkspaceManager` performs single-flight lookup and creation;
+    caches, revisions, server pools, and mutation coordination belong to one
+    `WorkspaceState`; registry locks are not held across routing or external
+    input/output; and active leases prevent premature eviction.
+- [ ] 12.3.4. Scope language servers by workspace and execution identity.
+  - Requires 12.3.3.
+  - Success: process and LSP roots are explicit; Rust repositories select and
+    launch their active toolchains deterministically; configuration or
+    toolchain changes retire stale servers; and health, restart, process-budget,
+    and idle-eviction policies are bounded and tested.
+- [ ] 12.3.5. Replace daemon-wide serialization with bounded workspace-local
+      coordination.
+  - Requires 12.3.3 and 12.3.4.
+  - Success: unrelated workspaces and supported server operations make
+    concurrent progress; one workspace mutation holds an exclusive lease;
+    same-workspace readers cannot observe staged documents; and saturation
+    returns stable retryable reasons and records the saturation evidence that
+    RFC 0001 requires instead of silently dropping admitted work.
+- [ ] 12.3.6. Prove the multi-workspace service boundary end to end.
+  - Requires 12.3.5.
+  - Success: one per-user daemon safely serves simultaneous temporary Rust,
+    Python, and TypeScript repositories; the suite covers distinct stable and
+    dated-nightly Rust toolchains, toolchain changes, server crashes, restart
+    limits, overload, cancellation, eviction, and workspace-local mutation
+    ordering.
 
 ## 13. Command contract proving slice
 
@@ -219,7 +276,7 @@ local signals that support later read, mutation, and workflow slices. See RFC
 <!-- Separate the reference list above from the task checklist below. -->
 
 - [ ] 13.4.1. Define canonical daemon event names and structured fields.
-  - Requires 13.2.2 and 13.2.3.
+  - Requires 13.2.2, 13.2.3, and 12.3.5.
   - Success: lifecycle, request, dispatch, and listener events have stable
     names and the minimum diagnostic fields required by RFC 0001.
 - [ ] 13.4.2. Emit bounded structured events for daemon lifecycle and
@@ -268,7 +325,7 @@ Boundary classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 14.1.1. Implement `weaver definitions get`.
-  - Requires phase 13.
+  - Requires phase 13 and 12.3.6.
   - Success: position references return localized human output by default and
     stable JSON under `--json`, with provider provenance in machine output.
 - [ ] 14.1.2. Implement `weaver references list`.
@@ -443,7 +500,7 @@ are tracked in the
 
 - [ ] 15.3.1. Add Sempai execution routing in `weaverd` for selector-backed
       `symbols list`.
-  - Requires 15.2.12.
+  - Requires 15.2.12 and 12.3.3.
   - Success: daemon execution paths compile and execute Sempai plans for
     supported languages and return structured match streams.
 - [ ] 15.3.2. Add `weaver symbols list --query` with `--lang`, `--uri`, and
@@ -459,7 +516,7 @@ are tracked in the
     output remains deterministic.
 - [ ] 15.3.4. Integrate parse-cache adapter keyed by URI, language, and
       revision, aligned with daemon document lifecycle.
-  - Requires 15.3.3.
+  - Requires 15.3.3 and 12.3.3.
   - Success: repeated queries against unchanged revisions hit cache in
     integration tests, revision changes invalidate cached parses
     deterministically, and cache misses or invalidations preserve semantic
@@ -553,12 +610,12 @@ command-contract tasks are tracked in the
     contract; `--force` cannot silently bypass invariant-preserving checks.
 - [ ] 16.1.4. Extract the mutation engine from daemon dispatch into a reusable
       library boundary.
-  - Requires 16.1.1.
+  - Requires 16.1.1 and 12.3.3.
   - Success: patch parsers, semantic actuators, the daemon, and in-process
     consumers submit one shared mutation-plan type; adapters do not duplicate
     verification, conflict detection, commit, or rollback behaviour.
 - [ ] 16.1.5. Verify complete workspace deltas through both safety locks.
-  - Requires 16.1.4.
+  - Requires 16.1.4 and 12.3.4.
   - Success: create, replace, delete, and move operations enter one staged
     workspace view; Tree-sitter validates final content; Language Server
     Protocol (LSP) verification observes the complete proposed delta and
@@ -567,7 +624,7 @@ command-contract tasks are tracked in the
     `inconclusive` status and follow declared safety policy; no path silently
     weakens the Double-Lock contract.
 - [ ] 16.1.6. Add stale-base checks and metadata-preserving transactions.
-  - Requires 16.1.4.
+  - Requires 16.1.4 and 12.3.5.
   - Success: every existing source carries an expected content digest; commit
     compares live content immediately before replacement; stale bases return a
     structured refusal without overwriting newer work. Prepare, commit, and
@@ -597,15 +654,16 @@ command-contract tasks are tracked in the
     same result contract.
 - [ ] 16.1.10. Implement `weaver patches apply` over the shared mutation engine
       and prove the vertical slice end to end.
-  - Requires phase 13, 16.1.2, 16.1.3, 16.1.4, 16.1.5, 16.1.6, 16.1.7,
-    16.1.8, and 16.1.9.
+  - Requires phase 13, 12.3.6, 16.1.2, 16.1.3, 16.1.4, 16.1.5, 16.1.6,
+    16.1.7, 16.1.8, and 16.1.9.
   - Success: the noun-verb command supports `--file`, `--dry-run`, `--force`,
     idempotency, universal `--json`, and human-readable summaries without a
     second commit path. End-to-end coverage includes create, replace, delete,
     move, multi-file semantic changes, stale bases, metadata preservation,
     ambiguous targets, no-op retries, formatter changes and failures,
     relocated diagnostics, unavailable LSP backends, rollback, retry matching,
-    and daemon-to-CLI result parity.
+    daemon-to-CLI result parity, and isolation from simultaneous mutations in
+    other workspaces.
 
 ### 16.2. Prove capability-routed rename from positions and selectors
 
