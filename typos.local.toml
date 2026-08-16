@@ -25,8 +25,8 @@ ignore = [
   "(?m)^      should-upload-workflow-artifacts:$",
   "(?m)^      should_upload_workflow_artifacts: \\$\\{\\{ steps\\.release_modes\\.outputs\\.should-upload-workflow-artifacts \\}\\}$",
   "(?m)^      should_upload_workflow_artifacts:$",
-  # API identifiers in Markdown code spans are not prose to spell-check.
-  "`[^`\\n]+`",
+  # Mask multiline code spans and shorter runs inside longer delimiters.
+  "(?:```(?:[^`]|`{1,2}[^`])*```|``(?:[^`]|`[^`])*``|`[^`]+`)",
   "\\bartifact-name\\b",
   "\\bartifact-suffix\\b",
 ]

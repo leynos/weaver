@@ -1544,10 +1544,10 @@ retirement occurs only after outstanding leases finish or are cancelled within
 a bounded shutdown policy. Server and workspace budgets are independent so
 evicting one idle server does not require discarding all workspace metadata.
 
-Admission is bounded at daemon, workspace, and server scopes. Saturation should
-produce a structured, retryable reason whenever the transport can respond;
-queue wait, execution time, rejection, restart, and eviction are separate
-observability events governed by
+Admission is bounded at daemon, workspace, and server scopes. Whenever the
+transport can respond, saturation must produce a structured, retryable result
+and must not silently drop the request; queue wait, execution time, rejection,
+restart, and eviction remain separate observability events governed by
 [RFC 0001](rfcs/0001-o11y.md). [ADR 010](adr-010-workspace-local-concurrency.md)
 records the proposed concurrency boundary.
 
@@ -1626,24 +1626,27 @@ Protocol.
 The target `LspHost` is owned beneath one `WorkspaceState`. It may reuse a
 healthy server only while the server's complete execution identity remains
 equal: language, configured command and arguments, resolved executable or
-toolchain, server configuration, and adapter-declared environment inputs.
-Unrelated repositories never share a process merely because they use the same
-language or Rust toolchain.
+toolchain, server configuration, adapter-declared environment inputs, and a
+server-root topology fingerprint derived from the process working directory,
+`rootUri`, and ordered `workspaceFolders`. Launch and `initialize` derive from
+that fingerprint. Unrelated repositories never share a process merely because
+they use the same language or Rust toolchain.
 
-Every server starts in the selected workspace or adapter-selected project root
-and initializes with matching `rootUri` and `workspaceFolders` values when the
-server supports workspace folders. Open documents, document versions, pending
-diagnostics, and request correlation remain session-local. An adapter may
-select a nested project root inside a workspace, but it may not add an
-unrelated repository to the session.
+Every server starts from the adapter-selected process root recorded in that
+fingerprint and initializes with matching `rootUri` and ordered
+`workspaceFolders` values when the server supports workspace folders. Open
+documents, document versions, pending diagnostics, and request correlation
+remain session-local. An adapter may select a nested project root inside a
+workspace, but it may not add an unrelated repository to the session.
 
-Rust server identity is resolved explicitly in the target workspace. When
+Rust server identity is resolved explicitly in the selected process root. When
 rustup manages the executable, Weaver records the active toolchain and launches
-`rustup run <toolchain> rust-analyzer`; it does not rely on the daemon's
-working directory or silently fall back when the selected toolchain lacks the
-component. Changes to toolchain files, Cargo configuration, Weaver adapter
-configuration, declared environment inputs, or bounded external override
-freshness retire the stale server before a replacement receives work.
+`rustup run <toolchain> rust-analyzer` from that same selected process root; it
+does not rely on the target workspace or the daemon's working directory or
+silently fall back when the selected toolchain lacks the component. Changes to
+toolchain files, Cargo configuration, Weaver adapter configuration, declared
+environment inputs, or bounded external override freshness retire the stale
+server before a replacement receives work.
 
 Health checks, bounded restart backoff, circuit breaking, process budgets, and
 idle eviction complete the lifecycle contract.
