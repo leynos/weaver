@@ -513,37 +513,99 @@ Idea: if the same selector records can drive safe patches, renames, and symbol
 relocation through capability-routed actuators, Weaver proves that agent-native
 composition does not weaken the Double-Lock safety model.
 
-This phase validates the first end-to-end observe-to-act loop. It migrates
-archive work from apply-patch, rename-symbol, `extricate-symbol`, selector
-handoff, mutation metadata, and visible safety-harness reporting. In this
-roadmap, `extricate-symbol` means moving a selected symbol to another module or
-file while preserving meaning. It is distinct from `extract-method`, which
-extracts a selected code region into a new callable and is not compressed into
-the symbol-relocation tasks below.
+This phase validates the first end-to-end selector-to-change loop. It migrates
+archive work from patch application, rename-symbol, `extricate-symbol`,
+selector handoff, mutation metadata, and visible safety-harness reporting. In
+this roadmap, `extricate-symbol` means moving a selected symbol to another
+module or file while preserving meaning. It is distinct from `extract-method`,
+which extracts a selected code region into a new callable and is not compressed
+into the symbol-relocation tasks below.
 
-### 16.1. Prove patch application under the new command contract
+### 16.1. Prove a reusable mutation vertical slice
 
-This step answers whether the completed patch and Double-Lock foundations fit
-the resource-first grammar. It migrates prototype archive work 6.1.1 through
-6.1.4 and 11.4.1 through 11.4.2. See `docs/weaver-design.md` §§4.2-4.3.
-Boundary classifications for these tasks are tracked in the
+This step answers whether the completed patch and Double-Lock foundations can
+become one reusable mutation engine behind the resource-first command grammar.
+It migrates prototype archive work 6.1.1 through 6.1.4 and 11.4.1 through
+11.4.2. See `docs/weaver-design.md` §§4.2-4.3. Boundary classifications for
+command-contract tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
-- [ ] 16.1.1. Implement `weaver patches apply`.
+- [ ] 16.1.1. Define the shared mutation plan and result contract for
+      `weaver patches apply`.
   - Requires phase 13 and reuses prototype archive work 6.1.1 through 6.1.4.
-  - Success: `patches apply` preserves Double-Lock verification, atomic
-    transactions, `--dry-run`, structured safety results, universal `--json`,
-    and human-readable safety summaries.
-- [ ] 16.1.2. Add idempotency keys, transaction IDs, and retry matching for
-      patch application.
+  - Success: a syntax-independent plan represents create, replace, delete, and
+    move operations, expected content versions, verification and formatting
+    policies, idempotency, and dry-run state. The result records transaction
+    identity, changed paths, base and final digests, formatting, verification
+    availability, diagnostic deltas, rollback, and a bounded reference to
+    complete diagnostics. Human and JSON renderers consume the same contract,
+    and the public command remains noun-verb `weaver patches apply`.
+- [ ] 16.1.2. Add idempotency keys, transaction IDs, and retry matching to the
+      patch contract.
   - Requires 16.1.1 and depends on OrthoConfig 7.2.1.
-  - Success: repeated equivalent patch submissions return the existing
-    transaction or refusal instead of duplicating work.
+  - Success: repeated equivalent submissions return the existing transaction
+    or refusal instead of duplicating work, including after process restart.
 - [ ] 16.1.3. Standardize mutation `--dry-run`, `--force`, and structured
       safety metadata.
   - Requires 16.1.2 and depends on OrthoConfig 7.2.1.
-  - Success: mutating commands declare preview, destructive-operation, and
-    safety-harness policy in command-surface metadata.
+  - Success: mutating commands declare preview, destructive-operation, safety,
+    verification-availability, and force-policy metadata in the command
+    contract; `--force` cannot silently bypass invariant-preserving checks.
+- [ ] 16.1.4. Extract the mutation engine from daemon dispatch into a reusable
+      library boundary.
+  - Requires 16.1.1.
+  - Success: patch parsers, semantic actuators, the daemon, and in-process
+    consumers submit one shared mutation-plan type; adapters do not duplicate
+    verification, conflict detection, commit, or rollback behaviour.
+- [ ] 16.1.5. Verify complete workspace deltas through both safety locks.
+  - Requires 16.1.4.
+  - Success: create, replace, delete, and move operations enter one staged
+    workspace view; Tree-sitter validates final content; Language Server
+    Protocol (LSP) verification observes the complete proposed delta and
+    flushes diagnostics once per language instead of checking files
+    independently. Missing semantic backends produce explicit `unavailable` or
+    `inconclusive` status and follow declared safety policy; no path silently
+    weakens the Double-Lock contract.
+- [ ] 16.1.6. Add stale-base checks and metadata-preserving transactions.
+  - Requires 16.1.4.
+  - Success: every existing source carries an expected content digest; commit
+    compares live content immediately before replacement; stale bases return a
+    structured refusal without overwriting newer work. Prepare, commit, and
+    rollback preserve permissions and executable state across create, replace,
+    delete, and move operations.
+- [ ] 16.1.7. Harden target resolution and repeated no-op handling.
+  - Requires 16.1.4 and 16.1.6.
+  - Success: exact, semantic-anchor, or fuzzy recovery applies only when one
+    candidate remains; ambiguity returns bounded candidate excerpts and makes
+    no changes. Byte-identical post-format mutations return an explicit no-op
+    result, and repeated equivalent no-op submissions trip a bounded circuit
+    breaker.
+- [ ] 16.1.8. Format staged content before final verification and commit.
+  - Requires 16.1.5 and 16.1.6.
+  - Success: configured formatters run only on touched staged files or a shadow
+    workspace; final diffs and digests are recalculated; both safety locks see
+    formatted content; formatter failure or partial execution cannot modify the
+    live workspace.
+- [ ] 16.1.9. Emit bounded post-mutation feedback from the shared result.
+  - Requires 16.1.5 and 16.1.8 and depends on OrthoConfig 7.2.4 through 7.2.6.
+  - Success: diagnostic comparison maps baseline ranges through final text
+    changes and distinguishes introduced, severity-worsened, resolved,
+    unchanged, and relocated diagnostics. Concise deltas stay inline; complete
+    diagnostics use a bounded spool reference. Project-defined verification
+    remains authoritative, and an LSP-clean result does not claim behavioural
+    correctness. Library, daemon JSONL, human, and `--json` surfaces expose the
+    same result contract.
+- [ ] 16.1.10. Implement `weaver patches apply` over the shared mutation engine
+      and prove the vertical slice end to end.
+  - Requires phase 13, 16.1.2, 16.1.3, 16.1.4, 16.1.5, 16.1.6, 16.1.7,
+    16.1.8, and 16.1.9.
+  - Success: the noun-verb command supports `--file`, `--dry-run`, `--force`,
+    idempotency, universal `--json`, and human-readable summaries without a
+    second commit path. End-to-end coverage includes create, replace, delete,
+    move, multi-file semantic changes, stale bases, metadata preservation,
+    ambiguous targets, no-op retries, formatter changes and failures,
+    relocated diagnostics, unavailable LSP backends, rollback, retry matching,
+    and daemon-to-CLI result parity.
 
 ### 16.2. Prove capability-routed rename from positions and selectors
 
@@ -554,7 +616,7 @@ Boundary classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 16.2.1. Implement `weaver symbols rename` for position references.
-  - Requires 16.1.3 and reuses prototype archive work 5.2.1 through 5.2.5.
+  - Requires 16.1.10 and reuses prototype archive work 5.2.1 through 5.2.5.
   - Success: provider routing remains capability-first, mutation results
     include transaction ID, affected paths, provider provenance, and safety
     outcome.
@@ -610,7 +672,7 @@ distinct capability IDs, but this step does not implement those operations.
     unsupported symbol shapes.
 - [ ] 16.3.5. Extend plugin and daemon failure schemas with deterministic
       refusal diagnostics and rollback guarantees for extrication.
-  - Requires 16.1.3 and 16.3.4.
+  - Requires 16.1.10 and 16.3.4.
   - Success: refusal paths emit structured diagnostics, include stable reason
     codes, enumerate valid alternatives where possible, and leave the
     filesystem unchanged.
