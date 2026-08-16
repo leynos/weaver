@@ -423,9 +423,10 @@ these tasks are tracked in the
     guidance; and no query with error-severity diagnostics reaches execution.
 - [ ] 15.1.2. Define selector record schemas for one-liner matches.
   - Requires 15.1.1.
-  - Success: `weaver.selector.v1` records carry selector, workspace, URI,
-    range, language, query, capture, source-digest or revision, capability, and
-    provider identities needed for safe downstream context or mutation.
+  - Success: `weaver.selector.v1` records carry selector, stream, sequence,
+    workspace, URI, range, language, query, capture, source-digest or revision,
+    capability, and provider identities. A terminal
+    `weaver.selector-stream-end.v1` record proves successful completion.
     Deterministic structural evidence and compatibility provenance replace an
     invented floating-point confidence value.
 
@@ -530,10 +531,12 @@ classifications for these tasks are tracked in the
 - [ ] 15.3.3. Define stable JSONL request and response schemas for Sempai query
       operations, with snapshot coverage.
   - Requires 15.3.2.
-  - Success: `--json` emits one deterministic `weaver.selector.v1` object per
-    line, zero matches emit zero records and succeed, no summary object enters
-    the stream, source identity and provenance are present, and schema fixtures
-    lock field names, ordering, bounds, and error separation.
+  - Success: `--json` emits zero or more deterministic
+    `weaver.selector.v1` records followed by one
+    `weaver.selector-stream-end.v1` completion record. Zero matches emit the
+    completion record only; producer failure omits completion; source identity
+    and provenance are present; and schema fixtures lock field names, ordering,
+    bounds, completion, and error separation.
 - [ ] 15.3.4. Integrate parse-cache adapter keyed by URI, language, and
       revision, aligned with daemon document lifecycle.
   - Requires 15.3.3 and 12.3.3.
@@ -544,22 +547,24 @@ classifications for these tasks are tracked in the
 - [ ] 15.3.5. Implement actuation handoff contract using focus-first selection
       with span fallback and optional capture targeting.
   - Requires 15.3.3.
-  - Success: consumers validate versioned selectors from
-    `--selectors <path|->`, use focus, match, or explicit capture spans without
-    hidden state, reject stale or cross-workspace source identities before
-    actuation, and expose deterministic zero-, one-, and many-match policy.
+  - Success: consumers read or spool complete bounded streams from
+    `--selectors <path|->`, validate the terminal completion record before
+    planning, use focus, match, or explicit capture spans without hidden state,
+    reject stale or cross-workspace source identities, and expose deterministic
+    zero-, one-, and many-match policy.
 - [ ] 15.3.6. Add diagnostics conformance suites for YAML, domain-specific
       language (DSL), semantic, compilation, and execution error categories.
   - Requires 15.3.3.
   - Success: each diagnostic category has deterministic snapshots and stable
     `E_SEMPAI_*` codes; expression recovery reports independent errors where
     possible; and recovered queries with error-severity diagnostics never emit
-    selectors.
+    a successful completion record.
 - [ ] 15.3.7. Add layered quality suites for parser and execution behaviour.
   - Requires 15.3.6.
   - Success: unit, snapshot, corpus, property, and fuzz suites run under
     repository gates and include representative language corpora, malformed
-    input, compatibility-adapter conformance, and bounded-output coverage.
+    input, compatibility-adapter conformance, truncated streams, and
+    bounded-output coverage.
 - [ ] 15.3.8. Publish compatibility boundaries for supported operators, modes,
       constraints, and escape-hatch behaviour.
   - Requires 15.3.7.
@@ -577,9 +582,9 @@ classifications for these tasks are tracked in the
 
 ### 15.4. Prove query output composes with context commands
 
-This step answers whether versioned selector streams can feed product commands
-rather than remaining terminal search output. It migrates prototype archive
-work 9.1.4 through 9.3.2 and 11.2.1. See RFC 0003 §6.7,
+This step answers whether completed versioned selector streams can feed product
+commands rather than remaining terminal search output. It migrates prototype
+archive work 9.1.4 through 9.3.2 and 11.2.1. See RFC 0003 §§6.7-6.8,
 ADR 012, and `docs/weaver-design.md` §2.1.2.
 
 - [ ] 15.4.1. Allow `cards get` and one-hop relation summaries to consume
@@ -587,12 +592,13 @@ ADR 012, and `docs/weaver-design.md` §2.1.2.
   - Requires 15.3.5 and 14.2.3.
   - Success: one query-to-card-to-relation workflow works in one command and
     through `--selectors <path|->`, with deterministic zero-, one-, and
-    many-match behaviour and stale-selector refusal.
+    many-match behaviour, completion validation, and stale-selector refusal.
 - [ ] 15.4.2. Add Sempai selector conformance and pipeline E2E coverage.
   - Requires 15.4.1.
   - Success: suites cover YAML-backed, bare-pattern, and expression selectors,
-    malformed query recovery, `jq -c` filtering, pager consumption, bounded
-    output, and malformed, stale, or incompatible selector-stream rejection.
+    malformed query recovery, completion-preserving `jq -c` filtering, pager
+    consumption, bounded output, and malformed, truncated, stale, or
+    incompatible selector-stream rejection.
 
 ## 16. Safe change loop slice
 
@@ -717,20 +723,22 @@ ADR 012. Boundary classifications for these tasks are tracked in the
     outcome.
 - [ ] 16.2.2. Add direct Sempai selector support to `symbols rename`.
   - Requires 15.3.5 and 16.2.1.
-  - Success: `symbols rename --query ...` produces the same versioned selector
-    contract as `symbols list`, handles zero, one, and many matches
+  - Success: `symbols rename --query ...` produces the same completed versioned
+    selector stream as `symbols list`, handles zero, one, and many matches
     deterministically, and requires explicit policy for ambiguous mutation.
 - [ ] 16.2.3. Add typed selector stream consumption to mutation commands.
   - Requires 15.3.3, 15.3.5, and 16.2.2.
-  - Success: `weaver symbols list --query … --json | jq -c … | weaver symbols
-    rename --selectors - …` works without hidden state; malformed,
-    cross-workspace, and stale records refuse before actuator planning; and the
-    resulting edits commit only through the shared mutation engine.
+  - Success: a completion-preserving
+    `weaver symbols list --query … --json | jq -c … | weaver symbols rename
+    --selectors - …` pipeline works without hidden state. The actuator reads
+    the complete stream before planning; malformed, truncated, cross-workspace,
+    and stale records refuse; and resulting edits commit only through the
+    shared mutation engine.
 - [ ] 16.2.4. Add rename and selector-mutation combinatorial E2E coverage.
   - Requires 16.2.3.
-  - Success: coverage combines selector forms, `--json`, `--dry-run`,
-    idempotency, provider failures, stale selectors, syntactic failures,
-    semantic failures, and rollback assertions.
+  - Success: coverage combines selector forms, completed streams, `--json`,
+    `--dry-run`, idempotency, provider failures, stale selectors, syntactic
+    failures, semantic failures, and rollback assertions.
 
 ### 16.3. Prove the `extricate-symbol` contract with Python first
 
