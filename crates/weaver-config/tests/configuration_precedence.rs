@@ -36,7 +36,7 @@ impl Harness {
                 "log_filter": default_log_filter(),
                 "log_format": default_log_format(),
                 "capability_overrides": [],
-                "locale": "en-US",
+                "locale": Config::default().locale().to_string(),
             }),
             file: RefCell::new(None),
             environment: RefCell::new(None),
@@ -74,17 +74,21 @@ impl Harness {
     }
 
     fn resolution(&self) -> Result<Config, String> {
-        self.resolve();
         self.resolved
             .borrow()
             .as_ref()
-            .expect("configuration result should be present")
+            .ok_or_else(|| "configuration layers should be merged before assertions".to_string())?
             .clone()
     }
 
-    fn config(&self) -> Config { self.resolution().expect("configuration should resolve") }
+    fn config(&self) -> Result<Config, String> { self.resolution() }
 
-    fn error(&self) -> String { self.resolution().expect_err("configuration should fail") }
+    fn error(&self) -> Result<String, String> {
+        match self.resolution() {
+            Ok(config) => Err(format!("configuration should fail, got {config:?}")),
+            Err(error) => Ok(error),
+        }
+    }
 }
 
 #[allow_fixture_expansion_lints]
@@ -115,6 +119,7 @@ fn given_lower_layers_allow_rename(harness: &Harness) {
 #[when("a CLI layer sets the locale to \"{locale}\"")]
 fn when_cli_locale(harness: &Harness, locale: String) {
     harness.set_cli(json!({ "locale": locale }));
+    harness.resolve();
 }
 
 #[when("the configuration layers are merged without overrides")]
@@ -135,31 +140,36 @@ fn when_cli_denies_rename(harness: &Harness) {
             "directive": "deny",
         }],
     }));
+    harness.resolve();
 }
 
 #[then("the resolved locale is \"{locale}\"")]
-fn then_locale_is(harness: &Harness, locale: String) {
-    assert_eq!(harness.config().locale().to_string(), locale);
+fn then_locale_is(harness: &Harness, locale: String) -> Result<(), String> {
+    assert_eq!(harness.config()?.locale().to_string(), locale);
+    Ok(())
 }
 
 #[then("the built-in Weaver defaults are returned")]
-fn then_defaults_are_returned(harness: &Harness) {
-    let config = harness.config();
+fn then_defaults_are_returned(harness: &Harness) -> Result<(), String> {
+    let config = harness.config()?;
     assert_eq!(config.daemon_socket(), &default_socket_endpoint());
     assert_eq!(config.log_filter(), default_log_filter());
     assert_eq!(config.log_format(), default_log_format());
-    assert_eq!(config.locale().to_string(), "en-US");
+    assert_eq!(config.locale(), Config::default().locale());
     assert_that!(config.capability_matrix().languages, is_empty());
+    Ok(())
 }
 
 #[then("configuration loading reports an invalid locale")]
-fn then_invalid_locale_is_reported(harness: &Harness) {
-    assert_that!(harness.error().as_str(), contains_substring("locale"));
+fn then_invalid_locale_is_reported(harness: &Harness) -> Result<(), String> {
+    let error = harness.error()?;
+    assert_that!(error.as_str(), contains_substring("locale"));
+    Ok(())
 }
 
 #[then("the resolved capability matrix denies the Rust rename capability")]
-fn then_rename_is_denied(harness: &Harness) {
-    let config = harness.config();
+fn then_rename_is_denied(harness: &Harness) -> Result<(), String> {
+    let config = harness.config()?;
     assert_eq!(
         config.capability_overrides,
         vec![CapabilityDirective::new(
@@ -173,6 +183,7 @@ fn then_rename_is_denied(harness: &Harness) {
         matrix.override_for("rust", "observe.rename"),
         Some(weaver_config::CapabilityOverride::Deny)
     );
+    Ok(())
 }
 
 #[scenario(path = "tests/features/configuration_precedence.feature")]

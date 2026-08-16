@@ -47,7 +47,7 @@ Observable success means all of the following are true:
   pre-review baseline recorded 13 Python graph-slice snapshot failures
   involving unaccepted `lsp_hover` output in
   `crates/weaver-e2e/tests/snapshots/graph_slice_python_*.snap.new`, but those
-  failures were not reproduced by the final `make test` run (1,474 passed, 4
+  failures were not reproduced by the final `make test` run (1,475 passed, 4
   skipped), which produced no `.snap.new` artefacts.
 
 ## Constraints
@@ -201,7 +201,7 @@ Observable success means all of the following are true:
 - [x] (2026-08-15) Complete final review validation after reconciling the
   pre-existing snapshot and Whitaker findings. `make check-fmt`, `make lint`,
   `make typecheck`, `make test`, `make markdownlint`, and `make nixie` pass.
-  The final `make test` run reports 1,474 passed and 4 skipped; it does not
+  The final `make test` run reports 1,475 passed and 4 skipped; it does not
   reproduce the 13 Python graph-slice snapshot failures involving unaccepted
   `lsp_hover` output recorded in the pre-review baseline, and it produces no
   `.snap.new` artefacts. No snapshot changes are included in this PR.
@@ -258,7 +258,14 @@ Observable success means all of the following are true:
 - [x] (2026-08-16) Commit `3508a00` (`Harden review test support`) was
   lease-pushed. The named final gates pass: `make check-fmt`, `make lint`,
   `make typecheck`, `make test`, `make markdownlint`, and `make nixie`;
-  `make test` reports 1,474 passed and 4 skipped, with no snapshot artefacts.
+  `make test` reports 1,475 passed and 4 skipped, with no snapshot artefacts.
+- [x] (2026-08-16) Strengthen configuration precedence evidence after review:
+  the defaults fixture and default assertion now derive locale from
+  `Config::default()`, the harness performs an explicit merge before fallible
+  query helpers, and `merged_capability_overrides_are_normalised_and_last_wins`
+  covers generated merge paths. The existing `weaver --capabilities` binary
+  tests retain real file, environment, and CLI boundary coverage, so no
+  duplicate combined boundary test is required.
 
 ## Surprises & discoveries
 
@@ -325,7 +332,7 @@ Observable success means all of the following are true:
 - Observation: the pre-review `make test` baseline recorded 13 Python
   graph-slice snapshot failures involving unaccepted `lsp_hover` output in
   `crates/weaver-e2e/tests/snapshots/graph_slice_python_*.snap.new`. Evidence:
-  the final `make test` run passed with 1,474 tests passed and 4 skipped; it
+  the final `make test` run passed with 1,475 tests passed and 4 skipped; it
   did not reproduce those failures and produced no `.snap.new` artefacts. No
   snapshot changes are included in this PR. Impact: retain the baseline as a
   historical observation, without accepting or updating snapshot files.
@@ -341,6 +348,22 @@ Observable success means all of the following are true:
   directives. Evidence: the matrix assertion can pass even if the post-merge
   normalization hook is removed. Impact: retain the raw-vector assertion in the
   precedence test as the non-vacuous normalization check.
+
+- Observation: the generated merge path now has property coverage for
+  capability-override normalization. Evidence:
+  `merged_capability_overrides_are_normalised_and_last_wins` generates
+  directives across defaults, file, environment, and CLI layers, then checks
+  normalized keys, last-wins values, and one output per normalized key. Impact:
+  retain this range-based invariant check alongside the concrete precedence
+  scenario and its raw merged-vector assertion.
+
+- Observation: the precedence harness resolves its explicit layers before
+  read-only BDD assertions, while the binary tests exercise the real file,
+  environment, and CLI composition boundary. Evidence: the harness uses
+  `MergeComposer` and fallible query helpers, and `main_entry.rs` runs the
+  compiled `weaver` binary with isolated child configuration. Impact: a second
+  test combining both mechanisms would duplicate existing boundary coverage
+  without adding a distinct contract.
 
 - Observation: a scoped tracing subscriber omitted the semantic-validation
   event in the focused Sempai test. Evidence: the package test failed at that
@@ -447,12 +470,13 @@ Observable success means all of the following are true:
   ADR only if implementation requires a new public contract, port, or permanent
   divergence. Date/Author: 2026-08-12, Codex.
 
-- Decision: do not add new Proptest, Kani, or Verus artefacts for the version
-  bump. Rationale: the migration introduces no new invariant over a range of
-  states, unsafe boundary, transition system, lemma, or contractual business
-  logic. Existing property tests for CLI configuration-argument ordering remain
-  relevant and run under `make test`. Reconsider this decision if production
-  logic expands beyond compatibility fixes. Date/Author: 2026-08-12, Codex.
+- Decision: cover the generated capability-override merge invariant with a
+  Proptest, while adding no Kani or Verus artefact. Rationale: the `post_merge`
+  normalization hook introduces a range-based invariant over directive layers,
+  so `merged_capability_overrides_are_normalised_and_last_wins` checks
+  normalized keys, last-wins values, and one output per key. The migration adds
+  no unsafe boundary, transition system, lemma, or proof obligation requiring
+  Kani or Verus. Date/Author: 2026-08-16, Codex.
 
 - Decision: retain the selective lockfile resolution and pause before
   Milestone 1 gates or CodeRabbit review. Rationale: the selective lockfile
@@ -512,13 +536,20 @@ Observable success means all of the following are true:
   propagates operational setup errors, and excludes ambient configuration from
   the binary probe. Date/Author: 2026-08-16, Codex.
 
+- Decision: keep explicit declarative precedence tests and real binary boundary
+  tests as separate evidence. Rationale: `MergeComposer` makes the merge policy
+  and fallible query path deterministic, while `weaver --capabilities` already
+  proves file, environment, and CLI composition through the production
+  boundary. A duplicate combined boundary test would repeat those contracts
+  without increasing coverage. Date/Author: 2026-08-16, Codex.
+
 ## Outcomes & retrospective
 
 The dependency, hermetic test, and documentation changes are implemented and
 their focused tests pass. The boundary-manifest test, formatting, type
 checking, and focused Clippy checks also pass. Final review validation passed
 `make check-fmt`, `make lint`, `make typecheck`, `make test`,
-`make markdownlint`, and `make nixie`; `make test` reported 1,474 passed and 4
+`make markdownlint`, and `make nixie`; `make test` reported 1,475 passed and 4
 skipped. The final run did not reproduce the 13 Python graph-slice snapshot
 failures involving unaccepted `lsp_hover` output in
 `crates/weaver-e2e/tests/snapshots/graph_slice_python_*.snap.new`, and produced
@@ -526,6 +557,12 @@ no `.snap.new` artefacts. No snapshot changes are included in this PR. GitHub
 searches found no issue tracking the historical observation; issue `#130`
 concerns backend-lock duration and LSP enrichment, not this snapshot failure. PR
 `#225` is under review, with all completed work checked in `Progress` above.
+The review follow-up also adds generated merge-path property coverage for
+capability-override normalization, derives the precedence fixture's locale from
+`Config::default()`, and makes merge/query errors fallible. The raw merged
+vector remains asserted alongside the capability matrix because the matrix
+performs its own last-wins reduction; the real binary boundary tests make a
+duplicate combined test unnecessary.
 
 ## Context and orientation
 
@@ -580,22 +617,22 @@ OrthoConfig command-contract machinery and Weaver-specific semantic adapters.
 
 An implementer must read the following before changing the corresponding area:
 
-- `$execplans` at `/home/leynos/.codex/skills/execplans/SKILL.md` governs this
+- `$execplans` at `$CODEX_HOME/skills/execplans/SKILL.md` governs this
   living document, Red-Green-Refactor evidence, tolerances, and the approval
   gate.
 - `$hexagonal-architecture` at
-  `/home/leynos/.codex/skills/hexagonal-architecture/SKILL.md` governs inward
+  `$CODEX_HOME/skills/hexagonal-architecture/SKILL.md` governs inward
   dependencies and port/adapter isolation. Apply its invariants to Weaver's
   existing feature layout; do not impose its canonical folder sketch.
-- `$leta` at `/home/leynos/.codex/skills/leta/SKILL.md` is the default for
+- `$leta` at `$CODEX_HOME/skills/leta/SKILL.md` is the default for
   symbol, reference, implementation, and call-graph navigation.
-- `$rust-router` at `/home/leynos/.codex/skills/rust-router/SKILL.md` routes
+- `$rust-router` at `$CODEX_HOME/skills/rust-router/SKILL.md` routes
   any compile or API issue to the smallest follow-on skill.
 - `$rust-unit-testing` at
-  `/home/leynos/.codex/skills/rust-unit-testing/SKILL.md` governs `rstest`
-  fixtures, rich assertion selection, and snapshots. Repository policy is
-  stricter than that skill for environment mutation: use no direct mutation,
-  even with `serial_test`.
+  `$CODEX_HOME/skills/rust-unit-testing/SKILL.md` governs `rstest` fixtures,
+  rich assertion selection, and snapshots. Repository policy is stricter than
+  that skill for environment mutation: use no direct mutation, even with
+  `serial_test`.
 - Load `$rust-errors` only if v0.9.0 changes a typed error boundary, and load
   `$rust-verification` followed by `$proptest`, `$kani`, or `$verus` only if
   implementation introduces an invariant or proof obligation not present in
@@ -974,8 +1011,10 @@ The migration is accepted only when a reviewer can observe all of the following:
 - The four named BDD scenarios pass through `rstest-bdd`.
 - Binary tests execute `weaver --capabilities` with isolated child
   environments and prove both failure and CLI-override success paths.
-- Existing CLI ordering property tests pass. No new property/model/proof suite
-  is required unless production logic changes beyond this plan.
+- `merged_capability_overrides_are_normalised_and_last_wins` passes over
+  generated defaults, file, environment, and CLI directive layers, asserting
+  normalized keys, last-wins values, and one output per key. Existing CLI
+  ordering property tests also pass; no Kani or Verus suite is required.
 - `rg -n 'std::env::(set_var|remove_var)' crates/weaver-config --glob '*.rs'`
   returns no matches.
 - The final-validation criterion is that `make check-fmt`,
@@ -1104,7 +1143,7 @@ presented as control over the full configuration-value environment layer.
 This plan entered execution on 2026-08-12 after explicit approval. A selective
 lockfile update replaced a broad regeneration attempt. Final review validation
 passed `make check-fmt`, `make lint`, `make typecheck`, `make test`,
-`make markdownlint`, and `make nixie`; `make test` reported 1,474 passed and 4
+`make markdownlint`, and `make nixie`; `make test` reported 1,475 passed and 4
 skipped. The final run did not reproduce the 13 Python graph-slice snapshot
 failures involving unaccepted `lsp_hover` output recorded in the pre-review
 baseline, and produced no `.snap.new` artefacts. No snapshot changes are
@@ -1113,5 +1152,6 @@ observation; issue `#130` concerns backend-lock duration and LSP enrichment,
 not this snapshot failure. PR `#225` remains under review. On 2026-08-16, commit
 `3508a00` (`Harden review test support`) captured the current review evidence:
 a raw merged capability assertion, serialized RAII-reset tracing capture, and
-fallible, hermetic test boundaries. This revision records that implementation
-provenance in the living plan.
+fallible, hermetic test boundaries. The current review follow-up additionally
+records the generated merge-path property, default-derived locale fixture, and
+explicit merge/query split described in the living sections above.

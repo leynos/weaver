@@ -270,6 +270,24 @@ Engine validation runs in two stages after normalization:
   payload semantics; it is currently a placeholder pending execution-layer
   context, including issue `#152`.
 
+### Sempai test-support ownership and capture lifecycle
+
+`crates/sempai/src/tests/engine_test_support.rs` owns the `pub(super)` engine
+fixtures used by Sempai's engine and integration test modules. The helpers are
+test-only and may be consumed by sibling modules under
+`crates/sempai/src/tests`; they are not production adapters or a cross-crate
+test API. Keep setup and diagnostic conversion in this module so BDD steps can
+propagate failures without duplicating engine construction.
+
+`crates/sempai/src/tests/tracing_tests.rs` owns `TraceCaptureState` and its
+subscriber. The subscriber is installed once because `tracing`'s registry is
+process-wide, while `begin_capture` serializes active captures and resets the
+per-test state. Captures are limited to the current test thread; dropping the
+`TraceCaptureGuard` clears the recorded spans and events. A tracing test must
+hold the guard across the engine operation, inspect its snapshot before the
+guard is dropped, and must not expose this state to production code or other
+test crates.
+
 ## Configuration framework internals
 
 ### `ortho_config` v0.9.0 integration
