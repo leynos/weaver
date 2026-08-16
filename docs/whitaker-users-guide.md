@@ -87,6 +87,20 @@ libraries = [
 ]
 ```
 
+### Temporary source pin for Weaver
+
+Weaver currently pins Whitaker to commit
+`2bc0c3fafb86914f14bd73461a511588841f0a34` because upstream issue
+[#311](https://github.com/leynos/whitaker/issues/311) regresses recognition of
+helpers defined in out-of-line `cfg(test)` modules.
+
+Pinning `whitaker-installer` alone does not pin the cloned suite. CI must check
+out that exact Whitaker source revision and run the installer with
+`--build-only --no-update` so the build uses the pinned checkout.
+
+Remove this pin after issue #311 is fixed and the fix has been verified
+against Weaver.
+
 ### Selecting individual lints
 
 To load specific lints instead of the full suite, specify each lint explicitly:
