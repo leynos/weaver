@@ -40,9 +40,11 @@ prior art, and migration analysis.
 ### Option A: Workspace-owned pool keyed by execution identity
 
 Each `WorkspaceState` owns a pool. Server identity includes language, command,
-arguments, resolved executable or toolchain, configuration, and relevant
-environment. The process starts in the workspace or adapter-selected project
-root and initializes with matching LSP root fields.
+arguments, resolved executable or toolchain, configuration, relevant
+environment, and a `ServerRootsFingerprint` covering the process working
+directory, `rootUri`, and ordered `workspaceFolders`. The process starts in the
+adapter-selected process root and initializes with matching LSP root fields
+derived from that fingerprint.
 
 ### Option B: One daemon-global server per language
 
@@ -90,18 +92,19 @@ Adopt option A.
 
 The workspace key is implicit in the pool owner. A language-server key includes
 the language, configured command and arguments, resolved executable or
-toolchain, server configuration fingerprint, and adapter-declared environment
-fingerprint.
+toolchain, `ServerRootsFingerprint`, server configuration fingerprint, and
+adapter-declared environment fingerprint.
 
-Every child starts with the selected workspace or project root as its current
-directory. LSP initialization supplies `rootUri` and a matching
-`workspaceFolders` entry when supported. Open-document state and document
-versions remain session-local.
+Every child starts with the adapter-selected process root as its current
+directory. LSP initialization derives `rootUri` and a matching
+`workspaceFolders` entry from the same root-topology fingerprint when
+supported. Open-document state and document versions remain session-local.
 
 For rustup-managed Rust servers, Weaver resolves the active toolchain with the
-workspace as `current_dir`, records that identity, and launches
-`rustup run <toolchain> rust-analyzer`. A missing component is an explicit
-`unavailable` result; Weaver does not fall back to a different toolchain.
+adapter-selected process root as `current_dir`, records that identity, and
+launches `rustup run <toolchain> rust-analyzer`. A missing component is an
+explicit `unavailable` result; Weaver does not fall back to a different
+toolchain.
 
 Relevant input changes or bounded freshness expiry trigger identity
 revalidation. A changed identity retires the old server before new leases use

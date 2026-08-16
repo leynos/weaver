@@ -243,6 +243,7 @@ Within one workspace, a server key contains at least:
 struct LanguageServerKey {
     language: Language,
     command: ServerCommandFingerprint,
+    server_roots: ServerRootsFingerprint,
     toolchain: Option<ToolchainIdentity>,
     configuration: ServerConfigurationFingerprint,
     environment: EnvironmentFingerprint,
@@ -253,15 +254,20 @@ The workspace key is implicit in the owning `WorkspaceState`. A pool may keep
 old and new identities briefly during a graceful replacement, but only the
 current identity may receive new leases.
 
+`ServerRootsFingerprint` captures the process working directory, the initial
+`rootUri`, and the ordered `workspaceFolders` used to launch and initialize a
+server. Launch and protocol initialization derive from the same fingerprint so
+the server cannot be reused under a different root topology.
+
 The fingerprint includes only environment variables declared relevant by the
 adapter. Raw environment values must not appear in logs, metrics labels, or
 unbounded diagnostic payloads.
 
 ### 6.4. Rust toolchain resolution
 
-Rustup's documented precedence and directory walk make the workspace working
-directory part of toolchain resolution.[^2] Weaver therefore resolves the
-active toolchain with the target workspace as `current_dir`.
+Rustup's documented precedence and directory walk make the selected process
+root part of toolchain resolution.[^2] Weaver therefore resolves the active
+toolchain with the adapter-selected process root as `current_dir`.
 
 For a rustup-managed adapter, the resolver records:
 
@@ -278,10 +284,10 @@ The preferred launch shape is explicit:
 rustup run <resolved-toolchain> rust-analyzer
 ```
 
-The child process also receives the workspace root as its working directory. If
-the selected toolchain lacks `rust-analyzer`, Weaver returns a structured
-`unavailable` result with installation guidance. It does not silently fall back
-to another toolchain.
+The child process also receives that selected process root as its working
+directory. If the selected toolchain lacks `rust-analyzer`, Weaver returns a
+structured `unavailable` result with installation guidance. It does not
+silently fall back to another toolchain.
 
 A directly configured executable remains supported. In that case the adapter
 fingerprints the configured command, resolved executable, arguments, selected
@@ -295,10 +301,11 @@ include `rust-toolchain`, `rust-toolchain.toml`, `.cargo/config`,
 
 ### 6.5. LSP initialization and document ownership
 
-Every server starts with the workspace root as its process working directory.
-The LSP `initialize` request sends that root through `rootUri` and a single
-entry in `workspaceFolders` when the server supports workspace folders. The
-client capabilities truthfully advertise workspace-folder support.
+Every server starts with the adapter-selected process root as its process
+working directory. The LSP `initialize` request derives `rootUri` and a single
+entry in `workspaceFolders` from the same root-topology fingerprint when the
+server supports workspace folders. The client capabilities truthfully advertise
+workspace-folder support.
 
 The LSP specification makes opened document content client-owned until close,
 and versions each subsequent change.[^1] Open-document maps, version counters,
@@ -409,11 +416,10 @@ opening, path containment, and symlink policy are enforced before a workspace
 enters the registry. A client cannot choose an internal workspace key, server
 key, toolchain identity, or environment fingerprint directly.
 
-Logs may include a bounded workspace identifier or a path when the path is the
-necessary local troubleshooting handle. Metrics labels must use bounded
-categories or opaque low-cardinality identifiers. Environment values, source
-contents, patch bodies, and complete server command lines are excluded from
-telemetry by default.
+Logs and metrics may include only bounded, opaque workspace identifiers for
+workspace identity. Raw workspace paths are excluded from logs and metrics.
+Environment values, source contents, patch bodies, and complete server command
+lines are excluded from telemetry by default.
 
 ## 7. Requirements
 
@@ -438,13 +444,13 @@ telemetry by default.
 - The daemon is the authority for canonical workspace resolution.
 - Workspace state is owned beneath a canonical workspace key.
 - Registry critical sections exclude routing and external input/output.
-- Server startup always sets the selected workspace or project root as
+- Server startup always sets the adapter-selected process root as
   `current_dir`.
 - LSP initialization supplies truthful root and workspace-folder fields.
 - Server identity changes are compared structurally, not inferred from a
   process still being alive.
-- Rustup resolution runs in the workspace context and preserves documented
-  precedence.
+- Rustup resolution runs in the adapter-selected process root and preserves
+  documented precedence.
 - Queue and process budgets are finite and configuration-validated.
 - Shutdown drains or cancels requests within a bounded deadline.
 - New state transitions emit structured `tracing` events and low-cardinality
@@ -476,10 +482,10 @@ and configuration vocabulary before implementation.
 
 ### 8.2. Stage two: carry workspace identity
 
-Add the workspace locator to CLI-daemon requests and reject schema/version
-mismatches explicitly. A temporary compatibility path may populate the locator
-from the daemon's captured startup root only for old clients and must emit a
-deprecation diagnostic.
+Add the workspace locator to CLI-daemon requests and reject missing locators or
+schema/version mismatches. The daemon returns an explicit schema error for any
+validation failure. No workspace operation executes before validation, and the
+daemon does not infer the locator from its captured startup root.
 
 ### 8.3. Stage three: introduce workspace ownership
 
@@ -489,7 +495,7 @@ boundary before enabling concurrency.
 
 ### 8.4. Stage four: scope language servers
 
-Add execution identity resolution, workspace-rooted process launch and LSP
+Add execution identity resolution, adapter-selected-root process launch and LSP
 initialization, Rust toolchain mediation, health checks, and identity-driven
 restart.
 
@@ -501,9 +507,9 @@ cross-workspace concurrency only after isolation tests pass.
 
 ### 8.6. Stage six: prove the service boundary
 
-Run the multi-repository combinatorial suite and operational probes. Remove the
-temporary single-workspace fallback only after the CLI and daemon version
-contract is covered end to end.
+Run the multi-repository combinatorial suite and operational probes. Remove any
+rollout scaffolding only after the CLI and daemon version contract is covered
+end to end.
 
 ## 9. Alternatives considered
 

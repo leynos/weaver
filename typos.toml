@@ -45,7 +45,6 @@ extend-ignore-re = [
     "\\bartifact-name\\b",
     "\\bartifact-suffix\\b",
     "\\brust-analyzer\\b",
-    "`[^`\\n]+`",
 ]
 
 [default.extend-words]
