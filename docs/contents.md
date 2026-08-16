@@ -44,6 +44,14 @@ readers can find the source of truth without scanning the whole tree.
   concurrency](adr-010-workspace-local-concurrency.md)
   - Proposed decision for workspace-local coordination, mutation isolation,
     bounded admission, and overload behaviour.
+- [Architectural decision record (ADR) 011: Sempai query input
+  syntax](adr-011-sempai-query-input-syntax.md)
+  - Proposed decision for bare positive queries, explicit rich expressions,
+    and equivalent argument, file, and standard-input sources.
+- [Architectural decision record (ADR) 012: Versioned selector
+  streams](adr-012-versioned-selector-streams.md)
+  - Proposed decision for deterministic selector JSONL, typed stream input,
+    source identity, and stale-selector refusal.
 - [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md)
   - Generated matrix classifying every command-contract roadmap task as an
     OrthoConfig consumer, temporary wrapper, pending dependency, or deliberate
@@ -77,6 +85,10 @@ readers can find the source of truth without scanning the whole tree.
   lifecycle](rfcs/0002-multi-workspace-daemon.md)
   - Proposed architecture for safe multi-repository tenancy, language-server
     reuse, Rust toolchain selection, and concurrent request execution.
+- [RFC 0003: Sempai query-to-selector vertical
+  slice](rfcs/0003-sempai-query-to-selector.md)
+  - Proposed delivery path from positive structural queries to versioned
+    selector streams and explicit downstream actuation.
 - [Ortho-config user's guide](ortho-config-users-guide.md)
   - Operational guide for configuration layering and ortho-config usage.
 - [Ortho-config v0.8.0 migration guide](ortho-config-v0-8-0-migration-guide.md)
@@ -118,6 +130,6 @@ readers can find the source of truth without scanning the whole tree.
 - [Weaver `act refactor` rename position migration guide](weaver-act-refactor-rename-position-migration-guide.md)
   - Migration notes for moving `act refactor` rename from `offset=` to
     `--position LINE:COL`.
-- [Weaver LSP host v0.1.0 migration guide](weaver-lsp-host-v0-1-0-migration-guide.md)
+- [Weaver LSP host v0.1.0 migration guide](weaver-lsp-host-v0.1.0-migration-guide.md)
   - Migration details for Language Server Protocol (LSP) host capability and
     API changes.
