@@ -34,5 +34,6 @@ Feature: Configuration precedence under OrthoConfig v0.9.0
 
   Scenario: The last duplicate capability directive wins during configuration loading
     Given a configuration file allowing the Rust rename capability
+    And the environment forces the Rust rename capability
     When the CLI denies the Rust rename capability
     Then loading the configuration resolves the capability matrix to deny the Rust rename capability
