@@ -1,11 +1,17 @@
 //! Shared request parsing and routing payload helpers for refactor snapshots.
 
+// This file is itself included via `#[path]` from each snapshot test crate,
+// so the child module needs an explicit path to resolve beside it.
+#[path = "refactor_routing/payloads.rs"]
+mod payloads;
+
 use std::{
     io::{self, Write},
     net::TcpStream,
     path::Path,
 };
 
+use payloads::{automatic_resolution_payload, provider_mismatch_payload};
 use serde_json::json;
 
 /// Explicit provider override values supported by the refactor snapshots.
@@ -100,97 +106,6 @@ pub fn language_for_extension(file: &Path) -> Option<&'static str> {
     }
 }
 
-/// Builds a capability-resolution `stderr` JSON payload for automatic
-/// provider selection based on the file extension.
-///
-/// Returns `None` when the file extension is not recognised.
-pub fn automatic_resolution_payload(file: &Path) -> Option<String> {
-    match language_for_extension(file) {
-        Some("python") => Some(
-            json!({
-                "status": "ok",
-                "type": "CapabilityResolution",
-                "details": {
-                    "capability": "rename-symbol",
-                    "language": "python",
-                    "selected_provider": "rope",
-                    "selection_mode": "automatic",
-                    "outcome": "selected",
-                    "candidates": [
-                        { "provider": "rope", "accepted": true, "reason": "matched_language_and_capability" },
-                        { "provider": "rust-analyzer", "accepted": false, "reason": "unsupported_language" }
-                    ]
-                }
-            })
-            .to_string(),
-        ),
-        Some("rust") => Some(
-            json!({
-                "status": "ok",
-                "type": "CapabilityResolution",
-                "details": {
-                    "capability": "rename-symbol",
-                    "language": "rust",
-                    "selected_provider": "rust-analyzer",
-                    "selection_mode": "automatic",
-                    "outcome": "selected",
-                    "candidates": [
-                        { "provider": "rust-analyzer", "accepted": true, "reason": "matched_language_and_capability" },
-                        { "provider": "rope", "accepted": false, "reason": "unsupported_language" }
-                    ]
-                }
-            })
-            .to_string(),
-        ),
-        _ => None,
-    }
-}
-
-/// Builds a refused capability-resolution `stderr` JSON payload for the case
-/// where an explicitly requested provider does not support the file's
-/// language.
-///
-/// Returns `None` when the provider and language are compatible, or when the
-/// file extension is not recognised.
-pub fn provider_mismatch_payload(file: &Path, provider: RequestedProvider) -> Option<String> {
-    let language = language_for_extension(file)?;
-    let mismatched = matches!(
-        (language, provider),
-        ("python", RequestedProvider::RustAnalyzer) | ("rust", RequestedProvider::Rope)
-    );
-    if !mismatched {
-        return None;
-    }
-
-    Some(
-        json!({
-            "status": "error",
-            "type": "CapabilityResolution",
-            "details": {
-                "capability": "rename-symbol",
-                "language": language,
-                "requested_provider": provider.as_str(),
-                "selection_mode": "explicit_provider",
-                "outcome": "refused",
-                "refusal_reason": "explicit_provider_mismatch",
-                "candidates": [
-                    {
-                        "provider": if language == "python" { "rope" } else { "rust-analyzer" },
-                        "accepted": false,
-                        "reason": "not_requested"
-                    },
-                    {
-                        "provider": provider.as_str(),
-                        "accepted": false,
-                        "reason": "explicit_provider_mismatch"
-                    }
-                ]
-            }
-        })
-        .to_string(),
-    )
-}
-
 /// Writes the complete fake-daemon response for a `refactor` operation to
 /// `writer`.
 ///
@@ -198,23 +113,21 @@ pub fn provider_mismatch_payload(file: &Path, provider: RequestedProvider) -> Op
 /// an optional capability-resolution `stderr` stream record followed by a
 /// `stdout` payload and an exit record.
 ///
-/// # Panics
-/// Panics if the `--file` argument is missing, the refactoring is not
-/// `rename`, `new_name` or `--position` is absent, the file extension is not
-/// recognised, or the `--provider` value is not `rope` or `rust-analyzer`.
-///
 /// # Errors
-/// Returns an `io::Error` if writing to `writer` fails.
+/// Returns `io::ErrorKind::InvalidData` when the request is malformed — a
+/// missing or unsupported `--refactoring`, `--file`, `new_name=`, `--position`,
+/// or `--provider`, or a file extension with no routing rule — and any other
+/// `io::Error` when writing to `writer` fails.
 pub fn write_refactor_response(
     writer: &mut TcpStream,
     operation: Operation,
     arguments: &[&str],
     renamed_symbol: &str,
 ) -> Result<(), io::Error> {
-    let request = validate_refactor_request(arguments);
+    let request = validate_refactor_request(arguments)?;
 
     if language_for_extension(request.file).is_none() {
-        panic_unsupported_extension(request.file);
+        return Err(unsupported_extension_error(request.file));
     }
 
     if write_provider_mismatch_response(writer, &request)? {
@@ -293,64 +206,105 @@ pub fn response_payload_for_operation(operation: Operation, renamed_symbol: &str
     }
 }
 
-fn requested_provider(arguments: &[&str]) -> Option<RequestedProvider> {
-    match argument_value(arguments, "--provider") {
-        Some("rope") => Some(RequestedProvider::Rope),
-        Some("rust-analyzer") => Some(RequestedProvider::RustAnalyzer),
-        Some(other) => panic!(
-            "refactor snapshot requests only support --provider rope or rust-analyzer, got {other}"
-        ),
-        None => None,
-    }
+/// Builds the `InvalidData` error used to report a malformed snapshot request.
+///
+/// The fake daemon surfaces these through its response thread, so a broken test
+/// request fails loudly instead of producing a misleading transcript.
+fn invalid_request(message: impl Into<String>) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, message.into())
 }
 
-fn panic_unsupported_extension(file: &Path) -> ! {
-    panic!(
+/// Reports a file extension for which no routing rule exists.
+fn unsupported_extension_error(file: &Path) -> io::Error {
+    invalid_request(format!(
         "fake daemon received a refactor request for unsupported file extension: {}; add a \
          routing rule to language_for_extension",
         file.display()
-    );
+    ))
 }
 
-fn validate_refactor_request<'a>(arguments: &'a [&'a str]) -> ValidatedRefactorRequest<'a> {
-    let Some(refactoring) = argument_value(arguments, "--refactoring") else {
-        panic!("refactor snapshot requests must include --refactoring");
-    };
-    assert_eq!(
-        refactoring, "rename",
-        "refactor snapshot requests only support --refactoring rename"
-    );
-    let Some(file) = argument_value(arguments, "--file") else {
-        panic!("refactor snapshot requests must include --file");
-    };
+fn requested_provider(arguments: &[&str]) -> io::Result<Option<RequestedProvider>> {
+    match argument_value(arguments, "--provider") {
+        Some("rope") => Ok(Some(RequestedProvider::Rope)),
+        Some("rust-analyzer") => Ok(Some(RequestedProvider::RustAnalyzer)),
+        Some(other) => Err(invalid_request(format!(
+            "refactor snapshot requests only support --provider rope or rust-analyzer, got {other}"
+        ))),
+        None => Ok(None),
+    }
+}
+
+/// Checks `--refactoring` names the only refactoring these snapshots cover.
+fn validate_refactoring(arguments: &[&str]) -> io::Result<()> {
+    match argument_value(arguments, "--refactoring") {
+        Some("rename") => Ok(()),
+        Some(other) => Err(invalid_request(format!(
+            "refactor snapshot requests only support --refactoring rename, got {other}"
+        ))),
+        None => Err(invalid_request(
+            "refactor snapshot requests must include --refactoring",
+        )),
+    }
+}
+
+/// Checks a non-empty `new_name=<value>` positional argument is present.
+fn validate_new_name(arguments: &[&str]) -> io::Result<()> {
     let Some(new_name) = arguments
         .iter()
         .find_map(|argument| argument.strip_prefix("new_name="))
     else {
-        panic!("refactor snapshot requests must include new_name=<value>");
+        return Err(invalid_request(
+            "refactor snapshot requests must include new_name=<value>",
+        ));
     };
-    assert!(
-        !new_name.is_empty(),
-        "refactor snapshot requests must include non-empty new_name=<value>"
-    );
-    let Some(position) = argument_value(arguments, "--position") else {
-        panic!("refactor snapshot requests must include --position <LINE:COL>");
-    };
-    let Some((line, column)) = position.split_once(':') else {
-        panic!("refactor snapshot requests must include --position <LINE:COL>");
-    };
-    let parsed_line = line.parse::<u32>().ok();
-    let parsed_column = column.parse::<u32>().ok();
-    assert!(
-        parsed_line.is_some_and(|value| value >= 1)
-            && parsed_column.is_some_and(|value| value >= 1),
-        "refactor snapshot requests must include one-indexed --position <LINE:COL>"
-    );
-
-    ValidatedRefactorRequest {
-        file: Path::new(file),
-        requested_provider: requested_provider(arguments),
+    if new_name.is_empty() {
+        return Err(invalid_request(
+            "refactor snapshot requests must include non-empty new_name=<value>",
+        ));
     }
+    Ok(())
+}
+
+/// Checks `--position` carries a one-indexed `LINE:COL` pair.
+fn validate_position(arguments: &[&str]) -> io::Result<()> {
+    const EXPECTATION: &str =
+        "refactor snapshot requests must include one-indexed --position <LINE:COL>";
+
+    let Some((line, column)) =
+        argument_value(arguments, "--position").and_then(|position| position.split_once(':'))
+    else {
+        return Err(invalid_request(EXPECTATION));
+    };
+    let is_one_indexed = |value: &str| value.parse::<u32>().is_ok_and(|parsed| parsed >= 1);
+    if is_one_indexed(line) && is_one_indexed(column) {
+        Ok(())
+    } else {
+        Err(invalid_request(EXPECTATION))
+    }
+}
+
+/// Validates a refactor request and extracts the parts the responder needs.
+///
+/// # Errors
+/// Returns `io::ErrorKind::InvalidData` describing the first malformed or
+/// missing argument.
+fn validate_refactor_request<'a>(
+    arguments: &'a [&'a str],
+) -> io::Result<ValidatedRefactorRequest<'a>> {
+    validate_refactoring(arguments)?;
+    validate_new_name(arguments)?;
+    validate_position(arguments)?;
+
+    let Some(file) = argument_value(arguments, "--file") else {
+        return Err(invalid_request(
+            "refactor snapshot requests must include --file",
+        ));
+    };
+
+    Ok(ValidatedRefactorRequest {
+        file: Path::new(file),
+        requested_provider: requested_provider(arguments)?,
+    })
 }
 
 fn write_stderr_stream(writer: &mut TcpStream, payload: &str) -> io::Result<()> {

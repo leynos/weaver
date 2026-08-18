@@ -5,6 +5,10 @@
 //! snapshot library. The suite covers both success and error scenarios across
 //! Rust, Python, and TypeScript.
 
+#[path = "support/error_assertions.rs"]
+mod error_assertions;
+
+use error_assertions::assert_error_mentions;
 use insta::assert_debug_snapshot;
 use weaver_e2e::fixtures;
 use weaver_syntax::{Pattern, RewriteRule, Rewriter, SupportedLanguage};
@@ -66,14 +70,13 @@ fn test_rewrite(case: RewriteTestCase<'_>, snapshot_name: &str) -> Result<(), Te
     Ok(())
 }
 
+/// Asserts that a rewrite case fails with an expected error substring.
 fn assert_rewrite_error(case: RewriteTestCase<'_>, expected_substring: &str) {
-    let result = apply_rewrite(case.source, case.pattern, case.replacement, case.language);
-    let Err(err) = result else {
-        panic!("expected error for pattern: {}", case.pattern)
-    };
-    assert!(
-        err.to_string().contains(expected_substring),
-        "error message should mention '{expected_substring}': {err}"
+    let outcome = apply_rewrite(case.source, case.pattern, case.replacement, case.language);
+    assert_error_mentions(
+        outcome,
+        &format!("pattern `{}`", case.pattern),
+        expected_substring,
     );
 }
 

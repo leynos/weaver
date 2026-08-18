@@ -5,6 +5,7 @@ mod world;
 
 use std::str::FromStr;
 
+use anyhow::{Context as _, Result};
 use lsp_types::{
     DidChangeTextDocumentParams,
     DidCloseTextDocumentParams,
@@ -26,37 +27,44 @@ pub use world::{TestServerConfig, TestWorld};
 
 /// Returns the sample file URI used by tests.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if the fixed sample URI is invalid.
+/// Returns an error if the fixed sample URI fails to parse.
 #[allow_fixture_expansion_lints]
 #[fixture]
-pub fn sample_uri() -> Uri {
-    match Uri::from_str("file:///workspace/main.rs") {
-        Ok(uri) => uri,
-        Err(error) => panic!("invalid test URI: {error}"),
-    }
+pub fn sample_uri() -> Result<Uri> {
+    Uri::from_str("file:///workspace/main.rs").context("sample test URI should parse")
+}
+
+fn sample_text_document() -> Result<TextDocumentIdentifier> {
+    Ok(TextDocumentIdentifier { uri: sample_uri()? })
 }
 
 /// Builds a definition request for the sample URI.
-#[must_use]
-pub fn definition_params() -> GotoDefinitionParams {
-    GotoDefinitionParams {
+///
+/// # Errors
+///
+/// Returns an error if the sample URI fails to parse.
+pub fn definition_params() -> Result<GotoDefinitionParams> {
+    Ok(GotoDefinitionParams {
         text_document_position_params: TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier { uri: sample_uri() },
+            text_document: sample_text_document()?,
             position: lsp_types::Position::new(1, 2),
         },
         work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
         partial_result_params: lsp_types::PartialResultParams::default(),
-    }
+    })
 }
 
 /// Builds a references request for the sample URI.
-#[must_use]
-pub fn reference_params() -> ReferenceParams {
-    ReferenceParams {
+///
+/// # Errors
+///
+/// Returns an error if the sample URI fails to parse.
+pub fn reference_params() -> Result<ReferenceParams> {
+    Ok(ReferenceParams {
         text_document_position: TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier { uri: sample_uri() },
+            text_document: sample_text_document()?,
             position: lsp_types::Position::new(1, 2),
         },
         work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
@@ -64,28 +72,34 @@ pub fn reference_params() -> ReferenceParams {
         context: ReferenceContext {
             include_declaration: false,
         },
-    }
+    })
 }
 
 /// Builds a did-open notification for the sample URI.
-#[must_use]
-pub fn did_open_params() -> DidOpenTextDocumentParams {
-    DidOpenTextDocumentParams {
+///
+/// # Errors
+///
+/// Returns an error if the sample URI fails to parse.
+pub fn did_open_params() -> Result<DidOpenTextDocumentParams> {
+    Ok(DidOpenTextDocumentParams {
         text_document: TextDocumentItem {
-            uri: sample_uri(),
+            uri: sample_uri()?,
             language_id: String::from("rust"),
             version: 1,
             text: String::from("fn main() {}"),
         },
-    }
+    })
 }
 
 /// Builds a did-change notification for the sample URI.
-#[must_use]
-pub fn did_change_params() -> DidChangeTextDocumentParams {
-    DidChangeTextDocumentParams {
+///
+/// # Errors
+///
+/// Returns an error if the sample URI fails to parse.
+pub fn did_change_params() -> Result<DidChangeTextDocumentParams> {
+    Ok(DidChangeTextDocumentParams {
         text_document: VersionedTextDocumentIdentifier {
-            uri: sample_uri(),
+            uri: sample_uri()?,
             version: 2,
         },
         content_changes: vec![TextDocumentContentChangeEvent {
@@ -93,13 +107,16 @@ pub fn did_change_params() -> DidChangeTextDocumentParams {
             range_length: None,
             text: String::from("fn main() { println!(\"hi\"); }"),
         }],
-    }
+    })
 }
 
 /// Builds a did-close notification for the sample URI.
-#[must_use]
-pub fn did_close_params() -> DidCloseTextDocumentParams {
-    DidCloseTextDocumentParams {
-        text_document: TextDocumentIdentifier { uri: sample_uri() },
-    }
+///
+/// # Errors
+///
+/// Returns an error if the sample URI fails to parse.
+pub fn did_close_params() -> Result<DidCloseTextDocumentParams> {
+    Ok(DidCloseTextDocumentParams {
+        text_document: sample_text_document()?,
+    })
 }

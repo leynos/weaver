@@ -74,11 +74,10 @@ mod tests {
 
     #[allow_fixture_expansion_lints]
     #[fixture]
-    fn sample_uri() -> Uri {
-        match "file:///src/main.rs".parse() {
-            Ok(uri) => uri,
-            Err(error) => panic!("valid uri: {error}"),
-        }
+    fn sample_uri() -> Result<Uri, String> {
+        "file:///src/main.rs"
+            .parse()
+            .map_err(|error| format!("valid uri: {error}"))
     }
 
     fn make_location(uri: &Uri, line: u32, character: u32) -> Location {
@@ -164,11 +163,12 @@ mod tests {
         &[(5, 8), (20, 1), (51, 13)]
     )]
     fn extracts_locations_from_response_variants(
-        sample_uri: Uri,
+        sample_uri: Result<Uri, String>,
         #[case] variant: ResponseVariant,
         #[case] expected: &[(u32, u32)],
     ) {
-        let response = build_response(&sample_uri, variant);
+        let uri = sample_uri.expect("sample uri fixture");
+        let response = build_response(&uri, variant);
         let locations = extract_locations(response);
 
         assert_eq!(
@@ -178,7 +178,7 @@ mod tests {
             expected.len(),
             locations.len()
         );
-        let expected_uri = sample_uri.to_string();
+        let expected_uri = uri.to_string();
         for (i, (expected_line, expected_column)) in expected.iter().enumerate() {
             assert_eq!(locations[i].uri, expected_uri, "location[{i}].uri mismatch");
             assert_eq!(

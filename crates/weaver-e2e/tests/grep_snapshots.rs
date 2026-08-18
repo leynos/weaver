@@ -3,8 +3,12 @@
 //! These tests validate structural code search using patterns with metavariables
 //! across Rust, Python, and TypeScript.
 
+#[path = "support/error_assertions.rs"]
+mod error_assertions;
+
 use std::collections::BTreeMap;
 
+use error_assertions::assert_error_mentions;
 use insta::assert_debug_snapshot;
 use weaver_e2e::fixtures;
 use weaver_syntax::{Parser, Pattern, SupportedLanguage};
@@ -82,17 +86,10 @@ fn find_matches(
         .collect())
 }
 
-/// Helper to assert that a pattern fails to compile with an expected error substring.
+/// Asserts that `pattern` fails to compile with an expected error substring.
 fn assert_pattern_error(pattern: &str, expected_substring: &str) {
-    let result = find_matches(DUMMY_RUST_SOURCE, pattern, SupportedLanguage::Rust);
-    let Err(err) = result else {
-        panic!("expected error for pattern: {pattern}");
-    };
-    let msg = err.to_string();
-    assert!(
-        msg.contains(expected_substring),
-        "error message should mention '{expected_substring}': {msg}"
-    );
+    let outcome = find_matches(DUMMY_RUST_SOURCE, pattern, SupportedLanguage::Rust);
+    assert_error_mentions(outcome, &format!("pattern `{pattern}`"), expected_substring);
 }
 
 // =============================================================================

@@ -123,15 +123,11 @@ mod tests {
     use super::*;
     use crate::safety_harness::edit::{FileEdit, Position, TextEdit};
 
-    /// Helper for testing successful edit application scenarios.
-    fn assert_edits_produce(original: &str, edits: Vec<TextEdit>, expected: &str) {
-        let path = PathBuf::from("test.txt");
-        let edit = FileEdit::with_edits(path, edits);
-        let result = match apply_edits(original, &edit) {
-            Ok(result) => result,
-            Err(error) => panic!("edit should succeed: {error}"),
-        };
-        assert_eq!(result, expected);
+    /// Applies `edits` to `original`, surfacing application failures to the
+    /// caller so the assertion stays in the test body.
+    fn edited_text(original: &str, edits: Vec<TextEdit>) -> Result<String, String> {
+        let edit = FileEdit::with_edits(PathBuf::from("test.txt"), edits);
+        apply_edits(original, &edit).map_err(|error| format!("edit should succeed: {error}"))
     }
 
     #[rstest]
@@ -178,7 +174,9 @@ mod tests {
         #[case] edits: Vec<TextEdit>,
         #[case] expected: &str,
     ) {
-        assert_edits_produce(original, edits, expected);
+        let actual = edited_text(original, edits).expect("edits should apply cleanly");
+
+        assert_eq!(actual, expected);
     }
 
     #[test]

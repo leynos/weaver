@@ -1,5 +1,6 @@
 //! stdin/stdout dispatch-layer tests for rust-analyzer plugin requests.
 
+use anyhow::Result;
 use rstest::rstest;
 use weaver_plugins::{
     capability::ReasonCode,
@@ -15,34 +16,23 @@ use super::support::{
 };
 use crate::run_with_adapter;
 
-fn valid_request_json() -> String {
+fn valid_request_json() -> serde_json::Result<String> {
     let request = request_with_args(rename_arguments());
-    match serde_json::to_string(&request) {
-        Ok(serialized_request) => serialized_request,
-        Err(error) => panic!("serialize request: {error}"),
-    }
+    serde_json::to_string(&request)
 }
 
 /// Dispatches `input` through `run_with_adapter` and parses the response.
-fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> PluginResponse {
+fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> Result<PluginResponse> {
     let mut stdin = std::io::Cursor::new(input.to_vec());
     let mut stdout = Vec::new();
-    if let Err(error) = run_with_adapter(&mut stdin, &mut stdout, adapter) {
-        panic!("dispatch should succeed: {error}");
-    }
-    let output = match String::from_utf8(stdout) {
-        Ok(output) => output,
-        Err(error) => panic!("utf8 stdout: {error}"),
-    };
-    match serde_json::from_str(output.trim()) {
-        Ok(response) => response,
-        Err(error) => panic!("parse response: {error}"),
-    }
+    run_with_adapter(&mut stdin, &mut stdout, adapter)?;
+    let output = String::from_utf8(stdout)?;
+    Ok(serde_json::from_str(output.trim())?)
 }
 
 #[rstest]
 #[case::success(
-    format!("{}\n", valid_request_json()).into_bytes(),
+    format!("{}\n", valid_request_json().expect("request serialization should succeed")).into_bytes(),
     adapter_returning(Ok(String::from("fn new_name() -> i32 {\n    1\n}\n"))),
     true,
     None
@@ -60,7 +50,7 @@ fn run_with_adapter_dispatch_layer(
     #[case] expect_success: bool,
     #[case] expected_message: Option<&str>,
 ) {
-    let response = dispatch_stdin(&input, &adapter);
+    let response = dispatch_stdin(&input, &adapter).expect("stdin dispatch should succeed");
     assert_eq!(response.is_success(), expect_success);
 
     if let Some(needle) = expected_message {
@@ -104,7 +94,8 @@ fn failure_responses_include_reason_codes(
         "{}\n",
         serde_json::to_string(&request).expect("serialize request")
     );
-    let response = dispatch_stdin(input.as_bytes(), &adapter_unused());
+    let response =
+        dispatch_stdin(input.as_bytes(), &adapter_unused()).expect("stdin dispatch should succeed");
 
     assert!(!response.is_success());
     assert!(

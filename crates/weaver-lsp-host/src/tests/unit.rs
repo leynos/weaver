@@ -159,7 +159,7 @@ fn applies_force_and_deny_overrides() {
         responses: ResponseSet::default(),
         initialization_error: None,
     }];
-    let mut world = TestWorld::new(config, overrides);
+    let mut world = TestWorld::new(config, overrides).expect("stub server should register");
 
     world.initialize(Language::Rust);
     let summary = world
@@ -240,7 +240,8 @@ fn rejects_duplicate_language_registration() {
 #[rstest]
 fn reports_unknown_language_on_request() {
     let mut host = crate::LspHost::new(CapabilityMatrix::default());
-    match host.goto_definition(Language::Rust, definition_params()) {
+    let params = definition_params().expect("definition params should build");
+    match host.goto_definition(Language::Rust, params) {
         Err(LspHostError::UnknownLanguage { .. }) => {}
         other => panic!("expected unknown language error, got {other:?}"),
     }
@@ -248,95 +249,117 @@ fn reports_unknown_language_on_request() {
 
 #[rstest]
 fn propagates_server_error_from_definition() {
-    assert_server_error_propagates(FailingDefinitionServer, HostOperation::Definition, |host| {
-        host.goto_definition(Language::Rust, definition_params())
-    });
+    let params = definition_params().expect("definition params should build");
+    let context = propagated_server_error(FailingDefinitionServer, |host| {
+        host.goto_definition(Language::Rust, params)
+    })
+    .expect("stub server should register");
+    assert_eq!(context, Some((Language::Rust, HostOperation::Definition)));
 }
 
 #[rstest]
 fn propagates_server_error_from_did_change() {
-    assert_server_error_propagates(FailingDidChangeServer, HostOperation::DidChange, |host| {
-        host.did_change(Language::Rust, did_change_params())
-    });
+    let params = did_change_params().expect("did-change params should build");
+    let context = propagated_server_error(FailingDidChangeServer, |host| {
+        host.did_change(Language::Rust, params)
+    })
+    .expect("stub server should register");
+    assert_eq!(context, Some((Language::Rust, HostOperation::DidChange)));
 }
 
 #[rstest]
 fn propagates_server_error_from_did_open() {
-    assert_server_error_propagates(FailingDidOpenServer, HostOperation::DidOpen, |host| {
-        host.did_open(Language::Rust, did_open_params())
-    });
+    let params = did_open_params().expect("did-open params should build");
+    let context = propagated_server_error(FailingDidOpenServer, |host| {
+        host.did_open(Language::Rust, params)
+    })
+    .expect("stub server should register");
+    assert_eq!(context, Some((Language::Rust, HostOperation::DidOpen)));
 }
 
 #[rstest]
 fn propagates_server_error_from_did_close() {
-    assert_server_error_propagates(FailingDidCloseServer, HostOperation::DidClose, |host| {
-        host.did_close(Language::Rust, did_close_params())
-    });
+    let params = did_close_params().expect("did-close params should build");
+    let context = propagated_server_error(FailingDidCloseServer, |host| {
+        host.did_close(Language::Rust, params)
+    })
+    .expect("stub server should register");
+    assert_eq!(context, Some((Language::Rust, HostOperation::DidClose)));
 }
 
 #[rstest]
 fn calls_initialise_before_requests() {
-    assert_initialise_before(
-        |host| {
-            let uri = sample_uri();
-            host.diagnostics(Language::Rust, uri)
-        },
-        &[CallKind::Initialise],
-        "initialise should precede requests",
+    let uri = sample_uri().expect("sample URI should parse");
+    let calls = recorded_calls(|host| host.diagnostics(Language::Rust, uri))
+        .expect("recording server should register");
+    assert!(
+        calls.starts_with(&[CallKind::Initialise]),
+        "initialise should precede requests: {calls:?}"
     );
 }
 
 #[rstest]
 fn calls_initialise_before_document_sync() {
-    assert_initialise_before(
-        |host| host.did_open(Language::Rust, did_open_params()),
-        &[CallKind::Initialise, CallKind::DidOpen],
-        "initialise should precede didOpen",
+    let params = did_open_params().expect("did-open params should build");
+    let calls = recorded_calls(|host| host.did_open(Language::Rust, params))
+        .expect("recording server should register");
+    assert!(
+        calls.starts_with(&[CallKind::Initialise, CallKind::DidOpen]),
+        "initialise should precede didOpen: {calls:?}"
     );
 }
 
-fn assert_server_error_propagates<T, F>(
+/// Builds a host with `server` registered as the Rust language server.
+fn host_with_rust_server(
     server: impl LanguageServer + 'static,
-    expected_operation: HostOperation,
-    call: F,
-) where
-    F: FnOnce(&mut crate::LspHost) -> Result<T, LspHostError>,
-    T: std::fmt::Debug,
-{
+) -> Result<crate::LspHost, LspHostError> {
     let mut host = crate::LspHost::new(CapabilityMatrix::default());
-    if let Err(error) = host.register_language(Language::Rust, Box::new(server)) {
-        panic!("registration failed: {error}");
-    }
+    host.register_language(Language::Rust, Box::new(server))?;
+    Ok(host)
+}
 
-    match call(&mut host) {
+/// Reads the language and operation out of a host server error, if that is
+/// what the outcome holds.
+fn server_error_context<T>(outcome: &Result<T, LspHostError>) -> Option<(Language, HostOperation)> {
+    match outcome {
         Err(LspHostError::Server {
             language,
             operation,
             ..
-        }) => {
-            assert_eq!(language, Language::Rust);
-            assert_eq!(operation, expected_operation);
-        }
-        other => panic!("expected server error, got {other:?}"),
+        }) => Some((*language, *operation)),
+        _ => None,
     }
 }
 
-fn assert_initialise_before<T, F>(call: F, expected_prefix: &[CallKind], message: &str)
+/// Runs `call` against a host registered with `server` and reports the
+/// server-error context of the outcome, or the registration failure.
+fn propagated_server_error<T, F>(
+    server: impl LanguageServer + 'static,
+    call: F,
+) -> Result<Option<(Language, HostOperation)>, LspHostError>
+where
+    F: FnOnce(&mut crate::LspHost) -> Result<T, LspHostError>,
+    T: std::fmt::Debug,
+{
+    let mut host = host_with_rust_server(server)?;
+    let outcome = call(&mut host);
+    Ok(server_error_context(&outcome))
+}
+
+/// Exercises `call` against a recording Rust server and returns the calls it
+/// observed, discarding the call's own outcome.
+fn recorded_calls<T, F>(call: F) -> Result<Vec<CallKind>, LspHostError>
 where
     F: FnOnce(&mut crate::LspHost) -> Result<T, LspHostError>,
 {
-    let responses = ResponseSet::default();
-    let server =
-        RecordingLanguageServer::new(ServerCapabilitySet::new(true, true, true), responses);
-    let handle = server.handle();
-    let mut host = crate::LspHost::new(CapabilityMatrix::default());
-    assert!(
-        host.register_language(Language::Rust, Box::new(server))
-            .is_ok()
+    let server = RecordingLanguageServer::new(
+        ServerCapabilitySet::new(true, true, true),
+        ResponseSet::default(),
     );
+    let handle = server.handle();
+    let mut host = host_with_rust_server(server)?;
 
     let _ = call(&mut host);
 
-    let calls = handle.calls();
-    assert!(calls.starts_with(expected_prefix), "{message}: {calls:?}");
+    Ok(handle.calls())
 }

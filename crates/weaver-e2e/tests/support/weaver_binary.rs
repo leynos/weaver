@@ -8,12 +8,19 @@ use std::{
 };
 
 /// Returns the resolved path to the `weaver` binary used by e2e tests.
-pub(crate) fn weaver_binary_path() -> &'static Path {
-    static WEAVER_BINARY: OnceLock<PathBuf> = OnceLock::new();
-    WEAVER_BINARY.get_or_init(|| match resolve_weaver_binary() {
-        Ok(path) => path,
-        Err(error) => panic!("failed to locate weaver binary: {error}"),
-    })
+///
+/// Resolution (which may build the binary) runs once per test process; the
+/// outcome — success or failure — is cached so that every caller sees the same
+/// answer and can decide how to report it.
+///
+/// # Errors
+/// Returns a description of why the binary could not be located or built.
+pub(crate) fn weaver_binary_path() -> Result<&'static Path, &'static str> {
+    static WEAVER_BINARY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
+    match WEAVER_BINARY.get_or_init(resolve_weaver_binary) {
+        Ok(path) => Ok(path.as_path()),
+        Err(error) => Err(error.as_str()),
+    }
 }
 
 fn resolve_weaver_binary() -> Result<PathBuf, String> {

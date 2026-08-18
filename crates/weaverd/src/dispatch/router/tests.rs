@@ -12,15 +12,12 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 use super::*;
 use crate::{dispatch::request::CommandRequest, tests::support::fs as test_fs};
 
-fn make_request(domain: &str, operation: &str) -> CommandRequest {
+fn make_request(domain: &str, operation: &str) -> Result<CommandRequest, String> {
     let json = format!(
         r#"{{"command":{{"domain":"{}","operation":"{}"}}}}"#,
         domain, operation
     );
-    match CommandRequest::parse(json.as_bytes()) {
-        Ok(request) => request,
-        Err(error) => panic!("test request: {error}"),
-    }
+    CommandRequest::parse(json.as_bytes()).map_err(|error| format!("test request: {error}"))
 }
 
 fn build_backends() -> FusionBackends<SemanticBackendProvider> {
@@ -33,11 +30,9 @@ fn build_backends() -> FusionBackends<SemanticBackendProvider> {
     FusionBackends::new(config, provider)
 }
 
-fn build_router() -> DomainRouter {
-    match DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace")) {
-        Ok(router) => router,
-        Err(error) => panic!("absolute workspace root: {error}"),
-    }
+fn build_router() -> Result<DomainRouter, String> {
+    DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace"))
+        .map_err(|error| format!("absolute workspace root: {error}"))
 }
 
 #[test]
@@ -75,39 +70,41 @@ fn invalid_arguments_message(domain: &str, operation: &str) -> Option<&'static s
     }
 }
 
-fn assert_routes_operations(domain: &str, operations: &[&str]) {
-    let router = build_router();
-    for op in operations {
-        let request = make_request(domain, op);
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-        let mut backends = build_backends();
-        let result = router.route(&request, &mut writer, &mut backends);
-        // get-definition requires --uri/--position args, so it will fail
-        // with InvalidArguments when called without them, but this still
-        // proves the operation is recognized and routed correctly
-        if let Some(message) = invalid_arguments_message(domain, op) {
-            assert!(
-                matches!(result, Err(DispatchError::InvalidArguments { .. })),
-                "{message}"
-            );
-        } else {
-            assert!(result.is_ok(), "{domain} {op} should route successfully");
-        }
-    }
-}
-
-fn assert_rejects_unknown_operation(domain: &str, operation: &str) {
-    let router = build_router();
-    let request = make_request(domain, operation);
+/// Routes one operation and returns the dispatch outcome under test.
+///
+/// The outer `Result` reports harness failures; the inner one is the value the
+/// assertions inspect.
+fn route_operation(
+    router: &DomainRouter,
+    domain: &str,
+    operation: &str,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+) -> Result<Result<DispatchResult, DispatchError>, String> {
+    let request = make_request(domain, operation)?;
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
-    let mut backends = build_backends();
-    let result = router.route(&request, &mut writer, &mut backends);
-    assert!(matches!(
-        result,
-        Err(DispatchError::UnknownOperation { .. })
-    ));
+    Ok(router.route(&request, &mut writer, backends))
+}
+
+/// Asserts an operation routed, tolerating the argument errors that operations
+/// requiring flags report when invoked without them: reaching argument
+/// validation already proves the operation was recognized and routed.
+macro_rules! assert_routed {
+    ($result:expr, $domain:expr, $operation:expr) => {{
+        let result = $result;
+        let domain: &str = $domain;
+        let operation: &str = $operation;
+        match invalid_arguments_message(domain, operation) {
+            Some(message) => assert!(
+                matches!(result, Err(DispatchError::InvalidArguments { .. })),
+                "{message}"
+            ),
+            None => assert!(
+                result.is_ok(),
+                "{domain} {operation} should route successfully"
+            ),
+        }
+    }};
 }
 
 #[rstest]
@@ -132,16 +129,34 @@ fn domain_parse_rejects_unknown() {
 #[case::observe("observe", DomainRoutingContext::OBSERVE.known_operations)]
 #[case::act("act", DomainRoutingContext::ACT.known_operations)]
 #[case::verify("verify", DomainRoutingContext::VERIFY.known_operations)]
-fn routes_known_operations(#[case] domain: &str, #[case] operations: &'static [&'static str]) {
-    assert_routes_operations(domain, operations);
+fn routes_known_operations(
+    #[case] domain: &str,
+    #[case] operations: &'static [&'static str],
+) -> Result<(), String> {
+    let router = build_router()?;
+    for operation in operations {
+        let mut backends = build_backends();
+        let result = route_operation(&router, domain, operation, &mut backends)?;
+        assert_routed!(result, domain, operation);
+    }
+    Ok(())
 }
 
 #[rstest]
 #[case::observe("observe", "nonexistent")]
 #[case::act("act", "bogus")]
 #[case::verify("verify", "unknown")]
-fn rejects_unknown_operation(#[case] domain: &str, #[case] operation: &str) {
-    assert_rejects_unknown_operation(domain, operation);
+fn rejects_unknown_operation(#[case] domain: &str, #[case] operation: &str) -> Result<(), String> {
+    let router = build_router()?;
+    let mut backends = build_backends();
+
+    let result = route_operation(&router, domain, operation, &mut backends)?;
+
+    assert!(matches!(
+        result,
+        Err(DispatchError::UnknownOperation { .. })
+    ));
+    Ok(())
 }
 
 #[rstest]
@@ -151,30 +166,20 @@ fn routes_operations_case_insensitively(
     #[case] domain: &str,
     #[case] operation: &str,
     mut backends: FusionBackends<SemanticBackendProvider>,
-) {
-    let router = build_router();
-    let request = make_request(domain, operation);
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-    let result = router.route(&request, &mut writer, &mut backends);
+) -> Result<(), String> {
+    let router = build_router()?;
+
+    let result = route_operation(&router, domain, operation, &mut backends)?;
+
     let domain_norm = domain.to_ascii_lowercase();
     let operation_norm = operation.to_ascii_lowercase();
-    if let Some(message) = invalid_arguments_message(&domain_norm, &operation_norm) {
-        assert!(
-            matches!(result, Err(DispatchError::InvalidArguments { .. })),
-            "{message}"
-        );
-    } else {
-        assert!(
-            result.is_ok(),
-            "{domain} {operation} should route successfully despite case"
-        );
-    }
+    assert_routed!(result, &domain_norm, &operation_norm);
+    Ok(())
 }
 
 #[rstest]
 fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBackendProvider>) {
-    let router = build_router();
+    let router = build_router().expect("router with absolute workspace root");
     let temp_dir = TempDir::new().expect("temp dir");
     let path = temp_dir.path().join("empty.py");
     test_fs::write(&path, "").expect("write fixture");
@@ -209,8 +214,8 @@ fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBack
 
 #[rstest]
 fn find_references_not_implemented(mut backends: FusionBackends<SemanticBackendProvider>) {
-    let router = build_router();
-    let request = make_request("observe", "find-references");
+    let router = build_router().expect("router with absolute workspace root");
+    let request = make_request("observe", "find-references").expect("test request");
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
     let result = router

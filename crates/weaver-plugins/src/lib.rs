@@ -57,6 +57,21 @@ pub mod runner;
 #[cfg(test)]
 mod tests;
 
+/// Shared contract expectations applied to the `rename-symbol` fixtures by
+/// every rename-capable plugin crate.
+///
+/// Enable the `test-support` feature to make these helpers available outside
+/// this crate.
+#[cfg(feature = "test-support")]
+pub use self::capability::fixture_contract::{
+    FixtureError,
+    assert_rename_symbol_request_fixture_contract,
+    assert_rename_symbol_response_fixture_contract,
+    assert_shared_request_fixtures_match_contract,
+    assert_shared_response_fixtures_match_contract,
+    error_mentions_fragment,
+    expect_fixture_error,
+};
 /// Shared `rename-symbol` fixture types and fixture collections used by
 /// downstream plugin tests.
 ///
@@ -76,8 +91,6 @@ pub use self::capability::test_support::{
 /// this crate.
 #[cfg(feature = "test-support")]
 pub use self::capability::test_support::{
-    assert_rename_symbol_request_fixture_contract,
-    assert_rename_symbol_response_fixture_contract,
     rename_symbol_request_fixture_named,
     rename_symbol_response_fixture_named,
     validate_rename_symbol_request_fixture,

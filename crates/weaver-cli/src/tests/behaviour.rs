@@ -16,18 +16,6 @@ use crate::{
     output::UNKNOWN_OPERATION_TYPE,
 };
 
-/// Test-local mirror of the shared configuration help flags.
-/// Must be kept in sync with `SHARED_CONFIG_HELP_FLAGS` in `lib.rs`.
-/// If this constant drifts, tests will fail, surfacing the discrepancy.
-const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
-    "--config-path <PATH>",
-    "--daemon-socket <ENDPOINT>",
-    "--log-filter <FILTER>",
-    "--log-format <FORMAT>",
-    "--capability-overrides <DIRECTIVE>",
-    "--locale <LOCALE>",
-];
-
 const SAMPLE_RUST_SOURCE: &str = "fn main() {\n    let value = 1;\n    value\n}\n";
 const SAMPLE_PATCH: &str = concat!(
     "diff --git a/src/main.rs b/src/main.rs\n",

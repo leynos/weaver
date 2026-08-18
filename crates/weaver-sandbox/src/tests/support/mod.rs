@@ -4,6 +4,8 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::MutexGuard;
+
+use anyhow::{Context as _, Result};
 use tempfile::TempDir;
 
 use crate::error::SandboxError;
@@ -63,8 +65,10 @@ impl TestWorld {
         let allowed_file = temp_dir.path().join("allowed.txt");
         let forbidden_file = temp_dir.path().join("forbidden.txt");
 
-        write_fixture(&allowed_file, "allowed file content");
-        write_fixture(&forbidden_file, "forbidden file content");
+        write_fixture(&allowed_file, "allowed file content")
+            .expect("allowed fixture file should be written");
+        write_fixture(&forbidden_file, "forbidden file content")
+            .expect("forbidden fixture file should be written");
 
         Self {
             profile: SandboxProfile::new(),
@@ -78,8 +82,13 @@ impl TestWorld {
         }
     }
 
-    pub fn configure_cat(&mut self, target: &Path) {
-        let mut command = SandboxCommand::new(resolve_binary(&["/bin/cat", "/usr/bin/cat"]));
+    /// Configures a `cat` invocation against `target`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no `cat` binary is present on the host.
+    pub fn configure_cat(&mut self, target: &Path) -> Result<()> {
+        let mut command = SandboxCommand::new(resolve_binary(&["/bin/cat", "/usr/bin/cat"])?);
         command.arg(target);
         command.stdout(Stdio::piped());
         command.stderr(Stdio::piped());
@@ -87,10 +96,16 @@ impl TestWorld {
         self.profile = self.profile.clone().allow_executable(command.get_program());
 
         self.command = Some(command);
+        Ok(())
     }
 
-    pub fn configure_env_reader(&mut self) {
-        let mut command = SandboxCommand::new(resolve_binary(&["/usr/bin/env", "/bin/env"]));
+    /// Configures an `env` invocation used to observe inherited variables.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no `env` binary is present on the host.
+    pub fn configure_env_reader(&mut self) -> Result<()> {
+        let mut command = SandboxCommand::new(resolve_binary(&["/usr/bin/env", "/bin/env"])?);
         command.stdout(Stdio::piped());
 
         self.profile = self
@@ -99,6 +114,7 @@ impl TestWorld {
             .allow_executable(command.get_program());
 
         self.command = Some(command);
+        Ok(())
     }
 
     pub fn set_env_var(&mut self, key: &'static str, value: &str) {
@@ -115,24 +131,38 @@ impl TestWorld {
         self.env = None;
     }
 
-    pub fn launch(&mut self) {
+    /// Launches the configured command, recording either its output or the
+    /// sandbox error that prevented it from running.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no command was configured, or if the child's
+    /// output could not be read.
+    pub fn launch(&mut self) -> Result<()> {
         let profile = self.profile.clone();
-        let Some(command) = self.command.take() else {
-            panic!("command not configured");
-        };
+        let command = self.command.take().context("command not configured")?;
 
         let sandbox = Sandbox::new(profile);
         match sandbox.spawn(command) {
-            Ok(child) => self.capture_output(child),
+            Ok(child) => self.capture_output(child)?,
+            // A rejected spawn is an expected outcome for some scenarios, so
+            // it is recorded rather than propagated.
             Err(error) => self.launch_error = Some(error),
         }
+        Ok(())
     }
 
-    pub fn capture_output(&mut self, mut child: SandboxChild) {
+    /// Waits for `child` and stores its output.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the child's output could not be read.
+    pub fn capture_output(&mut self, mut child: SandboxChild) -> Result<()> {
         let output = child
             .wait_with_output()
-            .unwrap_or_else(|error| panic!("failed to read child output: {error}"));
+            .context("failed to read child output")?;
         self.output = Some(output);
+        Ok(())
     }
 }
 
@@ -142,25 +172,34 @@ impl Drop for TestWorld {
     }
 }
 
+/// Returns the first candidate binary that exists on the host.
+///
+/// # Errors
+///
+/// Returns an error if none of the candidates are present.
 #[cfg(target_os = "linux")]
-pub fn resolve_binary(candidates: &[&str]) -> PathBuf {
-    for candidate in candidates {
-        let path = Path::new(candidate);
-        if path.exists() {
-            return path.to_path_buf();
-        }
-    }
-    panic!("no candidate binary found in {candidates:?}");
+pub fn resolve_binary(candidates: &[&str]) -> Result<PathBuf> {
+    candidates
+        .iter()
+        .map(Path::new)
+        .find(|path| path.exists())
+        .map(Path::to_path_buf)
+        .with_context(|| format!("no candidate binary found in {candidates:?}"))
 }
 
+/// Rejects binary resolution outwith Linux.
+///
+/// # Errors
+///
+/// Always returns an error; these tests target Linux hosts only.
 #[cfg(not(target_os = "linux"))]
-pub fn resolve_binary(_candidates: &[&str]) -> PathBuf {
-    panic!("sandbox behaviour tests are intended for Linux hosts only");
+pub fn resolve_binary(_candidates: &[&str]) -> Result<PathBuf> {
+    anyhow::bail!("sandbox behaviour tests are intended for Linux hosts only")
 }
 
-fn write_fixture(path: &Path, contents: &str) {
-    let mut file = fs::File::create(path)
-        .unwrap_or_else(|error| panic!("failed to create fixture {path:?}: {error}"));
+fn write_fixture(path: &Path, contents: &str) -> Result<()> {
+    let mut file =
+        fs::File::create(path).with_context(|| format!("failed to create fixture {path:?}"))?;
     file.write_all(contents.as_bytes())
-        .unwrap_or_else(|error| panic!("failed to write fixture {path:?}: {error}"));
+        .with_context(|| format!("failed to write fixture {path:?}"))
 }

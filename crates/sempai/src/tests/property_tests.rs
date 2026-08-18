@@ -7,6 +7,7 @@ use sempai_core::{
     formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom},
 };
 
+use super::engine_test_support::first_diagnostic_of;
 use crate::semantic_check::validate_formula;
 
 const MAX_DEPTH: u32 = 5;
@@ -190,12 +191,9 @@ fn positive_tree() -> BoxedStrategy<Decorated<Formula>> {
         .boxed()
 }
 
-fn first_diagnostic_code(formula: &Decorated<Formula>) -> DiagnosticCode {
-    let err = validate_formula(formula).expect_err("formula should fail validation");
-    let Some(diagnostic) = err.diagnostics().first() else {
-        panic!("should have diagnostic");
-    };
-    diagnostic.code()
+fn first_diagnostic_code(formula: &Decorated<Formula>) -> anyhow::Result<DiagnosticCode> {
+    let (code, _diagnostic) = first_diagnostic_of(validate_formula(formula))?;
+    Ok(code)
 }
 
 proptest! {
@@ -207,10 +205,8 @@ proptest! {
 
     #[test]
     fn prop_or_branch_containing_negation_is_rejected(formula in or_with_not_descendant()) {
-        prop_assert_eq!(
-            first_diagnostic_code(&formula),
-            DiagnosticCode::ESempaiInvalidNotInOr
-        );
+        let code = first_diagnostic_code(&formula).expect("formula should fail validation");
+        prop_assert_eq!(code, DiagnosticCode::ESempaiInvalidNotInOr);
     }
 
     #[test]
@@ -225,11 +221,11 @@ proptest! {
                 _ => None,
             });
 
-        let err = validate_formula(&formula).expect_err("formula should fail validation");
-        let first = err.diagnostics().first().expect("should have diagnostic");
+        let (code, diagnostic) = first_diagnostic_of(validate_formula(&formula))
+            .expect("formula should fail validation");
 
-        prop_assert_eq!(first.code(), DiagnosticCode::ESempaiMissingPositiveTermInAnd);
-        prop_assert_eq!(first.primary_span(), expected_span.as_ref());
+        prop_assert_eq!(code, DiagnosticCode::ESempaiMissingPositiveTermInAnd);
+        prop_assert_eq!(diagnostic.primary_span(), expected_span.as_ref());
     }
 
     #[test]

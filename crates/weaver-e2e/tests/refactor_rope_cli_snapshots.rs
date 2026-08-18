@@ -24,8 +24,10 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
     let daemon = FakeDaemon::start(1, "renamed_symbol").expect("fake daemon should start");
     let endpoint = daemon.endpoint();
 
-    let effective_provider = provider.unwrap_or("rope");
-    let provider_fragment = format!("--provider {effective_provider} ");
+    // Omitting `--provider` entirely is what exercises automatic routing;
+    // passing a default here would make the automatic case identical to the
+    // explicit one and the test inert.
+    let provider_fragment = provider.map_or_else(String::new, |name| format!("--provider {name} "));
     let command_string = format!(
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
          {provider_fragment}--refactoring rename --file src/main.py --position 1:5 \
@@ -40,8 +42,10 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
         "act".into(),
         "refactor".into(),
     ];
-    args.push("--provider".into());
-    args.push(effective_provider.into());
+    if let Some(name) = provider {
+        args.push("--provider".into());
+        args.push(name.into());
+    }
     args.extend([
         "--refactoring".into(),
         "rename".into(),

@@ -284,49 +284,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn write_man_page_creates_nested_directories() -> Result<(), String> {
-        let temp_dir = tempfile::tempdir().map_err(|error| format!("tempdir: {error}"))?;
-        let temp_path = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf())
-            .map_err(|path| format!("utf-8 tempdir: {}", path.display()))?;
+    fn write_man_page_creates_nested_directories() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let temp_path =
+            Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).expect("utf-8 tempdir");
         let nested_dir = temp_path.join("target/generated-man/test-target/debug");
-        let temp_dir_handle = Dir::open_ambient_dir(&temp_path, cap_std::ambient_authority())
-            .map_err(|error| format!("open tempdir: {error}"))?;
+        let temp_dir_handle =
+            Dir::open_ambient_dir(&temp_path, cap_std::ambient_authority()).expect("open tempdir");
         let existing_output_path = nested_dir.join("weaver.1");
         let existing_relative_path = existing_output_path
             .strip_prefix(&temp_path)
-            .map_err(|error| format!("existing path should live under tempdir: {error}"))?;
+            .expect("existing path should live under tempdir");
         let existing_parent = existing_relative_path
             .parent()
-            .ok_or_else(|| String::from("existing path should have parent"))?;
+            .expect("existing path should have parent");
         temp_dir_handle
             .create_dir_all(existing_parent)
-            .map_err(|error| format!("create existing parent dirs: {error}"))?;
+            .expect("create existing parent dirs");
         temp_dir_handle
             .write(existing_relative_path, b"old content\n")
-            .map_err(|error| format!("seed existing man page: {error}"))?;
+            .expect("seed existing man page");
 
-        let output_path = write_man_page(b".TH WEAVER 1\n", &nested_dir, "weaver.1")
-            .map_err(|error| format!("write man page: {error}"))?;
+        let output_path =
+            write_man_page(b".TH WEAVER 1\n", &nested_dir, "weaver.1").expect("write man page");
         let relative_output_path = output_path
             .strip_prefix(&temp_path)
-            .map_err(|error| format!("output path should live under tempdir: {error}"))?;
+            .expect("output path should live under tempdir");
 
         let expected_output_path = nested_dir.join("weaver.1");
-        if output_path != expected_output_path {
-            return Err(format!(
-                "unexpected output path: expected {expected_output_path}, got {output_path}"
-            ));
-        }
+        assert_eq!(
+            output_path, expected_output_path,
+            "unexpected output path: expected {expected_output_path}, got {output_path}"
+        );
 
         let written_content = temp_dir_handle
             .read_to_string(relative_output_path)
-            .map_err(|error| format!("read man page: {error}"))?;
-        if written_content != ".TH WEAVER 1\n" {
-            return Err(format!(
-                "unexpected man page content: expected {:?}, got {:?}",
-                ".TH WEAVER 1\n", written_content
-            ));
-        }
-        Ok(())
+            .expect("read man page");
+        assert_eq!(
+            written_content, ".TH WEAVER 1\n",
+            "unexpected man page content: expected {:?}, got {:?}",
+            ".TH WEAVER 1\n", written_content
+        );
     }
 }

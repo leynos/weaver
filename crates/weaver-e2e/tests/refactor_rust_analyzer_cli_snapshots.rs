@@ -16,77 +16,66 @@ use daemon_harness::{FakeDaemon, output_to_transcript, weaver_binary_path};
 use insta::assert_debug_snapshot;
 use rstest::rstest;
 
+/// Runs one `act refactor --refactoring rename` invocation and snapshots it.
+///
+/// `provider` is `None` for the automatic-routing case; omitting `--provider`
+/// entirely is what makes the daemon resolve the provider from the file
+/// extension, so the case must not pass the flag.
 #[expect(
     clippy::expect_used,
     reason = "test helper surfaces setup failures with the exact requested call structure"
 )]
-fn run_refactor_snapshot(snapshot_name: &str, display_command: &str, extra_args: &[&str]) {
+fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
     let daemon = FakeDaemon::start(1, "renamed_name").expect("fake daemon should start");
     let endpoint = daemon.endpoint();
 
-    let output = Command::new(weaver_binary_path())
-        .arg("--daemon-socket")
-        .arg(endpoint.as_str())
-        .arg("--output")
-        .arg("json")
-        .args(extra_args)
+    let provider_fragment = provider.map_or_else(String::new, |name| format!("--provider {name} "));
+    let command_string = format!(
+        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
+         {provider_fragment}--refactoring rename --file src/main.rs --position 1:4 \
+         new_name=renamed_name"
+    );
+
+    let mut args: Vec<String> = vec![
+        "--daemon-socket".into(),
+        endpoint,
+        "--output".into(),
+        "json".into(),
+        "act".into(),
+        "refactor".into(),
+    ];
+    if let Some(name) = provider {
+        args.push("--provider".into());
+        args.push(name.into());
+    }
+    args.extend([
+        "--refactoring".into(),
+        "rename".into(),
+        "--file".into(),
+        "src/main.rs".into(),
+        "--position".into(),
+        "1:4".into(),
+        "new_name=renamed_name".into(),
+    ]);
+
+    let mut command = Command::new(weaver_binary_path());
+    let output = command
+        .args(&args)
         .output()
         .expect("command should execute");
 
-    let transcript = output_to_transcript(display_command.to_owned(), &output, daemon.requests());
+    let transcript = output_to_transcript(command_string, &output, daemon.requests());
     daemon.join();
 
     assert_debug_snapshot!(snapshot_name, transcript);
 }
 
 #[rstest]
-#[case(
-    "refactor_rust_analyzer_actuator_isolation",
-    "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
-     --provider rust-analyzer --refactoring rename --file src/main.rs \
-     --position 1:4 new_name=renamed_name",
-    &[
-        "act", "refactor",
-        "--provider", "rust-analyzer",
-        "--refactoring", "rename",
-        "--file", "src/main.rs",
-        "--position", "1:4",
-        "new_name=renamed_name",
-    ],
-)]
-#[case(
-    "refactor_automatic_rust_routing",
-    "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
-     --provider rust-analyzer --refactoring rename --file src/main.rs --position 1:4 new_name=renamed_name",
-    &[
-        "act", "refactor",
-        "--provider", "rust-analyzer",
-        "--refactoring", "rename",
-        "--file", "src/main.rs",
-        "--position", "1:4",
-        "new_name=renamed_name",
-    ],
-)]
-#[case(
-    "refactor_rust_provider_mismatch_refusal",
-    "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
-     --provider rope --refactoring rename --file src/main.rs \
-     --position 1:4 new_name=renamed_name",
-    &[
-        "act", "refactor",
-        "--provider", "rope",
-        "--refactoring", "rename",
-        "--file", "src/main.rs",
-        "--position", "1:4",
-        "new_name=renamed_name",
-    ],
-)]
-fn refactor_rust_routing_cli_snapshot(
-    #[case] snapshot_name: &str,
-    #[case] display_command: &str,
-    #[case] extra_args: &[&str],
-) {
-    run_refactor_snapshot(snapshot_name, display_command, extra_args);
+#[case("refactor_rust_analyzer_actuator_isolation", Some("rust-analyzer"))]
+#[case("refactor_automatic_rust_routing", None)]
+#[case("refactor_rust_provider_mismatch_refusal", Some("rope"))]
+fn refactor_rust_routing_cli_snapshot(#[case] case_name: &str, #[case] provider: Option<&str>) {
+    run_rename_refactor_snapshot(case_name, provider);
 }
 
 #[test]

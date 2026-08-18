@@ -1,4 +1,9 @@
 //! Shared harness utilities for end-to-end integration tests.
+//!
+//! This module carries the pieces every snapshot suite needs: the in-process
+//! daemon, transcript capture, and snapshot assertion. Command-specific request
+//! builders live in sibling files (`get_card.rs`, `graph_slice.rs`) so that each
+//! test binary compiles only the helpers it actually uses.
 
 use std::{
     io,
@@ -10,7 +15,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use assert_cmd::Command;
 use insta::assert_snapshot;
 use serde::Serialize;
 use tempfile::TempDir;
@@ -41,35 +45,6 @@ pub(crate) struct Transcript {
     stderr: String,
 }
 
-/// Paired transcripts from a two-request caching sequence.
-#[derive(Debug, Serialize)]
-pub(crate) struct CacheTranscript {
-    pub first: Transcript,
-    pub second: Transcript,
-    pub cache_hits: u64,
-    pub cache_misses: u64,
-}
-
-/// Input parameters for a single `observe get-card` CLI invocation in tests.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct GetCardRequest<'a> {
-    pub uri: &'a str,
-    pub line: u32,
-    pub column: u32,
-    pub detail: &'a str,
-}
-
-/// Input parameters for a single `observe graph-slice` CLI invocation in tests.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct GraphSliceRequest<'a> {
-    pub uri: &'a str,
-    pub line: u32,
-    pub column: u32,
-    pub entry_detail: &'a str,
-    pub node_detail: &'a str,
-    pub max_cards: Option<u32>,
-}
-
 /// In-process test daemon accepting a bounded number of requests over a loopback socket.
 pub(crate) struct TestDaemon {
     address: SocketAddr,
@@ -81,7 +56,9 @@ impl TestDaemon {
     /// Starts the daemon, binding to an ephemeral loopback port and awaiting `expected_requests`
     /// connections.
     pub(crate) fn start(expected_requests: usize) -> Self {
-        let _ = weaver_binary_path();
+        // Resolve (and if necessary build) the CLI before the daemon starts
+        // serving, so a missing binary fails with a clear message up front.
+        let _binary = required_result(weaver_binary_path(), "locate weaver binary");
         let listener = required_result(TcpListener::bind(("127.0.0.1", 0)), "bind test listener");
         let address = required_result(listener.local_addr(), "listener address");
         let config = Config {
@@ -115,7 +92,8 @@ impl TestDaemon {
         }
     }
 
-    fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
+    /// Returns the `tcp://<addr>` string the CLI passes to `--daemon-socket`.
+    pub(crate) fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
     /// Returns the daemon's current card-cache statistics.
     pub(crate) fn cache_stats(&self) -> weaver_cards::CacheStats {
@@ -149,72 +127,19 @@ pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
     required_result(uri, "fixture path to URI").to_string()
 }
 
-/// Executes `weaver observe get-card` via the test daemon and returns a `Transcript`.
-pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> Transcript {
-    let command = format!(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri \
-         <uri> --position {}:{} --detail {}",
-        request.line, request.column, request.detail
-    );
-    let command_output = Command::new(weaver_binary_path())
-        .args([
-            "--daemon-socket",
-            &daemon.endpoint(),
-            "--output",
-            "json",
-            "observe",
-            "get-card",
-            "--uri",
-            request.uri,
-            "--position",
-            &format!("{}:{}", request.line, request.column),
-            "--detail",
-            request.detail,
-        ])
-        .output();
-    let output = required_result(command_output, "CLI should execute");
-    output_to_transcript(command, &output)
-}
-
-/// Executes `weaver observe graph-slice` via the test daemon and returns a `Transcript`.
-pub(crate) fn run_graph_slice(daemon: &TestDaemon, request: GraphSliceRequest<'_>) -> Transcript {
-    let mut command = format!(
-        concat!(
-            "weaver --daemon-socket tcp://<daemon-endpoint> --output json ",
-            "observe graph-slice --uri <uri> --position {}:{} ",
-            "--entry-detail {} --node-detail {}"
-        ),
-        request.line, request.column, request.entry_detail, request.node_detail
-    );
-    let mut cli_args = vec![
-        String::from("--daemon-socket"),
-        daemon.endpoint(),
-        String::from("--output"),
-        String::from("json"),
-        String::from("observe"),
-        String::from("graph-slice"),
-        String::from("--uri"),
-        String::from(request.uri),
-        String::from("--position"),
-        format!("{}:{}", request.line, request.column),
-        String::from("--entry-detail"),
-        String::from(request.entry_detail),
-        String::from("--node-detail"),
-        String::from(request.node_detail),
-    ];
-    if let Some(max_cards) = request.max_cards {
-        command.push_str(" --max-cards ");
-        command.push_str(&max_cards.to_string());
-        cli_args.push(String::from("--max-cards"));
-        cli_args.push(max_cards.to_string());
-    }
-
+/// Runs the `weaver` CLI with `cli_args` and captures the result as a `Transcript`.
+///
+/// `command` is the sanitised display form recorded in the snapshot, with the
+/// ephemeral endpoint and temporary paths already replaced by placeholders.
+pub(crate) fn run_cli(command: String, cli_args: &[String]) -> Transcript {
+    let binary = required_result(weaver_binary_path(), "locate weaver binary");
     let output = required_result(
-        Command::new(weaver_binary_path()).args(&cli_args).output(),
+        assert_cmd::Command::new(binary).args(cli_args).output(),
         "CLI should execute",
     );
     output_to_transcript(command, &output)
 }
+
 /// Asserts an insta snapshot stored under `tests/snapshots/<name>.snap`.
 pub(crate) fn assert_named_snapshot(name: &str, content: &str) {
     let mut settings = insta::Settings::clone_current();
@@ -341,60 +266,14 @@ fn normalize_message_value(value: &mut serde_json::Value) {
     }
 }
 
+/// The single intentional panic boundary of this harness.
+///
+/// Setup failures inside an end-to-end fixture cannot be reported to the test
+/// body without threading `Result` through every rstest fixture, so they are
+/// converted here into a panic carrying `context`.
 fn required_result<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
     match result {
         Ok(resolved) => resolved,
         Err(error) => panic!("{context}: {error}"),
-    }
-}
-
-#[cfg(test)]
-mod test_support_type_usage {
-    //! Ensures support helpers are referenced in compilation for strict lint profiles.
-    use super::*;
-
-    #[test]
-    fn test_build_reference_support_items() {
-        let cache_transcript = CacheTranscript {
-            first: Transcript {
-                command: String::from("<command>"),
-                status: 0,
-                stdout: String::new(),
-                stderr: String::new(),
-            },
-            second: Transcript {
-                command: String::from("<command>"),
-                status: 0,
-                stdout: String::new(),
-                stderr: String::new(),
-            },
-            cache_hits: 0,
-            cache_misses: 0,
-        };
-        let get_card_request = GetCardRequest {
-            uri: "file:///tmp/example",
-            line: 0,
-            column: 0,
-            detail: "semantic",
-        };
-        let graph_slice_request = GraphSliceRequest {
-            uri: "file:///tmp/example",
-            line: 0,
-            column: 0,
-            entry_detail: "semantic",
-            node_detail: "semantic",
-            max_cards: None,
-        };
-        let run_get_card_fn: for<'a> fn(&'a TestDaemon, GetCardRequest<'a>) -> Transcript =
-            run_get_card;
-        let run_graph_slice_fn: for<'a> fn(&'a TestDaemon, GraphSliceRequest<'a>) -> Transcript =
-            run_graph_slice;
-        let _ = (
-            cache_transcript,
-            get_card_request,
-            graph_slice_request,
-            run_get_card_fn,
-            run_graph_slice_fn,
-        );
     }
 }

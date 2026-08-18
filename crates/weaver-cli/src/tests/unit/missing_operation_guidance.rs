@@ -8,15 +8,7 @@ use std::{ffi::OsString, io::Cursor, process::ExitCode};
 use rstest::rstest;
 use weaver_config::Config;
 
-use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
-
-struct PanickingLoader;
-
-impl ConfigLoader for PanickingLoader {
-    fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-        panic!("missing-operation guidance must not attempt configuration loading");
-    }
-}
+use crate::{AppError, ConfigLoader, IoStreams, run_with_loader, tests::support};
 
 struct PreflightOutput {
     exit: ExitCode,
@@ -25,15 +17,11 @@ struct PreflightOutput {
 }
 
 fn run_with_panicking_loader(args: &[&str]) -> anyhow::Result<PreflightOutput> {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
     let cli_args = std::iter::once("weaver")
         .chain(args.iter().copied())
         .map(OsString::from)
         .collect::<Vec<_>>();
-    let exit = run_with_loader(cli_args, &mut io, &PanickingLoader);
+    let (exit, stdout, stderr) = support::run_with_panicking_loader(cli_args);
     let stderr_text = String::from_utf8(stderr)?;
 
     Ok(PreflightOutput {
@@ -68,39 +56,62 @@ fn assert_no_daemon_start_text(output: &PreflightOutput) {
     }
 }
 
+/// Pure predicate: does `stderr` match the unknown-domain guidance template
+/// for `domain`, without leaking known-domain operation guidance?
+fn unknown_domain_guidance_matches(stderr: &str, domain: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        stderr.contains(&format!("error: unknown domain '{domain}'")),
+        "stderr should report unknown domain {domain:?}\nstderr:\n{stderr}"
+    );
+    anyhow::ensure!(
+        stderr.contains("Valid domains: observe, act, verify"),
+        "stderr should list valid domains\nstderr:\n{stderr}"
+    );
+    anyhow::ensure!(
+        !stderr.contains("Available operations:"),
+        "stderr should not contain known-domain operation guidance\nstderr:\n{stderr}"
+    );
+    anyhow::ensure!(
+        stderr.contains("Next command:"),
+        "unknown domain must include Next command line\nstderr:\n{stderr}"
+    );
+    Ok(())
+}
+
 fn assert_unknown_domain_preflight(output: &PreflightOutput, domain: &str) {
     assert_preflight_failure(output);
-    assert!(
-        output
-            .stderr
-            .contains(&format!("error: unknown domain '{domain}'"))
-    );
-    assert!(
-        output
-            .stderr
-            .contains("Valid domains: observe, act, verify")
-    );
-    // Ensure legacy operation guidance does not appear
-    assert!(!output.stderr.contains("Available operations:"));
+    if let Err(error) = unknown_domain_guidance_matches(&output.stderr, domain) {
+        panic!("unknown-domain guidance must match the expected template: {error}");
+    }
+}
 
-    // Verify three-part template per roadmap 2.3.3
-    assert!(
-        output.stderr.contains("Next command:"),
-        "unknown domain must include Next command line"
+/// Pure predicate: does `stderr` match the known-domain missing-operation
+/// guidance template for `domain`, without leaking unknown-domain guidance?
+fn known_domain_operation_guidance_matches(stderr: &str, domain: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        stderr.contains(&format!("error: operation required for domain '{domain}'")),
+        "stderr should report missing operation for domain {domain:?}\nstderr:\n{stderr}"
     );
+    anyhow::ensure!(
+        stderr.contains("Available operations:"),
+        "stderr should list available operations\nstderr:\n{stderr}"
+    );
+    anyhow::ensure!(
+        !stderr.contains("Valid domains:"),
+        "stderr should not contain unknown-domain guidance\nstderr:\n{stderr}"
+    );
+    anyhow::ensure!(
+        !stderr.contains("Did you mean"),
+        "stderr should not contain domain suggestions\nstderr:\n{stderr}"
+    );
+    Ok(())
 }
 
 fn assert_known_domain_operation_guidance(output: &PreflightOutput, domain: &str) {
     assert_preflight_failure(output);
-    assert!(
-        output
-            .stderr
-            .contains(&format!("error: operation required for domain '{domain}'"))
-    );
-    assert!(output.stderr.contains("Available operations:"));
-    // Ensure unknown-domain guidance does not appear
-    assert!(!output.stderr.contains("Valid domains:"));
-    assert!(!output.stderr.contains("Did you mean"));
+    if let Err(error) = known_domain_operation_guidance_matches(&output.stderr, domain) {
+        panic!("known-domain guidance must match the expected template: {error}");
+    }
 }
 
 /// Verifies the unified three-part error template for known domain without operation.

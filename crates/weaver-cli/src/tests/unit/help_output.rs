@@ -5,38 +5,21 @@ use std::{ffi::OsString, io::Cursor, process::ExitCode};
 use rstest::rstest;
 use weaver_config::Config;
 
-use crate::{AppError, ConfigLoader, IoStreams, help, run_with_loader};
-
-/// Test-local mirror of the shared configuration help flags.
-/// Must be kept in sync with `SHARED_CONFIG_HELP_FLAGS` in `lib.rs`.
-/// If this constant drifts, tests will fail, surfacing the discrepancy.
-const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
-    "--config-path <PATH>",
-    "--daemon-socket <ENDPOINT>",
-    "--log-filter <FILTER>",
-    "--log-format <FORMAT>",
-    "--capability-overrides <DIRECTIVE>",
-    "--locale <LOCALE>",
-];
-
-struct PanickingLoader;
-
-impl ConfigLoader for PanickingLoader {
-    fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-        panic!("help output must not attempt configuration loading");
-    }
-}
+use crate::{
+    AppError,
+    ConfigLoader,
+    IoStreams,
+    help,
+    run_with_loader,
+    tests::support::{self, EXPECTED_SHARED_CONFIG_HELP_FLAGS},
+};
 
 fn run_with_args(args: &[&str]) -> anyhow::Result<(ExitCode, String, String)> {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
     let owned_args = args
         .iter()
         .map(|value| OsString::from(*value))
         .collect::<Vec<_>>();
-    let exit = run_with_loader(owned_args, &mut io, &PanickingLoader);
+    let (exit, stdout, stderr) = support::run_with_panicking_loader(owned_args);
     Ok((exit, String::from_utf8(stdout)?, String::from_utf8(stderr)?))
 }
 

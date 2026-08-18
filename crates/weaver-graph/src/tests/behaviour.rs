@@ -90,6 +90,17 @@ impl CallHierarchyClient for TestClient {
 
 fn strip_quotes(value: &str) -> &str { value.trim_matches('"') }
 
+/// Unwraps `world.result` into a reference to the built `CallGraph`,
+/// mapping a stored `GraphError` into an `anyhow::Error` with context.
+fn built_graph(world: &TestWorld) -> Result<&CallGraph> {
+    world
+        .result
+        .as_ref()
+        .context("result missing")?
+        .as_ref()
+        .map_err(|error| anyhow::anyhow!("graph build failed: {error}"))
+}
+
 #[given("a call hierarchy client with a simple call chain")]
 fn given_simple_chain(world: &RefCell<TestWorld>) -> Result<()> {
     world.borrow_mut().provider = Some(LspCallGraphProvider::new(TestClient::simple_chain()?));
@@ -146,12 +157,7 @@ fn then_graph_counts(
 #[then("the graph includes node {name}")]
 fn then_graph_includes_node(world: &RefCell<TestWorld>, name: String) -> Result<()> {
     let world_state = world.borrow();
-    let graph = world_state
-        .result
-        .as_ref()
-        .context("result missing")?
-        .as_ref()
-        .map_err(|error| anyhow::anyhow!("graph build failed: {error}"))?;
+    let graph = built_graph(&world_state)?;
     let node_name = strip_quotes(&name);
     ensure!(
         graph.find_by_name(node_name).is_some(),
@@ -167,12 +173,7 @@ fn then_graph_includes_edge(
     callee: String,
 ) -> Result<()> {
     let world_state = world.borrow();
-    let graph = world_state
-        .result
-        .as_ref()
-        .context("result missing")?
-        .as_ref()
-        .map_err(|error| anyhow::anyhow!("graph build failed: {error}"))?;
+    let graph = built_graph(&world_state)?;
     let caller_name = strip_quotes(&caller);
     let callee_name = strip_quotes(&callee);
     let caller_node = graph

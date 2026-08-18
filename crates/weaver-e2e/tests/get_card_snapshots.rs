@@ -2,21 +2,17 @@
 
 #[path = "support/fixture_io.rs"]
 mod fixture_io;
+#[path = "test_support/get_card.rs"]
+mod get_card_support;
 mod test_support;
 #[path = "support/weaver_binary.rs"]
 mod weaver_binary;
 
 use fixture_io::write_fixture_path;
+use get_card_support::{CacheTranscript, GetCardRequest, run_get_card};
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use test_support::{
-    CacheTranscript,
-    GetCardRequest,
-    TestDaemon,
-    assert_named_snapshot,
-    fixture_uri,
-    run_get_card,
-};
+use test_support::{TestDaemon, assert_named_snapshot, fixture_uri};
 use url::Url;
 use weaver_e2e::card_fixtures::{PYTHON_CASES, RUST_CASES};
 

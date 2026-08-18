@@ -2,13 +2,13 @@
 
 #[path = "support/fixture_io.rs"]
 mod fixture_io;
-
-use std::path::Path;
+#[path = "support/uri.rs"]
+mod uri;
 
 use fixture_io::write_fixture_path;
-use lsp_types::{GotoDefinitionResponse, Location, Uri};
+use lsp_types::{GotoDefinitionResponse, Location};
 use tempfile::TempDir;
-use url::Url;
+use uri::{FileUriError, file_uri};
 use weaver_cli::{OutputContext, render_human_output};
 use weaver_e2e::{
     fixtures,
@@ -24,11 +24,8 @@ enum TestError {
     #[error("LSP client error: {0}")]
     LspClient(#[from] LspClientError),
 
-    #[error("invalid file path: cannot convert to URI")]
-    InvalidFilePath,
-
-    #[error("invalid URI: {0}")]
-    InvalidUri(String),
+    #[error(transparent)]
+    FileUri(#[from] FileUriError),
 
     #[error("no definition location returned")]
     NoDefinition,
@@ -48,13 +45,6 @@ struct DefinitionLocation {
     uri: String,
     line: u32,
     column: u32,
-}
-
-fn file_uri(path: &Path) -> Result<Uri, TestError> {
-    let url = Url::from_file_path(path).map_err(|()| TestError::InvalidFilePath)?;
-    url.as_str()
-        .parse()
-        .map_err(|_| TestError::InvalidUri(url.to_string()))
 }
 
 fn first_location(response: Option<GotoDefinitionResponse>) -> Option<Location> {

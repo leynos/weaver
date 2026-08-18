@@ -161,19 +161,22 @@ mod tests {
         fn flush(&mut self) -> io::Result<()> { Ok(()) }
     }
 
-    fn test_localizer() -> impl Localizer {
-        match FluentLocalizer::with_en_us_defaults([WEAVER_EN_US]) {
-            Ok(localizer) => localizer,
-            Err(error) => panic!("embedded Fluent catalogue must parse: {error}"),
-        }
+    /// Builds the embedded Fluent catalogue for preflight tests.
+    ///
+    /// Returns a `Result` (rather than panicking) so callers decide how to
+    /// report a malformed catalogue, per the fallible-fixture convention.
+    fn test_localizer() -> anyhow::Result<impl Localizer> {
+        let localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])?;
+        Ok(localizer)
     }
 
     #[fixture]
-    fn preflight_context() -> PreflightContext {
-        PreflightContext {
-            localizer: Box::new(test_localizer()),
+    fn preflight_context() -> anyhow::Result<PreflightContext> {
+        let localizer = test_localizer()?;
+        Ok(PreflightContext {
+            localizer: Box::new(localizer),
             stderr: Vec::new(),
-        }
+        })
     }
 
     fn cli(domain: Option<&str>, operation: Option<&str>) -> Cli {
@@ -214,12 +217,12 @@ mod tests {
     })]
     fn preflight_guidance_paths_match_expected_contract(
         #[case] scenario: PreflightScenario,
-        preflight_context: PreflightContext,
+        preflight_context: anyhow::Result<PreflightContext>,
     ) {
         let PreflightContext {
             localizer,
             mut stderr,
-        } = preflight_context;
+        } = preflight_context.expect("build preflight context");
 
         let result = handle_preflight(
             &cli(scenario.domain, scenario.operation),
@@ -252,7 +255,7 @@ mod tests {
     #[case(WriteFailureScenario::BareInvocation)]
     #[case(WriteFailureScenario::DomainGuidance)]
     fn preflight_guidance_propagates_write_failure(#[case] scenario: WriteFailureScenario) {
-        let localizer = test_localizer();
+        let localizer = test_localizer().expect("build test localizer");
         let mut failing_writer = FailingWriter;
 
         let result = handle_preflight(

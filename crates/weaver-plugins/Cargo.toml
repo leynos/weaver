@@ -15,6 +15,7 @@ tracing = "0.1"
 weaver-sandbox = { path = "../weaver-sandbox" }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 mockall.workspace = true
 rstest.workspace = true
 rstest-bdd.workspace = true

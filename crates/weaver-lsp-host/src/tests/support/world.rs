@@ -106,21 +106,38 @@ macro_rules! notification_method {
 }
 
 impl TestWorld {
-    /// Builds a world populated with the supplied stub servers.
+    /// Builds a world with no stub servers registered.
+    ///
+    /// Registration is the only fallible part of world construction, so an
+    /// empty world stays infallible and can back a BDD fixture directly.
     #[must_use]
-    pub fn new(configs: Vec<TestServerConfig>, overrides: weaver_config::CapabilityMatrix) -> Self {
-        let mut world = Self {
-            configs,
-            host: LspHost::new(overrides.clone()),
+    pub fn empty(overrides: weaver_config::CapabilityMatrix) -> Self {
+        Self {
+            configs: Vec::new(),
+            host: LspHost::new(overrides),
             handles: HashMap::new(),
             last_error: None,
             last_definition: None,
             last_references: None,
             last_diagnostics: None,
             last_capabilities: None,
-        };
-        world.rebuild_host(overrides);
-        world
+        }
+    }
+
+    /// Builds a world populated with the supplied stub servers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LspHostError`] if a stub server cannot be registered, for
+    /// example when two configs claim the same language.
+    pub fn new(
+        configs: Vec<TestServerConfig>,
+        overrides: weaver_config::CapabilityMatrix,
+    ) -> Result<Self, LspHostError> {
+        let mut world = Self::empty(overrides.clone());
+        world.configs = configs;
+        world.rebuild_host(overrides)?;
+        Ok(world)
     }
 
     /// Returns the recorded call sequence for the specified language.
@@ -190,7 +207,14 @@ impl TestWorld {
     );
 
     /// Rebuilds the host using the stored server configs and supplied overrides.
-    pub fn rebuild_host(&mut self, overrides: weaver_config::CapabilityMatrix) {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LspHostError`] if a stub server cannot be registered.
+    pub fn rebuild_host(
+        &mut self,
+        overrides: weaver_config::CapabilityMatrix,
+    ) -> Result<(), LspHostError> {
         self.host = LspHost::new(overrides);
         self.handles.clear();
         self.last_error = None;
@@ -212,16 +236,11 @@ impl TestWorld {
             };
 
             let handle = server.handle();
-            if let Err(error) = self
-                .host
-                .register_language(config.language, Box::new(server))
-            {
-                panic!(
-                    "failed to register stub server for {}: {}",
-                    config.language, error
-                );
-            }
+            self.host
+                .register_language(config.language, Box::new(server))?;
             self.handles.insert(config.language, handle);
         }
+
+        Ok(())
     }
 }

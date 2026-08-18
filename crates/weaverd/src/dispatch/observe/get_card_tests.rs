@@ -1,65 +1,41 @@
 //! Unit tests for `observe::get_card`.
 
-use rstest::{fixture, rstest};
+use rstest::rstest;
 use tempfile::TempDir;
 use url::Url;
-use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel, RefusalReason};
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_cards::{DetailLevel, RefusalReason};
 use weaver_lsp_host::{Language, ServerCapabilitySet};
-use weaver_test_macros::allow_fixture_expansion_lints;
 
+use self::support::{
+    CardProbe,
+    SourceFile,
+    backends,
+    dispatch_payload,
+    dispatch_source,
+    make_request,
+    response_payload,
+    temp_dir,
+    write_source,
+};
 use super::*;
 use crate::{
     backends::FusionBackends,
-    dispatch::{
-        observe::test_support::{
-            StubLanguageServer,
-            markdown_hover,
-            semantic_backends_with_server,
-        },
-        request::CommandRequest,
+    dispatch::observe::test_support::{
+        StubLanguageServer,
+        markdown_hover,
+        semantic_backends_with_server,
     },
     semantic_provider::SemanticBackendProvider,
     tests::support::fs as test_fs,
 };
 
+#[path = "get_card_test_support.rs"]
+mod support;
+
 #[path = "get_card_semantic_tests.rs"]
 mod semantic_tests;
 
-#[allow_fixture_expansion_lints]
-#[fixture]
-fn temp_dir() -> TempDir {
-    match TempDir::new() {
-        Ok(temp_dir) => temp_dir,
-        Err(error) => panic!("temp dir: {error}"),
-    }
-}
-
-#[fixture]
-fn backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
-    let dir = match TempDir::new() {
-        Ok(dir) => dir,
-        Err(error) => panic!("create temp dir: {error}"),
-    };
-    let socket_path = dir
-        .path()
-        .join("socket.sock")
-        .to_string_lossy()
-        .into_owned();
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_path),
-        ..Config::default()
-    };
-    let provider =
-        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-    (FusionBackends::new(config, provider), dir)
-}
-
-#[derive(Clone, Copy)]
-struct SourceFile<'a> {
-    name: &'a str,
-    content: &'a str,
-}
+type BackendsFixture = Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>;
 
 #[derive(Clone)]
 struct RefusalCase<'a> {
@@ -70,184 +46,96 @@ struct RefusalCase<'a> {
     expected_message_substring: &'a str,
 }
 
-fn write_source(temp_dir: &TempDir, file: SourceFile<'_>) -> PathBuf {
-    let path = temp_dir.path().join(file.name);
-    if let Err(error) = test_fs::write(&path, file.content) {
-        panic!("write source: {error}");
-    }
-    path
+/// The observable outcome of dispatching the same request twice.
+struct CachedReuse {
+    first_status: i32,
+    second_status: i32,
+    first_payload: serde_json::Value,
+    second_payload: serde_json::Value,
+    hits: u64,
+    misses: u64,
 }
 
-fn make_request(uri: &str, line: u32, column: u32, detail: DetailLevel) -> CommandRequest {
-    let detail_str = match detail {
-        DetailLevel::Minimal => "minimal",
-        DetailLevel::Signature => "signature",
-        DetailLevel::Structure => "structure",
-        DetailLevel::Semantic => "semantic",
-        DetailLevel::Full => "full",
-        detail => unreachable!("unexpected DetailLevel variant: {:?}", detail),
-    };
-    match CommandRequest::parse(
-        format!(
-            concat!(
-                "{{\"command\":{{\"domain\":\"observe\",\"operation\":\"get-card\"}},",
-                "\"arguments\":[\"--uri\",\"{uri}\",\"--position\",\"{line}:{column}\",",
-                "\"--detail\",\"{detail}\"]}}"
-            ),
-            uri = uri,
-            line = line,
-            column = column,
-            detail = detail_str,
-        )
-        .as_bytes(),
-    ) {
-        Ok(request) => request,
-        Err(error) => panic!("request: {error}"),
-    }
-}
-
-fn response_text(output: Vec<u8>) -> String {
-    match String::from_utf8(output) {
-        Ok(text) => text,
-        Err(error) => panic!("utf8: {error}"),
-    }
-}
-
-fn response_payload(output: Vec<u8>) -> serde_json::Value {
-    let response = response_text(output);
-    let Some(stream_line) = response.lines().next() else {
-        panic!("stream line");
-    };
-    let envelope: serde_json::Value = match serde_json::from_str(stream_line) {
-        Ok(envelope) => envelope,
-        Err(error) => panic!("envelope: {error}"),
-    };
-    let Some(data) = envelope["data"].as_str() else {
-        panic!("stdout data");
-    };
-    match serde_json::from_str(data) {
-        Ok(payload) => payload,
-        Err(error) => panic!("payload: {error}"),
-    }
-}
-
-fn dispatch_payload(
-    request: &CommandRequest,
-    backends: &mut FusionBackends<SemanticBackendProvider>,
-) -> (DispatchResult, serde_json::Value) {
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-    let result = match handle(request, &mut writer, backends) {
-        Ok(result) => result,
-        Err(error) => panic!("handler should succeed: {error}"),
-    };
-    (result, response_payload(output))
-}
-
-fn assert_refusal_response(
-    temp_dir: TempDir,
-    case: RefusalCase<'_>,
-    backends: &mut FusionBackends<SemanticBackendProvider>,
-) {
-    let path = write_source(&temp_dir, case.file);
-    let uri = match Url::from_file_path(&path) {
-        Ok(uri) => uri,
-        Err(()) => panic!("file uri"),
-    }
-    .to_string();
-    let request = make_request(&uri, case.line, case.column, DetailLevel::Structure);
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-
-    let result = match handle(&request, &mut writer, backends) {
-        Ok(result) => result,
-        Err(error) => panic!("handler should succeed: {error}"),
-    };
-
-    assert_eq!(result.status, 1);
-    let payload = response_payload(output);
-    assert_eq!(payload["status"], "refusal");
-    assert_eq!(
-        payload["refusal"]["reason"],
-        match serde_json::to_value(&case.expected_reason) {
-            Ok(reason) => reason,
-            Err(error) => panic!("serialise reason: {error}"),
-        }
-    );
-    let Some(message) = payload["refusal"]["message"].as_str() else {
-        panic!("refusal message");
-    };
-    assert!(
-        message.contains(case.expected_message_substring),
-        "expected message '{message}' to contain '{}'",
-        case.expected_message_substring
-    );
-}
-
-fn assert_cached_request_reuse(
+/// Dispatches an identical request twice and reports the cache behaviour.
+fn dispatch_cached_pair(
     temp_dir: &TempDir,
     backends: &mut FusionBackends<SemanticBackendProvider>,
     detail: DetailLevel,
-) {
+) -> Result<CachedReuse, String> {
     let path = write_source(
         temp_dir,
         SourceFile {
             name: "cache.rs",
             content: "fn greet() -> usize {\n    1\n}\n",
         },
-    );
-    let uri = match Url::from_file_path(&path) {
-        Ok(uri) => uri,
-        Err(()) => panic!("file uri"),
-    }
-    .to_string();
-    let request = make_request(&uri, 1, 4, detail);
+    )?;
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| "file uri".to_string())?
+        .to_string();
+    let request = make_request(&uri, 1, 4, detail)?;
 
-    let (first_result, first_payload) = dispatch_payload(&request, backends);
-    let (second_result, second_payload) = dispatch_payload(&request, backends);
+    let (first_result, first_payload) = dispatch_payload(&request, backends)?;
+    let (second_result, second_payload) = dispatch_payload(&request, backends)?;
     let stats = backends.provider().card_extractor().cache_stats();
 
-    assert_eq!(first_result.status, 0);
-    assert_eq!(second_result.status, 0);
-    assert_eq!(
-        first_payload["card"]["provenance"]["extracted_at"],
-        second_payload["card"]["provenance"]["extracted_at"]
-    );
-    assert_eq!(stats.hits, 1);
-    assert_eq!(stats.misses, 1);
-    if detail >= DetailLevel::Semantic {
-        assert_eq!(first_payload["card"]["lsp"], second_payload["card"]["lsp"]);
-    }
+    Ok(CachedReuse {
+        first_status: first_result.status,
+        second_status: second_result.status,
+        first_payload,
+        second_payload,
+        hits: stats.hits,
+        misses: stats.misses,
+    })
+}
+
+/// Asserts a repeated request was served from the card cache.
+macro_rules! assert_cached_request_reuse {
+    ($reuse:expr, $detail:expr) => {{
+        let reuse = $reuse;
+        let detail: DetailLevel = $detail;
+        assert_eq!(reuse.first_status, 0);
+        assert_eq!(reuse.second_status, 0);
+        assert_eq!(
+            reuse.first_payload["card"]["provenance"]["extracted_at"],
+            reuse.second_payload["card"]["provenance"]["extracted_at"]
+        );
+        assert_eq!(reuse.hits, 1);
+        assert_eq!(reuse.misses, 1);
+        if detail >= DetailLevel::Semantic {
+            assert_eq!(
+                reuse.first_payload["card"]["lsp"],
+                reuse.second_payload["card"]["lsp"]
+            );
+        }
+    }};
 }
 
 #[rstest]
 fn handle_returns_success_for_supported_rust_symbol(
-    temp_dir: TempDir,
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, _dir) = backends;
-    let path = write_source(
-        &temp_dir,
+    temp_dir: Result<TempDir, String>,
+    backends: BackendsFixture,
+) -> Result<(), String> {
+    let (mut fusion, _dir) = backends?;
+    let dir = temp_dir?;
+
+    let (result, payload) = dispatch_source(
+        &mut fusion,
+        &dir,
         SourceFile {
             name: "card.rs",
             content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = \
                       name.len();\n    count\n}\n",
         },
-    );
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&uri, 2, 4, DetailLevel::Structure);
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-
-    let result = match handle(&request, &mut writer, &mut backends) {
-        Ok(result) => result,
-        Err(error) => panic!("handler should succeed: {error}"),
-    };
+        CardProbe {
+            position: (2, 4),
+            detail: DetailLevel::Structure,
+        },
+    )?;
 
     assert_eq!(result.status, 0);
-    let payload = response_payload(output);
     assert_eq!(payload["status"], "success");
     assert_eq!(payload["card"]["symbol"]["ref"]["name"], "greet");
+    Ok(())
 }
 
 #[rstest]
@@ -288,68 +176,108 @@ fn handle_returns_success_for_supported_rust_symbol(
     }
 )]
 fn handle_returns_structured_refusals(
-    temp_dir: TempDir,
+    temp_dir: Result<TempDir, String>,
     #[case] case: RefusalCase<'static>,
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, _dir) = backends;
-    assert_refusal_response(temp_dir, case, &mut backends);
+    backends: BackendsFixture,
+) -> Result<(), String> {
+    let (mut fusion, _dir) = backends?;
+    let dir = temp_dir?;
+    let expected_reason = serde_json::to_value(&case.expected_reason)
+        .map_err(|error| format!("serialise reason: {error}"))?;
+
+    let (result, payload) = dispatch_source(
+        &mut fusion,
+        &dir,
+        case.file,
+        CardProbe {
+            position: (case.line, case.column),
+            detail: DetailLevel::Structure,
+        },
+    )?;
+
+    assert_eq!(result.status, 1);
+    assert_eq!(payload["status"], "refusal");
+    assert_eq!(payload["refusal"]["reason"], expected_reason);
+    let message = payload["refusal"]["message"]
+        .as_str()
+        .expect("refusal message should be a string");
+    assert!(
+        message.contains(case.expected_message_substring),
+        "expected message '{message}' to contain '{}'",
+        case.expected_message_substring
+    );
+    Ok(())
 }
 
 #[rstest]
-fn handle_rejects_non_file_uri(backends: (FusionBackends<SemanticBackendProvider>, TempDir)) {
-    let (mut backends, _dir) = backends;
-    let request = make_request("https://example.com/demo.rs", 1, 1, DetailLevel::Minimal);
+fn handle_rejects_non_file_uri(backends: BackendsFixture) -> Result<(), String> {
+    let (mut fusion, _dir) = backends?;
+    let request = make_request("https://example.com/demo.rs", 1, 1, DetailLevel::Minimal)?;
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
-    let error = match handle(&request, &mut writer, &mut backends) {
+    let error = match handle(&request, &mut writer, &mut fusion) {
         Ok(result) => panic!("handler unexpectedly succeeded: {}", result.status),
         Err(error) => error,
     };
 
     assert!(matches!(error, DispatchError::InvalidArguments { .. }));
     assert!(error.to_string().contains("unsupported URI scheme"));
+    Ok(())
 }
 
 #[rstest]
 fn handle_reuses_cached_cards_for_identical_requests(
-    temp_dir: TempDir,
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, _dir) = backends;
-    assert_cached_request_reuse(&temp_dir, &mut backends, DetailLevel::Structure);
+    temp_dir: Result<TempDir, String>,
+    backends: BackendsFixture,
+) -> Result<(), String> {
+    let (mut fusion, _dir) = backends?;
+    let dir = temp_dir?;
+
+    let reuse = dispatch_cached_pair(&dir, &mut fusion, DetailLevel::Structure)?;
+
+    assert_cached_request_reuse!(reuse, DetailLevel::Structure);
+    Ok(())
 }
 
 #[rstest]
 fn handle_reuses_cached_cards_for_identical_semantic_requests(
-    temp_dir: TempDir,
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, _dir) = backends;
-    assert_cached_request_reuse(&temp_dir, &mut backends, DetailLevel::Semantic);
+    temp_dir: Result<TempDir, String>,
+    backends: BackendsFixture,
+) -> Result<(), String> {
+    let (mut fusion, _dir) = backends?;
+    let dir = temp_dir?;
+
+    let reuse = dispatch_cached_pair(&dir, &mut fusion, DetailLevel::Semantic)?;
+
+    assert_cached_request_reuse!(reuse, DetailLevel::Semantic);
+    Ok(())
 }
 
 #[rstest]
 fn handle_invalidates_stale_revisions_when_file_changes(
-    temp_dir: TempDir,
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, _dir) = backends;
+    temp_dir: Result<TempDir, String>,
+    backends: BackendsFixture,
+) -> Result<(), String> {
+    let (mut fusion, _dir) = backends?;
+    let dir = temp_dir?;
     let path = write_source(
-        &temp_dir,
+        &dir,
         SourceFile {
             name: "cache.rs",
             content: "fn greet() -> usize {\n    1\n}\n",
         },
-    );
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&uri, 1, 4, DetailLevel::Structure);
+    )?;
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| "file uri".to_string())?
+        .to_string();
+    let request = make_request(&uri, 1, 4, DetailLevel::Structure)?;
 
-    let (_, first_payload) = dispatch_payload(&request, &mut backends);
-    test_fs::write(&path, "fn welcome() -> usize {\n    2\n}\n").expect("rewrite source");
-    let (_, second_payload) = dispatch_payload(&request, &mut backends);
-    let extractor = backends.provider().card_extractor();
+    let (_, first_payload) = dispatch_payload(&request, &mut fusion)?;
+    test_fs::write(&path, "fn welcome() -> usize {\n    2\n}\n")
+        .map_err(|error| format!("rewrite source: {error}"))?;
+    let (_, second_payload) = dispatch_payload(&request, &mut fusion)?;
+    let extractor = fusion.provider().card_extractor();
     let stats = extractor.cache_stats();
 
     assert_eq!(extractor.cache_len(), 1);
@@ -359,4 +287,5 @@ fn handle_invalidates_stale_revisions_when_file_changes(
         first_payload["card"]["symbol"]["ref"]["name"],
         second_payload["card"]["symbol"]["ref"]["name"]
     );
+    Ok(())
 }

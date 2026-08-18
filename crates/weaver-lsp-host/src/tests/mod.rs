@@ -2,5 +2,6 @@
 
 mod adapter_behaviour;
 mod behaviour;
+mod behaviour_assertions;
 mod support;
 mod unit;

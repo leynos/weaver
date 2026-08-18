@@ -9,6 +9,7 @@ use sempai_core::{
 use sempai_yaml::{LegacyClause, LegacyFormula, MatchFormula, SearchQueryPrincipal};
 use serde_json::{Value, json};
 
+use super::engine_test_support::first_diagnostic_of_report;
 use crate::{
     Engine,
     EngineConfig,
@@ -26,14 +27,6 @@ fn normalize_v2_decorated(formula: MatchFormula) -> Result<Decorated<Formula>> {
     normalize_search_principal(&principal, None).map_err(Into::into)
 }
 
-fn first_diagnostic_code(report: &sempai_core::DiagnosticReport) -> Result<DiagnosticCode> {
-    report
-        .diagnostics()
-        .first()
-        .map(sempai_core::Diagnostic::code)
-        .ok_or_else(|| anyhow::anyhow!("expected diagnostic"))
-}
-
 fn make_legacy_patterns_with_constraints<const N: usize>(constraints: [Value; N]) -> LegacyFormula {
     LegacyFormula::Patterns(
         constraints
@@ -43,58 +36,75 @@ fn make_legacy_patterns_with_constraints<const N: usize>(constraints: [Value; N]
     )
 }
 
-fn assert_schema_invalid_normalization(constraint: Value, expected_message: &str) -> Result<()> {
-    let principal =
-        SearchQueryPrincipal::Legacy(make_legacy_patterns_with_constraints([constraint]));
+/// Extracts the error report from a result, or a descriptive error if the
+/// result unexpectedly succeeded. A fallible extractor shared by every
+/// helper below that expects a compilation/normalization failure.
+fn err_report<T>(
+    result: Result<T, sempai_core::DiagnosticReport>,
+    success_message: &str,
+) -> Result<sempai_core::DiagnosticReport> {
+    result
+        .err()
+        .ok_or_else(|| anyhow::anyhow!("{success_message}"))
+}
 
-    let Err(report) = normalize_search_principal(&principal, None) else {
-        return Err(anyhow::anyhow!("known malformed constraint succeeded"));
-    };
-
+/// Pure query/assertion: the report's first diagnostic has `expected_code`
+/// and its message contains `expected_message`.
+fn assert_first_diagnostic(
+    report: &sempai_core::DiagnosticReport,
+    expected_code: DiagnosticCode,
+    expected_message: &str,
+) -> Result<()> {
+    let (code, diagnostic) = first_diagnostic_of_report(report)?;
     ensure!(
-        first_diagnostic_code(&report)? == DiagnosticCode::ESempaiSchemaInvalid,
-        "expected schema-invalid diagnostic"
+        code == expected_code,
+        "expected {expected_code:?} diagnostic, got {code:?}"
     );
-    let diagnostic = report
-        .diagnostics()
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("expected diagnostic"))?;
-    ensure!(diagnostic.message().contains(expected_message));
+    ensure!(
+        diagnostic.message().contains(expected_message),
+        "expected diagnostic message to contain {expected_message:?}, got {:?}",
+        diagnostic.message()
+    );
     Ok(())
 }
 
+fn assert_schema_invalid_normalization(constraint: Value, expected_message: &str) -> Result<()> {
+    let principal =
+        SearchQueryPrincipal::Legacy(make_legacy_patterns_with_constraints([constraint]));
+    let report = err_report(
+        normalize_search_principal(&principal, None),
+        "known malformed constraint succeeded",
+    )?;
+    assert_first_diagnostic(
+        &report,
+        DiagnosticCode::ESempaiSchemaInvalid,
+        expected_message,
+    )
+}
+
 fn assert_missing_positive_term_in_and_for_decorated(decorated: &Decorated<Formula>) -> Result<()> {
-    let Err(err) = validate_formula(decorated) else {
-        return Err(anyhow::anyhow!("constraint-only And validation succeeded"));
-    };
-    let first = err
-        .diagnostics()
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("expected diagnostic"))?;
+    let err = err_report(
+        validate_formula(decorated),
+        "constraint-only And validation succeeded",
+    )?;
+    let (code, _diagnostic) = first_diagnostic_of_report(&err)?;
     ensure!(
-        first.code() == DiagnosticCode::ESempaiMissingPositiveTermInAnd,
-        "expected missing-positive-term diagnostic"
+        code == DiagnosticCode::ESempaiMissingPositiveTermInAnd,
+        "expected missing-positive-term diagnostic, got {code:?}"
     );
     Ok(())
 }
 
 fn assert_compile_yaml_schema_invalid(yaml: &str, expected_message: &str) -> Result<()> {
-    let Err(report) = Engine::new(EngineConfig::default()).compile_yaml(yaml) else {
-        return Err(anyhow::anyhow!(
-            "malformed known constraint compiled successfully"
-        ));
-    };
-
-    ensure!(
-        first_diagnostic_code(&report)? == DiagnosticCode::ESempaiSchemaInvalid,
-        "expected schema-invalid diagnostic"
-    );
-    let diagnostic = report
-        .diagnostics()
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("expected diagnostic"))?;
-    ensure!(diagnostic.message().contains(expected_message));
-    Ok(())
+    let report = err_report(
+        Engine::new(EngineConfig::default()).compile_yaml(yaml),
+        "malformed known constraint compiled successfully",
+    )?;
+    assert_first_diagnostic(
+        &report,
+        DiagnosticCode::ESempaiSchemaInvalid,
+        expected_message,
+    )
 }
 
 #[test]

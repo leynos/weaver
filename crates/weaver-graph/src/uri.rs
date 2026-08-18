@@ -60,22 +60,21 @@ pub fn path_to_uri(path: &Utf8PathBuf) -> Result<Uri, GraphError> {
 mod tests {
     //! Unit tests for URI to path conversion utilities.
 
-    #![expect(clippy::unwrap_used, reason = "tests use unwrap for clarity")]
-
     use std::str::FromStr;
 
     use super::*;
 
     #[test]
     fn uri_to_path_handles_simple_path() {
-        let uri = Uri::from_str("file:///src/main.rs").unwrap();
+        let uri = Uri::from_str("file:///src/main.rs").expect("valid file URI should parse");
         let path = uri_to_path(&uri);
         assert_eq!(path.as_str(), "/src/main.rs");
     }
 
     #[test]
     fn uri_to_path_handles_percent_encoding() {
-        let uri = Uri::from_str("file:///path%20with%20spaces/file.rs").unwrap();
+        let uri = Uri::from_str("file:///path%20with%20spaces/file.rs")
+            .expect("percent-encoded file URI should parse");
         let path = uri_to_path(&uri);
         assert_eq!(path.as_str(), "/path with spaces/file.rs");
     }
@@ -83,7 +82,7 @@ mod tests {
     #[test]
     fn path_to_uri_roundtrips() {
         let original = Utf8PathBuf::from("/src/main.rs");
-        let uri = path_to_uri(&original).unwrap();
+        let uri = path_to_uri(&original).expect("absolute path should convert to a URI");
         let recovered = uri_to_path(&uri);
         assert_eq!(original, recovered);
     }
@@ -91,7 +90,7 @@ mod tests {
     #[test]
     fn uri_to_path_handles_non_file_scheme() {
         // Non-file:// URIs fall back to returning the raw URI string
-        let uri = Uri::from_str("http://example.com/path").unwrap();
+        let uri = Uri::from_str("http://example.com/path").expect("http URI should parse");
         let path = uri_to_path(&uri);
         // Since it's not file://, we get the raw URI string as the path
         assert_eq!(path.as_str(), "http://example.com/path");
@@ -101,7 +100,7 @@ mod tests {
     fn uri_to_path_handles_malformed_file_uri() {
         // Malformed URIs that start with file:// but fail URL parsing
         // should still work via the fallback path stripping
-        let uri = Uri::from_str("file:///valid/path.rs").unwrap();
+        let uri = Uri::from_str("file:///valid/path.rs").expect("valid file URI should parse");
         let path = uri_to_path(&uri);
         assert_eq!(path.as_str(), "/valid/path.rs");
     }
@@ -112,7 +111,7 @@ mod tests {
         let relative = Utf8PathBuf::from("relative/path.rs");
         let result = path_to_uri(&relative);
         assert!(result.is_err());
-        let err = result.unwrap_err();
+        let err = result.expect_err("relative path should fail URI conversion");
         assert!(
             matches!(err, GraphError::Validation(_)),
             "expected Validation error, got: {err:?}"
@@ -122,7 +121,8 @@ mod tests {
     #[test]
     fn uri_to_path_handles_special_characters() {
         // Test various special characters that need percent-encoding
-        let uri = Uri::from_str("file:///path%23with%3Fspecial.rs").unwrap();
+        let uri = Uri::from_str("file:///path%23with%3Fspecial.rs")
+            .expect("percent-encoded special characters should parse");
         let path = uri_to_path(&uri);
         // %23 = #, %3F = ?
         assert_eq!(path.as_str(), "/path#with?special.rs");

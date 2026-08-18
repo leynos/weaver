@@ -26,25 +26,29 @@ struct World {
 fn world() -> World { World::default() }
 
 #[given("the shared valid rename-symbol request fixture")]
-fn given_valid_request_fixture(world: &mut World) {
-    world.request_fixture = Some(rename_symbol_request_fixture_named("valid_request"));
+fn given_valid_request_fixture(world: &mut World) -> Result<()> {
+    world.request_fixture = Some(rename_symbol_request_fixture_named("valid_request")?);
+    Ok(())
 }
 
 #[given("the shared rename-symbol request fixture missing uri")]
-fn given_missing_uri_request_fixture(world: &mut World) {
-    world.request_fixture = Some(rename_symbol_request_fixture_named("missing_uri"));
+fn given_missing_uri_request_fixture(world: &mut World) -> Result<()> {
+    world.request_fixture = Some(rename_symbol_request_fixture_named("missing_uri")?);
+    Ok(())
 }
 
 #[given("the shared successful diff response fixture")]
-fn given_successful_diff_response_fixture(world: &mut World) {
-    world.response_fixture = Some(rename_symbol_response_fixture_named("successful_diff"));
+fn given_successful_diff_response_fixture(world: &mut World) -> Result<()> {
+    world.response_fixture = Some(rename_symbol_response_fixture_named("successful_diff")?);
+    Ok(())
 }
 
 #[given("the shared successful non-diff response fixture")]
-fn given_non_diff_response_fixture(world: &mut World) {
+fn given_non_diff_response_fixture(world: &mut World) -> Result<()> {
     world.response_fixture = Some(rename_symbol_response_fixture_named(
         "successful_analysis_rejected",
-    ));
+    )?);
+    Ok(())
 }
 
 #[when("the rope crate validates the shared request fixture")]

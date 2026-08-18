@@ -46,12 +46,24 @@ pub struct FakeDaemon {
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
+// `CARGO_BIN_EXE_weaver` is only set for the crate that owns the binary
+// (`weaver-cli`), so assert_cmd's env-based lookup can never succeed here;
+// the shared resolver falls back to probing and building the workspace binary.
+#[path = "../support/weaver_binary.rs"]
+mod weaver_binary_resolver;
+
 /// Returns the path to the compiled `weaver` binary for use in end-to-end
 /// tests.
 ///
 /// This wrapper keeps the test support API stable for modules that already
-/// import it.
-pub fn weaver_binary_path() -> std::path::PathBuf { assert_cmd::cargo::cargo_bin("weaver") }
+/// import it. Resolution failure aborts the calling test: there is no useful
+/// way to continue a CLI snapshot without the binary.
+pub fn weaver_binary_path() -> std::path::PathBuf {
+    match weaver_binary_resolver::weaver_binary_path() {
+        Ok(path) => path.to_path_buf(),
+        Err(error) => panic!("failed to locate weaver binary: {error}"),
+    }
+}
 
 impl FakeDaemon {
     /// Binds an ephemeral localhost TCP port and spawns a background thread that

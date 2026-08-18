@@ -5,43 +5,24 @@
 //! or daemon connectivity.  Also verifies that `--help` now exits
 //! with code 0 and writes to stdout.
 
-use std::{ffi::OsString, io::Cursor, process::ExitCode};
+use std::{ffi::OsString, process::ExitCode};
 
-use weaver_config::Config;
+use rstest::rstest;
 
-use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
-
-/// A config loader that panics if called, proving that version output
-/// short-circuits before configuration loading.
-struct PanickingLoader;
-
-impl ConfigLoader for PanickingLoader {
-    fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-        panic!("version output must not attempt configuration loading");
-    }
-}
+use crate::tests::support;
 
 /// Runs the CLI with the given arguments and returns exit code plus
 /// captured stdout and stderr.
 fn run_with_args(args: Vec<OsString>) -> anyhow::Result<(ExitCode, String, String)> {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
-    let exit = run_with_loader(args, &mut io, &PanickingLoader);
+    let (exit, stdout, stderr) = support::run_with_panicking_loader(args);
     Ok((exit, String::from_utf8(stdout)?, String::from_utf8(stderr)?))
 }
 
-#[test]
-fn version_long_flag_exits_with_success() {
-    let args = vec![OsString::from("weaver"), OsString::from("--version")];
-    let (exit, ..) = run_with_args(args).expect("version command output must be UTF-8");
-    assert_eq!(exit, ExitCode::SUCCESS);
-}
-
-#[test]
-fn version_short_flag_exits_with_success() {
-    let args = vec![OsString::from("weaver"), OsString::from("-V")];
+#[rstest]
+#[case::long_flag("--version")]
+#[case::short_flag("-V")]
+fn version_flag_exits_with_success(#[case] flag: &str) {
+    let args = vec![OsString::from("weaver"), OsString::from(flag)];
     let (exit, ..) = run_with_args(args).expect("version command output must be UTF-8");
     assert_eq!(exit, ExitCode::SUCCESS);
 }

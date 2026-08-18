@@ -1,27 +1,12 @@
 //! Integration-focused tests for Sempai engine query plans.
 
-use sempai_core::formula::{Atom, Constraint, Decorated, Formula};
+use sempai_core::formula::Constraint;
 
-use crate::{
-    Engine,
-    EngineConfig,
-    semantic_check::{reset_validate_constraints_call_count, validate_constraints_call_count},
+use super::engine_test_support::{assert_pattern_formula, compile_yaml_text as compile_yaml};
+use crate::semantic_check::{
+    reset_validate_constraints_call_count,
+    validate_constraints_call_count,
 };
-
-fn compile_yaml(yaml: &str) -> Result<Vec<crate::engine::QueryPlan>, crate::DiagnosticReport> {
-    Engine::new(EngineConfig::default()).compile_yaml(yaml)
-}
-
-fn assert_pattern_formula(formula: &Decorated<Formula>, expected_text: &str) {
-    assert!(
-        matches!(
-            &formula.node,
-            Formula::Atom(Atom::Pattern(pattern)) if pattern.text == expected_text
-        ),
-        "expected Pattern atom with text \"{expected_text}\", got {:?}",
-        formula.node
-    );
-}
 
 #[test]
 fn compile_yaml_decorated_metadata_reaches_queryplan() {
