@@ -1,5 +1,6 @@
 //! Behaviour tests for YAML rule parsing.
 
+use anyhow::{Context, Result, bail, ensure};
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use sempai_core::{DiagnosticCode, DiagnosticReport, test_support::QuotedString};
@@ -23,35 +24,44 @@ fn given_yaml(world: &mut TestWorld, yaml: QuotedString) {
 }
 
 #[when("the rule file is parsed")]
-fn when_parse_rule_file(world: &mut TestWorld) {
-    let yaml = world.yaml.as_deref().expect("yaml should be set");
+fn when_parse_rule_file(world: &mut TestWorld) -> Result<()> {
+    let yaml = world.yaml.as_deref().context("yaml should be set")?;
     world.parse_result =
         Some(parse_rule_file(yaml, Some("file:///rules.yaml")).map(|file| file.rules().len()));
+    Ok(())
 }
 
 #[then("parsing succeeds with {count} rule")]
-fn then_parse_succeeds(world: &mut TestWorld, count: usize) {
-    let parsed = world
+fn then_parse_succeeds(world: &mut TestWorld, count: usize) -> Result<()> {
+    let parse_result = world
         .parse_result
         .as_ref()
-        .expect("parse result should be set")
+        .context("parse result should be set")?;
+    let parsed = parse_result
         .as_ref()
-        .expect("parsing should succeed");
-    assert_eq!(*parsed, count);
+        .map_err(|report| anyhow::Error::msg(report.to_string()))
+        .context("parsing should succeed")?;
+    ensure!(
+        *parsed == count,
+        "expected {count} parsed rules, got {parsed}"
+    );
+    Ok(())
 }
 
 #[then("parsing fails with diagnostic code {code}")]
-fn then_parse_fails(world: &mut TestWorld, code: QuotedString) {
-    let report = world
+fn then_parse_fails(world: &mut TestWorld, code: QuotedString) -> Result<()> {
+    let parse_result = world
         .parse_result
         .as_ref()
-        .expect("parse result should be set")
-        .as_ref()
-        .expect_err("parsing should fail");
-    let diagnostic = report.diagnostics().first().expect("one diagnostic");
-    let expected: DiagnosticCode =
-        serde_json::from_str(&format!("\"{}\"", code.as_str())).expect("known diagnostic code");
-    assert_eq!(diagnostic.code(), expected);
+        .context("parse result should be set")?;
+    let Err(report) = parse_result else {
+        bail!("parsing should fail");
+    };
+    let diagnostic = report.diagnostics().first().context("one diagnostic")?;
+    let expected: DiagnosticCode = serde_json::from_str(&format!("\"{}\"", code.as_str()))
+        .context("feature file contains a known diagnostic code")?;
+    ensure!(diagnostic.code() == expected, "unexpected diagnostic code");
+    Ok(())
 }
 
 #[scenario(path = "tests/features/sempai_yaml.feature")]

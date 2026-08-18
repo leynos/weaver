@@ -2,9 +2,17 @@
 
 use std::{collections::BTreeSet, sync::Arc};
 
+use anyhow::{Result as AnyResult, ensure};
 use rstest::rstest;
 use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom, TreeSitterQueryAtom};
 
+use super::engine_test_support::{
+    SingleRuleDiagnosticCase,
+    compile_and_first,
+    compile_yaml_text,
+    default_engine,
+    simple_rule_yaml,
+};
 use crate::{
     Diagnostic,
     DiagnosticCode,
@@ -17,48 +25,17 @@ use crate::{
     semantic_check::{MAX_FORMULA_DEPTH, validate_formula},
 };
 
-fn default_engine() -> Engine { Engine::new(EngineConfig::default()) }
-
-fn compile_yaml_text(yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
-    let engine = default_engine();
-    engine.compile_yaml(yaml)
-}
-
-fn compile_and_first(yaml: &str) -> (DiagnosticCode, Diagnostic) {
-    first_diagnostic_of_err(compile_yaml_text(yaml))
-}
-
-fn simple_rule_yaml(id: Option<&str>, pattern_line: &str) -> String {
-    let id_line = id.map_or_else(String::new, |rule_id| format!("id: {rule_id}"));
-    format!(
-        concat!(
-            "rules:\n",
-            "  - {id_line}\n",
-            "    message: oops\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    {pattern_line}\n",
-        ),
-        id_line = id_line,
-        pattern_line = pattern_line,
-    )
-}
-
-struct SingleRuleDiagnosticCase {
-    rule_id: Option<&'static str>,
-    yaml_body: &'static str,
-    expected_code: DiagnosticCode,
-    check_primary_span: bool,
-    check_message: Option<&'static str>,
-}
-
-fn first_diagnostic_of_err<T>(result: Result<T, DiagnosticReport>) -> (DiagnosticCode, Diagnostic) {
-    let report = result.err().expect("expected an error result");
+fn first_diagnostic_of_err<T>(
+    result: Result<T, DiagnosticReport>,
+) -> AnyResult<(DiagnosticCode, Diagnostic)> {
+    let report = result
+        .err()
+        .ok_or_else(|| anyhow::anyhow!("expected an error result"))?;
     let first: &Diagnostic = report
         .diagnostics()
         .first()
-        .expect("expected at least one diagnostic");
-    (first.code(), first.clone())
+        .ok_or_else(|| anyhow::anyhow!("expected at least one diagnostic"))?;
+    Ok((first.code(), first.clone()))
 }
 
 fn dummy_formula() -> Decorated<Formula> {
@@ -278,8 +255,11 @@ fn compile_yaml_rejects_formula_nesting_beyond_depth_limit() {
     ),
     DiagnosticCode::ESempaiMissingPositiveTermInAnd,
 )]
-fn compile_yaml_returns_semantic_error(#[case] yaml: &str, #[case] expected_code: DiagnosticCode) {
-    assert_compile_yaml_semantic_error(yaml, expected_code);
+fn compile_yaml_returns_semantic_error(
+    #[case] yaml: &str,
+    #[case] expected_code: DiagnosticCode,
+) -> AnyResult<()> {
+    assert_compile_yaml_semantic_error(yaml, expected_code)
 }
 
 #[rstest]
@@ -303,40 +283,59 @@ fn compile_yaml_returns_semantic_error(#[case] yaml: &str, #[case] expected_code
 )]
 fn compile_yaml_returns_expected_diagnostic_for_single_rule_cases(
     #[case] case: SingleRuleDiagnosticCase,
-) {
-    let (code, diag) = compile_and_first(&simple_rule_yaml(case.rule_id, case.yaml_body));
-    assert_eq!(code, case.expected_code);
+) -> AnyResult<()> {
+    let (code, diag) = compile_and_first(&simple_rule_yaml(case.rule_id, case.yaml_body))?;
+    ensure!(
+        code == case.expected_code,
+        "expected {:?}, got {code:?}",
+        case.expected_code
+    );
     if case.check_primary_span {
-        assert!(diag.primary_span().is_some());
+        ensure!(
+            diag.primary_span().is_some(),
+            "expected a primary diagnostic span"
+        );
     }
     if let Some(expected_message) = case.check_message {
-        assert!(diag.message().contains(expected_message));
+        ensure!(diag.message().contains(expected_message));
     }
+    Ok(())
 }
 
-fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {
+fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) -> AnyResult<()> {
     let engine = default_engine();
     let result = engine.compile_yaml(yaml);
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::ESempaiUnsupportedMode);
-    assert!(
+    let (code, diag) = first_diagnostic_of_err(result)?;
+    ensure!(
+        code == DiagnosticCode::ESempaiUnsupportedMode,
+        "expected unsupported-mode diagnostic, got {code:?}"
+    );
+    ensure!(
         diag.message().contains(expected_mode_fragment),
         "expected diagnostic message to contain {:?}, got {:?}",
         expected_mode_fragment,
         diag.message(),
     );
-    assert!(diag.primary_span().is_some());
+    ensure!(
+        diag.primary_span().is_some(),
+        "expected a primary diagnostic span"
+    );
+    Ok(())
 }
 
-fn assert_compile_yaml_semantic_error(yaml: &str, expected_code: DiagnosticCode) {
+fn assert_compile_yaml_semantic_error(yaml: &str, expected_code: DiagnosticCode) -> AnyResult<()> {
     let engine = default_engine();
     let result = engine.compile_yaml(yaml);
-    let (code, _diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, expected_code);
+    let (code, _diag) = first_diagnostic_of_err(result)?;
+    ensure!(
+        code == expected_code,
+        "expected {expected_code:?}, got {code:?}"
+    );
+    Ok(())
 }
 
 #[test]
-fn compile_yaml_returns_unsupported_mode_for_extract_rules() {
+fn compile_yaml_returns_unsupported_mode_for_extract_rules() -> AnyResult<()> {
     assert_compile_yaml_unsupported_mode(
         concat!(
             "rules:\n",
@@ -350,11 +349,11 @@ fn compile_yaml_returns_unsupported_mode_for_extract_rules() {
             "    pattern: source($X)\n",
         ),
         "extract",
-    );
+    )
 }
 
 #[test]
-fn compile_yaml_returns_unsupported_mode_for_unknown_modes() {
+fn compile_yaml_returns_unsupported_mode_for_unknown_modes() -> AnyResult<()> {
     assert_compile_yaml_unsupported_mode(
         concat!(
             "rules:\n",
@@ -366,20 +365,24 @@ fn compile_yaml_returns_unsupported_mode_for_unknown_modes() {
             "    pattern: foo($X)\n",
         ),
         "custom-mode",
-    );
+    )
 }
 
 #[test]
-fn compile_dsl_returns_not_implemented() {
+fn compile_dsl_returns_not_implemented() -> AnyResult<()> {
     let engine = default_engine();
     let result = engine.compile_dsl("test-rule", Language::Python, "pattern(\"def $F\")");
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::NotImplemented);
-    assert!(diag.message().contains("compile_dsl"));
+    let (code, diag) = first_diagnostic_of_err(result)?;
+    ensure!(
+        code == DiagnosticCode::NotImplemented,
+        "expected not-implemented diagnostic, got {code:?}"
+    );
+    ensure!(diag.message().contains("compile_dsl"));
+    Ok(())
 }
 
 #[test]
-fn execute_returns_not_implemented() {
+fn execute_returns_not_implemented() -> AnyResult<()> {
     let engine = default_engine();
     let plan = QueryPlan::new(
         String::from("test-rule"),
@@ -387,7 +390,11 @@ fn execute_returns_not_implemented() {
         Arc::new(dummy_formula()),
     );
     let result = engine.execute(&plan, "file:///test.rs", "fn main() {}");
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::NotImplemented);
-    assert!(diag.message().contains("execute"));
+    let (code, diag) = first_diagnostic_of_err(result)?;
+    ensure!(
+        code == DiagnosticCode::NotImplemented,
+        "expected not-implemented diagnostic, got {code:?}"
+    );
+    ensure!(diag.message().contains("execute"));
+    Ok(())
 }

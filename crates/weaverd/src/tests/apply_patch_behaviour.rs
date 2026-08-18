@@ -2,6 +2,7 @@
 
 use std::{cell::RefCell, path::PathBuf};
 
+use anyhow::{Context, Result, ensure};
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
@@ -71,8 +72,7 @@ struct ApplyPatchWorld {
 }
 
 impl ApplyPatchWorld {
-    fn new() -> Self {
-        let temp_dir = TempDir::new().expect("temp dir");
+    fn new(temp_dir: TempDir) -> Self {
         Self {
             temp_dir,
             patch: None,
@@ -82,44 +82,52 @@ impl ApplyPatchWorld {
         }
     }
 
-    fn create_file(&self, relative: &str, content: &str) {
+    fn create_file(&self, relative: &str, content: &str) -> Result<()> {
         let path = self.path(relative);
         if let Some(parent) = path.parent() {
-            test_fs::create_dir_all(parent).expect("create parent dirs");
+            test_fs::create_dir_all(parent).context("create fixture parent directories")?;
         }
-        test_fs::write(&path, content).expect("write file");
+        test_fs::write(&path, content).context("write fixture file")?;
+        Ok(())
     }
 
-    fn read_file(&self, relative: &str) -> String {
-        test_fs::read_to_string(self.path(relative)).expect("read file")
+    fn read_file(&self, relative: &str) -> Result<String> {
+        test_fs::read_to_string(self.path(relative)).context("read fixture file")
     }
 
-    fn file_exists(&self, relative: &str) -> bool {
-        test_fs::exists(self.path(relative)).expect("check file existence")
+    fn file_exists(&self, relative: &str) -> Result<bool> {
+        test_fs::exists(self.path(relative)).context("check fixture file existence")
     }
 
     fn path(&self, relative: &str) -> PathBuf { self.temp_dir.path().join(relative) }
 
     fn set_patch(&mut self, patch: &str) { self.patch = Some(patch.to_string()); }
 
-    fn apply_patch(&mut self) {
-        let patch = self.patch.clone().expect("patch should be set");
+    fn apply_patch(&mut self) -> Result<()> {
+        let patch = self.patch.clone().context("patch should be set")?;
         let executor = ApplyPatchExecutor::new(
             self.temp_dir.path().to_path_buf(),
             &self.syntactic_lock,
             &self.semantic_lock,
         );
         self.result = Some(executor.execute(&patch).map(|_| ()));
+        Ok(())
     }
 }
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<ApplyPatchWorld> { RefCell::new(ApplyPatchWorld::new()) }
+fn world() -> RefCell<ApplyPatchWorld> {
+    let temp_dir = match TempDir::new() {
+        Ok(temp_dir) => temp_dir,
+        Err(error) => panic!("create temporary workspace: {error}"),
+    };
+    RefCell::new(ApplyPatchWorld::new(temp_dir))
+}
 
 #[given("a workspace with the default source file")]
-fn given_default_source(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow().create_file("src/main.rs", DEFAULT_SOURCE);
+fn given_default_source(world: &RefCell<ApplyPatchWorld>) -> Result<()> {
+    world.borrow().create_file("src/main.rs", DEFAULT_SOURCE)
 }
 
 #[given("an empty workspace")]
@@ -160,8 +168,8 @@ fn given_patch_missing_hunk(world: &RefCell<ApplyPatchWorld>) {
 }
 
 #[given("a workspace with a deletable file")]
-fn given_deletable_file(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow().create_file("src/remove.rs", "fn old() {}\n");
+fn given_deletable_file(world: &RefCell<ApplyPatchWorld>) -> Result<()> {
+    world.borrow().create_file("src/remove.rs", "fn old() {}\n")
 }
 
 #[given("an apply-patch syntactic lock that passes")]
@@ -189,72 +197,83 @@ fn given_semantic_fails(world: &RefCell<ApplyPatchWorld>, path: String, message:
 }
 
 #[when("the patch is applied")]
-fn when_patch_applied(world: &RefCell<ApplyPatchWorld>) { world.borrow_mut().apply_patch(); }
+fn when_patch_applied(world: &RefCell<ApplyPatchWorld>) -> Result<()> {
+    world.borrow_mut().apply_patch()
+}
 
 #[then("the apply-patch file {path} contains {snippet}")]
-fn then_file_contains(world: &RefCell<ApplyPatchWorld>, path: String, snippet: String) {
+fn then_file_contains(
+    world: &RefCell<ApplyPatchWorld>,
+    path: String,
+    snippet: String,
+) -> Result<()> {
     let path = strip_quotes(&path);
     let snippet = strip_quotes(&snippet);
-    let content = world.borrow().read_file(path);
-    assert!(
+    let content = world.borrow().read_file(path)?;
+    ensure!(
         content.contains(snippet),
         "expected {path} to contain {snippet:?}, got: {content:?}"
     );
+    Ok(())
 }
 
 #[then("the file {path} is missing")]
-fn then_file_missing(world: &RefCell<ApplyPatchWorld>, path: String) {
+fn then_file_missing(world: &RefCell<ApplyPatchWorld>, path: String) -> Result<()> {
     let path = strip_quotes(&path);
-    assert!(
-        !world.borrow().file_exists(path),
+    ensure!(
+        !world.borrow().file_exists(path)?,
         "expected {path} to be missing"
     );
+    Ok(())
 }
 
 #[then("the apply-patch response succeeds")]
-fn then_patch_succeeds(world: &RefCell<ApplyPatchWorld>) {
+fn then_patch_succeeds(world: &RefCell<ApplyPatchWorld>) -> Result<()> {
     let world = world.borrow();
-    let result = world.result.as_ref().expect("result set");
-    assert!(result.is_ok(), "expected success, got: {result:?}");
+    let result = world.result.as_ref().context("result set")?;
+    ensure!(result.is_ok(), "expected success, got: {result:?}");
+    Ok(())
 }
 
 #[then("the apply-patch fails with {kind}")]
-fn then_patch_fails(world: &RefCell<ApplyPatchWorld>, kind: String) {
+fn then_patch_fails(world: &RefCell<ApplyPatchWorld>, kind: String) -> Result<()> {
     let kind = strip_quotes(&kind);
     let world = world.borrow();
-    let result = world.result.as_ref().expect("result set");
-    let Err(error) = result else {
-        panic!("expected failure, got success");
+    let result = world.result.as_ref().context("result set")?;
+    let error = match result {
+        Err(error) => error,
+        Ok(()) => anyhow::bail!("expected failure, got success"),
     };
     match kind {
-        "InvalidPath" => assert!(matches!(
+        "InvalidPath" => ensure!(matches!(
             error,
             ApplyPatchFailure::Patch(ApplyPatchError::InvalidPath { .. })
         )),
-        "InvalidDiffHeader" => assert!(matches!(
+        "InvalidDiffHeader" => ensure!(matches!(
             error,
             ApplyPatchFailure::Patch(ApplyPatchError::InvalidDiffHeader { .. })
         )),
-        "MissingHunk" => assert!(matches!(
+        "MissingHunk" => ensure!(matches!(
             error,
             ApplyPatchFailure::Patch(ApplyPatchError::MissingHunk { .. })
         )),
-        "SyntacticLock" => assert!(matches!(
+        "SyntacticLock" => ensure!(matches!(
             error,
             ApplyPatchFailure::Verification {
                 phase: "SyntacticLock",
                 ..
             }
         )),
-        "SemanticLock" => assert!(matches!(
+        "SemanticLock" => ensure!(matches!(
             error,
             ApplyPatchFailure::Verification {
                 phase: "SemanticLock",
                 ..
             }
         )),
-        other => panic!("unsupported failure kind: {other}"),
+        other => anyhow::bail!("unsupported failure kind: {other}"),
     }
+    Ok(())
 }
 
 #[rustfmt::skip]

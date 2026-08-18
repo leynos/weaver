@@ -36,6 +36,8 @@ weaver-syntax = { path = "../weaver-syntax" }
 tempfile.workspace = true
 
 [dev-dependencies]
+anyhow = { workspace = true }
+camino = { workspace = true }
 derive_more = { version = "2.1", features = ["as_ref", "deref"] }
 insta = { workspace = true, features = ["json", "redactions"] }
 mockall.workspace = true

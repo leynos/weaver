@@ -52,6 +52,39 @@ struct CapabilityWorld {
     version_b: Option<ContractVersion>,
 }
 
+fn manifest_with_cap(cap: &QuotedString, name: &str, kind: PluginKind) -> PluginManifest {
+    let capability_id: CapabilityId = match serde_json::from_str(&format!("\"{}\"", cap.as_str())) {
+        Ok(capability_id) => capability_id,
+        Err(error) => panic!("valid capability id: {error}"),
+    };
+    let metadata = PluginMetadata::new(name, "1.0", kind);
+    PluginManifest::new(
+        metadata,
+        vec!["python".into()],
+        PathBuf::from("/usr/bin/test"),
+    )
+    .with_capabilities(vec![capability_id])
+}
+
+fn assert_versions_compatible(world: &CapabilityWorld, expected: bool) {
+    let Some(version_a) = world.version_a.as_ref() else {
+        panic!("version_a must be set");
+    };
+    let Some(version_b) = world.version_b.as_ref() else {
+        panic!("version_b must be set");
+    };
+    let is_compatible = version_a.is_compatible_with(version_b);
+    let expected_compatibility = if expected {
+        "compatible"
+    } else {
+        "incompatible"
+    };
+    assert_eq!(
+        is_compatible, expected,
+        "expected {version_a} to be {expected_compatibility} with {version_b}"
+    );
+}
+
 #[allow_fixture_expansion_lints]
 #[fixture]
 fn world() -> CapabilityWorld { CapabilityWorld::default() }
@@ -110,8 +143,10 @@ fn given_analysis_response(world: &mut CapabilityWorld) {
 
 #[given("a failure response with reason code {code}")]
 fn given_failure_with_reason(world: &mut CapabilityWorld, code: QuotedString) {
-    let reason: ReasonCode =
-        serde_json::from_str(&format!("\"{}\"", code.as_str())).expect("valid reason code");
+    let reason: ReasonCode = match serde_json::from_str(&format!("\"{}\"", code.as_str())) {
+        Ok(reason) => reason,
+        Err(error) => panic!("valid reason code: {error}"),
+    };
     let diag = PluginDiagnostic::new(DiagnosticSeverity::Error, "symbol not found")
         .with_reason_code(reason);
     world.response = Some(PluginResponse::failure(vec![diag]));
@@ -119,24 +154,12 @@ fn given_failure_with_reason(world: &mut CapabilityWorld, code: QuotedString) {
 
 #[given("an actuator manifest with capability {cap}")]
 fn given_actuator_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) {
-    let cap_id: CapabilityId =
-        serde_json::from_str(&format!("\"{}\"", cap.as_str())).expect("valid capability id");
-    let meta = PluginMetadata::new("test-plugin", "1.0", PluginKind::Actuator);
-    world.manifest = Some(
-        PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/test"))
-            .with_capabilities(vec![cap_id]),
-    );
+    world.manifest = Some(manifest_with_cap(&cap, "test-plugin", PluginKind::Actuator));
 }
 
 #[given("a sensor manifest with capability {cap}")]
 fn given_sensor_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) {
-    let cap_id: CapabilityId =
-        serde_json::from_str(&format!("\"{}\"", cap.as_str())).expect("valid capability id");
-    let meta = PluginMetadata::new("test-sensor", "1.0", PluginKind::Sensor);
-    world.manifest = Some(
-        PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/test"))
-            .with_capabilities(vec![cap_id]),
-    );
+    world.manifest = Some(manifest_with_cap(&cap, "test-sensor", PluginKind::Sensor));
 }
 
 #[given("contract version {major}.{minor}")]
@@ -155,21 +178,31 @@ fn given_version_b(world: &mut CapabilityWorld, major: u16, minor: u16) {
 
 #[when("the request is validated")]
 fn when_validate_request(world: &mut CapabilityWorld) {
-    let contract = world.contract.as_ref().expect("contract must be set");
-    let request = world.request.as_ref().expect("request must be set");
+    let Some(contract) = world.contract.as_ref() else {
+        panic!("contract must be set");
+    };
+    let Some(request) = world.request.as_ref() else {
+        panic!("request must be set");
+    };
     world.validation_result = Some(contract.validate_request(request));
 }
 
 #[when("the response is validated")]
 fn when_validate_response(world: &mut CapabilityWorld) {
-    let contract = world.contract.as_ref().expect("contract must be set");
-    let response = world.response.as_ref().expect("response must be set");
+    let Some(contract) = world.contract.as_ref() else {
+        panic!("contract must be set");
+    };
+    let Some(response) = world.response.as_ref() else {
+        panic!("response must be set");
+    };
     world.validation_result = Some(contract.validate_response(response));
 }
 
 #[when("the manifest is validated")]
 fn when_validate_manifest(world: &mut CapabilityWorld) {
-    let manifest = world.manifest.as_ref().expect("manifest must be set");
+    let Some(manifest) = world.manifest.as_ref() else {
+        panic!("manifest must be set");
+    };
     world.validation_result = Some(manifest.validate());
 }
 
@@ -179,26 +212,23 @@ fn when_validate_manifest(world: &mut CapabilityWorld) {
 
 #[then("validation succeeds")]
 fn then_validation_succeeds(world: &mut CapabilityWorld) {
-    let result = world
-        .validation_result
-        .as_ref()
-        .expect("validation must have been run");
-    assert!(
-        result.is_ok(),
-        "expected validation to succeed but got: {}",
-        result.as_ref().expect_err("unreachable")
-    );
+    let Some(result) = world.validation_result.as_ref() else {
+        panic!("validation must have been run");
+    };
+    if let Err(error) = result {
+        panic!("expected validation to succeed but got: {error}");
+    }
 }
 
 #[then("validation fails with {substring}")]
 fn then_validation_fails_with(world: &mut CapabilityWorld, substring: QuotedString) {
-    let result = world
-        .validation_result
-        .as_ref()
-        .expect("validation must have been run");
-    let err = result
-        .as_ref()
-        .expect_err("expected validation to fail but it succeeded");
+    let Some(result) = world.validation_result.as_ref() else {
+        panic!("validation must have been run");
+    };
+    let err = match result {
+        Ok(()) => panic!("expected validation to fail but it succeeded"),
+        Err(error) => error,
+    };
     let msg = err.to_string();
     assert!(
         msg.to_ascii_lowercase()
@@ -210,22 +240,12 @@ fn then_validation_fails_with(world: &mut CapabilityWorld, substring: QuotedStri
 
 #[then("the versions are compatible")]
 fn then_versions_compatible(world: &mut CapabilityWorld) {
-    let a = world.version_a.as_ref().expect("version_a must be set");
-    let b = world.version_b.as_ref().expect("version_b must be set");
-    assert!(
-        a.is_compatible_with(b),
-        "expected {a} to be compatible with {b}"
-    );
+    assert_versions_compatible(world, true);
 }
 
 #[then("the versions are incompatible")]
 fn then_versions_incompatible(world: &mut CapabilityWorld) {
-    let a = world.version_a.as_ref().expect("version_a must be set");
-    let b = world.version_b.as_ref().expect("version_b must be set");
-    assert!(
-        !a.is_compatible_with(b),
-        "expected {a} to be incompatible with {b}"
-    );
+    assert_versions_compatible(world, false);
 }
 
 // ---------------------------------------------------------------------------

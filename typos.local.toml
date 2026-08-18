@@ -11,8 +11,9 @@ accepted = []
 [words.corrections]
 
 [patterns]
-# Preserve complete formal names without accepting their component words broadly.
+# Ignore inline code and preserve formal names without accepting components broadly.
 ignore = [
+  "`[^`\\n]+`",
   "\\brust-analyzer\\b",
   "\\bRust\\s+Analyzer\\b",
   "\\bHashiCorp\\b",

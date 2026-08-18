@@ -15,8 +15,8 @@ use crate::{BackendKind, bootstrap_with};
 /// Verifies that the public `bootstrap_with` re-export correctly initialises
 /// the daemon without eagerly starting backends.
 #[rstest]
-fn bootstrap_with_reexport_initialises_daemon() {
-    let loader = TestConfigLoader::new();
+fn bootstrap_with_reexport_initialises_daemon() -> Result<(), String> {
+    let loader = TestConfigLoader::new()?;
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
 
@@ -27,11 +27,12 @@ fn bootstrap_with_reexport_initialises_daemon() {
     assert!(events.contains(&HealthEvent::BootstrapStarting));
     assert!(events.contains(&HealthEvent::BootstrapSucceeded));
     assert!(provider.recorded_starts().is_empty());
+    Ok(())
 }
 
 #[rstest]
-fn daemon_reexport_controls_backends() {
-    let loader = TestConfigLoader::new();
+fn daemon_reexport_controls_backends() -> Result<(), String> {
+    let loader = TestConfigLoader::new()?;
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
     let mut daemon = bootstrap_with(&loader, reporter.clone(), provider.clone())
@@ -41,4 +42,5 @@ fn daemon_reexport_controls_backends() {
         .ensure_backend(BackendKind::Semantic)
         .expect("backend should start");
     assert_eq!(provider.recorded_starts(), vec![BackendKind::Semantic]);
+    Ok(())
 }

@@ -33,14 +33,18 @@ fn with_span(mut formula: Decorated<Formula>, span: SourceSpan) -> Decorated<For
 fn assert_invalid_not_in_or(formula: &Decorated<Formula>) {
     let result = validate_formula(formula);
     let err = result.expect_err("should fail validation");
-    let first = err.diagnostics().first().expect("should have diagnostic");
+    let Some(first) = err.diagnostics().first() else {
+        panic!("should have diagnostic");
+    };
     assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
 }
 
 fn assert_missing_positive_term_in_and(formula: &Decorated<Formula>) {
     let result = validate_formula(formula);
     let err = result.expect_err("should fail validation");
-    let first = err.diagnostics().first().expect("should have diagnostic");
+    let Some(first) = err.diagnostics().first() else {
+        panic!("should have diagnostic");
+    };
     assert_eq!(
         first.code(),
         DiagnosticCode::ESempaiMissingPositiveTermInAnd
@@ -48,12 +52,11 @@ fn assert_missing_positive_term_in_and(formula: &Decorated<Formula>) {
 }
 
 fn first_validation_diagnostic(formula: &Decorated<Formula>) -> sempai_core::Diagnostic {
-    validate_formula(formula)
-        .expect_err("should fail validation")
-        .diagnostics()
-        .first()
-        .expect("should have diagnostic")
-        .clone()
+    let err = validate_formula(formula).expect_err("should fail validation");
+    let Some(diagnostic) = err.diagnostics().first() else {
+        panic!("should have diagnostic");
+    };
+    diagnostic.clone()
 }
 
 fn make_not(inner: Decorated<Formula>) -> Decorated<Formula> {
@@ -119,11 +122,15 @@ fn sp(uri: &str, start: usize, end: usize) -> SourceSpan {
     } else {
         Some(uri.to_owned())
     };
-    SourceSpan::new(
-        u32::try_from(start).expect("span start fits u32"),
-        u32::try_from(end).expect("span end fits u32"),
-        uri_opt,
-    )
+    let start_offset = match u32::try_from(start) {
+        Ok(converted_start) => converted_start,
+        Err(error) => panic!("span start fits u32: {error}"),
+    };
+    let end_offset = match u32::try_from(end) {
+        Ok(converted_end) => converted_end,
+        Err(error) => panic!("span end fits u32: {error}"),
+    };
+    SourceSpan::new(start_offset, end_offset, uri_opt)
 }
 
 fn build_constraint_only_and(

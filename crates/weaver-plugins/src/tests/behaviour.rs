@@ -92,18 +92,21 @@ fn register_plugin(registry: &mut PluginRegistry, name: &str, language: &str, ki
         vec![language.into()],
         PathBuf::from(format!("/usr/bin/{name}")),
     );
-    registry.register(manifest).expect("register plugin");
+    if let Err(error) = registry.register(manifest) {
+        panic!("register plugin: {error}");
+    }
 }
 
 /// Extracts a successful `PluginResponse` from the test world.
 /// Panics if no response was captured or if the response was an error.
 fn get_successful_response(world: &TestWorld) -> &PluginResponse {
-    world
-        .response
-        .as_ref()
-        .expect("no response captured")
-        .as_ref()
-        .expect("expected success but got error")
+    let Some(response) = world.response.as_ref() else {
+        panic!("no response captured");
+    };
+    match response {
+        Ok(successful_response) => successful_response,
+        Err(error) => panic!("expected success but got error: {error}"),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -195,12 +198,12 @@ fn then_output_is_empty(world: &mut TestWorld) {
 
 #[then("the execution fails with {error_kind}")]
 fn then_execution_fails(world: &mut TestWorld, error_kind: ErrorKind) {
-    let err = world
-        .response
-        .as_ref()
-        .expect("no response captured")
-        .as_ref()
-        .expect_err("expected error but got success");
+    let Some(response) = world.response.as_ref() else {
+        panic!("no response captured");
+    };
+    let Err(err) = response else {
+        panic!("expected error but got success");
+    };
     match error_kind {
         ErrorKind::NotFound => {
             assert!(

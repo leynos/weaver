@@ -21,8 +21,8 @@ fn rust_extract_request() -> ExtractRequest<'static> {
 #[rstest]
 fn extraction_ranges_are_deterministic(rust_extract_request: ExtractRequest<'static>) {
     let request = rust_extract_request;
-    let first = extract(request);
-    let second = extract(request);
+    let first = extract(request).expect("first card extraction should succeed");
+    let second = extract(request).expect("second card extraction should succeed");
 
     assert_eq!(
         first.symbol.symbol_ref.range,
@@ -50,7 +50,8 @@ fn python_docstrings_are_preserved(
         line: 1,
         column: 5,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("Python card extraction should succeed");
 
     assert_eq!(
         card.doc.as_ref().map(|doc| doc.docstring.as_str()),
@@ -68,7 +69,8 @@ fn python_byte_and_format_docstrings_are_rejected(#[case] source: &'static str) 
         line: 1,
         column: 5,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("Python card extraction should succeed");
 
     assert!(card.doc.is_none());
 }
@@ -81,7 +83,8 @@ fn member_assignments_do_not_create_synthetic_locals() {
         line: 1,
         column: 10,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("TypeScript card extraction should succeed");
 
     assert!(
         card.structure
@@ -100,7 +103,8 @@ fn semantic_detail_degrades_to_tree_sitter_provenance() {
         line: 1,
         column: 10,
         detail: DetailLevel::Semantic,
-    });
+    })
+    .expect("semantic TypeScript card extraction should succeed");
 
     assert!(card.lsp.is_none());
     assert_eq!(
@@ -118,7 +122,8 @@ fn get_card_success_payload_preserves_wrapped_cards(rust_extract_request: Extrac
         source: "fn greet() {}\n",
         detail: DetailLevel::Minimal,
         ..rust_extract_request
-    });
+    })
+    .expect("minimal Rust card extraction should succeed");
     let response = GetCardResponse::Success {
         card: Box::new(card),
     };

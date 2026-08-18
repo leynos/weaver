@@ -43,7 +43,7 @@ repository's 400-line limit.
 
 ## Workspace baseline
 
-The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
+The workspace targets `ortho_config` v0.9.0 and Rust 1.89.
 
 ## Workflow pins and Dependabot
 
@@ -270,16 +270,34 @@ Engine validation runs in two stages after normalization:
   payload semantics; it is currently a placeholder pending execution-layer
   context, including issue `#152`.
 
+### Sempai test-support ownership and capture lifecycle
+
+`crates/sempai/src/tests/engine_test_support.rs` owns the `pub(super)` engine
+fixtures used by Sempai's engine and integration test modules. The helpers are
+test-only and may be consumed by sibling modules under
+`crates/sempai/src/tests`; they are not production adapters or a cross-crate
+test API. Keep setup and diagnostic conversion in this module so BDD steps can
+propagate failures without duplicating engine construction.
+
+`crates/sempai/src/tests/tracing_tests.rs` owns `TraceCaptureState` and its
+subscriber. The subscriber is installed once because `tracing`'s registry is
+process-wide, while `begin_capture` serializes active captures and resets the
+per-test state. Captures are limited to the current test thread; dropping the
+`TraceCaptureGuard` clears the recorded spans and events. A tracing test must
+hold the guard across the engine operation, inspect its snapshot before the
+guard is dropped, and must not expose this state to production code or other
+test crates.
+
 ## Configuration framework internals
 
-### `ortho_config` v0.8.0 integration
+### `ortho_config` v0.9.0 integration
 
 `weaver_config::Config` declares its discovery policy inline through the
 `#[ortho_config(discovery(...))]` attribute. The app name, dotfile, project
 file, and `--config-path` flag are all defined next to the struct, so every
 consumer shares the same generated loader without bespoke builders.
 
-The `ortho_config` v0.8.0 loader preserves the stricter discovery and parsing
+The `ortho_config` v0.9.0 loader preserves the stricter discovery and parsing
 model adopted in earlier releases: if any discovered configuration file fails
 to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
 Both the CLI and daemon bubble that error to the user instead of quietly
@@ -289,6 +307,24 @@ Configuration is layered with `ortho_config`, producing the precedence order
 `defaults < files < environment < CLI`. File discovery honours `--config-path`
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
+
+`Config` enables OrthoConfig's `post_merge_hook` and owns the normalization of
+duplicate capability directives there. This keeps the invariant consistent for
+both generated production loading and `Config::merge_from_layers` policy tests;
+CLI and daemon adapters must not repeat the normalization.
+
+### Configuration test boundary
+
+Configuration policy tests use `ortho_config::MergeComposer` to create owned
+defaults, file, environment, and CLI layers. The helper belongs only in tests:
+it exercises the `weaver-config` domain merge policy without changing the test
+process environment. Binary-level tests use `assert_cmd` with `env_clear()` and
+child-only `.env(...)` values to prove the real CLI environment adapter.
+
+`MapEnv` is limited to OrthoConfig discovery inputs, such as home or XDG path
+selection. It does not model `WEAVER_*` configuration-value merging, so do not
+use it in place of declarative layers or child-process tests. Direct
+`std::env::set_var` and `std::env::remove_var` are forbidden in Weaver tests.
 
 ### Dependency-graph resolution
 
@@ -891,6 +927,15 @@ The module keeps connection retry logic in `start_and_retry_daemon`, which
 tolerates socket-bind lag after daemon startup, and `write_error_and_fail`, a
 small helper that writes a display message to `stderr` and returns
 `ExitCode::FAILURE`.
+
+### 2.6 CLI BDD output expectations
+
+`crates/weaver-cli/src/tests/behaviour.rs` keeps `OutputStream` and
+`OutputCheck` private to the feature-bound CLI BDD steps. `OutputStream`
+selects stdout or stderr and reads its text, while `OutputCheck` pairs that
+stream with the unchanged `OutputAssertion` comparison kind before
+`assert_output` reads the selected stream. Do not promote these types to shared
+test support unless a second CLI BDD module needs this exact contract.
 
 ## Test infrastructure for rename-symbol coverage
 

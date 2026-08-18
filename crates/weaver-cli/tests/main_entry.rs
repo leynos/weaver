@@ -8,6 +8,8 @@ use predicates::{
     prelude::PredicateBooleanExt,
     str::{contains, is_empty},
 };
+use rstest::rstest;
+use tempfile::TempDir;
 use weaver_cli::DOMAIN_OPERATIONS;
 
 const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
@@ -19,11 +21,74 @@ const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
     "--locale <LOCALE>",
 ];
 
+fn isolated_command(temp_dir: &TempDir) -> assert_cmd::Command {
+    let mut command = cargo_bin_cmd!("weaver");
+    command
+        .env_clear()
+        .env("HOME", temp_dir.path())
+        .env("XDG_CONFIG_HOME", temp_dir.path().join("xdg-config"))
+        .env("XDG_CACHE_HOME", temp_dir.path().join("xdg-cache"));
+    command
+}
+
 #[test]
 fn capabilities_probe_succeeds() {
-    let mut command = cargo_bin_cmd!("weaver");
+    let temp_dir = TempDir::new().expect("create temporary home");
+    let mut command = isolated_command(&temp_dir);
     command.arg("--capabilities");
     command.assert().success();
+}
+
+#[rstest]
+fn invalid_child_environment_locale_fails_capabilities() {
+    let temp_dir = TempDir::new().expect("create temporary home");
+    let mut command = isolated_command(&temp_dir);
+    command.env("WEAVER_LOCALE", "not_a_locale");
+    command.arg("--capabilities");
+
+    command
+        .assert()
+        .failure()
+        .stderr(contains("locale"))
+        .stderr(contains("not_a_locale"));
+}
+
+#[rstest]
+fn cli_locale_overrides_invalid_child_environment_locale() {
+    let temp_dir = TempDir::new().expect("create temporary home");
+    let mut command = isolated_command(&temp_dir);
+    command
+        .env("WEAVER_LOCALE", "not_a_locale")
+        .args(["--locale", "en-GB", "--capabilities"]);
+
+    command.assert().success();
+}
+
+#[rstest]
+fn missing_extends_parent_is_reported_by_the_binary() {
+    use cap_std::{ambient_authority, fs::Dir};
+
+    let temp_dir = TempDir::new().expect("create temporary configuration directory");
+    let config_path = temp_dir.path().join("weaver.toml");
+    let missing_path = temp_dir.path().join("missing.toml");
+    let directory = Dir::open_ambient_dir(temp_dir.path(), ambient_authority())
+        .expect("open temporary configuration directory");
+    directory
+        .write("weaver.toml", "extends = \"missing.toml\"\n")
+        .expect("write extending configuration");
+
+    let mut command = isolated_command(&temp_dir);
+    command.args([
+        "--config-path",
+        config_path.to_str().expect("temporary path is UTF-8"),
+        "--capabilities",
+    ]);
+
+    command
+        .assert()
+        .failure()
+        .stderr(contains(config_path.display().to_string()))
+        .stderr(contains(missing_path.display().to_string()));
 }
 
 #[test]

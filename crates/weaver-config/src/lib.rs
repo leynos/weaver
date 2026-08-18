@@ -48,7 +48,7 @@ pub use defaults::{
 };
 pub use locale::{Locale, LocaleParseError};
 pub use logging::{LogFormat, LogFormatParseError};
-use ortho_config::OrthoConfig;
+use ortho_config::{OrthoConfig, OrthoResult, PostMergeContext, PostMergeHook};
 pub use runtime::{RuntimePaths, RuntimePathsError};
 use serde::{Deserialize, Serialize};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
@@ -102,6 +102,7 @@ pub fn config_field_help(help_id: &str) -> &'static str {
 #[serde(default)]
 #[ortho_config(
     prefix = "WEAVER",
+    post_merge_hook,
     discovery(
         app_name = "weaver",
         config_file_name = "config.toml",
@@ -162,11 +163,7 @@ impl Config {
     /// This wrapper does not introduce its own panic paths, but the
     /// `ortho_config` generated loader may panic if its generated discovery or
     /// CLI metadata trips an internal debug assertion.
-    pub fn load() -> ortho_config::OrthoResult<Self> {
-        let mut config = <Self as OrthoConfig>::load()?;
-        config.normalise_capability_overrides();
-        Ok(config)
-    }
+    pub fn load() -> ortho_config::OrthoResult<Self> { <Self as OrthoConfig>::load() }
 
     /// Loads configuration using a custom iterator of CLI arguments.
     ///
@@ -180,9 +177,7 @@ impl Config {
         I: IntoIterator<Item = T>,
         T: Into<std::ffi::OsString> + Clone,
     {
-        let mut config = <Self as OrthoConfig>::load_from_iter(iter)?;
-        config.normalise_capability_overrides();
-        Ok(config)
+        <Self as OrthoConfig>::load_from_iter(iter)
     }
 
     /// Accessor for the configured daemon socket.
@@ -212,6 +207,13 @@ impl Config {
     }
 }
 
+impl PostMergeHook for Config {
+    fn post_merge(&mut self, _context: &PostMergeContext) -> OrthoResult<()> {
+        self.normalise_capability_overrides();
+        Ok(())
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         let mut config = Self {
@@ -223,5 +225,92 @@ impl Default for Config {
         };
         config.normalise_capability_overrides();
         config
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Property tests for configuration merge invariants.
+
+    use std::collections::BTreeMap;
+
+    use ortho_config::MergeComposer;
+    use proptest::prelude::*;
+    use serde_json::json;
+
+    use super::{CapabilityDirective, CapabilityOverride, Config};
+
+    fn directive_layer_strategy() -> impl Strategy<Value = (CapabilityDirective, usize)> {
+        (
+            prop_oneof![Just("Rust"), Just(" rust "), Just("PYTHON")],
+            prop_oneof![
+                Just("observe.rename"),
+                Just(" Observe.Rename "),
+                Just("observe.definition"),
+            ],
+            prop_oneof![
+                Just(CapabilityOverride::Allow),
+                Just(CapabilityOverride::Deny),
+                Just(CapabilityOverride::Force),
+            ],
+            0_usize..4,
+        )
+            .prop_map(|(language, capability, directive, layer)| {
+                (
+                    CapabilityDirective::new(language, capability, directive),
+                    layer,
+                )
+            })
+    }
+
+    fn normalised_key(directive: &CapabilityDirective) -> (String, String) {
+        (
+            directive.language.trim().to_lowercase(),
+            directive.capability.trim().to_lowercase(),
+        )
+    }
+
+    proptest! {
+        #[test]
+        fn merged_capability_overrides_are_normalised_and_last_wins(
+            assignments in prop::collection::vec(directive_layer_strategy(), 10..40),
+        ) {
+            let mut layers = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+            for (directive, layer) in assignments {
+                layers[layer].push(directive);
+            }
+
+            let mut defaults = serde_json::to_value(Config::default())
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+            defaults["capability_overrides"] = json!(&layers[0]);
+            let mut composer = MergeComposer::with_capacity(4);
+            composer.push_defaults(defaults);
+            composer.push_file(json!({ "capability_overrides": &layers[1] }), None);
+            composer.push_environment(json!({ "capability_overrides": &layers[2] }));
+            composer.push_cli(json!({ "capability_overrides": &layers[3] }));
+
+            let config = Config::merge_from_layers(composer.layers())
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+            let mut expected = BTreeMap::new();
+            for directives in &layers {
+                for directive in directives {
+                    expected.insert(normalised_key(directive), directive.directive);
+                }
+            }
+
+            for directive in &config.capability_overrides {
+                let (language, capability) = normalised_key(directive);
+                prop_assert_eq!(&directive.language, &language);
+                prop_assert_eq!(&directive.capability, &capability);
+            }
+            let actual = config
+                .capability_overrides
+                .iter()
+                .map(|directive| (normalised_key(directive), directive.directive))
+                .collect::<BTreeMap<_, _>>();
+
+            prop_assert_eq!(config.capability_overrides.len(), actual.len());
+            prop_assert_eq!(actual, expected);
+        }
     }
 }

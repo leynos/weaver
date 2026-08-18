@@ -6,6 +6,11 @@ focus because both binaries share the same loading pipeline and rely on the
 `weaver-config` crate to merge settings from files, environment variables, and
 command-line arguments.
 
+## Requirements
+
+Weaver requires Rust 1.89 or newer to build from source because its
+`ortho-config` dependency has the same minimum supported Rust version.
+
 ## 0.1.0 command-surface target
 
 Weaver is pre-0.1.0, so the current public command grammar is not a
@@ -136,6 +141,11 @@ retrying. If no configuration files exist at all, the loader still falls back
 to the built-in defaults described below. See the
 [developer's guide](developers-guide.md) for toolchain baseline and
 configuration framework internals.
+
+An `extends` entry is also strict. If a parent file is missing, Weaver exits
+non-zero and names both the configuration file containing `extends` and the
+resolved path of the missing parent. Correct the reference or create the parent
+file; Weaver never silently ignores an inheritance failure.
 
 Operators will see aggregated errors enumerated in the order discovery
 encounters them. For example:

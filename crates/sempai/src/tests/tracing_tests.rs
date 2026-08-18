@@ -5,8 +5,11 @@ use std::{
     sync::{
         Arc,
         Mutex,
-        atomic::{AtomicU64, AtomicUsize, Ordering},
+        MutexGuard,
+        OnceLock,
+        atomic::{AtomicU64, Ordering},
     },
+    thread::ThreadId,
 };
 
 use tracing::{
@@ -16,30 +19,139 @@ use tracing::{
     Subscriber,
     field::{Field, Visit},
     span::{Attributes, Id, Record},
+    subscriber::Interest,
 };
 
 use crate::{Engine, EngineConfig};
 
-#[derive(Default)]
 struct SpanCountingSubscriber {
-    compile_yaml_spans: Arc<AtomicUsize>,
-    debug_events: Arc<Mutex<Vec<RecordedEvent>>>,
+    state: Arc<TraceCaptureState>,
     next_id: AtomicU64,
 }
 
-impl SpanCountingSubscriber {
-    fn compile_yaml_spans(&self) -> Arc<AtomicUsize> { Arc::clone(&self.compile_yaml_spans) }
+static TRACE_SUBSCRIBER_INSTALLATION: OnceLock<Result<(), String>> = OnceLock::new();
 
-    fn debug_events(&self) -> Arc<Mutex<Vec<RecordedEvent>>> { Arc::clone(&self.debug_events) }
+struct TraceCaptureState {
+    capture: Mutex<TraceCapture>,
+    capture_lock: Mutex<()>,
+}
+
+impl TraceCaptureState {
+    fn shared() -> &'static Arc<Self> {
+        static STATE: OnceLock<Arc<TraceCaptureState>> = OnceLock::new();
+        STATE.get_or_init(|| {
+            Arc::new(Self {
+                capture: Mutex::default(),
+                capture_lock: Mutex::default(),
+            })
+        })
+    }
+
+    fn install_global_subscriber(state: &Arc<Self>) -> Result<(), String> {
+        // The registry is global, but each guard serialises and resets its
+        // capture state so the test cannot leak observations to another test.
+        TRACE_SUBSCRIBER_INSTALLATION
+            .get_or_init(|| {
+                let subscriber = SpanCountingSubscriber {
+                    state: Arc::clone(state),
+                    next_id: AtomicU64::default(),
+                };
+                tracing::subscriber::set_global_default(subscriber)
+                    .map_err(|error| error.to_string())
+            })
+            .clone()
+    }
+
+    fn begin_capture(&self) -> TraceCaptureGuard<'_> {
+        let capture_lock = self
+            .capture_lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut capture = self
+            .capture
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        *capture = TraceCapture {
+            trace_thread_id: Some(std::thread::current().id()),
+            ..TraceCapture::default()
+        };
+        TraceCaptureGuard {
+            state: self,
+            _capture_lock: capture_lock,
+        }
+    }
+
+    fn records_current_thread(&self) -> bool {
+        self.capture
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .trace_thread_id
+            == Some(std::thread::current().id())
+    }
+}
+
+#[derive(Default)]
+struct TraceCapture {
+    trace_thread_id: Option<ThreadId>,
+    compile_yaml_spans: usize,
+    debug_events: Vec<RecordedEvent>,
+}
+
+#[derive(Debug)]
+struct TraceCaptureSnapshot {
+    compile_yaml_spans: usize,
+    debug_events: Vec<RecordedEvent>,
+}
+
+struct TraceCaptureGuard<'a> {
+    state: &'a TraceCaptureState,
+    _capture_lock: MutexGuard<'a, ()>,
+}
+
+impl TraceCaptureGuard<'_> {
+    fn snapshot(&self) -> TraceCaptureSnapshot {
+        let capture = self
+            .state
+            .capture
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        TraceCaptureSnapshot {
+            compile_yaml_spans: capture.compile_yaml_spans,
+            debug_events: capture.debug_events.clone(),
+        }
+    }
+}
+
+impl Drop for TraceCaptureGuard<'_> {
+    fn drop(&mut self) {
+        *self
+            .state
+            .capture
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = TraceCapture::default();
+    }
 }
 
 impl Subscriber for SpanCountingSubscriber {
-    fn enabled(&self, metadata: &Metadata<'_>) -> bool { metadata.target().starts_with("sempai") }
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        self.state.records_current_thread() && metadata.target().starts_with("sempai")
+    }
+
+    fn register_callsite(&self, _metadata: &'static Metadata<'static>) -> Interest {
+        Interest::sometimes()
+    }
 
     fn new_span(&self, attributes: &Attributes<'_>) -> Id {
         let metadata = attributes.metadata();
-        if metadata.name() == "compile_yaml" && metadata.target() == "sempai::engine" {
-            self.compile_yaml_spans.fetch_add(1, Ordering::Relaxed);
+        let mut capture = self
+            .state
+            .capture
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if capture.trace_thread_id == Some(std::thread::current().id())
+            && is_compile_yaml_span(metadata)
+        {
+            capture.compile_yaml_spans += 1;
         }
         Id::from_u64(self.next_id.fetch_add(1, Ordering::Relaxed) + 1)
     }
@@ -54,18 +166,26 @@ impl Subscriber for SpanCountingSubscriber {
         }
         let mut fields = FieldRecorder::default();
         event.record(&mut fields);
-        self.debug_events
+        let mut capture = self
+            .state
+            .capture
             .lock()
-            .expect("debug event storage should not be poisoned")
-            .push(RecordedEvent {
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if capture.trace_thread_id == Some(std::thread::current().id()) {
+            capture.debug_events.push(RecordedEvent {
                 target: event.metadata().target().to_owned(),
                 fields: fields.into_fields(),
             });
+        }
     }
 
     fn enter(&self, _span: &Id) {}
 
     fn exit(&self, _span: &Id) {}
+}
+
+fn is_compile_yaml_span(metadata: &Metadata<'_>) -> bool {
+    metadata.name() == "compile_yaml" && metadata.target() == "sempai::engine"
 }
 
 #[derive(Debug, Default)]
@@ -104,7 +224,7 @@ impl Visit for FieldRecorder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct RecordedEvent {
     target: String,
     fields: BTreeMap<String, String>,
@@ -126,53 +246,43 @@ fn compile_yaml_emits_observable_compile_span() {
         "    severity: ERROR\n",
         "    pattern: foo($X)\n",
     );
-    let subscriber = SpanCountingSubscriber::default();
-    let compile_yaml_spans = subscriber.compile_yaml_spans();
-    let debug_events = subscriber.debug_events();
+    let state = TraceCaptureState::shared();
+    TraceCaptureState::install_global_subscriber(state)
+        .expect("tracing subscriber must not already be configured");
+    let capture = state.begin_capture();
+    let engine = Engine::new(EngineConfig::default());
+    engine
+        .compile_yaml(yaml)
+        .expect("valid rule should compile");
 
-    tracing::subscriber::with_default(subscriber, || {
-        let engine = Engine::new(EngineConfig::default());
-        engine
-            .compile_yaml(yaml)
-            .expect("valid rule should compile");
-    });
-
+    let trace = capture.snapshot();
     assert_eq!(
-        compile_yaml_spans.load(Ordering::Relaxed),
-        1,
+        trace.compile_yaml_spans, 1,
         "expected compile_yaml to create exactly one observable tracing span",
     );
-    assert_compile_yaml_debug_events(&debug_events);
+    assert_compile_yaml_debug_events(&trace.debug_events);
 }
 
-fn assert_compile_yaml_debug_events(debug_events: &Arc<Mutex<Vec<RecordedEvent>>>) {
-    let recorded_events = debug_events
-        .lock()
-        .expect("debug event storage should not be poisoned");
+fn assert_compile_yaml_debug_events(recorded_events: &[RecordedEvent]) {
     assert_event(
-        &recorded_events,
+        recorded_events,
         "sempai::engine",
         "yaml parsed successfully",
         &[("rules", FieldMatcher::Exact("1"))],
     );
     assert_event(
-        &recorded_events,
+        recorded_events,
         "sempai::engine",
         "principal normalized",
         &[("rule_id", FieldMatcher::Exact("demo.span"))],
     );
     assert_event(
-        &recorded_events,
+        recorded_events,
         "sempai::semantic_check",
         "semantic validation passed",
         &[("source_span", FieldMatcher::StartsWith("Some("))],
     );
-    assert_event(
-        &recorded_events,
-        "sempai::engine",
-        "query plan created",
-        &[],
-    );
+    assert_event(recorded_events, "sempai::engine", "query plan created", &[]);
 }
 
 #[derive(Debug, Clone, Copy)]

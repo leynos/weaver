@@ -1,0 +1,5 @@
+---
+source: crates/weaver-config/tests/configuration_failfast.rs
+expression: normalized_message
+---
+Configuration file error in '<TEMP>/missing.toml': extended configuration file '<TEMP>/missing.toml' does not exist (referenced from '<TEMP>/weaver.toml')

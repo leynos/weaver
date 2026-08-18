@@ -106,11 +106,12 @@ impl CallHierarchyClient for TestClient {
     );
 }
 
-fn build_graph(provider: &mut LspCallGraphProvider<TestClient>, depth: u32) -> CallGraph {
+fn build_graph(
+    provider: &mut LspCallGraphProvider<TestClient>,
+    depth: u32,
+) -> Result<CallGraph, GraphError> {
     let position = SourcePosition::new("/src/main.rs", 1, 1);
-    provider
-        .build_graph(&position, depth)
-        .expect("graph should build")
+    provider.build_graph(&position, depth)
 }
 
 fn test_build_graph_error(
@@ -138,14 +139,16 @@ fn test_build_graph_error(
 fn build_graph_depth_zero_skips_traversal() {
     let counts = Arc::new(Mutex::new(CallCounts::default()));
     let client = TestClient::new(
-        Response::Ok(Some(vec![item("main", 1, 1)])),
+        Response::Ok(Some(vec![
+            item("main", 1, 1).expect("main item should build"),
+        ])),
         Response::Err,
         Response::Err,
         Arc::clone(&counts),
     );
     let mut provider = LspCallGraphProvider::new(client);
 
-    let graph = build_graph(&mut provider, 0);
+    let graph = build_graph(&mut provider, 0).expect("depth-zero graph should build");
 
     assert_eq!(graph.node_count(), 1);
     assert_eq!(graph.edge_count(), 0);
@@ -158,14 +161,20 @@ fn build_graph_depth_zero_skips_traversal() {
 fn build_graph_collects_incoming_and_outgoing_edges() {
     let counts = Arc::new(Mutex::new(CallCounts::default()));
     let client = TestClient::new(
-        Response::Ok(Some(vec![item("main", 1, 1)])),
-        Response::Ok(Some(vec![incoming_call("caller", 3, 0)])),
-        Response::Ok(Some(vec![outgoing_call("helper", 5, 0)])),
+        Response::Ok(Some(vec![
+            item("main", 1, 1).expect("main item should build"),
+        ])),
+        Response::Ok(Some(vec![
+            incoming_call("caller", 3, 0).expect("caller item should build"),
+        ])),
+        Response::Ok(Some(vec![
+            outgoing_call("helper", 5, 0).expect("helper item should build"),
+        ])),
         Arc::clone(&counts),
     );
     let mut provider = LspCallGraphProvider::new(client);
 
-    let graph = build_graph(&mut provider, 1);
+    let graph = build_graph(&mut provider, 1).expect("graph should build");
 
     assert_eq!(graph.node_count(), 3);
     assert_eq!(graph.edge_count(), 2);
@@ -195,8 +204,12 @@ fn build_graph_collects_incoming_and_outgoing_edges() {
 fn callers_graph_uses_incoming_only() {
     let counts = Arc::new(Mutex::new(CallCounts::default()));
     let client = TestClient::new(
-        Response::Ok(Some(vec![item("main", 1, 1)])),
-        Response::Ok(Some(vec![incoming_call("caller", 3, 0)])),
+        Response::Ok(Some(vec![
+            item("main", 1, 1).expect("main item should build"),
+        ])),
+        Response::Ok(Some(vec![
+            incoming_call("caller", 3, 0).expect("caller item should build"),
+        ])),
         Response::Err,
         Arc::clone(&counts),
     );

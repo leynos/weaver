@@ -1,5 +1,7 @@
 //! Tests for legacy search syntax and basic YAML parsing.
 
+use anyhow::ensure;
+
 use super::*;
 
 #[test]
@@ -24,7 +26,8 @@ fn parse_legacy_search_rule() {
             RulePrincipal::Search(SearchQueryPrincipal::Legacy(LegacyFormula::Pattern(pattern)))
                 if pattern == "foo($X)"
         ));
-    });
+    })
+    .expect("legacy search rule should parse");
 }
 
 #[test]
@@ -49,17 +52,25 @@ fn parse_project_depends_on_search_rule() {
             }
             other => panic!("expected ProjectDependsOn principal, got {other:?}"),
         }
-    });
+    })
+    .expect("project dependency search rule should parse");
 }
 
-fn assert_schema_invalid(yaml: &str, expected_fragment: &str) {
-    let (code, message, has_span) = first_err_diagnostic(yaml);
-    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(
+fn assert_schema_invalid(yaml: &str, expected_fragment: &str) -> anyhow::Result<()> {
+    let (code, message, has_span) = first_err_diagnostic(yaml)?;
+    ensure!(
+        code == DiagnosticCode::ESempaiSchemaInvalid,
+        "expected schema-invalid diagnostic, got {code:?}"
+    );
+    ensure!(
         message.contains(expected_fragment),
         "expected diagnostic message to contain {expected_fragment:?}, got {message:?}",
     );
-    assert!(has_span);
+    ensure!(
+        has_span,
+        "expected schema diagnostic to have a primary span"
+    );
+    Ok(())
 }
 
 #[rstest]
@@ -90,7 +101,7 @@ fn assert_schema_invalid(yaml: &str, expected_fragment: &str) {
     "must define string `namespace` and `package` fields",
 )]
 fn parse_project_depends_on_invalid_cases(#[case] case_yaml: &str, #[case] case_expected: &str) {
-    assert_schema_invalid(case_yaml, case_expected);
+    assert_schema_invalid(case_yaml, case_expected).expect("rule should be schema-invalid");
 }
 
 #[test]
@@ -103,7 +114,7 @@ fn invalid_yaml_returns_yaml_parse_diagnostic() {
         "    severity: ERROR\n",
         "    pattern: [",
     );
-    let (code, _, has_span) = first_err_diagnostic(yaml);
+    let (code, _, has_span) = first_err_diagnostic(yaml).expect("YAML parse should fail");
     assert_eq!(code, DiagnosticCode::ESempaiYamlParse);
     assert!(has_span);
 }
@@ -117,7 +128,8 @@ fn missing_required_field_returns_schema_diagnostic() {
         "    severity: ERROR\n",
         "    pattern: foo($X)\n",
     );
-    let (code, message, has_span) = first_err_diagnostic(yaml);
+    let (code, message, has_span) =
+        first_err_diagnostic(yaml).expect("schema validation should fail");
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(message.contains("missing required field"));
     assert!(has_span);
@@ -142,7 +154,8 @@ fn missing_required_field_returns_schema_diagnostic() {
     "    pattern: foo($X)\n",
 ))]
 fn reject_empty_languages(#[case] yaml: &str) {
-    let (code, message, _has_span) = first_err_diagnostic(yaml);
+    let (code, message, _has_span) =
+        first_err_diagnostic(yaml).expect("schema validation should fail");
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(message.contains("field `languages` must not be empty"));
 }
@@ -161,7 +174,8 @@ fn reject_taint_rule_with_legacy_search_keys() {
         "      sources: []\n",
         "      sinks: []\n",
     );
-    let (code, message, _has_span) = first_err_diagnostic(yaml);
+    let (code, message, _has_span) =
+        first_err_diagnostic(yaml).expect("schema validation should fail");
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(
         message

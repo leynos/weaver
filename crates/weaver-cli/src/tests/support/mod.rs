@@ -338,20 +338,20 @@ pub(super) fn default_daemon_lines() -> Vec<String> {
 ///
 /// This mirrors the structure of `default_daemon_lines` so sibling test helpers
 /// can emit deterministic stdout-only sequences with a trailing exit event.
-pub(super) fn daemon_lines_for_stdout(payload: &str) -> Vec<String> {
+pub(super) fn daemon_lines_for_stdout(payload: &str) -> anyhow::Result<Vec<String>> {
     let stream = serde_json::json!({
         "kind": "stream",
         "stream": "stdout",
         "data": payload,
     });
-    vec![
-        serde_json::to_string(&stream).expect("serialize stream"),
+    Ok(vec![
+        serde_json::to_string(&stream)?,
         "{\"kind\":\"exit\",\"status\":0}".to_string(),
-    ]
+    ])
 }
 
 /// Builds a stderr stream entry plus exit record for a custom payload.
-pub(super) fn daemon_lines_for_stderr(payload: &str, status: i32) -> Vec<String> {
+pub(super) fn daemon_lines_for_stderr(payload: &str, status: i32) -> anyhow::Result<Vec<String>> {
     let stream = serde_json::json!({
         "kind": "stream",
         "stream": "stderr",
@@ -361,10 +361,10 @@ pub(super) fn daemon_lines_for_stderr(payload: &str, status: i32) -> Vec<String>
         "kind": "exit",
         "status": status,
     });
-    vec![
-        serde_json::to_string(&stream).expect("serialize stream"),
-        serde_json::to_string(&exit).expect("serialize exit"),
-    ]
+    Ok(vec![
+        serde_json::to_string(&stream)?,
+        serde_json::to_string(&exit)?,
+    ])
 }
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────

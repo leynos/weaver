@@ -192,10 +192,10 @@ fn positive_tree() -> BoxedStrategy<Decorated<Formula>> {
 
 fn first_diagnostic_code(formula: &Decorated<Formula>) -> DiagnosticCode {
     let err = validate_formula(formula).expect_err("formula should fail validation");
-    err.diagnostics()
-        .first()
-        .expect("should have diagnostic")
-        .code()
+    let Some(diagnostic) = err.diagnostics().first() else {
+        panic!("should have diagnostic");
+    };
+    diagnostic.code()
 }
 
 proptest! {

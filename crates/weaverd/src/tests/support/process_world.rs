@@ -44,13 +44,9 @@ pub struct ProcessTestWorld {
     health_history: RefCell<Vec<String>>,
 }
 
-impl Default for ProcessTestWorld {
-    fn default() -> Self { Self::new() }
-}
-
 impl ProcessTestWorld {
-    pub fn new() -> Self {
-        let loader = TestConfigLoader::new();
+    pub fn new() -> Result<Self, String> {
+        let loader = TestConfigLoader::new()?;
         let world = Self {
             loader,
             reporter: Arc::new(RecordingHealthReporter::default()),
@@ -61,9 +57,8 @@ impl ProcessTestWorld {
             wait_error: None,
             health_history: RefCell::new(Vec::new()),
         };
-        test_support::clear_health_events(world.health_path().as_path())
-            .expect("clear_health_events should succeed");
-        world
+        test_support::clear_health_events(world.health_path().as_path()).ok();
+        Ok(world)
     }
 
     pub fn start_background(&mut self) -> StepResult {
@@ -160,7 +155,7 @@ impl ProcessTestWorld {
         self.wait_error = None;
         self.health_history.borrow_mut().clear();
         self.shutdown = TestShutdownSignal::new();
-        let _ = test_support::clear_health_events(self.health_path().as_path());
+        test_support::clear_health_events(self.health_path().as_path()).ok();
     }
 
     pub fn record_wait_for_status(&mut self, expected: &str) {
@@ -222,7 +217,9 @@ impl ProcessTestWorld {
                 .any(|status| status == expected)
     }
 
-    pub fn lock_exists(&self) -> bool { fs::exists(self.lock_path()).expect("check lock file") }
+    pub fn lock_exists(&self) -> Result<bool, String> {
+        fs::exists(self.lock_path()).map_err(|error| format!("check lock file: {error}"))
+    }
 
     pub fn daemonizer_calls(&self) -> usize { self.daemonizer.calls() }
 
@@ -304,7 +301,9 @@ impl TestShutdownSignal {
 
     pub fn trigger(&self) {
         let (lock, cvar) = &*self.inner;
-        let mut triggered = lock.lock().expect("shutdown mutex poisoned");
+        let mut triggered = lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         *triggered = true;
         cvar.notify_all();
     }
@@ -313,11 +312,13 @@ impl TestShutdownSignal {
 impl ShutdownSignal for TestShutdownSignal {
     fn wait(&self) -> Result<(), ShutdownError> {
         let (lock, cvar) = &*self.inner;
-        let mut triggered = lock.lock().expect("shutdown mutex poisoned");
+        let mut triggered = lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         while !*triggered {
             triggered = cvar
                 .wait(triggered)
-                .expect("shutdown mutex poisoned during wait");
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
         }
         Ok(())
     }
@@ -327,5 +328,5 @@ pub fn snapshot_status(snapshot: &Value) -> &str {
     snapshot
         .get("status")
         .and_then(Value::as_str)
-        .expect("health snapshot should contain a status field")
+        .map_or("<missing status>", |status| status)
 }

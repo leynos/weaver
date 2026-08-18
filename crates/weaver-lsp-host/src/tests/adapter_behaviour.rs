@@ -103,10 +103,9 @@ fn when_adapter_initialized(world: &RefCell<AdapterTestWorld>) {
 fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) {
     let borrow = world.borrow();
 
-    let error = borrow
-        .last_error
-        .as_ref()
-        .expect("expected an error but got none");
+    let Some(error) = borrow.last_error.as_ref() else {
+        panic!("expected an error but got none");
+    };
 
     assert!(
         borrow.error_is_binary_not_found,
@@ -114,13 +113,13 @@ fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) {
         error
     );
 
-    let source = error
-        .source()
-        .expect("LanguageServerError is expected to wrap an AdapterError source");
+    let Some(source) = error.source() else {
+        panic!("LanguageServerError is expected to wrap an AdapterError source");
+    };
 
-    let adapter_error = source
-        .downcast_ref::<AdapterError>()
-        .expect("LanguageServerError source should be an AdapterError");
+    let Some(adapter_error) = source.downcast_ref::<AdapterError>() else {
+        panic!("LanguageServerError source should be an AdapterError");
+    };
 
     assert!(
         matches!(adapter_error, AdapterError::BinaryNotFound { .. }),
@@ -132,7 +131,9 @@ fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) {
 #[then("the error message contains the command path")]
 fn then_error_contains_command_path(world: &RefCell<AdapterTestWorld>) {
     let borrow = world.borrow();
-    let error = borrow.last_error.as_ref().expect("expected an error");
+    let Some(error) = borrow.last_error.as_ref() else {
+        panic!("expected an error");
+    };
     let error_string = error.to_string();
     // The error should mention the command that failed or language server
     assert!(

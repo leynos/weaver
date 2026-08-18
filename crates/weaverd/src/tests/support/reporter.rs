@@ -42,14 +42,14 @@ impl RecordingHealthReporter {
     pub fn events(&self) -> Vec<HealthEvent> {
         self.events
             .lock()
-            .expect("health reporter mutex poisoned")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
     }
 
     pub fn record(&self, event: HealthEvent) {
         self.events
             .lock()
-            .expect("health reporter mutex poisoned")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(event);
     }
 }

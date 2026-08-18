@@ -10,6 +10,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use anyhow::{Context, Result, ensure};
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_config::SocketEndpoint;
@@ -59,18 +60,20 @@ impl ListenerWorld {
         }
     }
 
-    fn reserve_port(&mut self) {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind reserved port");
-        let port = listener.local_addr().expect("local addr").port();
+    fn reserve_port(&mut self) -> std::io::Result<()> {
+        let listener = TcpListener::bind(("127.0.0.1", 0))?;
+        let port = listener.local_addr()?.port();
         self.endpoint = SocketEndpoint::tcp("127.0.0.1", port);
         self.reserved = Some(listener);
+        Ok(())
     }
 
-    fn connect_clients(&self, count: usize) {
-        let addr = self.address.expect("listener address should be set");
+    fn connect_clients(&self, count: usize) -> Result<()> {
+        let addr = self.address.context("listener address should be set")?;
         for _ in 0..count {
-            TcpStream::connect(addr).expect("connect client");
+            TcpStream::connect(addr)?;
         }
+        Ok(())
     }
 
     fn wait_for_connections(&self, expected: usize) -> bool {
@@ -100,23 +103,31 @@ impl Drop for ListenerWorld {
 fn world() -> RefCell<ListenerWorld> { RefCell::new(ListenerWorld::new()) }
 
 #[given("a TCP socket listener is running")]
-fn given_tcp_listener(world: &RefCell<ListenerWorld>) {
+fn given_tcp_listener(world: &RefCell<ListenerWorld>) -> Result<()> {
     world.borrow_mut().start_listener();
-    assert!(
+    ensure!(
         world.borrow().bind_error.is_none(),
         "listener start failed: {:?}",
         world.borrow().bind_error
     );
+    Ok(())
 }
 
 #[given("a TCP socket is already bound")]
-fn given_tcp_in_use(world: &RefCell<ListenerWorld>) { world.borrow_mut().reserve_port(); }
+fn given_tcp_in_use(world: &RefCell<ListenerWorld>) -> Result<()> {
+    world.borrow_mut().reserve_port()?;
+    Ok(())
+}
 
 #[when("a client connects")]
-fn when_client_connects(world: &RefCell<ListenerWorld>) { world.borrow().connect_clients(1); }
+fn when_client_connects(world: &RefCell<ListenerWorld>) -> Result<()> {
+    world.borrow().connect_clients(1)
+}
 
 #[when("two clients connect")]
-fn when_two_clients_connect(world: &RefCell<ListenerWorld>) { world.borrow().connect_clients(2); }
+fn when_two_clients_connect(world: &RefCell<ListenerWorld>) -> Result<()> {
+    world.borrow().connect_clients(2)
+}
 
 #[when("the listener starts on the same socket")]
 fn when_listener_starts_same_socket(world: &RefCell<ListenerWorld>) {
@@ -124,29 +135,31 @@ fn when_listener_starts_same_socket(world: &RefCell<ListenerWorld>) {
 }
 
 #[then("the listener records {count} connections")]
-fn then_listener_records_plural(world: &RefCell<ListenerWorld>, count: usize) {
-    assert_listener_records(world, count);
+fn then_listener_records_plural(world: &RefCell<ListenerWorld>, count: usize) -> Result<()> {
+    assert_listener_records(world, count)
 }
 
 #[then("the listener records {count} connection")]
-fn then_listener_records_singular(world: &RefCell<ListenerWorld>, count: usize) {
-    assert_listener_records(world, count);
+fn then_listener_records_singular(world: &RefCell<ListenerWorld>, count: usize) -> Result<()> {
+    assert_listener_records(world, count)
 }
 
-fn assert_listener_records(world: &RefCell<ListenerWorld>, count: usize) {
-    assert!(
+fn assert_listener_records(world: &RefCell<ListenerWorld>, count: usize) -> Result<()> {
+    ensure!(
         world.borrow().wait_for_connections(count),
         "expected {count} connections, got {}",
         world.borrow().accepted.load(Ordering::SeqCst)
     );
+    Ok(())
 }
 
 #[then("starting the listener fails")]
-fn then_listener_fails(world: &RefCell<ListenerWorld>) {
-    assert!(
+fn then_listener_fails(world: &RefCell<ListenerWorld>) -> Result<()> {
+    ensure!(
         world.borrow().bind_error.is_some(),
         "expected listener start to fail"
     );
+    Ok(())
 }
 
 #[scenario(path = "tests/features/daemon_socket.feature")]

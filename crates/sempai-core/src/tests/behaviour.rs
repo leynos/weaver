@@ -33,14 +33,15 @@ struct TestWorld {
 #[fixture]
 fn world() -> TestWorld { TestWorld::default() }
 
-#[expect(
-    clippy::expect_fun_call,
-    reason = "Test helper needs string interpolation in expect message; will be addressed when \
-              whitaker permits unwrap_or_else panic in test interpolation contexts"
-)]
 fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
-    let json = serde_json::to_string(code).expect("serialise diagnostic code");
-    serde_json::from_str(&json).expect(&format!("unrecognised diagnostic code: {code}"))
+    let serialized_code = match serde_json::to_string(code) {
+        Ok(serialized_code) => serialized_code,
+        Err(error) => panic!("diagnostic code should serialize: {error}"),
+    };
+    match serde_json::from_str(&serialized_code) {
+        Ok(diagnostic_code) => diagnostic_code,
+        Err(error) => panic!("unrecognised diagnostic code {code}: {error}"),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -71,14 +72,24 @@ fn given_report_with_constructor(
 
 #[given("a span from bytes {byte_range} at lines {line_range}")]
 fn given_span(world: &mut TestWorld, byte_range: QuotedString, line_range: QuotedString) {
-    let (start_byte, end_byte) = parse_byte_range(byte_range.as_str()).expect("valid byte range");
-    let (start_lc, end_lc) = parse_line_range(line_range.as_str()).expect("valid line range");
+    let (start_byte, end_byte) = match parse_byte_range(byte_range.as_str()) {
+        Ok(parsed_byte_range) => parsed_byte_range,
+        Err(error) => panic!("byte range should be valid: {error}"),
+    };
+    let (start_lc, end_lc) = match parse_line_range(line_range.as_str()) {
+        Ok(parsed_line_range) => parsed_line_range,
+        Err(error) => panic!("line range should be valid: {error}"),
+    };
     world.span = Some(Span::new(start_byte, end_byte, start_lc, end_lc));
 }
 
 #[given("language {name}")]
 fn given_language(world: &mut TestWorld, name: QuotedString) {
-    world.language = Some(name.as_str().parse().expect("valid language name"));
+    let language = match name.as_str().parse() {
+        Ok(language) => language,
+        Err(error) => panic!("language name should be valid: {error}"),
+    };
+    world.language = Some(language);
 }
 
 #[given("a diagnostic with code {code} and message {message}")]
@@ -103,8 +114,11 @@ fn given_not_implemented_report(world: &mut TestWorld, feature: QuotedString) {
 
 #[given("diagnostic code payload {code}")]
 fn given_diagnostic_code_payload(world: &mut TestWorld, code: QuotedString) {
-    world.diagnostic_code_payload =
-        Some(serde_json::to_string(code.as_str()).expect("serialise diagnostic code payload"));
+    let serialized_code = match serde_json::to_string(code.as_str()) {
+        Ok(serialized_code) => serialized_code,
+        Err(error) => panic!("diagnostic code payload should serialize: {error}"),
+    };
+    world.diagnostic_code_payload = Some(serialized_code);
 }
 
 // ---------------------------------------------------------------------------
@@ -113,36 +127,57 @@ fn given_diagnostic_code_payload(world: &mut TestWorld, code: QuotedString) {
 
 #[when("the span is serialized to JSON")]
 fn when_serialize_span(world: &mut TestWorld) {
-    let span = world.span.as_ref().expect("span should be set");
-    world.json_output = Some(serde_json::to_string(span).expect("serialize span"));
+    let Some(span) = world.span.as_ref() else {
+        panic!("span should be set");
+    };
+    let serialized_span = match serde_json::to_string(span) {
+        Ok(serialized_span) => serialized_span,
+        Err(error) => panic!("span should serialize: {error}"),
+    };
+    world.json_output = Some(serialized_span);
 }
 
 #[when("the language is serialized and deserialized")]
 fn when_language_round_trip(world: &mut TestWorld) {
-    let lang = world.language.expect("language should be set");
-    let json = serde_json::to_string(&lang).expect("serialize language");
-    let deserialized: Language = serde_json::from_str(&json).expect("deserialize language");
-    world.round_tripped_language = Some(deserialized);
+    let Some(language) = world.language else {
+        panic!("language should be set");
+    };
+    let serialized_language = match serde_json::to_string(&language) {
+        Ok(serialized_language) => serialized_language,
+        Err(error) => panic!("language should serialize: {error}"),
+    };
+    let deserialized_language: Language = match serde_json::from_str(&serialized_language) {
+        Ok(deserialized_language) => deserialized_language,
+        Err(error) => panic!("language should deserialize: {error}"),
+    };
+    world.round_tripped_language = Some(deserialized_language);
 }
 
 #[when("the diagnostic report is formatted")]
 fn when_format_report(world: &mut TestWorld) {
-    let report = world.report.as_ref().expect("report should be set");
+    let Some(report) = world.report.as_ref() else {
+        panic!("report should be set");
+    };
     world.formatted_output = Some(format!("{report}"));
 }
 
 #[when("the diagnostic report is serialized to JSON")]
 fn when_serialize_diagnostic_report(world: &mut TestWorld) {
-    let report = world.report.as_ref().expect("report should be set");
-    world.json_output = Some(serde_json::to_string(report).expect("serialize report"));
+    let Some(report) = world.report.as_ref() else {
+        panic!("report should be set");
+    };
+    let serialized_report = match serde_json::to_string(report) {
+        Ok(serialized_report) => serialized_report,
+        Err(error) => panic!("report should serialize: {error}"),
+    };
+    world.json_output = Some(serialized_report);
 }
 
 #[when("the diagnostic code payload is deserialized")]
 fn when_deserialize_diagnostic_code_payload(world: &mut TestWorld) {
-    let payload = world
-        .diagnostic_code_payload
-        .as_ref()
-        .expect("diagnostic code payload should be set");
+    let Some(payload) = world.diagnostic_code_payload.as_ref() else {
+        panic!("diagnostic code payload should be set");
+    };
     world.deserialization_error = serde_json::from_str::<DiagnosticCode>(payload)
         .err()
         .map(|e| e.to_string());
@@ -153,16 +188,22 @@ fn when_deserialize_diagnostic_code_payload(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 fn first_diagnostic_object(world: &TestWorld) -> serde_json::Map<String, serde_json::Value> {
-    let json = world.json_output.as_ref().expect("JSON should be set");
-    let parsed: serde_json::Value =
-        serde_json::from_str(json).expect("JSON output should be valid");
-    parsed
+    let Some(json) = world.json_output.as_ref() else {
+        panic!("JSON should be set");
+    };
+    let parsed_json: serde_json::Value = match serde_json::from_str(json) {
+        Ok(parsed_json) => parsed_json,
+        Err(error) => panic!("JSON output should be valid: {error}"),
+    };
+    let Some(diagnostic_object) = parsed_json
         .get("diagnostics")
         .and_then(serde_json::Value::as_array)
         .and_then(|diagnostics| diagnostics.first())
         .and_then(serde_json::Value::as_object)
-        .expect("first diagnostic object should exist")
-        .clone()
+    else {
+        panic!("first diagnostic object should exist");
+    };
+    diagnostic_object.clone()
 }
 
 fn assert_str_contains(haystack: &str, needle: &str, label: &str) {
@@ -172,20 +213,21 @@ fn assert_str_contains(haystack: &str, needle: &str, label: &str) {
     );
 }
 
-#[expect(
-    clippy::expect_fun_call,
-    reason = "Test step needs string interpolation in expect message; will be addressed when \
-              whitaker permits unwrap_or_else panic in test interpolation contexts"
-)]
 #[then("the JSON contains key {key} with value {value}")]
 fn then_json_contains(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
-    let json = world.json_output.as_ref().expect("JSON should be set");
-    let parsed: serde_json::Value =
-        serde_json::from_str(json).expect("JSON output should be valid");
-    let actual = parsed.get(key.as_str()).expect(&format!(
-        "expected JSON to contain key '{}', got: {json}",
-        key.as_str()
-    ));
+    let Some(json) = world.json_output.as_ref() else {
+        panic!("JSON should be set");
+    };
+    let parsed_json: serde_json::Value = match serde_json::from_str(json) {
+        Ok(parsed_json) => parsed_json,
+        Err(error) => panic!("JSON output should be valid: {error}"),
+    };
+    let Some(actual) = parsed_json.get(key.as_str()) else {
+        panic!(
+            "expected JSON to contain key '{}', got: {json}",
+            key.as_str()
+        );
+    };
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
     assert_eq!(
@@ -216,11 +258,6 @@ fn then_first_diagnostic_does_not_contain_key(world: &mut TestWorld, key: Quoted
     );
 }
 
-#[expect(
-    clippy::expect_fun_call,
-    reason = "Test step needs string interpolation in expect message; will be addressed when \
-              whitaker permits unwrap_or_else panic in test interpolation contexts"
-)]
 #[then("the first diagnostic JSON contains key {key} with value {value}")]
 fn then_first_diagnostic_contains_key_with_value(
     world: &mut TestWorld,
@@ -228,10 +265,12 @@ fn then_first_diagnostic_contains_key_with_value(
     value: QuotedString,
 ) {
     let first = first_diagnostic_object(world);
-    let actual = first.get(key.as_str()).expect(&format!(
-        "expected first diagnostic JSON to contain key '{}', got: {first:?}",
-        key.as_str()
-    ));
+    let Some(actual) = first.get(key.as_str()) else {
+        panic!(
+            "expected first diagnostic JSON to contain key '{}', got: {first:?}",
+            key.as_str()
+        );
+    };
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
     assert_eq!(
@@ -244,29 +283,29 @@ fn then_first_diagnostic_contains_key_with_value(
 
 #[then("the round-tripped language equals the original")]
 fn then_language_round_trip_equals(world: &mut TestWorld) {
-    let original = world.language.expect("original language should be set");
-    let round_tripped = world
-        .round_tripped_language
-        .expect("round-tripped language should be set");
+    let Some(original) = world.language else {
+        panic!("original language should be set");
+    };
+    let Some(round_tripped) = world.round_tripped_language else {
+        panic!("round-tripped language should be set");
+    };
     assert_eq!(original, round_tripped);
 }
 
 #[then("the formatted output contains {snippet}")]
 fn then_formatted_contains(world: &mut TestWorld, snippet: QuotedString) {
-    let output = world
-        .formatted_output
-        .as_ref()
-        .expect("formatted output should be set");
+    let Some(output) = world.formatted_output.as_ref() else {
+        panic!("formatted output should be set");
+    };
     assert_str_contains(output, snippet.as_str(), "formatted output");
 }
 
 #[then("deserialization fails with message containing {snippet}")]
 fn then_deserialization_fails(world: &mut TestWorld, snippet: QuotedString) {
-    let err = world
-        .deserialization_error
-        .as_ref()
-        .expect("deserialization error should be set");
-    assert_str_contains(err, snippet.as_str(), "deserialization error");
+    let Some(error) = world.deserialization_error.as_ref() else {
+        panic!("deserialization error should be set");
+    };
+    assert_str_contains(error, snippet.as_str(), "deserialization error");
 }
 
 // ---------------------------------------------------------------------------

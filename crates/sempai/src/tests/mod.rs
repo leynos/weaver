@@ -4,6 +4,7 @@ mod behaviour;
 mod constraint_walker_proptest;
 mod diagnostic_snapshot_tests;
 mod engine_integration_tests;
+mod engine_test_support;
 mod engine_tests;
 mod normalization_constraint_tests;
 mod normalization_metadata_tests;

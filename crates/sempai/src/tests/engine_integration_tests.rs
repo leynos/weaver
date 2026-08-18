@@ -8,10 +8,8 @@ use crate::{
     semantic_check::{reset_validate_constraints_call_count, validate_constraints_call_count},
 };
 
-fn compile_yaml(yaml: &str) -> Vec<crate::engine::QueryPlan> {
-    Engine::new(EngineConfig::default())
-        .compile_yaml(yaml)
-        .expect("should compile")
+fn compile_yaml(yaml: &str) -> Result<Vec<crate::engine::QueryPlan>, crate::DiagnosticReport> {
+    Engine::new(EngineConfig::default()).compile_yaml(yaml)
 }
 
 fn assert_pattern_formula(formula: &Decorated<Formula>, expected_text: &str) {
@@ -43,7 +41,7 @@ fn compile_yaml_decorated_metadata_reaches_queryplan() {
         "      fix: replace_me\n",
     );
 
-    let plans = compile_yaml(yaml);
+    let plans = compile_yaml(yaml).expect("decorated metadata YAML should compile");
     let formula = plans.first().expect("should have one plan").formula();
 
     assert_pattern_formula(formula, "foo($X)");
@@ -70,7 +68,7 @@ fn compile_yaml_arc_reuse_across_languages() {
         "    pattern: foo($X)\n",
     );
 
-    let plans = compile_yaml(yaml);
+    let plans = compile_yaml(yaml).expect("multi-language YAML should compile");
 
     assert_eq!(plans.len(), 2);
     let first = plans.first().expect("expected first plan");
@@ -96,7 +94,7 @@ fn compile_yaml_invokes_validate_constraints_for_where_clauses() {
 
     reset_validate_constraints_call_count();
 
-    let plans = compile_yaml(yaml);
+    let plans = compile_yaml(yaml).expect("constraint YAML should compile");
     assert!(!plans.is_empty());
     let formula = plans.first().expect("should have one plan").formula();
 

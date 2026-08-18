@@ -1,5 +1,6 @@
 //! Behaviour-driven tests for `graph-slice` schema contracts.
 
+use anyhow::{Context, Result, bail, ensure};
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_test_macros::allow_fixture_expansion_lints;
@@ -28,6 +29,26 @@ struct TestWorld {
 #[fixture]
 fn world() -> TestWorld { TestWorld::default() }
 
+fn graph_slice_args(optional_argument: Option<(&str, &str)>) -> Vec<String> {
+    let mut args = vec![
+        String::from("--uri"),
+        String::from("file:///src/main.rs"),
+        String::from("--position"),
+        String::from("10:5"),
+    ];
+    if let Some((flag, value)) = optional_argument {
+        args.extend([String::from(flag), String::from(value)]);
+    }
+    args
+}
+
+fn parse_graph_slice_request(world: &mut TestWorld, args: &[String]) {
+    match GraphSliceRequest::parse(args) {
+        Ok(request) => world.request = Some(request),
+        Err(error) => world.request_error = Some(error.to_string()),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Given steps
 // ---------------------------------------------------------------------------
@@ -43,55 +64,37 @@ fn given_truncated_response(world: &mut TestWorld) {
 }
 
 #[given("a graph-slice refusal with reason {reason}")]
-fn given_refusal(world: &mut TestWorld, reason: QuotedString) {
+fn given_refusal(world: &mut TestWorld, reason: QuotedString) -> Result<()> {
     let parsed = reason
         .as_str()
         .parse::<SliceRefusalReason>()
-        .expect("valid refusal reason");
+        .with_context(|| {
+            format!(
+                "feature file contains an invalid refusal reason: {}",
+                reason.as_str()
+            )
+        })?;
     world.response = Some(graph_slice_fixtures::sample_refusal(parsed));
+    Ok(())
 }
 
 #[given("a graph-slice request with no optional flags")]
-fn given_default_request(world: &mut TestWorld) {
-    let args = vec![
-        String::from("--uri"),
-        String::from("file:///src/main.rs"),
-        String::from("--position"),
-        String::from("10:5"),
-    ];
-    world.request = Some(GraphSliceRequest::parse(&args).expect("valid request"));
+fn given_default_request(world: &mut TestWorld) -> Result<()> {
+    let args = graph_slice_args(None);
+    world.request = Some(GraphSliceRequest::parse(&args).context("default request is valid")?);
+    Ok(())
 }
 
 #[given("a graph-slice request with edge types {types}")]
 fn given_request_with_edge_types(world: &mut TestWorld, types: QuotedString) {
-    let args = vec![
-        String::from("--uri"),
-        String::from("file:///src/main.rs"),
-        String::from("--position"),
-        String::from("10:5"),
-        String::from("--edge-types"),
-        String::from(types.as_str()),
-    ];
-    match GraphSliceRequest::parse(&args) {
-        Ok(request) => world.request = Some(request),
-        Err(error) => world.request_error = Some(error.to_string()),
-    }
+    let args = graph_slice_args(Some(("--edge-types", types.as_str())));
+    parse_graph_slice_request(world, &args);
 }
 
 #[given("a graph-slice request with depth {depth}")]
 fn given_request_with_depth(world: &mut TestWorld, depth: QuotedString) {
-    let args = vec![
-        String::from("--uri"),
-        String::from("file:///src/main.rs"),
-        String::from("--position"),
-        String::from("10:5"),
-        String::from("--depth"),
-        String::from(depth.as_str()),
-    ];
-    match GraphSliceRequest::parse(&args) {
-        Ok(request) => world.request = Some(request),
-        Err(error) => world.request_error = Some(error.to_string()),
-    }
+    let args = graph_slice_args(Some(("--depth", depth.as_str())));
+    parse_graph_slice_request(world, &args);
 }
 
 #[given("a graph-slice response with all resolution scopes")]
@@ -104,109 +107,127 @@ fn given_multi_resolution(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 #[when("the slice response is serialized to JSON")]
-fn when_response_serialized(world: &mut TestWorld) {
-    let response = world.response.as_ref().expect("response should be set");
-    world.json_output = Some(serde_json::to_string(response).expect("serialize"));
+fn when_response_serialized(world: &mut TestWorld) -> Result<()> {
+    let response = world.response.as_ref().context("response should be set")?;
+    world.json_output = Some(serde_json::to_string(response).context("serialize response")?);
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
 // Then steps
 // ---------------------------------------------------------------------------
 
-fn parse_json(world: &TestWorld) -> serde_json::Value {
-    let json = world.json_output.as_ref().expect("JSON should be set");
-    serde_json::from_str(json).expect("valid JSON")
+fn parse_json(world: &TestWorld) -> Result<serde_json::Value> {
+    let json = world.json_output.as_ref().context("JSON should be set")?;
+    serde_json::from_str(json).context("serialized response contains valid JSON")
 }
 
 fn json_pointer(field: &str) -> String { format!("/{}", field.replace('.', "/")) }
 
 #[then("the slice JSON contains a {field} field")]
-fn then_json_contains(world: &mut TestWorld, field: QuotedString) {
-    let parsed = parse_json(world);
+fn then_json_contains(world: &mut TestWorld, field: QuotedString) -> Result<()> {
+    let parsed = parse_json(world)?;
     let pointer = json_pointer(field.as_str());
-    assert!(
+    ensure!(
         parsed.pointer(&pointer).is_some(),
         "expected JSON to contain field '{}', got: {parsed}",
         field.as_str()
     );
+    Ok(())
 }
 
 #[then("the slice JSON field {key} has value {value}")]
-fn then_json_field_value(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
-    let parsed = parse_json(world);
+fn then_json_field_value(
+    world: &mut TestWorld,
+    key: QuotedString,
+    value: QuotedString,
+) -> Result<()> {
+    let parsed = parse_json(world)?;
     let pointer = json_pointer(key.as_str());
     let Some(actual) = parsed.pointer(&pointer) else {
-        panic!("expected JSON to contain key '{}'", key.as_str());
+        bail!("expected JSON to contain key '{}'", key.as_str());
     };
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(String::from(value.as_str())));
-    assert_eq!(
-        actual,
-        &expected,
+    ensure!(
+        actual == &expected,
         "expected '{}' = {:?}, got {:?}",
         key.as_str(),
         expected,
         actual
     );
+    Ok(())
 }
 
 #[then("the slice JSON field {key} is empty")]
-fn then_json_field_is_empty(world: &mut TestWorld, key: QuotedString) {
-    let parsed = parse_json(world);
+fn then_json_field_is_empty(world: &mut TestWorld, key: QuotedString) -> Result<()> {
+    let parsed = parse_json(world)?;
     let pointer = json_pointer(key.as_str());
     let Some(actual) = parsed.pointer(&pointer) else {
-        panic!("expected JSON to contain key '{}'", key.as_str());
+        bail!("expected JSON to contain key '{}'", key.as_str());
     };
     match actual {
         serde_json::Value::Array(arr) if arr.is_empty() => {}
         serde_json::Value::Object(obj) if obj.is_empty() => {}
         serde_json::Value::String(s) if s.is_empty() => {}
         serde_json::Value::Null => {}
-        other => panic!("expected '{}' to be empty, got {:?}", key.as_str(), other),
+        other => bail!("expected '{}' to be empty, got {other:?}", key.as_str()),
     }
+    Ok(())
 }
 
 #[then("the depth is {depth}")]
-fn then_depth_is(world: &mut TestWorld, depth: QuotedString) {
-    let request = world.request.as_ref().expect("request should be set");
-    let expected: u32 = depth.as_str().parse().expect("valid u32 in feature file");
-    assert_eq!(request.depth(), expected);
+fn then_depth_is(world: &mut TestWorld, depth: QuotedString) -> Result<()> {
+    let request = world.request.as_ref().context("request should be set")?;
+    let expected = depth
+        .as_str()
+        .parse::<u32>()
+        .context("feature file contains a valid u32 depth")?;
+    ensure!(request.depth() == expected, "expected depth {expected}");
+    Ok(())
 }
 
 #[then("the direction is {direction}")]
-fn then_direction_is(world: &mut TestWorld, direction: QuotedString) {
-    let request = world.request.as_ref().expect("request should be set");
-    let expected: crate::SliceDirection = direction
+fn then_direction_is(world: &mut TestWorld, direction: QuotedString) -> Result<()> {
+    let request = world.request.as_ref().context("request should be set")?;
+    let expected = direction
         .as_str()
-        .parse()
-        .expect("valid direction in feature file");
-    assert_eq!(request.direction(), expected);
+        .parse::<crate::SliceDirection>()
+        .context("feature file contains a valid direction")?;
+    ensure!(
+        request.direction() == expected,
+        "expected direction {expected:?}"
+    );
+    Ok(())
 }
 
 #[then("the edge types include {edge_type}")]
-fn then_edge_types_include(world: &mut TestWorld, edge_type: QuotedString) {
-    let request = world.request.as_ref().expect("request should be set");
-    let expected: SliceEdgeType = edge_type
+fn then_edge_types_include(world: &mut TestWorld, edge_type: QuotedString) -> Result<()> {
+    let request = world.request.as_ref().context("request should be set")?;
+    let expected = edge_type
         .as_str()
-        .parse()
-        .expect("valid edge type in feature file");
-    assert!(
+        .parse::<SliceEdgeType>()
+        .context("feature file contains a valid edge type")?;
+    ensure!(
         request.edge_types().contains(&expected),
         "expected edge types to include {:?}, got: {:?}",
         expected,
         request.edge_types()
     );
+    Ok(())
 }
 
 #[then("the edge types are {types}")]
-fn then_edge_types_are(world: &mut TestWorld, types: QuotedString) {
-    let request = world.request.as_ref().expect("request should be set");
+fn then_edge_types_are(world: &mut TestWorld, types: QuotedString) -> Result<()> {
+    let request = world.request.as_ref().context("request should be set")?;
     let expected: Vec<SliceEdgeType> = types
         .as_str()
         .split(',')
-        .map(|s| s.trim().parse().expect("valid edge type"))
-        .collect();
-    assert_eq!(request.edge_types(), &expected);
+        .map(|edge_type| edge_type.trim().parse::<SliceEdgeType>())
+        .collect::<std::result::Result<_, _>>()
+        .context("feature file contains valid edge types")?;
+    ensure!(request.edge_types() == expected, "unexpected edge types");
+    Ok(())
 }
 
 #[then("the request is rejected")]
@@ -218,25 +239,30 @@ fn then_request_rejected(world: &mut TestWorld) {
 }
 
 #[then("the response contains edge with resolution_scope {scope}")]
-fn then_response_contains_resolution_scope(world: &mut TestWorld, scope: QuotedString) {
-    let parsed = parse_json(world);
+fn then_response_contains_resolution_scope(
+    world: &mut TestWorld,
+    scope: QuotedString,
+) -> Result<()> {
+    let parsed = parse_json(world)?;
     let edges = parsed
         .get("edges")
         .and_then(|v| v.as_array())
-        .expect("edges array");
+        .context("response contains an edges array")?;
     let expected_scope = scope
         .as_str()
         .parse::<ResolutionScope>()
-        .expect("valid resolution scope");
-    let serialized = serde_json::to_string(&expected_scope).expect("serialize");
+        .context("feature file contains a valid resolution scope")?;
+    let serialized =
+        serde_json::to_string(&expected_scope).context("serialize resolution scope")?;
     let expected_str = serialized.trim_matches('"');
     let found = edges
         .iter()
         .any(|edge| edge.get("resolution_scope").and_then(|v| v.as_str()) == Some(expected_str));
-    assert!(
+    ensure!(
         found,
         "expected to find edge with resolution_scope '{expected_str}'"
     );
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

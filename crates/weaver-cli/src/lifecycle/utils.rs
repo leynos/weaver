@@ -129,8 +129,10 @@ mod tests {
     /// 1. The "Waiting for daemon start..." message is written to stderr
     /// 2. A LaunchDaemon error is propagated
     #[rstest]
-    fn try_auto_start_daemon_failure_behaviour(temp_paths: (TempDir, RuntimePaths)) {
-        let (dir, _paths) = temp_paths;
+    fn try_auto_start_daemon_failure_behaviour(
+        temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
+    ) -> anyhow::Result<()> {
+        let (dir, _paths) = temp_paths?;
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
                 dir.path()
@@ -159,6 +161,7 @@ mod tests {
             matches!(error, LifecycleError::LaunchDaemon { .. }),
             "expected LaunchDaemon error, got: {error:?}"
         );
+        Ok(())
     }
 
     /// Success path: try_auto_start_daemon spawns daemon and returns Ok when
@@ -169,8 +172,10 @@ mod tests {
     /// returns Ok(()) when the daemon becomes ready.
     #[cfg(unix)]
     #[rstest]
-    fn try_auto_start_daemon_succeeds_when_ready(temp_paths: (TempDir, RuntimePaths)) {
-        let (dir, _paths) = temp_paths;
+    fn try_auto_start_daemon_succeeds_when_ready(
+        temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
+    ) -> anyhow::Result<()> {
+        let (dir, _paths) = temp_paths?;
         let health_path = dir.path().join("weaverd.health");
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
@@ -206,6 +211,7 @@ mod tests {
             output.contains("Waiting for daemon start..."),
             "expected waiting message, got: {output:?}"
         );
+        Ok(())
     }
 
     /// Timeout path: try_auto_start_daemon returns StartupTimeout when daemon
@@ -216,8 +222,10 @@ mod tests {
     #[cfg(unix)]
     #[ignore = "takes 30 seconds due to AUTO_START_TIMEOUT"]
     #[rstest]
-    fn try_auto_start_daemon_times_out_when_daemon_slow(temp_paths: (TempDir, RuntimePaths)) {
-        let (dir, _paths) = temp_paths;
+    fn try_auto_start_daemon_times_out_when_daemon_slow(
+        temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
+    ) -> anyhow::Result<()> {
+        let (dir, _paths) = temp_paths?;
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
                 dir.path()
@@ -250,5 +258,6 @@ mod tests {
             output.contains("Waiting for daemon start..."),
             "expected waiting message, got: {output:?}"
         );
+        Ok(())
     }
 }

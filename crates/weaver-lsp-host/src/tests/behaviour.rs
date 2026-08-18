@@ -190,10 +190,9 @@ fn when_python_references(world: &RefCell<TestWorld>) {
 #[then("rust capabilities are available from the server")]
 fn then_rust_capabilities(world: &RefCell<TestWorld>) {
     let borrow = world.borrow();
-    let summary = borrow
-        .last_capabilities
-        .as_ref()
-        .expect("capabilities missing");
+    let Some(summary) = borrow.last_capabilities.as_ref() else {
+        panic!("capabilities missing");
+    };
 
     for state in summary.states() {
         assert!(
@@ -244,10 +243,9 @@ fn then_override_succeeds(world: &RefCell<TestWorld>) {
         "diagnostics should propagate"
     );
 
-    let summary = borrow
-        .host
-        .capabilities(Language::TypeScript)
-        .expect("capability summary missing");
+    let Some(summary) = borrow.host.capabilities(Language::TypeScript) else {
+        panic!("capability summary missing");
+    };
     let diagnostics = summary.state(CapabilityKind::Diagnostics);
     assert_eq!(diagnostics.source, CapabilitySource::ForcedOverride);
 }
@@ -270,10 +268,9 @@ fn then_missing_capability(world: &RefCell<TestWorld>) {
 }
 #[then("python recorded only initialisation")]
 fn then_python_calls(world: &RefCell<TestWorld>) {
-    let calls = world
-        .borrow()
-        .calls(Language::Python)
-        .expect("calls missing");
+    let Some(calls) = world.borrow().calls(Language::Python) else {
+        panic!("calls missing");
+    };
     assert_eq!(calls, [CallKind::Initialise]);
 }
 #[then("typescript recorded a diagnostics call")]
@@ -290,7 +287,9 @@ fn then_document_sync_error(world: &RefCell<TestWorld>) {
 }
 fn assert_call_recorded(world: &RefCell<TestWorld>, language: Language, kind: CallKind) {
     let borrow = world.borrow();
-    let calls = borrow.calls(language).expect("missing calls for language");
+    let Some(calls) = borrow.calls(language) else {
+        panic!("missing calls for language");
+    };
     assert!(
         calls.contains(&kind),
         "expected to record {kind:?} for {language}, got {calls:?}"

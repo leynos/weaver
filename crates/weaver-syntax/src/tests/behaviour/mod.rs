@@ -82,7 +82,11 @@ fn strip_quotes(s: &str) -> &str { s.trim_matches('"') }
 fn given_language(world: &RefCell<TestWorld>, language: String) {
     let mut w = world.borrow_mut();
     let language_str = strip_quotes(&language);
-    w.language = Some(SupportedLanguage::from_str(language_str).expect("language"));
+    let parsed_language = match SupportedLanguage::from_str(language_str) {
+        Ok(parsed_language) => parsed_language,
+        Err(error) => panic!("language should parse: {error}"),
+    };
+    w.language = Some(parsed_language);
 }
 
 #[given("a file {filename} with content {content}")]
@@ -100,18 +104,29 @@ fn given_rust_source(world: &RefCell<TestWorld>, code: String) {
     w.language = Some(SupportedLanguage::Rust);
     let source_code = strip_quotes(&code);
 
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser init");
-    let parsed = parser.parse(source_code).expect("parse");
-    w.parsed_source = Some(parsed);
+    let mut parser = match Parser::new(SupportedLanguage::Rust) {
+        Ok(parser) => parser,
+        Err(error) => panic!("parser should initialise: {error}"),
+    };
+    let parsed_source = match parser.parse(source_code) {
+        Ok(parsed_source) => parsed_source,
+        Err(error) => panic!("source should parse: {error}"),
+    };
+    w.parsed_source = Some(parsed_source);
 }
 
 #[given("a pattern {pattern}")]
 fn given_pattern(world: &RefCell<TestWorld>, pattern: String) {
     let mut w = world.borrow_mut();
     let pat = strip_quotes(&pattern);
-    let language = w.language.expect("language should be set");
-    let compiled = Pattern::compile(pat, language).expect("pattern compile");
-    w.pattern = Some(compiled);
+    let Some(language) = w.language else {
+        panic!("language should be set");
+    };
+    let compiled_pattern = match Pattern::compile(pat, language) {
+        Ok(compiled_pattern) => compiled_pattern,
+        Err(error) => panic!("pattern should compile: {error}"),
+    };
+    w.pattern = Some(compiled_pattern);
 }
 
 #[given("a rewrite rule from {from_pattern} to {to_replacement}")]
@@ -119,9 +134,15 @@ fn given_rewrite_rule(world: &RefCell<TestWorld>, from_pattern: String, to_repla
     let mut w = world.borrow_mut();
     let from_pat = strip_quotes(&from_pattern);
     let to_repl = strip_quotes(&to_replacement);
-    let language = w.language.expect("language should be set");
+    let Some(language) = w.language else {
+        panic!("language should be set");
+    };
+    let compiled_pattern = match Pattern::compile(from_pat, language) {
+        Ok(compiled_pattern) => compiled_pattern,
+        Err(error) => panic!("pattern should compile: {error}"),
+    };
     // Store the pattern and replacement for later use
-    w.pattern = Some(Pattern::compile(from_pat, language).expect("pattern"));
+    w.pattern = Some(compiled_pattern);
     w.replacement = Some(to_repl.to_owned());
 }
 
@@ -134,14 +155,14 @@ fn when_validate_single_file(world: &RefCell<TestWorld>) {
     let mut w = world.borrow_mut();
     let lock = TreeSitterSyntacticLock::new();
 
-    let (path, content) = w
-        .files
-        .first()
-        .expect("world should have at least one file to validate");
-    let failures = lock
-        .validate_file(path, content)
-        .expect("syntactic lock validation should succeed");
-    w.validation_failures = failures;
+    let Some((path, content)) = w.files.first() else {
+        panic!("world should have at least one file to validate");
+    };
+    let validation_failures = match lock.validate_file(path, content) {
+        Ok(validation_failures) => validation_failures,
+        Err(error) => panic!("syntactic lock validation should succeed: {error}"),
+    };
+    w.validation_failures = validation_failures;
 }
 
 #[when("the syntactic lock validates all files")]
@@ -154,24 +175,25 @@ fn when_validate_all_files(world: &RefCell<TestWorld>) {
         .iter()
         .map(|(p, c)| (p.as_path(), c.as_str()))
         .collect();
-    let failures = lock.validate_files(files).expect("validate");
-    w.validation_failures = failures;
+    let validation_failures = match lock.validate_files(files) {
+        Ok(validation_failures) => validation_failures,
+        Err(error) => panic!("syntactic lock validation should succeed: {error}"),
+    };
+    w.validation_failures = validation_failures;
 }
 
 #[when("the pattern is matched against the source")]
 fn when_match_pattern(world: &RefCell<TestWorld>) {
     let mut w = world.borrow_mut();
 
-    let parsed = w
-        .parsed_source
-        .as_ref()
-        .expect("parsed source should be set before matching");
-    let pattern = w
-        .pattern
-        .as_ref()
-        .expect("pattern should be set before matching");
+    let Some(parsed_source) = w.parsed_source.as_ref() else {
+        panic!("parsed source should be set before matching");
+    };
+    let Some(pattern) = w.pattern.as_ref() else {
+        panic!("pattern should be set before matching");
+    };
 
-    let results = pattern.find_all(parsed);
+    let results = pattern.find_all(parsed_source);
     w.matches = results.iter().map(MatchResultSnapshot::from).collect();
 }
 
@@ -180,28 +202,34 @@ fn when_apply_rewrite(world: &RefCell<TestWorld>) {
     let mut w = world.borrow_mut();
 
     // Get the pattern and source for rewriting
-    let language = w.language.expect("language should be set");
-    let source_text = w
+    let Some(language) = w.language else {
+        panic!("language should be set");
+    };
+    let Some(source_text) = w
         .parsed_source
         .as_ref()
-        .map(|p| p.source().to_owned())
-        .expect("parsed source should be set before applying rewrite");
-    let pat = w
-        .pattern
-        .take()
-        .expect("pattern should be set before applying rewrite");
-    let replacement = w
-        .replacement
-        .take()
-        .expect("replacement should be set before applying rewrite");
+        .map(|parsed_source| parsed_source.source().to_owned())
+    else {
+        panic!("parsed source should be set before applying rewrite");
+    };
+    let Some(pattern) = w.pattern.take() else {
+        panic!("pattern should be set before applying rewrite");
+    };
+    let Some(replacement) = w.replacement.take() else {
+        panic!("replacement should be set before applying rewrite");
+    };
 
     // Apply the rewrite
     let rewriter = Rewriter::new(language);
-    let rule = RewriteRule::new(pat, &replacement).expect("rewrite rule should build");
-    let result = rewriter
-        .apply(&rule, &source_text)
-        .expect("rewrite should apply");
-    w.rewrite_result = Some(result);
+    let rewrite_rule = match RewriteRule::new(pattern, &replacement) {
+        Ok(rewrite_rule) => rewrite_rule,
+        Err(error) => panic!("rewrite rule should build: {error}"),
+    };
+    let rewrite_result = match rewriter.apply(&rewrite_rule, &source_text) {
+        Ok(rewrite_result) => rewrite_result,
+        Err(error) => panic!("rewrite should apply: {error}"),
+    };
+    w.rewrite_result = Some(rewrite_result);
 }
 
 // =============================================================================
@@ -292,7 +320,9 @@ fn then_capture_contains(world: &RefCell<TestWorld>, name: String, expected: Str
 fn then_output_contains(world: &RefCell<TestWorld>, text: String) {
     let w = world.borrow();
     let expected_text = strip_quotes(&text);
-    let result = w.rewrite_result.as_ref().expect("rewrite result");
+    let Some(result) = w.rewrite_result.as_ref() else {
+        panic!("rewrite result should be set");
+    };
     assert!(
         result.output().contains(expected_text),
         "Expected output to contain '{expected_text}', got: {}",
@@ -303,13 +333,17 @@ fn then_output_contains(world: &RefCell<TestWorld>, text: String) {
 #[then("the rewrite made changes")]
 fn then_rewrite_changed(world: &RefCell<TestWorld>) {
     let w = world.borrow();
-    let result = w.rewrite_result.as_ref().expect("rewrite result");
+    let Some(result) = w.rewrite_result.as_ref() else {
+        panic!("rewrite result should be set");
+    };
     assert!(result.has_changes(), "Expected rewrite to make changes");
 }
 
 #[then("the rewrite made no changes")]
 fn then_rewrite_unchanged(world: &RefCell<TestWorld>) {
     let w = world.borrow();
-    let result = w.rewrite_result.as_ref().expect("rewrite result");
+    let Some(result) = w.rewrite_result.as_ref() else {
+        panic!("rewrite result should be set");
+    };
     assert!(!result.has_changes(), "Expected rewrite to make no changes");
 }

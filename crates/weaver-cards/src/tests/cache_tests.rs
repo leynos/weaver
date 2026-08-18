@@ -23,16 +23,17 @@ fn rust_path() -> &'static Path { Path::new("/tmp/weaver-cards-tests/cache.rs") 
 
 fn rust_source(name: &str) -> String { format!("fn {name}() -> usize {{\n    1\n}}\n") }
 
-fn extract_card(extractor: &TreeSitterCardExtractor, source: &str) -> crate::SymbolCard {
-    extractor
-        .extract(CardExtractionInput {
-            path: rust_path(),
-            source,
-            line: 1,
-            column: 4,
-            detail: DetailLevel::Structure,
-        })
-        .expect("card extraction should succeed")
+fn extract_card(
+    extractor: &TreeSitterCardExtractor,
+    source: &str,
+) -> Result<crate::SymbolCard, crate::CardExtractionError> {
+    extractor.extract(CardExtractionInput {
+        path: rust_path(),
+        source,
+        line: 1,
+        column: 4,
+        detail: DetailLevel::Structure,
+    })
 }
 
 #[rstest]
@@ -81,8 +82,10 @@ fn zero_capacity_cache_panics() { drop(CardCache::new(0)); }
 #[rstest]
 fn content_change_invalidates_cache() {
     let extractor = TreeSitterCardExtractor::with_cache_capacity(8);
-    let first = extract_card(&extractor, &rust_source("greet"));
-    let second = extract_card(&extractor, &rust_source("welcome"));
+    let first = extract_card(&extractor, &rust_source("greet"))
+        .expect("first card extraction should succeed");
+    let second = extract_card(&extractor, &rust_source("welcome"))
+        .expect("second card extraction should succeed");
 
     assert_ne!(first.etag, second.etag);
     assert_eq!(extractor.cache_len(), 1);
@@ -186,8 +189,8 @@ fn cache_preserves_extraction_timestamp() {
     let extractor = TreeSitterCardExtractor::with_cache_capacity(8);
     let source = rust_source("greet");
 
-    let first = extract_card(&extractor, &source);
-    let second = extract_card(&extractor, &source);
+    let first = extract_card(&extractor, &source).expect("first card extraction should succeed");
+    let second = extract_card(&extractor, &source).expect("second card extraction should succeed");
 
     assert_eq!(
         first.provenance.extracted_at,
@@ -231,9 +234,11 @@ fn cache_correctness_after_invalidation() {
     let original_source = rust_source("greet");
     let updated_source = rust_source("welcome");
 
-    let original = extract_card(&extractor, &original_source);
+    let original = extract_card(&extractor, &original_source)
+        .expect("original card extraction should succeed");
     extractor.invalidate_path(rust_path());
-    let updated = extract_card(&extractor, &updated_source);
+    let updated =
+        extract_card(&extractor, &updated_source).expect("updated card extraction should succeed");
 
     assert_ne!(
         original.symbol.symbol_ref.name,
@@ -250,11 +255,11 @@ fn extractor_reuses_parser_and_cache_for_identical_requests() {
     let parser_before = extractor
         .parser_identity(SupportedLanguage::Rust)
         .expect("parser identity should resolve");
-    let _ = extract_card(&extractor, &source);
+    extract_card(&extractor, &source).expect("first card extraction should succeed");
     let parser_after_first = extractor
         .parser_identity(SupportedLanguage::Rust)
         .expect("parser identity should resolve");
-    let _ = extract_card(&extractor, &source);
+    extract_card(&extractor, &source).expect("second card extraction should succeed");
     let parser_after_second = extractor
         .parser_identity(SupportedLanguage::Rust)
         .expect("parser identity should resolve");
@@ -282,10 +287,15 @@ fn identical_concurrent_requests_only_parse_once() {
         })
         .collect();
 
-    let cards: Vec<_> = handles
+    let extraction_results = handles
         .into_iter()
-        .map(|handle| handle.join().expect("thread should complete"))
-        .collect();
+        .map(std::thread::JoinHandle::join)
+        .collect::<std::thread::Result<Vec<_>>>()
+        .expect("all extraction threads should complete");
+    let cards = extraction_results
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .expect("concurrent card extractions should succeed");
 
     let first = cards.first().expect("first card should exist");
     let second = cards.get(1).expect("second card should exist");
