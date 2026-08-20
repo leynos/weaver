@@ -230,6 +230,7 @@ fn given_empty_python_fixture(world: &GetCardWorldFixture) -> Result<()> {
         .write_fixture("empty", "empty.py", "")
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[when("an observe get-card request is sent for the Rust fixture")]
 fn when_request_rust_fixture(world: &GetCardWorldFixture) -> Result<()> {
     get_card_world(world)?
@@ -242,6 +243,7 @@ fn when_request_rust_fixture(world: &GetCardWorldFixture) -> Result<()> {
         })
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[when("an observe get-card semantic request is sent for the Rust fixture")]
 fn when_request_rust_fixture_semantic(world: &GetCardWorldFixture) -> Result<()> {
     get_card_world(world)?
@@ -254,6 +256,7 @@ fn when_request_rust_fixture_semantic(world: &GetCardWorldFixture) -> Result<()>
         })
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[when("an observe get-card request is sent for the unsupported fixture")]
 fn when_request_unsupported_fixture(world: &GetCardWorldFixture) -> Result<()> {
     get_card_world(world)?
@@ -266,6 +269,7 @@ fn when_request_unsupported_fixture(world: &GetCardWorldFixture) -> Result<()> {
         })
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[when("an observe get-card request is sent for the empty Python fixture")]
 fn when_request_empty_fixture(world: &GetCardWorldFixture) -> Result<()> {
     get_card_world(world)?
@@ -293,6 +297,7 @@ fn when_rewrite_rust_fixture(world: &GetCardWorldFixture, name: String) -> Resul
         .rewrite_fixture("rust", &source)
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[then(r#"the stdout response contains "{fragment}""#)]
 fn then_stdout_contains(world: &GetCardWorldFixture, fragment: String) -> Result<()> {
     let state = get_card_world(world)?;
@@ -316,6 +321,7 @@ fn then_exit_status(world: &GetCardWorldFixture, status: i32) -> Result<()> {
     Ok(())
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[then("both responses are identical")]
 fn then_both_responses_identical(world: &GetCardWorldFixture) -> Result<()> {
     let state = get_card_world(world)?;
@@ -328,6 +334,7 @@ fn then_both_responses_identical(world: &GetCardWorldFixture) -> Result<()> {
     Ok(())
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[then(r#"the latest stdout response contains "{fragment}""#)]
 fn then_latest_stdout_contains(world: &GetCardWorldFixture, fragment: String) -> Result<()> {
     let state = get_card_world(world)?;
@@ -340,6 +347,7 @@ fn then_latest_stdout_contains(world: &GetCardWorldFixture, fragment: String) ->
     Ok(())
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[then("the latest stdout response differs from the first response")]
 fn then_latest_response_differs(world: &GetCardWorldFixture) -> Result<()> {
     let state = get_card_world(world)?;
