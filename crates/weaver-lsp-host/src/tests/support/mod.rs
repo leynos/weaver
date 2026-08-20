@@ -40,6 +40,18 @@ fn sample_text_document() -> Result<TextDocumentIdentifier> {
     Ok(TextDocumentIdentifier { uri: sample_uri()? })
 }
 
+/// Builds the sample document position shared by positional requests.
+///
+/// # Errors
+///
+/// Returns an error if the sample URI fails to parse.
+fn sample_text_document_position_params() -> Result<TextDocumentPositionParams> {
+    Ok(TextDocumentPositionParams {
+        text_document: sample_text_document()?,
+        position: lsp_types::Position::new(1, 2),
+    })
+}
+
 /// Builds a definition request for the sample URI.
 ///
 /// # Errors
@@ -47,10 +59,7 @@ fn sample_text_document() -> Result<TextDocumentIdentifier> {
 /// Returns an error if the sample URI fails to parse.
 pub fn definition_params() -> Result<GotoDefinitionParams> {
     Ok(GotoDefinitionParams {
-        text_document_position_params: TextDocumentPositionParams {
-            text_document: sample_text_document()?,
-            position: lsp_types::Position::new(1, 2),
-        },
+        text_document_position_params: sample_text_document_position_params()?,
         work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
         partial_result_params: lsp_types::PartialResultParams::default(),
     })
@@ -63,10 +72,7 @@ pub fn definition_params() -> Result<GotoDefinitionParams> {
 /// Returns an error if the sample URI fails to parse.
 pub fn reference_params() -> Result<ReferenceParams> {
     Ok(ReferenceParams {
-        text_document_position: TextDocumentPositionParams {
-            text_document: sample_text_document()?,
-            position: lsp_types::Position::new(1, 2),
-        },
+        text_document_position: sample_text_document_position_params()?,
         work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
         partial_result_params: lsp_types::PartialResultParams::default(),
         context: ReferenceContext {
