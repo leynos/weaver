@@ -56,61 +56,86 @@ fn assert_no_daemon_start_text(output: &PreflightOutput) {
     }
 }
 
-/// Pure predicate: does `stderr` match the unknown-domain guidance template
-/// for `domain`, without leaking known-domain operation guidance?
-fn unknown_domain_guidance_matches(stderr: &str, domain: &str) -> anyhow::Result<()> {
-    anyhow::ensure!(
-        stderr.contains(&format!("error: unknown domain '{domain}'")),
-        "stderr should report unknown domain {domain:?}\nstderr:\n{stderr}"
-    );
-    anyhow::ensure!(
-        stderr.contains("Valid domains: observe, act, verify"),
-        "stderr should list valid domains\nstderr:\n{stderr}"
-    );
-    anyhow::ensure!(
-        !stderr.contains("Available operations:"),
-        "stderr should not contain known-domain operation guidance\nstderr:\n{stderr}"
-    );
-    anyhow::ensure!(
-        stderr.contains("Next command:"),
-        "unknown domain must include Next command line\nstderr:\n{stderr}"
-    );
-    Ok(())
+/// Expected shape of one flavour of preflight guidance: the error line it must
+/// carry, plus the fragments that must and must not accompany it.
+///
+/// Describing each flavour as data keeps a single validation algorithm below,
+/// rather than one near-identical predicate per flavour.
+struct GuidanceTemplate {
+    /// Names the flavour in failure messages, such as `unknown-domain guidance`.
+    description: &'static str,
+    error_line: String,
+    required_fragments: &'static [&'static str],
+    forbidden_fragments: &'static [&'static str],
 }
 
-fn assert_unknown_domain_preflight(output: &PreflightOutput, domain: &str) {
-    assert_preflight_failure(output);
-    if let Err(error) = unknown_domain_guidance_matches(&output.stderr, domain) {
-        panic!("unknown-domain guidance must match the expected template: {error}");
+/// Guidance expected when the domain itself is not recognised.
+///
+/// Operation guidance is forbidden because it would imply the domain was
+/// valid.
+fn unknown_domain_guidance_template(domain: &str) -> GuidanceTemplate {
+    GuidanceTemplate {
+        description: "unknown-domain guidance",
+        error_line: format!("error: unknown domain '{domain}'"),
+        required_fragments: &["Valid domains: observe, act, verify", "Next command:"],
+        forbidden_fragments: &["Available operations:"],
     }
 }
 
-/// Pure predicate: does `stderr` match the known-domain missing-operation
-/// guidance template for `domain`, without leaking unknown-domain guidance?
-fn known_domain_operation_guidance_matches(stderr: &str, domain: &str) -> anyhow::Result<()> {
+/// Guidance expected when the domain is known but the operation is missing.
+///
+/// Domain listings and suggestions are forbidden because the domain was
+/// understood.
+fn known_domain_operation_guidance_template(domain: &str) -> GuidanceTemplate {
+    GuidanceTemplate {
+        description: "known-domain missing-operation guidance",
+        error_line: format!("error: operation required for domain '{domain}'"),
+        required_fragments: &["Available operations:"],
+        forbidden_fragments: &["Valid domains:", "Did you mean"],
+    }
+}
+
+/// Checks `stderr` against `template`, reporting the first unmet expectation.
+///
+/// # Errors
+/// Returns the failing expectation, named by the template description and
+/// accompanied by the offending transcript.
+fn guidance_matches(stderr: &str, template: GuidanceTemplate) -> anyhow::Result<()> {
+    let GuidanceTemplate {
+        description,
+        error_line,
+        required_fragments,
+        forbidden_fragments,
+    } = template;
+
     anyhow::ensure!(
-        stderr.contains(&format!("error: operation required for domain '{domain}'")),
-        "stderr should report missing operation for domain {domain:?}\nstderr:\n{stderr}"
+        stderr.contains(&error_line),
+        "{description} should report {error_line:?}\nstderr:\n{stderr}"
     );
-    anyhow::ensure!(
-        stderr.contains("Available operations:"),
-        "stderr should list available operations\nstderr:\n{stderr}"
-    );
-    anyhow::ensure!(
-        !stderr.contains("Valid domains:"),
-        "stderr should not contain unknown-domain guidance\nstderr:\n{stderr}"
-    );
-    anyhow::ensure!(
-        !stderr.contains("Did you mean"),
-        "stderr should not contain domain suggestions\nstderr:\n{stderr}"
-    );
+
+    for &fragment in required_fragments {
+        anyhow::ensure!(
+            stderr.contains(fragment),
+            "{description} should contain {fragment:?}\nstderr:\n{stderr}"
+        );
+    }
+
+    for &fragment in forbidden_fragments {
+        anyhow::ensure!(
+            !stderr.contains(fragment),
+            "{description} should not contain {fragment:?}\nstderr:\n{stderr}"
+        );
+    }
+
     Ok(())
 }
 
-fn assert_known_domain_operation_guidance(output: &PreflightOutput, domain: &str) {
+/// Panic boundary: fails the calling test when `output` is not a preflight
+/// failure carrying the guidance `template` describes.
+fn assert_preflight_guidance(output: &PreflightOutput, template: GuidanceTemplate) {
     assert_preflight_failure(output);
-    if let Err(error) = known_domain_operation_guidance_matches(&output.stderr, domain) {
-        panic!("known-domain guidance must match the expected template: {error}");
+    if let Err(error) = guidance_matches(&output.stderr, template) {
+        panic!("preflight guidance must match the expected template: {error}");
     }
 }
 
@@ -172,7 +197,7 @@ fn known_domain_without_operation_emits_contextual_guidance() {
     let output =
         run_with_panicking_loader(&["observe"]).expect("guidance command output must be UTF-8");
 
-    assert_known_domain_operation_guidance(&output, "observe");
+    assert_preflight_guidance(&output, known_domain_operation_guidance_template("observe"));
     assert!(output.stderr.contains("get-definition"));
     assert!(output.stderr.contains("get-card"));
     assert!(
@@ -207,7 +232,7 @@ fn unknown_domain_preflight_guidance(
 ) {
     let output = run_with_panicking_loader(args).expect("guidance command output must be UTF-8");
 
-    assert_unknown_domain_preflight(&output, domain);
+    assert_preflight_guidance(&output, unknown_domain_guidance_template(domain));
     assert_three_part_template(&output, "Valid domains: observe, act, verify")
         .expect("unknown-domain guidance must follow the three-part template");
 
