@@ -1540,7 +1540,7 @@ Each workspace state owns caches, the committed revision, language-server
 lifecycle, and mutation coordination. Its lifecycle is explicit: creation is
 single-flight, active leases prevent eviction, draining refuses new work, and
 retirement occurs only after outstanding leases finish or are cancelled within
-a bounded shutdown policy. Server and workspace budgets are independent so
+a bounded shutdown policy. Server and workspace budgets are independent, so
 evicting one idle server does not require discarding all workspace metadata.
 
 Admission is bounded at daemon, workspace, and server scopes. Whenever the

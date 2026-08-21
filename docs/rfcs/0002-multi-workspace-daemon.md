@@ -173,7 +173,7 @@ The daemon rejects a locator that:
 - conflicts with a workspace identity already being retired.
 
 Canonicalization collapses ordinary relative components and supported symlink
-aliases so the same repository does not gain duplicate mutable state. The
+aliases, so the same repository does not gain duplicate mutable state. The
 implementation must use capability-oriented directory access rather than
 treating the canonical string as filesystem authority.
 
@@ -225,7 +225,7 @@ struct WorkspaceState {
 
 The manager lock protects only lookup, insertion, retirement marking, and
 removal. An `Arc<WorkspaceState>` remains valid after the manager releases its
-lock. Workspace creation must be single-flight so simultaneous first requests
+lock. Workspace creation must be single-flight, so simultaneous first requests
 do not create duplicate pools.
 
 Workspace-owned caches include any state whose correctness depends on paths,
@@ -256,7 +256,7 @@ current identity may receive new leases.
 
 `ServerRootsFingerprint` captures the process working directory, the initial
 `rootUri`, and the ordered `workspaceFolders` used to launch and initialize a
-server. Launch and protocol initialization derive from the same fingerprint so
+server. Launch and protocol initialization derive from the same fingerprint, so
 the server cannot be reused under a different root topology.
 
 The fingerprint includes only environment variables declared relevant by the
@@ -289,13 +289,14 @@ directory. If the selected toolchain lacks `rust-analyzer`, Weaver returns a
 structured `unavailable` result with installation guidance. It does not
 silently fall back to another toolchain.
 
-A directly configured executable remains supported. In that case the adapter
+A directly configured executable remains supported. In that case, the adapter
 fingerprints the configured command, resolved executable, arguments, selected
 environment, and server configuration instead of inventing a rustup identity.
 
-Before reusing an idle Rust server, the pool revalidates the execution identity
-when a watched input changes or the bounded freshness marker expires. A changed
-identity retires the old server and starts a replacement. Relevant inputs
+When a watched input changes or the bounded freshness marker expires, the pool
+marks the current server stale, issues no new leases, drains active leases,
+retires the server, and starts a replacement. Before reusing an idle Rust
+server, the pool still revalidates the execution identity. Relevant inputs
 include `rust-toolchain`, `rust-toolchain.toml`, `.cargo/config`,
 `.cargo/config.toml`, Weaver configuration, and configured adapter inputs.
 
@@ -391,7 +392,7 @@ Server: absent -> starting -> ready -> unhealthy -> draining -> stopped
 
 Health checks detect child exit, transport failure, initialization failure, and
 repeated request timeout. Restart uses bounded exponential backoff and a
-circuit breaker so a broken server cannot create an unbounded spawn loop.
+circuit breaker, so a broken server cannot create an unbounded spawn loop.
 
 Idle eviction applies separately to server processes and workspace state. A
 workspace with active requests, open documents, a mutation lease, or a server
@@ -473,7 +474,7 @@ lines are excluded from telemetry by default.
 
 Weaver is pre-0.1.0, so the request schema may make workspace identity required
 without preserving an indefinitely ambiguous fallback. Migration should still
-be staged so each pull request has an observable compatibility boundary.
+be staged, so each pull request has an observable compatibility boundary.
 
 ### 8.1. Stage one: ratify contracts
 
