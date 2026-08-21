@@ -13,7 +13,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      WHITAKER_INSTALLER_REV: 764d5a3199fa2999ae979255e467c9d96fd65780
+      WHITAKER_REV: 2bc0c3fafb86914f14bd73461a511588841f0a34
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -58,11 +58,12 @@ jobs:
         run: |
           cargo install --locked \
             --git https://github.com/leynos/whitaker \
-            --rev "${WHITAKER_INSTALLER_REV}" \
+            --rev "${WHITAKER_REV}" \
             whitaker-installer
-          # Test Whitaker's cranelift support from the pinned fix revision
-          # instead of installing rustc-codegen-cranelift separately here.
-          whitaker-installer --cranelift
+          whitaker_source_dir="${XDG_DATA_HOME:-${HOME}/.local/share}/whitaker"
+          git clone https://github.com/leynos/whitaker "${whitaker_source_dir}"
+          git -C "${whitaker_source_dir}" checkout --detach "${WHITAKER_REV}"
+          whitaker-installer --build-only --no-update --cranelift
       - name: Lint
         run: make lint
       - name: Workflow contract tests

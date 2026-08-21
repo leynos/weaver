@@ -9,6 +9,7 @@ import pytest
 
 
 SCRIPTS = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = SCRIPTS.parent
 PROHIBITED = "hand" + "-written"
 TITLE_PROHIBITED = "Hand" + "-written"
 SECOND_PROHIBITED = "spell" + "-checked"
@@ -46,14 +47,24 @@ def test_checker_boundaries_ignores_exclusions(
     initialize(
         tmp_path,
         {
-            "README.md": (f"{PROHIBITED}\n{TITLE_PROHIBITED} prose\n`{PROHIBITED}`\n"),
+            "README.md": (
+                f"{PROHIBITED}\n"
+                f"{TITLE_PROHIBITED} prose\n"
+                f"`{PROHIBITED}`\n"
+                f"`prefix\n{PROHIBITED}\nsuffix`\n"
+                f"``prefix `{PROHIBITED}` suffix``\n"
+                f"```prefix ``{PROHIBITED}`` suffix```\n"
+            ),
             "skip.md": f"{PROHIBITED}\n",
             "joined.md": "pre-hand" + "-written\n",
         },
     )
+    local_policy = rollout.load_dictionary(
+        REPOSITORY_ROOT / "typos.local.toml", local_overlay=True
+    )
     policy = rollout.Dictionary(
         phrase_corrections=((PROHIBITED, "handwritten"),),
-        ignore_patterns=(r"`[^`\n]+`",),
+        ignore_patterns=local_policy.ignore_patterns,
         excluded_files=("skip.md",),
     )
 
