@@ -161,8 +161,8 @@ fn valid_request_returns_success_and_echoed_constraints(
     assert_eq!(payload["constraints"]["node_detail"], "semantic");
     assert_eq!(payload["spillover"]["truncated"], false);
     assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "increment");
-    let first_symbol_ids = symbol_ids(&payload["cards"]).expect("first payload cards");
-    let second_symbol_ids = symbol_ids(&second_payload["cards"]).expect("second payload cards");
+    let first_symbol_ids = symbol_ids(&payload["cards"])?;
+    let second_symbol_ids = symbol_ids(&second_payload["cards"])?;
     assert!(first_symbol_ids.len() >= 2);
     assert_eq!(first_symbol_ids, second_symbol_ids);
     Ok(())
@@ -212,10 +212,8 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
     let kept_symbol_id = payload["cards"][0]["symbol"]["symbol_id"]
         .as_str()
         .expect("kept symbol_id should be a string");
-    let first_frontier =
-        frontier_ids(&payload["spillover"]["frontier"]).expect("first payload frontier");
-    let second_frontier =
-        frontier_ids(&second_payload["spillover"]["frontier"]).expect("second payload frontier");
+    let first_frontier = frontier_ids(&payload["spillover"]["frontier"])?;
+    let second_frontier = frontier_ids(&second_payload["spillover"]["frontier"])?;
     assert!(!first_frontier.contains(&kept_symbol_id));
     assert_eq!(first_frontier, second_frontier);
     assert_spillover_truncated_with_frontier(&payload);

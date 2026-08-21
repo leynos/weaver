@@ -13,11 +13,12 @@ use super::*;
 use crate::{dispatch::request::CommandRequest, tests::support::fs as test_fs};
 
 fn make_request(domain: &str, operation: &str) -> Result<CommandRequest, String> {
-    let json = format!(
-        r#"{{"command":{{"domain":"{}","operation":"{}"}}}}"#,
-        domain, operation
-    );
-    CommandRequest::parse(json.as_bytes()).map_err(|error| format!("test request: {error}"))
+    let payload = serde_json::json!({
+        "command": {"domain": domain, "operation": operation},
+    });
+    let json =
+        serde_json::to_vec(&payload).map_err(|error| format!("serialise test request: {error}"))?;
+    CommandRequest::parse(&json).map_err(|error| format!("test request: {error}"))
 }
 
 fn build_backends() -> FusionBackends<SemanticBackendProvider> {
@@ -184,14 +185,12 @@ fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBack
     let path = temp_dir.path().join("empty.py");
     test_fs::write(&path, "").expect("write fixture");
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let json = format!(
-        concat!(
-            "{{\"command\":{{\"domain\":\"observe\",\"operation\":\"get-card\"}},",
-            "\"arguments\":[\"--uri\",\"{uri}\",\"--position\",\"1:1\"]}}"
-        ),
-        uri = uri,
-    );
-    let request = CommandRequest::parse(json.as_bytes()).expect("test request");
+    let payload = serde_json::json!({
+        "command": {"domain": "observe", "operation": "get-card"},
+        "arguments": ["--uri", uri, "--position", "1:1"],
+    });
+    let json = serde_json::to_vec(&payload).expect("serialise test request");
+    let request = CommandRequest::parse(&json).expect("test request");
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
     let result = router

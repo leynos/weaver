@@ -3,8 +3,7 @@
 //! Every helper here propagates failure to the calling test so panics stay in
 //! test bodies, where the reported line number is useful.
 
-use std::path::PathBuf;
-
+use camino::Utf8PathBuf;
 use rstest::fixture;
 use serde_json::Value;
 use tempfile::TempDir;
@@ -41,26 +40,22 @@ pub(crate) fn write_source(
     temp_dir: &TempDir,
     name: &str,
     content: &str,
-) -> Result<PathBuf, std::io::Error> {
+) -> Result<Utf8PathBuf, String> {
     let path = temp_dir.path().join(name);
-    test_fs::write(&path, content)?;
+    let path = Utf8PathBuf::from_path_buf(path)
+        .map_err(|path| format!("fixture path should be UTF-8: {path:?}"))?;
+    test_fs::write(&path, content).map_err(|error| error.to_string())?;
     Ok(path)
 }
 
 pub(crate) fn make_request(arguments: &[&str]) -> Result<CommandRequest, String> {
-    let args_json: Vec<String> = arguments
-        .iter()
-        .map(|s| format!("\"{}\"", s.replace('"', "\\\"")))
-        .collect();
-    let json = format!(
-        concat!(
-            "{{\"command\":{{\"domain\":\"observe\",",
-            "\"operation\":\"graph-slice\"}},",
-            "\"arguments\":[{}]}}"
-        ),
-        args_json.join(",")
-    );
-    CommandRequest::parse(json.as_bytes()).map_err(|error| format!("request: {error}"))
+    let payload = serde_json::json!({
+        "command": {"domain": "observe", "operation": "graph-slice"},
+        "arguments": arguments,
+    });
+    let json =
+        serde_json::to_vec(&payload).map_err(|error| format!("serialise request: {error}"))?;
+    CommandRequest::parse(&json).map_err(|error| format!("request: {error}"))
 }
 
 pub(crate) fn response_payload(output: Vec<u8>) -> Result<Value, String> {
@@ -116,8 +111,7 @@ pub(crate) struct SourceRequest<'a> {
 
 /// Writes the fixture and builds the request that targets it.
 pub(crate) fn prepare_request(source: &SourceRequest<'_>) -> Result<CommandRequest, String> {
-    let path = write_source(source.temp_dir, source.filename, source.content)
-        .map_err(|error| error.to_string())?;
+    let path = write_source(source.temp_dir, source.filename, source.content)?;
     let uri = Url::from_file_path(&path)
         .map_err(|()| "file uri".to_string())?
         .to_string();

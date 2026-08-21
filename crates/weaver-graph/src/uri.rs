@@ -96,13 +96,16 @@ mod tests {
         assert_eq!(path.as_str(), "http://example.com/path");
     }
 
+    #[cfg(not(windows))]
     #[test]
-    fn uri_to_path_handles_malformed_file_uri() {
-        // Malformed URIs that start with file:// but fail URL parsing
-        // should still work via the fallback path stripping
-        let uri = Uri::from_str("file:///valid/path.rs").expect("valid file URI should parse");
+    fn uri_to_path_falls_back_when_to_file_path_rejects_host() {
+        // A file:// URI with a non-empty, non-localhost host parses fine as a
+        // URL, but `Url::to_file_path()` rejects such a host on non-Windows
+        // platforms. That forces `uri_to_path` past the primary URL-based
+        // conversion and into the manual "file://" prefix-stripping fallback.
+        let uri = Uri::from_str("file://host/path.rs").expect("valid file URI should parse");
         let path = uri_to_path(&uri);
-        assert_eq!(path.as_str(), "/valid/path.rs");
+        assert_eq!(path.as_str(), "host/path.rs");
     }
 
     #[test]

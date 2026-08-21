@@ -14,6 +14,12 @@
 /// This module is available only when the `test-support` feature is enabled.
 #[cfg(feature = "test-support")]
 pub mod fixture_contract;
+/// Error type shared by the `rename-symbol` fixture contract and fixture
+/// support modules.
+///
+/// This module is available only when the `test-support` feature is enabled.
+#[cfg(feature = "test-support")]
+pub mod fixture_error;
 pub mod reason_code;
 pub mod rename_symbol;
 /// Shared test fixtures and validation helpers for capability contract tests.

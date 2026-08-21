@@ -3,8 +3,7 @@
 //! Every helper propagates failure to the calling test so panics stay in test
 //! bodies, where the reported line number identifies the failing case.
 
-use std::path::PathBuf;
-
+use camino::Utf8PathBuf;
 use rstest::fixture;
 use serde_json::Value;
 use tempfile::TempDir;
@@ -53,8 +52,13 @@ pub(crate) struct SourceFile<'a> {
     pub(crate) content: &'a str,
 }
 
-pub(crate) fn write_source(temp_dir: &TempDir, file: SourceFile<'_>) -> Result<PathBuf, String> {
+pub(crate) fn write_source(
+    temp_dir: &TempDir,
+    file: SourceFile<'_>,
+) -> Result<Utf8PathBuf, String> {
     let path = temp_dir.path().join(file.name);
+    let path = Utf8PathBuf::from_path_buf(path)
+        .map_err(|path| format!("fixture path should be UTF-8: {path:?}"))?;
     test_fs::write(&path, file.content).map_err(|error| format!("write source: {error}"))?;
     Ok(path)
 }

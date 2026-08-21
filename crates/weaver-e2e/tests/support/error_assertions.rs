@@ -13,20 +13,30 @@ pub(crate) fn error_message<T, E: Display>(outcome: Result<T, E>) -> Option<Stri
     outcome.err().map(|error| error.to_string())
 }
 
-/// Asserts `outcome` failed with a message mentioning `expected_substring`.
+/// Checks `outcome` failed with a message mentioning `expected_substring`.
 ///
 /// `subject` names the rejected input so a failure identifies the offending
 /// case without the reader having to count `#[case]` attributes.
+///
+/// # Errors
+/// Returns a description of the mismatch when `outcome` succeeded or when its
+/// error message does not mention `expected_substring`. Callers in `#[test]`
+/// bodies turn that into a panic, keeping the panic out of shared support.
 pub(crate) fn assert_error_mentions<T, E: Display>(
     outcome: Result<T, E>,
     subject: &str,
     expected_substring: &str,
-) {
+) -> Result<(), String> {
     let Some(message) = error_message(outcome) else {
-        panic!("expected {subject} to be rejected, but it succeeded");
+        return Err(format!(
+            "expected {subject} to be rejected, but it succeeded"
+        ));
     };
-    assert!(
-        message.contains(expected_substring),
-        "error for {subject} should mention '{expected_substring}': {message}"
-    );
+    if message.contains(expected_substring) {
+        Ok(())
+    } else {
+        Err(format!(
+            "error for {subject} should mention '{expected_substring}': {message}"
+        ))
+    }
 }

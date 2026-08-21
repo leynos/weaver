@@ -141,11 +141,10 @@ fn given_default_source(world: &ApplyPatchWorldFixture) -> Result<()> {
 }
 
 #[given("an empty workspace")]
-#[expect(
-    unused_variables,
-    reason = "BDD step intentionally relies on the default empty workspace"
-)]
-fn given_empty_workspace(world: &ApplyPatchWorldFixture) {}
+fn given_empty_workspace(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?;
+    Ok(())
+}
 
 #[given("a patch that replaces the main message")]
 fn given_patch_replace(world: &ApplyPatchWorldFixture) -> Result<()> {

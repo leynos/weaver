@@ -5,7 +5,7 @@
 
 use serde_json::json;
 
-use super::fixture_contract::FixtureError;
+use super::fixture_error::FixtureError;
 use crate::{
     capability::{CapabilityContract, ReasonCode, RenameSymbolContract},
     error::PluginError,

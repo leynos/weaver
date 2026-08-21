@@ -950,9 +950,10 @@ access:
 - `rename_symbol_request_fixtures()` / `rename_symbol_response_fixtures()` —
   the canonical fixture collections consumed by plugin contract tests.
 - `rename_symbol_request_fixture_named(name)` /
-  `rename_symbol_response_fixture_named(name)` — look up a single named request
-  or response fixture by key and panic when the requested fixture name is
-  unknown.
+  `rename_symbol_response_fixture_named(name)` — look up a single named
+  request or response fixture by key and return `Result<_, FixtureError>`
+  instead of panicking; a miss yields `FixtureError::Missing { kind, name }`,
+  where `kind` is `"request"` or `"response"`.
 - `validate_rename_symbol_request_fixture(fixture)` /
   `validate_rename_symbol_response_fixture(fixture)` — run contract validation
   without panicking and return `Result<(), PluginError>` so callers can inspect
@@ -963,22 +964,38 @@ access:
   `Result<(), FixtureError>`, so callers assert (and panic, if desired) at the
   test boundary rather than inside the shared helper.
 
+`FixtureError` (re-exported as `weaver_plugins::FixtureError`) is the shared
+error type for these fallible helpers. It carries three variants:
+`Missing { kind, name }` for an unknown fixture name, `UnexpectedSuccess {
+kind, name }` for a fixture that was expected to fail contract validation but
+did not, and `ContractMismatch { message }` for a validation failure. It
+derives `thiserror::Error`, so it converts cleanly into `anyhow::Error` at a
+`?`-propagating test boundary.
+
 ```toml
 [dev-dependencies]
 weaver-plugins = { path = "../weaver-plugins", features = ["test-support"] }
 ```
 
-Typical lookup and validation usage:
+Typical lookup and validation usage, propagating lookup failures with `?` at
+a `Result`-returning test boundary:
 
 ```rust
+use anyhow::Result;
 use weaver_plugins::{
     rename_symbol_request_fixture_named, validate_rename_symbol_request_fixture,
 };
 
-let fixture = rename_symbol_request_fixture_named("valid_request");
-let result = validate_rename_symbol_request_fixture(&fixture);
-assert!(result.is_ok(), "fixture should satisfy the shared contract");
+fn fixture_satisfies_contract() -> Result<()> {
+    let fixture = rename_symbol_request_fixture_named("valid_request")?;
+    let result = validate_rename_symbol_request_fixture(&fixture);
+    assert!(result.is_ok(), "fixture should satisfy the shared contract");
+    Ok(())
+}
 ```
+
+Prefer `.expect("valid_request fixture should exist")` in place of `?` when
+the surrounding test function does not return a `Result`.
 
 ### `FakeDaemon` (`weaver-e2e/tests/test_support/daemon_harness.rs`)
 

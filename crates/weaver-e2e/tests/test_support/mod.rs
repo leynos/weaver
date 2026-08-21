@@ -31,7 +31,7 @@ use weaverd::{
     SemanticBackendProvider,
 };
 
-use crate::{fixture_io::write_fixture_path, weaver_binary::weaver_binary_path};
+use crate::{fixture_io::write_fixture_path, weaver_binary::resolve_or_build_weaver_binary_path};
 
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
@@ -58,7 +58,10 @@ impl TestDaemon {
     pub(crate) fn start(expected_requests: usize) -> Self {
         // Resolve (and if necessary build) the CLI before the daemon starts
         // serving, so a missing binary fails with a clear message up front.
-        let _binary = required_result(weaver_binary_path(), "locate weaver binary");
+        let _binary = required_result(
+            resolve_or_build_weaver_binary_path(),
+            "locate weaver binary",
+        );
         let listener = required_result(TcpListener::bind(("127.0.0.1", 0)), "bind test listener");
         let address = required_result(listener.local_addr(), "listener address");
         let config = Config {
@@ -132,7 +135,10 @@ pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
 /// `command` is the sanitised display form recorded in the snapshot, with the
 /// ephemeral endpoint and temporary paths already replaced by placeholders.
 pub(crate) fn run_cli(command: String, cli_args: &[String]) -> Transcript {
-    let binary = required_result(weaver_binary_path(), "locate weaver binary");
+    let binary = required_result(
+        resolve_or_build_weaver_binary_path(),
+        "locate weaver binary",
+    );
     let output = required_result(
         assert_cmd::Command::new(binary).args(cli_args).output(),
         "CLI should execute",

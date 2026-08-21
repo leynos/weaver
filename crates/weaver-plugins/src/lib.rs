@@ -64,7 +64,6 @@ mod tests;
 /// this crate.
 #[cfg(feature = "test-support")]
 pub use self::capability::fixture_contract::{
-    FixtureError,
     assert_rename_symbol_request_fixture_contract,
     assert_rename_symbol_response_fixture_contract,
     assert_shared_request_fixtures_match_contract,
@@ -72,6 +71,12 @@ pub use self::capability::fixture_contract::{
     error_mentions_fragment,
     expect_fixture_error,
 };
+/// Error type raised while resolving or checking a shared contract fixture.
+///
+/// Enable the `test-support` feature to make this type available outside
+/// this crate.
+#[cfg(feature = "test-support")]
+pub use self::capability::fixture_error::FixtureError;
 /// Shared `rename-symbol` fixture types and fixture collections used by
 /// downstream plugin tests.
 ///

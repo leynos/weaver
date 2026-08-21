@@ -7,15 +7,17 @@ use std::{
     sync::OnceLock,
 };
 
-/// Returns the resolved path to the `weaver` binary used by e2e tests.
+/// Resolves the `weaver` binary used by e2e tests, building it if necessary.
 ///
-/// Resolution (which may build the binary) runs once per test process; the
-/// outcome — success or failure — is cached so that every caller sees the same
-/// answer and can decide how to report it.
+/// This is not a pure lookup: when no prebuilt binary can be found, it shells
+/// out to `cargo build -p weaver-cli --bin weaver`, writing build artefacts
+/// into the workspace target directory. The build runs at most once per test
+/// process because the outcome — success or failure — is cached, so every
+/// caller sees the same answer and can decide how to report it.
 ///
 /// # Errors
 /// Returns a description of why the binary could not be located or built.
-pub(crate) fn weaver_binary_path() -> Result<&'static Path, &'static str> {
+pub(crate) fn resolve_or_build_weaver_binary_path() -> Result<&'static Path, &'static str> {
     static WEAVER_BINARY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
     match WEAVER_BINARY.get_or_init(resolve_weaver_binary) {
         Ok(path) => Ok(path.as_path()),

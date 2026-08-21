@@ -56,6 +56,8 @@ pub struct TestWorld {
     configs: Vec<TestServerConfig>,
     /// Host instance under test.
     pub host: LspHost,
+    /// Capability overrides currently applied to `host`.
+    active_overrides: weaver_config::CapabilityMatrix,
     handles: HashMap<Language, RecordingServerHandle>,
     /// Last error observed while exercising the host.
     pub last_error: Option<LspHostError>,
@@ -114,7 +116,8 @@ impl TestWorld {
     pub fn empty(overrides: weaver_config::CapabilityMatrix) -> Self {
         Self {
             configs: Vec::new(),
-            host: LspHost::new(overrides),
+            host: LspHost::new(overrides.clone()),
+            active_overrides: overrides,
             handles: HashMap::new(),
             last_error: None,
             last_definition: None,
@@ -138,6 +141,12 @@ impl TestWorld {
         world.configs = configs;
         world.rebuild_host(overrides)?;
         Ok(world)
+    }
+
+    /// Returns the capability overrides currently applied to the host.
+    #[must_use]
+    pub fn active_overrides(&self) -> weaver_config::CapabilityMatrix {
+        self.active_overrides.clone()
     }
 
     /// Returns the recorded call sequence for the specified language.
@@ -217,7 +226,7 @@ impl TestWorld {
     ) -> Result<(), LspHostError> {
         // Build the replacement host and handle map in locals so a mid-loop
         // registration failure leaves the world untouched rather than torn.
-        let mut new_host = LspHost::new(overrides);
+        let mut new_host = LspHost::new(overrides.clone());
         let mut new_handles: HashMap<Language, RecordingServerHandle> = HashMap::new();
 
         for config in &self.configs {
@@ -239,6 +248,7 @@ impl TestWorld {
 
         self.host = new_host;
         self.handles = new_handles;
+        self.active_overrides = overrides;
         self.last_error = None;
         self.last_definition = None;
         self.last_references = None;

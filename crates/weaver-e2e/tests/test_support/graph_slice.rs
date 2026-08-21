@@ -20,17 +20,10 @@ pub(crate) struct GraphSliceRequest<'a> {
 /// Executes `weaver observe graph-slice` via the test daemon and returns a `Transcript`.
 pub(crate) fn run_graph_slice(daemon: &TestDaemon, request: GraphSliceRequest<'_>) -> Transcript {
     let position = format!("{}:{}", request.line, request.column);
-    let mut command = format!(
-        concat!(
-            "weaver --daemon-socket tcp://<daemon-endpoint> --output json ",
-            "observe graph-slice --uri <uri> --position {} ",
-            "--entry-detail {} --node-detail {}"
-        ),
-        position, request.entry_detail, request.node_detail
-    );
+    let endpoint = daemon.endpoint();
     let mut cli_args = vec![
         String::from("--daemon-socket"),
-        daemon.endpoint(),
+        endpoint.clone(),
         String::from("--output"),
         String::from("json"),
         String::from("observe"),
@@ -45,11 +38,31 @@ pub(crate) fn run_graph_slice(daemon: &TestDaemon, request: GraphSliceRequest<'_
         String::from(request.node_detail),
     ];
     if let Some(max_cards) = request.max_cards {
-        command.push_str(" --max-cards ");
-        command.push_str(&max_cards.to_string());
         cli_args.push(String::from("--max-cards"));
         cli_args.push(max_cards.to_string());
     }
 
+    let command = display_command(&cli_args, &endpoint, request.uri);
     run_cli(command, &cli_args)
+}
+
+/// Renders `cli_args` as the sanitised `command` string recorded in snapshots.
+///
+/// The ephemeral daemon endpoint and the temporary fixture URI are the only
+/// run-varying arguments, so each is swapped for a stable placeholder. Deriving
+/// the display form from the real arguments keeps the two in step by
+/// construction.
+fn display_command(cli_args: &[String], endpoint: &str, uri: &str) -> String {
+    let mut command = String::from("weaver");
+    for argument in cli_args {
+        command.push(' ');
+        if argument == endpoint {
+            command.push_str("tcp://<daemon-endpoint>");
+        } else if argument == uri {
+            command.push_str("<uri>");
+        } else {
+            command.push_str(argument);
+        }
+    }
+    command
 }

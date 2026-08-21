@@ -289,7 +289,7 @@ fn then_dispatch_error_contains(
 }
 
 #[scenario(path = "tests/features/refactor.feature")]
-fn refactor_behaviour(#[from(world)] world: RefactorWorldFixture) { let _ = world; }
+fn refactor_behaviour(#[from(world)] _: RefactorWorldFixture) {}
 
 fn read_routed_target(world: &RefactorWorld) -> Result<String, String> {
     let target_file = world.target_file()?;

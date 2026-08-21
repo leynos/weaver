@@ -43,9 +43,12 @@ pub(super) fn automatic_resolution_payload(file: &Path) -> Option<String> {
                     "selected_provider": "rust-analyzer",
                     "selection_mode": "automatic",
                     "outcome": "selected",
+                    // Candidate order mirrors the daemon's alphabetical sort by
+                    // provider name, so `rope` precedes `rust-analyzer` even
+                    // though `rust-analyzer` is the selected provider.
                     "candidates": [
-                        { "provider": "rust-analyzer", "accepted": true, "reason": "matched_language_and_capability" },
-                        { "provider": "rope", "accepted": false, "reason": "unsupported_language" }
+                        { "provider": "rope", "accepted": false, "reason": "unsupported_language" },
+                        { "provider": "rust-analyzer", "accepted": true, "reason": "matched_language_and_capability" }
                     ]
                 }
             })

@@ -6,7 +6,7 @@ Transcript {
     command: "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --refactoring rename --file src/main.rs --position 1:4 new_name=renamed_name",
     status: 0,
     stdout: "{\"files_deleted\":0,\"files_written\":1,\"status\":\"ok\"}",
-    stderr: "{\"details\":{\"candidates\":[{\"accepted\":true,\"provider\":\"rust-analyzer\",\"reason\":\"matched_language_and_capability\"},{\"accepted\":false,\"provider\":\"rope\",\"reason\":\"unsupported_language\"}],\"capability\":\"rename-symbol\",\"language\":\"rust\",\"outcome\":\"selected\",\"selected_provider\":\"rust-analyzer\",\"selection_mode\":\"automatic\"},\"status\":\"ok\",\"type\":\"CapabilityResolution\"}",
+    stderr: "{\"details\":{\"candidates\":[{\"accepted\":false,\"provider\":\"rope\",\"reason\":\"unsupported_language\"},{\"accepted\":true,\"provider\":\"rust-analyzer\",\"reason\":\"matched_language_and_capability\"}],\"capability\":\"rename-symbol\",\"language\":\"rust\",\"outcome\":\"selected\",\"selected_provider\":\"rust-analyzer\",\"selection_mode\":\"automatic\"},\"status\":\"ok\",\"type\":\"CapabilityResolution\"}",
     requests: [
         Object {
             "arguments": Array [

@@ -55,13 +55,14 @@ mod weaver_binary_resolver;
 /// Returns the path to the compiled `weaver` binary for use in end-to-end
 /// tests.
 ///
-/// This wrapper keeps the test support API stable for modules that already
-/// import it.
+/// This wrapper keeps the `daemon_harness::weaver_binary_path` module path
+/// stable for modules that already import it; callers receive an
+/// `io::Result<PathBuf>` from the underlying resolver.
 ///
 /// # Errors
 /// Returns an `io::Error` if the `weaver` binary cannot be located.
 pub fn weaver_binary_path() -> io::Result<std::path::PathBuf> {
-    weaver_binary_resolver::weaver_binary_path()
+    weaver_binary_resolver::resolve_or_build_weaver_binary_path()
         .map(std::path::Path::to_path_buf)
         .map_err(io::Error::other)
 }

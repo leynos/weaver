@@ -70,14 +70,18 @@ fn test_rewrite(case: RewriteTestCase<'_>, snapshot_name: &str) -> Result<(), Te
     Ok(())
 }
 
-/// Asserts that a rewrite case fails with an expected error substring.
-fn assert_rewrite_error(case: RewriteTestCase<'_>, expected_substring: &str) {
+/// Checks that a rewrite case fails with an expected error substring.
+///
+/// # Errors
+/// Returns a description of the mismatch when the rewrite succeeds or when its
+/// error does not mention `expected_substring`.
+fn assert_rewrite_error(case: RewriteTestCase<'_>, expected_substring: &str) -> Result<(), String> {
     let outcome = apply_rewrite(case.source, case.pattern, case.replacement, case.language);
     assert_error_mentions(
         outcome,
         &format!("pattern `{}`", case.pattern),
         expected_substring,
-    );
+    )
 }
 
 /// Macro to generate a snapshot-based rewrite test.
@@ -113,7 +117,11 @@ macro_rules! rewrite_error_test {
                     language: $language,
                 },
                 $expected,
-            );
+            )
+            .expect(concat!(
+                stringify!($name),
+                ": rewrite should fail mentioning the expected error"
+            ));
         }
     };
 }

@@ -35,10 +35,11 @@ fn world() -> RefCell<TestWorld> {
     RefCell::new(initial)
 }
 
-/// Replaces the world with one built from `configs`.
+/// Replaces the world with one built from `configs`, preserving any
+/// capability overrides already applied to the current world.
 fn install_world(world: &RefCell<TestWorld>, configs: Vec<TestServerConfig>) -> Result<()> {
-    let rebuilt = TestWorld::new(configs, CapabilityMatrix::default())
-        .context("stub servers should register")?;
+    let overrides = world.borrow().active_overrides();
+    let rebuilt = TestWorld::new(configs, overrides).context("stub servers should register")?;
     *world.borrow_mut() = rebuilt;
     Ok(())
 }
