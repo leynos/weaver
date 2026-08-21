@@ -44,6 +44,28 @@ fn make_legacy_patterns_with_constraints<const N: usize>(constraints: [Value; N]
     )
 }
 
+fn assert_schema_invalid_report(
+    report: &sempai_core::DiagnosticReport,
+    expected_message: &str,
+) -> Result<(), String> {
+    let code = first_diagnostic_code(report)?;
+    if code != DiagnosticCode::ESempaiSchemaInvalid {
+        return Err(format!("expected schema-invalid code, got {code}"));
+    }
+    let message = report
+        .diagnostics()
+        .first()
+        .ok_or("expected diagnostic")?
+        .message();
+    if message.contains(expected_message) {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected diagnostic message to contain {expected_message:?}, got {message:?}"
+        ))
+    }
+}
+
 fn assert_schema_invalid_normalization(
     constraint: Value,
     expected_message: &str,
@@ -55,21 +77,7 @@ fn assert_schema_invalid_normalization(
         return Err(String::from("known malformed constraint should fail"));
     };
 
-    let code = first_diagnostic_code(&report)?;
-    if code != DiagnosticCode::ESempaiSchemaInvalid {
-        return Err(format!("expected schema-invalid code, got {code}"));
-    }
-    let message = report
-        .diagnostics()
-        .first()
-        .ok_or("expected diagnostic")?
-        .message();
-    if !message.contains(expected_message) {
-        return Err(format!(
-            "expected diagnostic message to contain {expected_message:?}, got {message:?}"
-        ));
-    }
-    Ok(())
+    assert_schema_invalid_report(&report, expected_message)
 }
 
 fn assert_missing_positive_term_in_and_for_decorated(
@@ -93,21 +101,7 @@ fn assert_compile_yaml_schema_invalid(yaml: &str, expected_message: &str) -> Res
         return Err(String::from("malformed known constraint should fail"));
     };
 
-    let code = first_diagnostic_code(&report)?;
-    if code != DiagnosticCode::ESempaiSchemaInvalid {
-        return Err(format!("expected schema-invalid code, got {code}"));
-    }
-    let message = report
-        .diagnostics()
-        .first()
-        .ok_or("expected diagnostic")?
-        .message();
-    if !message.contains(expected_message) {
-        return Err(format!(
-            "expected diagnostic message to contain {expected_message:?}, got {message:?}"
-        ));
-    }
-    Ok(())
+    assert_schema_invalid_report(&report, expected_message)
 }
 
 #[test]

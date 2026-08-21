@@ -209,6 +209,49 @@ fn assert_str_contains(haystack: &str, needle: &str, label: &str) -> Result<(), 
     }
 }
 
+fn expected_json_value(value: &str) -> serde_json::Value {
+    serde_json::from_str(value).unwrap_or_else(|_| serde_json::Value::String(value.to_owned()))
+}
+
+fn assert_json_contains_key_with_value(
+    json: &serde_json::Value,
+    key: &str,
+    value: &str,
+    label: &str,
+) -> Result<(), String> {
+    let actual = json
+        .get(key)
+        .ok_or_else(|| format!("expected {label} to contain key '{key}', got: {json}"))?;
+    let expected = expected_json_value(value);
+    if actual == &expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected {label} key '{key}' to have value {expected:?}, got {actual:?}"
+        ))
+    }
+}
+
+fn assert_first_diagnostic_key_presence(
+    world: &TestWorld,
+    key: &str,
+    should_be_present: bool,
+) -> Result<(), String> {
+    let first = first_diagnostic_object(world)?;
+    if first.contains_key(key) == should_be_present {
+        Ok(())
+    } else {
+        let expectation = if should_be_present {
+            "contain"
+        } else {
+            "not contain"
+        };
+        Err(format!(
+            "expected first diagnostic JSON to {expectation} key '{key}', got: {first:?}"
+        ))
+    }
+}
+
 #[then("the JSON contains key {key} with value {value}")]
 fn then_json_contains(
     world: &mut TestWorld,
@@ -218,22 +261,7 @@ fn then_json_contains(
     let json = world.json_output.as_ref().ok_or("JSON should be set")?;
     let parsed: serde_json::Value =
         serde_json::from_str(json).map_err(|error| error.to_string())?;
-    let actual = parsed.get(key.as_str()).ok_or_else(|| {
-        format!(
-            "expected JSON to contain key '{}', got: {json}",
-            key.as_str()
-        )
-    })?;
-    let expected: serde_json::Value = serde_json::from_str(value.as_str())
-        .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
-    if actual == &expected {
-        Ok(())
-    } else {
-        Err(format!(
-            "expected JSON key '{}' to have value {expected:?}, got {actual:?}",
-            key.as_str()
-        ))
-    }
+    assert_json_contains_key_with_value(&parsed, key.as_str(), value.as_str(), "JSON")
 }
 
 #[then("the first diagnostic JSON contains key {key}")]
@@ -241,15 +269,7 @@ fn then_first_diagnostic_contains_key(
     world: &mut TestWorld,
     key: QuotedString,
 ) -> Result<(), String> {
-    let first = first_diagnostic_object(world)?;
-    if first.contains_key(key.as_str()) {
-        Ok(())
-    } else {
-        Err(format!(
-            "expected first diagnostic JSON to contain key '{}', got: {first:?}",
-            key.as_str()
-        ))
-    }
+    assert_first_diagnostic_key_presence(world, key.as_str(), true)
 }
 
 #[then("the first diagnostic JSON does not contain key {key}")]
@@ -257,15 +277,7 @@ fn then_first_diagnostic_does_not_contain_key(
     world: &mut TestWorld,
     key: QuotedString,
 ) -> Result<(), String> {
-    let first = first_diagnostic_object(world)?;
-    if first.contains_key(key.as_str()) {
-        Err(format!(
-            "expected first diagnostic JSON to not contain key '{}', got: {first:?}",
-            key.as_str()
-        ))
-    } else {
-        Ok(())
-    }
+    assert_first_diagnostic_key_presence(world, key.as_str(), false)
 }
 
 #[then("the first diagnostic JSON contains key {key} with value {value}")]
@@ -275,22 +287,12 @@ fn then_first_diagnostic_contains_key_with_value(
     value: QuotedString,
 ) -> Result<(), String> {
     let first = first_diagnostic_object(world)?;
-    let actual = first.get(key.as_str()).ok_or_else(|| {
-        format!(
-            "expected first diagnostic JSON to contain key '{}', got: {first:?}",
-            key.as_str()
-        )
-    })?;
-    let expected: serde_json::Value = serde_json::from_str(value.as_str())
-        .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
-    if actual == &expected {
-        Ok(())
-    } else {
-        Err(format!(
-            "expected key '{}' to have value {expected:?}, got {actual:?}",
-            key.as_str()
-        ))
-    }
+    assert_json_contains_key_with_value(
+        &serde_json::Value::Object(first),
+        key.as_str(),
+        value.as_str(),
+        "first diagnostic JSON",
+    )
 }
 
 #[then("the round-tripped language equals the original")]

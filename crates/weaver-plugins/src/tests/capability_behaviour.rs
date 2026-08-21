@@ -79,6 +79,72 @@ fn parse_kv_pairs(input: &str) -> HashMap<String, serde_json::Value> {
     map
 }
 
+/// Builds a manifest whose single capability is supplied by a Gherkin step.
+fn manifest_with_capability(
+    name: &str,
+    kind: PluginKind,
+    capability: &QuotedString,
+) -> Result<PluginManifest, String> {
+    let capability_id: CapabilityId = serde_json::from_str(&format!("\"{}\"", capability.as_str()))
+        .map_err(|error| format!("valid capability id: {error}"))?;
+    let metadata = PluginMetadata::new(name, "1.0", kind);
+    Ok(PluginManifest::new(
+        metadata,
+        vec!["python".into()],
+        PathBuf::from("/usr/bin/test"),
+    )
+    .with_capabilities(vec![capability_id]))
+}
+
+/// Validates a contract target and stores the result for a later assertion step.
+fn validate_contract_target<T>(
+    world: &mut CapabilityWorld,
+    get_target: impl FnOnce(&CapabilityWorld) -> Option<&T>,
+    validate: impl FnOnce(&RenameSymbolContract, &T) -> Result<(), PluginError>,
+    target_name: &str,
+) -> StepResult {
+    let result = {
+        let contract = world
+            .contract
+            .as_ref()
+            .ok_or_else(|| String::from("contract must be set"))?;
+        let target_value = get_target(world).ok_or_else(|| format!("{target_name} must be set"))?;
+        validate(contract, target_value)
+    };
+    world.validation_result = Some(result);
+    Ok(())
+}
+
+/// Retrieves the two contract versions used by compatibility assertions.
+fn version_pair(world: &CapabilityWorld) -> Result<(&ContractVersion, &ContractVersion), String> {
+    let first = world
+        .version_a
+        .as_ref()
+        .ok_or_else(|| String::from("version_a must be set"))?;
+    let second = world
+        .version_b
+        .as_ref()
+        .ok_or_else(|| String::from("version_b must be set"))?;
+    Ok((first, second))
+}
+
+/// Checks whether the configured versions have the expected compatibility.
+fn assert_version_compatibility(world: &CapabilityWorld, should_be_compatible: bool) -> StepResult {
+    let (first, second) = version_pair(world)?;
+    let are_compatible = first.is_compatible_with(second);
+    if are_compatible == should_be_compatible {
+        return Ok(());
+    }
+    let expectation = if should_be_compatible {
+        "compatible"
+    } else {
+        "incompatible"
+    };
+    Err(format!(
+        "expected {first} to be {expectation} with {second}"
+    ))
+}
+
 // ---------------------------------------------------------------------------
 // Given steps
 // ---------------------------------------------------------------------------
@@ -122,25 +188,21 @@ fn given_failure_with_reason(world: &mut CapabilityWorld, code: QuotedString) ->
 
 #[given("an actuator manifest with capability {cap}")]
 fn given_actuator_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) -> StepResult {
-    let cap_id: CapabilityId = serde_json::from_str(&format!("\"{}\"", cap.as_str()))
-        .map_err(|error| format!("valid capability id: {error}"))?;
-    let meta = PluginMetadata::new("test-plugin", "1.0", PluginKind::Actuator);
-    world.manifest = Some(
-        PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/test"))
-            .with_capabilities(vec![cap_id]),
-    );
+    world.manifest = Some(manifest_with_capability(
+        "test-plugin",
+        PluginKind::Actuator,
+        &cap,
+    )?);
     Ok(())
 }
 
 #[given("a sensor manifest with capability {cap}")]
 fn given_sensor_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) -> StepResult {
-    let cap_id: CapabilityId = serde_json::from_str(&format!("\"{}\"", cap.as_str()))
-        .map_err(|error| format!("valid capability id: {error}"))?;
-    let meta = PluginMetadata::new("test-sensor", "1.0", PluginKind::Sensor);
-    world.manifest = Some(
-        PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/test"))
-            .with_capabilities(vec![cap_id]),
-    );
+    world.manifest = Some(manifest_with_capability(
+        "test-sensor",
+        PluginKind::Sensor,
+        &cap,
+    )?);
     Ok(())
 }
 
@@ -160,30 +222,22 @@ fn given_version_b(world: &mut CapabilityWorld, major: u16, minor: u16) {
 
 #[when("the request is validated")]
 fn when_validate_request(world: &mut CapabilityWorld) -> StepResult {
-    let contract = world
-        .contract
-        .as_ref()
-        .ok_or_else(|| String::from("contract must be set"))?;
-    let request = world
-        .request
-        .as_ref()
-        .ok_or_else(|| String::from("request must be set"))?;
-    world.validation_result = Some(contract.validate_request(request));
-    Ok(())
+    validate_contract_target(
+        world,
+        |state| state.request.as_ref(),
+        RenameSymbolContract::validate_request,
+        "request",
+    )
 }
 
 #[when("the response is validated")]
 fn when_validate_response(world: &mut CapabilityWorld) -> StepResult {
-    let contract = world
-        .contract
-        .as_ref()
-        .ok_or_else(|| String::from("contract must be set"))?;
-    let response = world
-        .response
-        .as_ref()
-        .ok_or_else(|| String::from("response must be set"))?;
-    world.validation_result = Some(contract.validate_response(response));
-    Ok(())
+    validate_contract_target(
+        world,
+        |state| state.response.as_ref(),
+        RenameSymbolContract::validate_response,
+        "response",
+    )
 }
 
 #[when("the manifest is validated")]
@@ -238,36 +292,12 @@ fn then_validation_fails_with(world: &mut CapabilityWorld, substring: QuotedStri
 
 #[then("the versions are compatible")]
 fn then_versions_compatible(world: &mut CapabilityWorld) -> StepResult {
-    let a = world
-        .version_a
-        .as_ref()
-        .ok_or_else(|| String::from("version_a must be set"))?;
-    let b = world
-        .version_b
-        .as_ref()
-        .ok_or_else(|| String::from("version_b must be set"))?;
-    if a.is_compatible_with(b) {
-        Ok(())
-    } else {
-        Err(format!("expected {a} to be compatible with {b}"))
-    }
+    assert_version_compatibility(world, true)
 }
 
 #[then("the versions are incompatible")]
 fn then_versions_incompatible(world: &mut CapabilityWorld) -> StepResult {
-    let a = world
-        .version_a
-        .as_ref()
-        .ok_or_else(|| String::from("version_a must be set"))?;
-    let b = world
-        .version_b
-        .as_ref()
-        .ok_or_else(|| String::from("version_b must be set"))?;
-    if a.is_compatible_with(b) {
-        Err(format!("expected {a} to be incompatible with {b}"))
-    } else {
-        Ok(())
-    }
+    assert_version_compatibility(world, false)
 }
 
 // ---------------------------------------------------------------------------

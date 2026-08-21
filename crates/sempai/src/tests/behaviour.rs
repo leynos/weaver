@@ -132,6 +132,26 @@ fn first_compiled_plan(world: &TestWorld) -> Result<&QueryPlan, String> {
         .ok_or_else(|| String::from("expected at least one query plan"))
 }
 
+macro_rules! assert_first_plan_formula_is_atom {
+    ($function_name:ident, $step:literal, $value:ident, $atom_name:literal, $atom:ident, $field:ident) => {
+        #[then($step)]
+        fn $function_name(world: &mut TestWorld, $value: QuotedString) -> Result<(), String> {
+            let first = first_compiled_plan(world)?;
+            if matches!(&first.formula().node, Formula::Atom(Atom::$atom(atom)) if atom.$field == $value.as_str())
+            {
+                Ok(())
+            } else {
+                Err(format!(
+                    "expected first query plan formula to be {}({:?}), got {:?}",
+                    $atom_name,
+                    $value.as_str(),
+                    first.formula().node
+                ))
+            }
+        }
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Then steps
 // ---------------------------------------------------------------------------
@@ -218,41 +238,23 @@ fn then_first_plan_rule_id(world: &mut TestWorld, id: QuotedString) -> Result<()
     }
 }
 
-#[then("the first query plan formula is pattern atom {text}")]
-fn then_first_plan_formula_is_pattern_atom(
-    world: &mut TestWorld,
-    text: QuotedString,
-) -> Result<(), String> {
-    let first = first_compiled_plan(world)?;
-    if matches!(&first.formula().node, Formula::Atom(Atom::Pattern(pattern)) if pattern.text == text.as_str())
-    {
-        Ok(())
-    } else {
-        Err(format!(
-            "expected first query plan formula to be Pattern({:?}), got {:?}",
-            text.as_str(),
-            first.formula().node
-        ))
-    }
-}
+assert_first_plan_formula_is_atom!(
+    then_first_plan_formula_is_pattern_atom,
+    "the first query plan formula is pattern atom {text}",
+    text,
+    "Pattern",
+    Pattern,
+    text
+);
 
-#[then("the first query plan formula is Tree-sitter query atom {query}")]
-fn then_first_plan_formula_is_tree_sitter_query_atom(
-    world: &mut TestWorld,
-    query: QuotedString,
-) -> Result<(), String> {
-    let first = first_compiled_plan(world)?;
-    if matches!(&first.formula().node, Formula::Atom(Atom::TreeSitterQuery(atom)) if atom.query == query.as_str())
-    {
-        Ok(())
-    } else {
-        Err(format!(
-            "expected first query plan formula to be TreeSitterQuery({:?}), got {:?}",
-            query.as_str(),
-            first.formula().node
-        ))
-    }
-}
+assert_first_plan_formula_is_atom!(
+    then_first_plan_formula_is_tree_sitter_query_atom,
+    "the first query plan formula is Tree-sitter query atom {query}",
+    query,
+    "TreeSitterQuery",
+    TreeSitterQuery,
+    query
+);
 
 #[then("execution fails with code {code}")]
 fn then_execution_fails(world: &mut TestWorld, code: QuotedString) -> Result<(), String> {

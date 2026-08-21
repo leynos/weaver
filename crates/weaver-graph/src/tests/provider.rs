@@ -13,6 +13,7 @@ use lsp_types::{
 
 use crate::{
     CallGraph,
+    CallNode,
     GraphError,
     provider::{CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition},
     tests::support::{Response, incoming_call, item, outgoing_call},
@@ -22,6 +23,12 @@ use crate::{
 struct CallCounts {
     incoming: usize,
     outgoing: usize,
+}
+
+#[derive(Clone, Copy)]
+enum ExpectedGraphEdge {
+    Caller,
+    Callee,
 }
 
 #[derive(Debug, Clone)]
@@ -184,6 +191,18 @@ fn assert_graph_has_expected_edges(
     graph: &CallGraph,
     call_counts: &CallCounts,
 ) -> Result<(), String> {
+    assert_graph_has_expected_size(graph)?;
+
+    let main = find_graph_node(graph, "main")?;
+    let caller = find_graph_node(graph, "caller")?;
+    let helper = find_graph_node(graph, "helper")?;
+
+    assert_graph_has_expected_edge(graph, main, caller, ExpectedGraphEdge::Caller)?;
+    assert_graph_has_expected_edge(graph, main, helper, ExpectedGraphEdge::Callee)?;
+    assert_expected_call_counts(call_counts)
+}
+
+fn assert_graph_has_expected_size(graph: &CallGraph) -> Result<(), String> {
     if graph.node_count() != 3 || graph.edge_count() != 2 {
         return Err(format!(
             "expected graph with three nodes and two edges, got {} nodes and {} edges",
@@ -192,28 +211,50 @@ fn assert_graph_has_expected_edges(
         ));
     }
 
-    let main = graph
-        .find_by_name("main")
-        .ok_or_else(|| String::from("main node missing"))?;
-    let caller = graph
-        .find_by_name("caller")
-        .ok_or_else(|| String::from("caller node missing"))?;
-    let helper = graph
-        .find_by_name("helper")
-        .ok_or_else(|| String::from("helper node missing"))?;
+    Ok(())
+}
 
-    if !graph
-        .callers_of(main.id())
-        .any(|node| node.id() == caller.id())
-    {
-        return Err(String::from("caller edge missing"));
+fn find_graph_node<'graph>(
+    graph: &'graph CallGraph,
+    name: &str,
+) -> Result<&'graph CallNode, String> {
+    graph
+        .find_by_name(name)
+        .ok_or_else(|| format!("{name} node missing"))
+}
+
+fn assert_graph_has_expected_edge(
+    graph: &CallGraph,
+    node: &CallNode,
+    related_node: &CallNode,
+    expected_edge: ExpectedGraphEdge,
+) -> Result<(), String> {
+    let has_expected_edge = match expected_edge {
+        ExpectedGraphEdge::Caller => graph
+            .callers_of(node.id())
+            .any(|candidate| candidate.id() == related_node.id()),
+        ExpectedGraphEdge::Callee => graph
+            .callees_of(node.id())
+            .any(|candidate| candidate.id() == related_node.id()),
+    };
+
+    if has_expected_edge {
+        Ok(())
+    } else {
+        Err(String::from(expected_edge.missing_message()))
     }
-    if !graph
-        .callees_of(main.id())
-        .any(|node| node.id() == helper.id())
-    {
-        return Err(String::from("callee edge missing"));
+}
+
+impl ExpectedGraphEdge {
+    const fn missing_message(self) -> &'static str {
+        match self {
+            Self::Caller => "caller edge missing",
+            Self::Callee => "callee edge missing",
+        }
     }
+}
+
+fn assert_expected_call_counts(call_counts: &CallCounts) -> Result<(), String> {
     if call_counts.incoming == 1 && call_counts.outgoing == 1 {
         Ok(())
     } else {

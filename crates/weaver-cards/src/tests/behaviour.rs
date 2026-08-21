@@ -76,6 +76,39 @@ fn build_refusal_response(reason: RefusalReason, detail: DetailLevel) -> GetCard
     }
 }
 
+/// Parses arguments into the request state required by subsequent BDD steps.
+fn set_request(world: &mut TestWorld, arguments: &[&str]) -> Result<(), String> {
+    let request_arguments: Vec<String> = arguments
+        .iter()
+        .map(|argument| (*argument).to_owned())
+        .collect();
+    world.request =
+        Some(GetCardRequest::parse(&request_arguments).map_err(|error| error.to_string())?);
+    Ok(())
+}
+
+/// Asserts whether a JSON field is present using the common dotted-field syntax.
+fn assert_json_field_presence(
+    world: &TestWorld,
+    field: &QuotedString,
+    should_be_present: bool,
+) -> Result<(), String> {
+    let (parsed, pointer) = parse_json_and_pointer(world, field)?;
+    let is_present = parsed.pointer(&pointer).is_some();
+    if is_present == should_be_present {
+        return Ok(());
+    }
+    let expectation = if should_be_present {
+        "contain"
+    } else {
+        "NOT contain"
+    };
+    Err(format!(
+        "expected JSON to {expectation} field '{}', got: {parsed}",
+        field.as_str()
+    ))
+}
+
 // ---------------------------------------------------------------------------
 // Given steps
 // ---------------------------------------------------------------------------
@@ -105,28 +138,25 @@ fn given_success_response(world: &mut TestWorld, detail: QuotedString) -> Result
 
 #[given("a get-card request with no detail flag")]
 fn given_request_no_detail(world: &mut TestWorld) -> Result<(), String> {
-    let args = vec![
-        String::from("--uri"),
-        String::from("file:///src/main.rs"),
-        String::from("--position"),
-        String::from("10:5"),
-    ];
-    world.request = Some(GetCardRequest::parse(&args).map_err(|error| error.to_string())?);
-    Ok(())
+    set_request(
+        world,
+        &["--uri", "file:///src/main.rs", "--position", "10:5"],
+    )
 }
 
 #[given("a get-card request with an unknown flag")]
 fn given_request_unknown_flag(world: &mut TestWorld) -> Result<(), String> {
-    let args = vec![
-        String::from("--uri"),
-        String::from("file:///src/main.rs"),
-        String::from("--position"),
-        String::from("10:5"),
-        String::from("--some-unknown"),
-        String::from("value"),
-    ];
-    world.request = Some(GetCardRequest::parse(&args).map_err(|error| error.to_string())?);
-    Ok(())
+    set_request(
+        world,
+        &[
+            "--uri",
+            "file:///src/main.rs",
+            "--position",
+            "10:5",
+            "--some-unknown",
+            "value",
+        ],
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -167,13 +197,7 @@ fn parse_json_and_pointer(
 
 #[then("the JSON contains a {field} field")]
 fn then_json_contains_field(world: &mut TestWorld, field: QuotedString) -> Result<(), String> {
-    let (parsed, pointer) = parse_json_and_pointer(world, &field)?;
-    assert!(
-        parsed.pointer(&pointer).is_some(),
-        "expected JSON to contain field '{}', got: {parsed}",
-        field.as_str()
-    );
-    Ok(())
+    assert_json_field_presence(world, &field, true)
 }
 
 #[then("the JSON does not contain a {field} field")]
@@ -181,13 +205,7 @@ fn then_json_does_not_contain_field(
     world: &mut TestWorld,
     field: QuotedString,
 ) -> Result<(), String> {
-    let (parsed, pointer) = parse_json_and_pointer(world, &field)?;
-    assert!(
-        parsed.pointer(&pointer).is_none(),
-        "expected JSON NOT to contain field '{}', got: {parsed}",
-        field.as_str()
-    );
-    Ok(())
+    assert_json_field_presence(world, &field, false)
 }
 
 #[then("the JSON field {key} has value {value}")]

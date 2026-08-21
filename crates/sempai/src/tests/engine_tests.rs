@@ -340,40 +340,36 @@ fn assert_compile_yaml_semantic_error(
     Ok(())
 }
 
-#[test]
-fn compile_yaml_returns_unsupported_mode_for_extract_rules() {
-    assert_compile_yaml_unsupported_mode(
-        concat!(
-            "rules:\n",
-            "  - id: demo.extract\n",
-            "    mode: extract\n",
-            "    message: extract foo\n",
-            "    languages: [python]\n",
-            "    severity: WARNING\n",
-            "    dest-language: python\n",
-            "    extract: foo($X)\n",
-            "    pattern: source($X)\n",
-        ),
-        "extract",
-    )
-    .expect("unsupported-mode diagnostic");
-}
-
-#[test]
-fn compile_yaml_returns_unsupported_mode_for_unknown_modes() {
-    assert_compile_yaml_unsupported_mode(
-        concat!(
-            "rules:\n",
-            "  - id: demo.custom\n",
-            "    mode: custom-mode\n",
-            "    message: custom mode\n",
-            "    languages: [python]\n",
-            "    severity: WARNING\n",
-            "    pattern: foo($X)\n",
-        ),
-        "custom-mode",
-    )
-    .expect("unsupported-mode diagnostic");
+#[rstest]
+#[case::extract(
+    concat!(
+        "rules:\n",
+        "  - id: demo.extract\n",
+        "    mode: extract\n",
+        "    message: extract foo\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    dest-language: python\n",
+        "    extract: foo($X)\n",
+        "    pattern: source($X)\n",
+    ),
+    "extract",
+)]
+#[case::unknown(
+    concat!(
+        "rules:\n",
+        "  - id: demo.custom\n",
+        "    mode: custom-mode\n",
+        "    message: custom mode\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    pattern: foo($X)\n",
+    ),
+    "custom-mode",
+)]
+fn compile_yaml_returns_unsupported_mode(#[case] yaml: &str, #[case] expected_mode_fragment: &str) {
+    assert_compile_yaml_unsupported_mode(yaml, expected_mode_fragment)
+        .expect("unsupported-mode diagnostic");
 }
 
 #[test]
