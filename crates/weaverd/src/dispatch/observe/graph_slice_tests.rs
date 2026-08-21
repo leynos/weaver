@@ -58,32 +58,44 @@ fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
     }
 }
 
+/// Collects an identifier from every entry of a JSON array, reporting the
+/// supplied message when the value is not an array or an entry lacks a
+/// string identifier.
+///
+/// Callers supply the diagnostics so each collection names the payload shape
+/// it expected.
+fn collect_ids_from_array<'a>(
+    values: &'a serde_json::Value,
+    array_error: &'static str,
+    id_error: &'static str,
+    extract_id: impl Fn(&'a serde_json::Value) -> Option<&'a str>,
+) -> Result<Vec<&'a str>, String> {
+    values
+        .as_array()
+        .ok_or_else(|| array_error.to_owned())?
+        .iter()
+        .map(|value| extract_id(value).ok_or_else(|| id_error.to_owned()))
+        .collect()
+}
+
 /// Collects `symbol.symbol_id` from every card in a `cards` array.
 fn symbol_ids(cards: &serde_json::Value) -> Result<Vec<&str>, String> {
-    cards
-        .as_array()
-        .ok_or_else(|| String::from("cards should be an array"))?
-        .iter()
-        .map(|card| {
-            card["symbol"]["symbol_id"]
-                .as_str()
-                .ok_or_else(|| String::from("symbol_id should be a string"))
-        })
-        .collect()
+    collect_ids_from_array(
+        cards,
+        "cards should be an array",
+        "symbol_id should be a string",
+        |card| card["symbol"]["symbol_id"].as_str(),
+    )
 }
 
 /// Collects `symbol_id` from every entry in a spillover frontier array.
 fn frontier_ids(frontier: &serde_json::Value) -> Result<Vec<&str>, String> {
-    frontier
-        .as_array()
-        .ok_or_else(|| String::from("frontier should be an array"))?
-        .iter()
-        .map(|entry| {
-            entry["symbol_id"]
-                .as_str()
-                .ok_or_else(|| String::from("frontier symbol_id should be a string"))
-        })
-        .collect()
+    collect_ids_from_array(
+        frontier,
+        "frontier should be an array",
+        "frontier symbol_id should be a string",
+        |entry| entry["symbol_id"].as_str(),
+    )
 }
 
 /// Maps a structured refusal reason onto the exit status the handler reports.
