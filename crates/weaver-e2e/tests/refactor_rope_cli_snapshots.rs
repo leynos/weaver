@@ -16,12 +16,11 @@ use daemon_harness::{FakeDaemon, output_to_transcript, weaver_binary_path};
 use insta::assert_debug_snapshot;
 use rstest::rstest;
 
-#[expect(
-    clippy::expect_used,
-    reason = "test helper surfaces setup failures with the exact requested call structure"
-)]
-fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
-    let daemon = FakeDaemon::start(1, "renamed_symbol").expect("fake daemon should start");
+fn run_rename_refactor_snapshot(
+    snapshot_name: &str,
+    provider: Option<&str>,
+) -> std::io::Result<()> {
+    let daemon = FakeDaemon::start(1, "renamed_symbol")?;
     let endpoint = daemon.endpoint();
 
     // Omitting `--provider` entirely is what exercises automatic routing;
@@ -56,16 +55,15 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
         "new_name=renamed_symbol".into(),
     ]);
 
-    let mut command = Command::new(weaver_binary_path());
-    let output = command
-        .args(&args)
-        .output()
-        .expect("command should execute");
+    let mut command = Command::new(weaver_binary_path()?);
+    let output = command.args(&args).output()?;
 
     let transcript = output_to_transcript(command_string, &output, daemon.requests());
     daemon.join();
 
     assert_debug_snapshot!(snapshot_name, transcript);
+
+    Ok(())
 }
 
 #[rstest]
@@ -73,7 +71,7 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
 #[case("refactor_automatic_rope_routing", None)]
 #[case("refactor_provider_mismatch_refusal", Some("rust-analyzer"))]
 fn refactor_rope_routing_cli_snapshot(#[case] case_name: &str, #[case] provider: Option<&str>) {
-    run_rename_refactor_snapshot(case_name, provider);
+    run_rename_refactor_snapshot(case_name, provider).expect("rename refactor snapshot should run");
 }
 
 #[test]
@@ -90,7 +88,7 @@ fn refactor_pipeline_with_observe_and_jq_snapshot() {
 
     let daemon = FakeDaemon::start(2, "renamed_symbol").expect("fake daemon should start");
     let endpoint = daemon.endpoint();
-    let weaver_bin = weaver_binary_path();
+    let weaver_bin = weaver_binary_path().expect("weaver binary should be locatable");
 
     let shell_script = concat!(
         "\"$WEAVER_BIN\" --daemon-socket \"$WEAVER_ENDPOINT\" --output json ",

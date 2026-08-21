@@ -129,14 +129,15 @@ fn v2_decorated_over_branches_preserves_metadata_and_spans(
 fn v2_decorated_over_unary_preserves_metadata_and_spans(
     #[case] formula: MatchFormula,
     #[case] extract: fn(&Formula) -> Result<&Decorated<Formula>>,
-) {
+) -> anyhow::Result<()> {
     let span = SourceSpan::new(14, 101, Some(String::from("file:///rule.yaml")));
     let decorated = normalize_decorated_with(formula, &span).expect("formula should normalize");
 
     assert_decorated_metadata(&decorated, &span);
     let inner = extract(&decorated.node).expect("expected wrapper formula");
     assert_empty_metadata_with_span(inner, &span);
-    assert_wraps_pattern_atom(inner, "x");
+    assert_wraps_pattern_atom(inner, "x")?;
+    Ok(())
 }
 
 #[test]
@@ -209,7 +210,8 @@ fn v2_decorated_nested_inside_not_preserves_metadata_and_spans() {
                 Formula::Inside(inside_inner) => {
                     assert_eq!(inside_inner.span.as_ref(), Some(&span));
                     assert_empty_metadata(inside_inner);
-                    assert_wraps_pattern_atom(inside_inner, "x");
+                    assert_wraps_pattern_atom(inside_inner, "x")
+                        .expect("inner formula should wrap the pattern atom");
                 }
                 other => panic!("expected Inside formula inside Not, got {other:?}"),
             }

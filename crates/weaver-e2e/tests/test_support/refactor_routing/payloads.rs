@@ -74,6 +74,29 @@ pub(super) fn provider_mismatch_payload(
         return None;
     }
 
+    // The real daemon sorts candidates alphabetically by provider name
+    // (`sorted_capability_manifests`), so "rope" always precedes
+    // "rust-analyzer" regardless of language or requested provider. Each
+    // entry's reason then depends solely on whether it is the requested
+    // (but mismatched) provider.
+    let requested = provider.as_str();
+    let candidates = [
+        ("rope", "not_requested"),
+        ("rust-analyzer", "not_requested"),
+    ]
+    .map(|(candidate_provider, default_reason)| {
+        let reason = if candidate_provider == requested {
+            "explicit_provider_mismatch"
+        } else {
+            default_reason
+        };
+        json!({
+            "provider": candidate_provider,
+            "accepted": false,
+            "reason": reason
+        })
+    });
+
     Some(
         json!({
             "status": "error",
@@ -85,18 +108,7 @@ pub(super) fn provider_mismatch_payload(
                 "selection_mode": "explicit_provider",
                 "outcome": "refused",
                 "refusal_reason": "explicit_provider_mismatch",
-                "candidates": [
-                    {
-                        "provider": if language == "python" { "rope" } else { "rust-analyzer" },
-                        "accepted": false,
-                        "reason": "not_requested"
-                    },
-                    {
-                        "provider": provider.as_str(),
-                        "accepted": false,
-                        "reason": "explicit_provider_mismatch"
-                    }
-                ]
+                "candidates": candidates
             }
         })
         .to_string(),

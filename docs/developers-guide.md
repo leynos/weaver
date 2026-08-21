@@ -959,8 +959,9 @@ access:
   the exact contract failure.
 - `assert_rename_symbol_request_fixture_contract` /
   `assert_rename_symbol_response_fixture_contract` — assertion helpers that
-  validate a fixture against the `RenameSymbolContract` and panic with a
-  descriptive message on failure.
+  validate a fixture against the `RenameSymbolContract` and return
+  `Result<(), FixtureError>`, so callers assert (and panic, if desired) at the
+  test boundary rather than inside the shared helper.
 
 ```toml
 [dev-dependencies]

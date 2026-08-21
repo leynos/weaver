@@ -137,12 +137,7 @@ fn then_graph_counts(
     edge_count: usize,
 ) -> Result<()> {
     let world_state = world.borrow();
-    let graph = world_state
-        .result
-        .as_ref()
-        .context("result missing")?
-        .as_ref()
-        .map_err(|error| anyhow::anyhow!("graph build failed: {error}"))?;
+    let graph = built_graph(&world_state)?;
     ensure!(
         graph.node_count() == node_count,
         "expected {node_count} nodes"

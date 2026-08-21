@@ -148,10 +148,11 @@ fn v2_unary_wrapper_normalizes_to_inner_pattern(
     #[case] input: MatchFormula,
     #[case] extract: fn(&Formula) -> anyhow::Result<&Decorated<Formula>>,
     #[case] expected_text: &str,
-) {
+) -> anyhow::Result<()> {
     let result = normalize_v2(input).expect("v2 formula should normalize");
     let inner = extract(&result).expect("expected wrapper formula");
-    assert_wraps_pattern_atom(inner, expected_text);
+    assert_wraps_pattern_atom(inner, expected_text)?;
+    Ok(())
 }
 
 #[test]

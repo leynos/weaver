@@ -38,6 +38,18 @@ pub enum FixtureError {
         /// Name of the offending fixture.
         name: &'static str,
     },
+
+    /// A fixture, or a whole fixture suite, breached the shared contract
+    /// expectation it declares.
+    #[error("{message}")]
+    ContractMismatch {
+        /// Human-readable description of the breach.
+        message: String,
+    },
+}
+
+impl FixtureError {
+    const fn mismatch(message: String) -> Self { Self::ContractMismatch { message } }
 }
 
 /// Extracts the validation error from a fixture expected to breach the
@@ -64,76 +76,105 @@ pub fn error_mentions_fragment(error: &PluginError, fragment: &str) -> bool {
     error.to_string().contains(fragment)
 }
 
-fn assert_fixture_contract<T>(
+fn check_fixture_contract<T>(
     fixture: &RenameSymbolFixture<T>,
     result: Result<(), PluginError>,
     kind: &'static str,
-) {
+) -> Result<(), FixtureError> {
     let Some(fragment) = fixture.expected_error_fragment() else {
-        assert!(
-            result.is_ok(),
-            "{kind} fixture '{}' should be valid, got: {result:?}",
-            fixture.name()
-        );
-        return;
+        return result.map_err(|error| {
+            FixtureError::mismatch(format!(
+                "{kind} fixture '{}' should be valid, got: {error}",
+                fixture.name()
+            ))
+        });
     };
 
-    // This helper is an assertion boundary for downstream plugin tests, so a
-    // contract breach must fail the calling test rather than propagate.
-    let error = match expect_fixture_error(fixture, kind, result) {
-        Ok(error) => error,
-        Err(failure) => panic!("{failure}"),
-    };
-    assert!(
-        error_mentions_fragment(&error, fragment),
+    let error = expect_fixture_error(fixture, kind, result)?;
+    if error_mentions_fragment(&error, fragment) {
+        return Ok(());
+    }
+
+    Err(FixtureError::mismatch(format!(
         "{kind} fixture '{}' should mention '{fragment}', got: {error}",
         fixture.name()
-    );
+    )))
 }
 
-/// Asserts that one shared request fixture matches the contract expectation.
-pub fn assert_rename_symbol_request_fixture_contract(fixture: &RenameSymbolRequestFixture) {
-    assert_fixture_contract(
+/// Checks that one shared request fixture matches the contract expectation.
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when the fixture does not match the outcome it
+/// declares.
+pub fn assert_rename_symbol_request_fixture_contract(
+    fixture: &RenameSymbolRequestFixture,
+) -> Result<(), FixtureError> {
+    check_fixture_contract(
         fixture,
         validate_rename_symbol_request_fixture(fixture),
         "request",
-    );
+    )
 }
 
-/// Asserts that one shared response fixture matches the contract expectation.
-pub fn assert_rename_symbol_response_fixture_contract(fixture: &RenameSymbolResponseFixture) {
-    assert_fixture_contract(
+/// Checks that one shared response fixture matches the contract expectation.
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when the fixture does not match the outcome it
+/// declares.
+pub fn assert_rename_symbol_response_fixture_contract(
+    fixture: &RenameSymbolResponseFixture,
+) -> Result<(), FixtureError> {
+    check_fixture_contract(
         fixture,
         validate_rename_symbol_response_fixture(fixture),
         "response",
-    );
+    )
 }
 
-fn assert_suite_matches_contract<T>(suite_name: &str, fixtures: &[T], assert_fixture: impl Fn(&T)) {
-    assert!(
-        !fixtures.is_empty(),
-        "shared {suite_name} should not be empty; check plugin fixture wiring"
-    );
+fn check_suite_matches_contract<T>(
+    suite_name: &str,
+    fixtures: &[T],
+    check_fixture: impl Fn(&T) -> Result<(), FixtureError>,
+) -> Result<(), FixtureError> {
+    if fixtures.is_empty() {
+        return Err(FixtureError::mismatch(format!(
+            "shared {suite_name} should not be empty; check plugin fixture wiring"
+        )));
+    }
 
     for fixture in fixtures {
-        assert_fixture(fixture);
+        check_fixture(fixture)?;
     }
+
+    Ok(())
 }
 
-/// Asserts every shared request fixture matches the `rename-symbol` contract.
-pub fn assert_shared_request_fixtures_match_contract() {
-    assert_suite_matches_contract(
+/// Checks every shared request fixture against the `rename-symbol` contract.
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when the suite is empty or any fixture does not
+/// match the outcome it declares.
+pub fn assert_shared_request_fixtures_match_contract() -> Result<(), FixtureError> {
+    check_suite_matches_contract(
         "rename_symbol_request_fixtures",
         &rename_symbol_request_fixtures(),
         assert_rename_symbol_request_fixture_contract,
-    );
+    )
 }
 
-/// Asserts every shared response fixture matches the `rename-symbol` contract.
-pub fn assert_shared_response_fixtures_match_contract() {
-    assert_suite_matches_contract(
+/// Checks every shared response fixture against the `rename-symbol` contract.
+///
+/// # Errors
+///
+/// Returns [`FixtureError`] when the suite is empty or any fixture does not
+/// match the outcome it declares.
+pub fn assert_shared_response_fixtures_match_contract() -> Result<(), FixtureError> {
+    check_suite_matches_contract(
         "rename_symbol_response_fixtures",
         &rename_symbol_response_fixtures(),
         assert_rename_symbol_response_fixture_contract,
-    );
+    )
 }

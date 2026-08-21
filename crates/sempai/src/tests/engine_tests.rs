@@ -118,7 +118,7 @@ fn compile_yaml_normalizes_and_returns_query_plans(
 }
 
 #[rstest]
-fn compile_yaml_plan_formula_matches_normalization(default_engine: Engine) {
+fn compile_yaml_plan_formula_matches_normalization(default_engine: Engine) -> anyhow::Result<()> {
     let yaml = concat!(
         "rules:\n",
         "  - id: demo.formula.check\n",
@@ -130,7 +130,8 @@ fn compile_yaml_plan_formula_matches_normalization(default_engine: Engine) {
     let plans = default_engine.compile_yaml(yaml).expect("should compile");
     let plan = plans.first().expect("should have one plan");
     let formula = plan.formula();
-    assert_pattern_formula(formula, "foo($X)");
+    assert_pattern_formula(formula, "foo($X)")?;
+    Ok(())
 }
 
 #[test]
@@ -152,7 +153,8 @@ fn compile_yaml_multiple_languages_yields_multiple_plans() {
     assert!(languages.contains(&Language::Python));
     for plan in &plans {
         assert_eq!(plan.rule_id(), "demo.multi");
-        assert_pattern_formula(plan.formula(), "foo($X)");
+        assert_pattern_formula(plan.formula(), "foo($X)")
+            .expect("plan formula should be the pattern atom");
     }
 }
 
@@ -180,8 +182,10 @@ fn compile_yaml_multiple_rules_return_expected_plans() {
         assert_eq!(plan.language(), Language::Rust);
         seen.insert(plan.rule_id().to_owned());
         match plan.rule_id() {
-            "demo.first" => assert_pattern_formula(plan.formula(), "foo($X)"),
-            "demo.second" => assert_pattern_formula(plan.formula(), "bar($Y)"),
+            "demo.first" => assert_pattern_formula(plan.formula(), "foo($X)")
+                .expect("first plan formula should be the pattern atom"),
+            "demo.second" => assert_pattern_formula(plan.formula(), "bar($Y)")
+                .expect("second plan formula should be the pattern atom"),
             other => panic!("unexpected rule id {other}"),
         }
     }

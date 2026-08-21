@@ -215,13 +215,10 @@ impl TestWorld {
         &mut self,
         overrides: weaver_config::CapabilityMatrix,
     ) -> Result<(), LspHostError> {
-        self.host = LspHost::new(overrides);
-        self.handles.clear();
-        self.last_error = None;
-        self.last_definition = None;
-        self.last_references = None;
-        self.last_diagnostics = None;
-        self.last_capabilities = None;
+        // Build the replacement host and handle map in locals so a mid-loop
+        // registration failure leaves the world untouched rather than torn.
+        let mut new_host = LspHost::new(overrides);
+        let mut new_handles: HashMap<Language, RecordingServerHandle> = HashMap::new();
 
         for config in &self.configs {
             let server = match &config.initialization_error {
@@ -236,10 +233,17 @@ impl TestWorld {
             };
 
             let handle = server.handle();
-            self.host
-                .register_language(config.language, Box::new(server))?;
-            self.handles.insert(config.language, handle);
+            new_host.register_language(config.language, Box::new(server))?;
+            new_handles.insert(config.language, handle);
         }
+
+        self.host = new_host;
+        self.handles = new_handles;
+        self.last_error = None;
+        self.last_definition = None;
+        self.last_references = None;
+        self.last_diagnostics = None;
+        self.last_capabilities = None;
 
         Ok(())
     }

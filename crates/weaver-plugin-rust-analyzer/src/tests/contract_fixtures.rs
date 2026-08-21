@@ -6,11 +6,16 @@
 
 use rstest::rstest;
 use weaver_plugins::{
+    FixtureError,
     assert_shared_request_fixtures_match_contract,
     assert_shared_response_fixtures_match_contract,
 };
 
+type SuiteCheck = fn() -> Result<(), FixtureError>;
+
 #[rstest]
-#[case::requests(assert_shared_request_fixtures_match_contract as fn())]
-#[case::responses(assert_shared_response_fixtures_match_contract as fn())]
-fn shared_fixtures_match_rename_symbol_contract(#[case] validate: fn()) { validate(); }
+#[case::requests(assert_shared_request_fixtures_match_contract as SuiteCheck)]
+#[case::responses(assert_shared_response_fixtures_match_contract as SuiteCheck)]
+fn shared_fixtures_match_rename_symbol_contract(#[case] check: SuiteCheck) {
+    check().expect("shared fixtures should match the rename-symbol contract");
+}

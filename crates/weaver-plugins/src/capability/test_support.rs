@@ -292,3 +292,50 @@ fn arguments_with_value(
     arguments.insert(String::from(field), value);
     arguments
 }
+
+#[cfg(test)]
+mod tests {
+    //! Covers the named-fixture lookups, whose misses must name the fixture
+    //! kind and the requested name so a caller can tell which collection was
+    //! searched.
+
+    use rstest::rstest;
+
+    use super::{
+        FixtureError,
+        rename_symbol_request_fixture_named,
+        rename_symbol_response_fixture_named,
+    };
+
+    /// Named-lookup helper reduced to the failure it reports, so both
+    /// collections can share one table-driven case.
+    type MissingLookup = fn(&str) -> Option<FixtureError>;
+
+    fn request_lookup_error(name: &str) -> Option<FixtureError> {
+        rename_symbol_request_fixture_named(name).err()
+    }
+
+    fn response_lookup_error(name: &str) -> Option<FixtureError> {
+        rename_symbol_response_fixture_named(name).err()
+    }
+
+    #[rstest]
+    #[case::request(request_lookup_error as MissingLookup, "request")]
+    #[case::response(response_lookup_error as MissingLookup, "response")]
+    fn named_lookup_reports_missing_fixture(
+        #[case] lookup: MissingLookup,
+        #[case] expected_kind: &str,
+    ) {
+        let requested = "definitely_not_a_fixture";
+
+        let error = lookup(requested).expect("an unknown fixture name should not resolve");
+
+        match error {
+            FixtureError::Missing { kind, name } => {
+                assert_eq!(kind, expected_kind);
+                assert_eq!(name, requested);
+            }
+            other => panic!("expected a missing-fixture error, got: {other}"),
+        }
+    }
+}

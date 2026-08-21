@@ -75,8 +75,11 @@ pub(super) fn compile_and_first(yaml: &str) -> anyhow::Result<(DiagnosticCode, D
 
 /// Asserts that `formula` is a `Pattern` atom with the given text. Shared by
 /// every test that checks a compiled query plan's formula shape.
-pub(super) fn assert_pattern_formula(formula: &Decorated<Formula>, expected_text: &str) {
-    assert!(
+pub(super) fn assert_pattern_formula(
+    formula: &Decorated<Formula>,
+    expected_text: &str,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
         matches!(
             &formula.node,
             Formula::Atom(Atom::Pattern(pattern)) if pattern.text == expected_text
@@ -84,4 +87,5 @@ pub(super) fn assert_pattern_formula(formula: &Decorated<Formula>, expected_text
         "expected Pattern atom with text \"{expected_text}\", got {:?}",
         formula.node
     );
+    Ok(())
 }

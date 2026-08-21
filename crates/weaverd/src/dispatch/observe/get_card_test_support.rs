@@ -78,18 +78,14 @@ pub(crate) fn make_request(
     detail: DetailLevel,
 ) -> Result<CommandRequest, String> {
     let detail_str = detail_value(detail)?;
-    let json = format!(
-        concat!(
-            "{{\"command\":{{\"domain\":\"observe\",\"operation\":\"get-card\"}},",
-            "\"arguments\":[\"--uri\",\"{uri}\",\"--position\",\"{line}:{column}\",",
-            "\"--detail\",\"{detail}\"]}}"
-        ),
-        uri = uri,
-        line = line,
-        column = column,
-        detail = detail_str,
-    );
-    CommandRequest::parse(json.as_bytes()).map_err(|error| format!("request: {error}"))
+    let position = format!("{line}:{column}");
+    let payload = serde_json::json!({
+        "command": {"domain": "observe", "operation": "get-card"},
+        "arguments": ["--uri", uri, "--position", position, "--detail", detail_str],
+    });
+    let json =
+        serde_json::to_vec(&payload).map_err(|error| format!("serialise request: {error}"))?;
+    CommandRequest::parse(&json).map_err(|error| format!("request: {error}"))
 }
 
 pub(crate) fn response_payload(output: Vec<u8>) -> Result<Value, String> {

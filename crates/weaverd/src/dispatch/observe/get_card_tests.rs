@@ -200,7 +200,7 @@ fn handle_returns_structured_refusals(
     assert_eq!(payload["refusal"]["reason"], expected_reason);
     let message = payload["refusal"]["message"]
         .as_str()
-        .expect("refusal message should be a string");
+        .ok_or_else(|| String::from("refusal message should be a string"))?;
     assert!(
         message.contains(case.expected_message_substring),
         "expected message '{message}' to contain '{}'",
@@ -217,7 +217,9 @@ fn handle_rejects_non_file_uri(backends: BackendsFixture) -> Result<(), String> 
     let mut writer = ResponseWriter::new(&mut output);
 
     let error = match handle(&request, &mut writer, &mut fusion) {
-        Ok(result) => panic!("handler unexpectedly succeeded: {}", result.status),
+        Ok(result) => {
+            return Err(format!("handler unexpectedly succeeded: {}", result.status));
+        }
         Err(error) => error,
     };
 

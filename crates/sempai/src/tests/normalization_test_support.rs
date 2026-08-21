@@ -2,7 +2,7 @@
 //!
 //! `normalization_tests.rs` and `normalization_metadata_tests.rs` both drive
 //! [`normalize_search_principal`] from legacy and v2 rule formulas, then
-//! inspect the resulting [`Formula`] tree. Centralising the normalization
+//! inspect the resulting [`Formula`] tree. Centralizing the normalization
 //! wrappers, branch/wrapper extractors, and pattern assertions here keeps
 //! both suites focused on the behaviour under test rather than restating
 //! the same match arms.
@@ -32,12 +32,16 @@ pub(super) fn normalize_v2(formula: MatchFormula) -> Result<Formula> {
 /// Asserts that a `Decorated<Formula>` wraps a `Pattern` atom with the given
 /// text. Intended for use in unary-wrapper tests (`Not`, `Inside`,
 /// `Anywhere`).
-pub(super) fn assert_wraps_pattern_atom(inner: &Decorated<Formula>, expected_text: &str) {
-    assert!(
+pub(super) fn assert_wraps_pattern_atom(
+    inner: &Decorated<Formula>,
+    expected_text: &str,
+) -> Result<()> {
+    ensure!(
         matches!(&inner.node, Formula::Atom(Atom::Pattern(p)) if p.text == expected_text),
         "expected Pattern(\"{expected_text}\"), got {:?}",
         inner.node
     );
+    Ok(())
 }
 
 /// Asserts that a branch slice contains exactly two `Pattern` atoms with the
@@ -58,8 +62,8 @@ pub(super) fn assert_two_pattern_branches(
     let second = branches
         .get(1)
         .ok_or_else(|| anyhow::anyhow!("expected second branch"))?;
-    assert_wraps_pattern_atom(first, first_text);
-    assert_wraps_pattern_atom(second, second_text);
+    assert_wraps_pattern_atom(first, first_text)?;
+    assert_wraps_pattern_atom(second, second_text)?;
     Ok(())
 }
 

@@ -56,13 +56,14 @@ mod weaver_binary_resolver;
 /// tests.
 ///
 /// This wrapper keeps the test support API stable for modules that already
-/// import it. Resolution failure aborts the calling test: there is no useful
-/// way to continue a CLI snapshot without the binary.
-pub fn weaver_binary_path() -> std::path::PathBuf {
-    match weaver_binary_resolver::weaver_binary_path() {
-        Ok(path) => path.to_path_buf(),
-        Err(error) => panic!("failed to locate weaver binary: {error}"),
-    }
+/// import it.
+///
+/// # Errors
+/// Returns an `io::Error` if the `weaver` binary cannot be located.
+pub fn weaver_binary_path() -> io::Result<std::path::PathBuf> {
+    weaver_binary_resolver::weaver_binary_path()
+        .map(std::path::Path::to_path_buf)
+        .map_err(io::Error::other)
 }
 
 impl FakeDaemon {

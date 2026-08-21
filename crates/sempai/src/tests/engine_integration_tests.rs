@@ -29,7 +29,7 @@ fn compile_yaml_decorated_metadata_reaches_queryplan() {
     let plans = compile_yaml(yaml).expect("decorated metadata YAML should compile");
     let formula = plans.first().expect("should have one plan").formula();
 
-    assert_pattern_formula(formula, "foo($X)");
+    assert_pattern_formula(formula, "foo($X)").expect("plan formula should be the pattern atom");
     assert_eq!(formula.as_name.as_deref(), Some("my_capture"));
     assert_eq!(formula.fix.as_deref(), Some("replace_me"));
     assert_eq!(
