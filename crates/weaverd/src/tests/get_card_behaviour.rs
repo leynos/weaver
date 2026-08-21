@@ -26,7 +26,7 @@ use crate::{
 };
 
 #[fixture]
-fn test_handler() -> Arc<DispatchConnectionHandler> {
+fn test_handler() -> Result<Arc<DispatchConnectionHandler>, String> {
     let config = Config {
         daemon_socket: SocketEndpoint::unix("/tmp/weaver-bdd-get-card/socket.sock"),
         ..Config::default()
@@ -35,25 +35,25 @@ fn test_handler() -> Arc<DispatchConnectionHandler> {
         SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
     let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
     let backend_manager = BackendManager::new(backends);
-    let workspace_root = std::env::current_dir().expect("workspace root");
+    let workspace_root =
+        std::env::current_dir().map_err(|error| format!("workspace root: {error}"))?;
     let runtime_dir = std::env::temp_dir();
-    Arc::new(
-        DispatchConnectionHandler::new(
-            backend_manager,
-            workspace_root,
-            "/tmp/weaver-bdd-get-card/socket.sock",
-            runtime_dir,
-        )
-        .expect("absolute workspace root"),
+    DispatchConnectionHandler::new(
+        backend_manager,
+        workspace_root,
+        "/tmp/weaver-bdd-get-card/socket.sock",
+        runtime_dir,
     )
+    .map(Arc::new)
+    .map_err(|error| format!("create dispatch handler: {error}"))
 }
 
 struct GetCardWorld {
     endpoint: SocketEndpoint,
-    handler: Arc<DispatchConnectionHandler>,
+    handler: Result<Arc<DispatchConnectionHandler>, String>,
     listener: Option<ListenerHandle>,
     address: Option<SocketAddr>,
-    temp_dir: TempDir,
+    temp_dir: Result<TempDir, String>,
     paths: HashMap<String, PathBuf>,
     uris: HashMap<String, String>,
     response_lines: Vec<String>,
@@ -68,13 +68,13 @@ struct GetCardRequest<'a> {
 }
 
 impl GetCardWorld {
-    fn with_handler(handler: Arc<DispatchConnectionHandler>) -> Self {
+    fn with_handler(handler: Result<Arc<DispatchConnectionHandler>, String>) -> Self {
         Self {
             endpoint: SocketEndpoint::tcp("127.0.0.1", 0),
             handler,
             listener: None,
             address: None,
-            temp_dir: TempDir::new().expect("temp dir"),
+            temp_dir: TempDir::new().map_err(|error| format!("create temp dir: {error}")),
             paths: HashMap::new(),
             uris: HashMap::new(),
             response_lines: Vec::new(),
@@ -82,29 +82,34 @@ impl GetCardWorld {
         }
     }
 
-    fn start_listener(&mut self) {
-        let listener = SocketListener::bind(&self.endpoint).expect("bind listener");
+    fn start_listener(&mut self) -> Result<(), String> {
+        let listener = SocketListener::bind(&self.endpoint)
+            .map_err(|error| format!("bind listener: {error}"))?;
         self.address = listener.local_addr();
         self.listener = Some(
             listener
-                .start(self.handler.clone())
-                .expect("start listener"),
+                .start(self.handler.as_ref()?.clone())
+                .map_err(|error| format!("start listener: {error}"))?,
         );
+        Ok(())
     }
 
-    fn write_fixture(&mut self, key: &str, name: &str, source: &str) {
-        let path = self.temp_dir.path().join(name);
-        test_fs::write(&path, source).expect("write fixture");
-        let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    fn write_fixture(&mut self, key: &str, name: &str, source: &str) -> Result<(), String> {
+        let path = self.temp_dir.as_ref()?.path().join(name);
+        test_fs::write(&path, source).map_err(|error| format!("write fixture: {error}"))?;
+        let uri = Url::from_file_path(&path)
+            .map_err(|()| String::from("build file URI"))?
+            .to_string();
         self.paths.insert(String::from(key), path);
         self.uris.insert(String::from(key), uri);
+        Ok(())
     }
 
-    fn send_get_card(&mut self, request_params: GetCardRequest<'_>) {
+    fn send_get_card(&mut self, request_params: GetCardRequest<'_>) -> Result<(), String> {
         let uri = self
             .uris
             .get(request_params.key)
-            .expect("fixture uri")
+            .ok_or_else(|| String::from("fixture uri"))?
             .clone();
         let request = format!(
             concat!(
@@ -117,23 +122,32 @@ impl GetCardWorld {
             column = request_params.column,
             detail = request_params.detail,
         );
-        let addr = self.address.expect("address set");
-        let mut stream = TcpStream::connect(addr).expect("connect");
+        let addr = self.address.ok_or_else(|| String::from("address set"))?;
+        let mut stream = TcpStream::connect(addr).map_err(|error| format!("connect: {error}"))?;
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
-            .expect("set read timeout");
-        stream.write_all(request.as_bytes()).expect("write request");
-        stream.write_all(b"\n").expect("write newline");
-        stream.flush().expect("flush");
+            .map_err(|error| format!("set read timeout: {error}"))?;
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|error| format!("write request: {error}"))?;
+        stream
+            .write_all(b"\n")
+            .map_err(|error| format!("write newline: {error}"))?;
+        stream.flush().map_err(|error| format!("flush: {error}"))?;
 
         self.previous_response_lines = Some(self.response_lines.clone());
         self.response_lines.clear();
         let mut reader = BufReader::new(stream);
         let mut line_buffer = String::new();
-        while reader.read_line(&mut line_buffer).expect("read") > 0 {
+        while reader
+            .read_line(&mut line_buffer)
+            .map_err(|error| format!("read: {error}"))?
+            > 0
+        {
             self.response_lines.push(line_buffer.trim().to_string());
             line_buffer.clear();
         }
+        Ok(())
     }
 
     fn stdout_contains(&self, needle: &str) -> bool {
@@ -148,9 +162,12 @@ impl GetCardWorld {
         })
     }
 
-    fn rewrite_fixture(&mut self, key: &str, source: &str) {
-        let path = self.paths.get(key).expect("fixture path");
-        test_fs::write(path, source).expect("rewrite fixture");
+    fn rewrite_fixture(&mut self, key: &str, source: &str) -> Result<(), String> {
+        let path = self
+            .paths
+            .get(key)
+            .ok_or_else(|| String::from("fixture path"))?;
+        test_fs::write(path, source).map_err(|error| format!("rewrite fixture: {error}"))
     }
 
     fn latest_stdout_contains(&self, needle: &str) -> bool { self.stdout_contains(needle) }
@@ -193,86 +210,88 @@ impl Drop for GetCardWorld {
 }
 
 #[fixture]
-fn world(test_handler: Arc<DispatchConnectionHandler>) -> RefCell<GetCardWorld> {
+fn world(test_handler: Result<Arc<DispatchConnectionHandler>, String>) -> RefCell<GetCardWorld> {
     RefCell::new(GetCardWorld::with_handler(test_handler))
 }
 
 #[given("a daemon connection is established for get-card")]
-fn given_daemon_connection(world: &RefCell<GetCardWorld>) { world.borrow_mut().start_listener(); }
+fn given_daemon_connection(world: &RefCell<GetCardWorld>) -> Result<(), String> {
+    world.borrow_mut().start_listener()
+}
 
 #[given("a supported Rust source fixture")]
-fn given_supported_rust_fixture(world: &RefCell<GetCardWorld>) {
+fn given_supported_rust_fixture(world: &RefCell<GetCardWorld>) -> Result<(), String> {
     world.borrow_mut().write_fixture(
         "rust",
         "card.rs",
         "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    \
          count\n}\n",
-    );
+    )
 }
 
 #[given("an unsupported text fixture")]
-fn given_unsupported_fixture(world: &RefCell<GetCardWorld>) {
+fn given_unsupported_fixture(world: &RefCell<GetCardWorld>) -> Result<(), String> {
     world
         .borrow_mut()
-        .write_fixture("text", "notes.txt", "plain text only\n");
+        .write_fixture("text", "notes.txt", "plain text only\n")
 }
 
 #[given("an empty Python fixture")]
-fn given_empty_python_fixture(world: &RefCell<GetCardWorld>) {
-    world.borrow_mut().write_fixture("empty", "empty.py", "");
+fn given_empty_python_fixture(world: &RefCell<GetCardWorld>) -> Result<(), String> {
+    world.borrow_mut().write_fixture("empty", "empty.py", "")
 }
 
 #[when("an observe get-card request is sent for the Rust fixture")]
-fn when_request_rust_fixture(world: &RefCell<GetCardWorld>) {
+fn when_request_rust_fixture(world: &RefCell<GetCardWorld>) -> Result<(), String> {
     world.borrow_mut().send_get_card(GetCardRequest {
         key: "rust",
         line: 2,
         column: 4,
         detail: "structure",
-    });
+    })
 }
 
 #[when("an observe get-card semantic request is sent for the Rust fixture")]
-fn when_request_rust_fixture_semantic(world: &RefCell<GetCardWorld>) {
+fn when_request_rust_fixture_semantic(world: &RefCell<GetCardWorld>) -> Result<(), String> {
     world.borrow_mut().send_get_card(GetCardRequest {
         key: "rust",
         line: 2,
         column: 4,
         detail: "semantic",
-    });
+    })
 }
 
 #[when("an observe get-card request is sent for the unsupported fixture")]
-fn when_request_unsupported_fixture(world: &RefCell<GetCardWorld>) {
+fn when_request_unsupported_fixture(world: &RefCell<GetCardWorld>) -> Result<(), String> {
     world.borrow_mut().send_get_card(GetCardRequest {
         key: "text",
         line: 1,
         column: 1,
         detail: "structure",
-    });
+    })
 }
 
 #[when("an observe get-card request is sent for the empty Python fixture")]
-fn when_request_empty_fixture(world: &RefCell<GetCardWorld>) {
+fn when_request_empty_fixture(world: &RefCell<GetCardWorld>) -> Result<(), String> {
     world.borrow_mut().send_get_card(GetCardRequest {
         key: "empty",
         line: 1,
         column: 1,
         detail: "structure",
-    });
+    })
 }
 
 #[when("the same observe get-card request is sent twice for the Rust fixture")]
-fn when_request_rust_fixture_twice(world: &RefCell<GetCardWorld>) {
-    when_request_rust_fixture(world);
-    when_request_rust_fixture(world);
+fn when_request_rust_fixture_twice(world: &RefCell<GetCardWorld>) -> Result<(), String> {
+    when_request_rust_fixture(world)?;
+    when_request_rust_fixture(world)
 }
 
 #[when("the Rust fixture is rewritten to return {name}")]
-fn when_rewrite_rust_fixture(world: &RefCell<GetCardWorld>, name: String) {
+fn when_rewrite_rust_fixture(world: &RefCell<GetCardWorld>, name: String) -> Result<(), String> {
     let function_name = name.trim_matches('"');
     let source = format!("fn {function_name}() -> usize {{\n    1\n}}\n");
-    world.borrow_mut().rewrite_fixture("rust", &source);
+    world.borrow_mut().rewrite_fixture("rust", &source)
 }
 
 #[then(r#"the stdout response contains "{fragment}""#)]
@@ -325,4 +344,7 @@ fn then_latest_response_differs(world: &RefCell<GetCardWorld>) {
 }
 
 #[scenario(path = "tests/features/get_card.feature")]
-fn get_card_behaviour(#[from(world)] world: RefCell<GetCardWorld>) { drop(world); }
+fn get_card_behaviour(#[from(world)] world: RefCell<GetCardWorld>) -> Result<(), String> {
+    drop(world);
+    Ok(())
+}

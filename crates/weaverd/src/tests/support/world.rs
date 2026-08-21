@@ -24,16 +24,15 @@ pub struct TestWorld {
 
 impl TestWorld {
     /// Builds a world with a successful configuration loader.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            loader: Box::new(TestConfigLoader::new()),
+    pub fn new() -> Result<Self, String> {
+        Ok(Self {
+            loader: Box::new(TestConfigLoader::new()?),
             reporter: Arc::new(RecordingHealthReporter::default()),
             provider: RecordingBackendProvider::default(),
             daemon: None,
             bootstrap_error: None,
             backend_result: None,
-        }
+        })
     }
 
     /// Installs a loader that always fails.
@@ -43,9 +42,10 @@ impl TestWorld {
     }
 
     /// Installs a loader that succeeds.
-    pub fn use_successful_loader(&mut self) {
-        self.loader = Box::new(TestConfigLoader::new());
+    pub fn use_successful_loader(&mut self) -> Result<(), String> {
+        self.loader = Box::new(TestConfigLoader::new()?);
         self.reset_results();
+        Ok(())
     }
 
     /// Runs the bootstrap sequence once.
@@ -99,10 +99,6 @@ impl TestWorld {
     }
 }
 
-impl Default for TestWorld {
-    fn default() -> Self { Self::new() }
-}
-
 /// Default test world fixture.
 #[must_use]
-pub fn world() -> RefCell<TestWorld> { RefCell::new(TestWorld::new()) }
+pub fn world() -> RefCell<Result<TestWorld, String>> { RefCell::new(TestWorld::new()) }

@@ -18,7 +18,7 @@ use crate::{CardSymbolKind, DetailLevel};
 #[case(CaseSpec { path: Path::new("fixture.ts"), source: "interface Widget {\n  name: string;\n}\n", line: 1, column: 11, kind: CardSymbolKind::Interface, name: "Widget", container: None }.into())]
 #[case(CaseSpec { path: Path::new("fixture.ts"), source: "class Widget {\n  render(): void {\n    const ready = true;\n    if (ready) {\n      return;\n    }\n  }\n}\n", line: 2, column: 3, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") }.into())]
 fn extracts_supported_symbol_kinds(#[case] case: SymbolExpectation<'static>) {
-    let card = extract(case.request);
+    let card = extract(case.request).expect("card extraction should succeed");
     assert_eq!(card.symbol.symbol_ref.kind, case.expected_kind);
     assert_eq!(card.symbol.symbol_ref.name, case.expected_name);
     assert_eq!(
@@ -50,7 +50,7 @@ fn extracts_supported_symbol_kinds(#[case] case: SymbolExpectation<'static>) {
     detail: DetailLevel::Structure,
 })]
 fn returns_module_cards_for_import_interstitials(#[case] request: ExtractRequest<'static>) {
-    let card = extract(request);
+    let card = extract(request).expect("card extraction should succeed");
     assert_eq!(card.symbol.symbol_ref.kind, CardSymbolKind::Module);
     let interstitial = card
         .interstitial
@@ -86,7 +86,7 @@ fn returns_module_cards_for_import_interstitials(#[case] request: ExtractRequest
     detail: DetailLevel::Structure,
 })]
 fn nested_locals_do_not_become_entities(#[case] request: ExtractRequest<'static>) {
-    let card = extract(request);
+    let card = extract(request).expect("card extraction should succeed");
     assert_eq!(card.symbol.symbol_ref.kind, CardSymbolKind::Function);
     assert_eq!(card.symbol.symbol_ref.name, "outer");
 }
@@ -99,14 +99,16 @@ fn whitespace_only_edits_do_not_change_symbol_id() {
         line: 1,
         column: 5,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("card extraction should succeed");
     let spaced = extract(ExtractRequest {
         path: Path::new("fixture.py"),
         source: "def greet( name: str ) -> int:\n\n    total = len(name)\n    return total\n",
         line: 1,
         column: 5,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("card extraction should succeed");
 
     assert_eq!(compact.symbol.symbol_id, spaced.symbol.symbol_id);
 }

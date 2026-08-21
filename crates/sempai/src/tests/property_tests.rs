@@ -190,12 +190,15 @@ fn positive_tree() -> BoxedStrategy<Decorated<Formula>> {
         .boxed()
 }
 
-fn first_diagnostic_code(formula: &Decorated<Formula>) -> DiagnosticCode {
-    let err = validate_formula(formula).expect_err("formula should fail validation");
+fn first_diagnostic_code(formula: &Decorated<Formula>) -> Result<DiagnosticCode, String> {
+    let err = match validate_formula(formula) {
+        Ok(()) => return Err(String::from("formula should fail validation")),
+        Err(report) => report,
+    };
     err.diagnostics()
         .first()
-        .expect("should have diagnostic")
-        .code()
+        .map(sempai_core::Diagnostic::code)
+        .ok_or_else(|| String::from("should have diagnostic"))
 }
 
 proptest! {
@@ -208,7 +211,7 @@ proptest! {
     #[test]
     fn prop_or_branch_containing_negation_is_rejected(formula in or_with_not_descendant()) {
         prop_assert_eq!(
-            first_diagnostic_code(&formula),
+            first_diagnostic_code(&formula).map_err(proptest::test_runner::TestCaseError::fail)?,
             DiagnosticCode::ESempaiInvalidNotInOr
         );
     }

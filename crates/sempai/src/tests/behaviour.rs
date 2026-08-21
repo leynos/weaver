@@ -41,25 +41,34 @@ fn given_default_engine(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 #[when("YAML {yaml} is compiled")]
-fn when_compile_yaml(world: &mut TestWorld, yaml: QuotedString) {
-    let engine = world.engine.as_ref().expect("engine should be set");
+fn when_compile_yaml(world: &mut TestWorld, yaml: QuotedString) -> Result<(), String> {
+    let engine = world.engine.as_ref().ok_or("engine should be set")?;
     world.compile_result = Some(engine.compile_yaml(yaml.as_str()));
+    Ok(())
 }
 
 #[when("DSL {dsl} is compiled for language {lang}")]
-fn when_compile_dsl(world: &mut TestWorld, dsl: QuotedString, lang: QuotedString) {
-    let engine = world.engine.as_ref().expect("engine should be set");
-    let language: Language = lang.as_str().parse().expect("valid language name");
+fn when_compile_dsl(
+    world: &mut TestWorld,
+    dsl: QuotedString,
+    lang: QuotedString,
+) -> Result<(), String> {
+    let engine = world.engine.as_ref().ok_or("engine should be set")?;
+    let language = lang
+        .as_str()
+        .parse::<Language>()
+        .map_err(|error| error.to_string())?;
     world.compile_result = Some(
         engine
             .compile_dsl("interactive", language, dsl.as_str())
             .map(|plan| vec![plan]),
     );
+    Ok(())
 }
 
 #[when("a query plan is executed")]
-fn when_execute(world: &mut TestWorld) {
-    let engine = world.engine.as_ref().expect("engine should be set");
+fn when_execute(world: &mut TestWorld) -> Result<(), String> {
+    let engine = world.engine.as_ref().ok_or("engine should be set")?;
     let dummy_formula = Decorated {
         node: Formula::Atom(Atom::Pattern(PatternAtom {
             text: String::from("dummy"),
@@ -79,6 +88,7 @@ fn when_execute(world: &mut TestWorld) {
             .execute(&plan, "file:///t.rs", "fn main() {}")
             .map(|_| ()),
     );
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -91,30 +101,35 @@ fn assert_diagnostic_code<T: std::fmt::Debug>(
     expected_code: &str,
     result_name: &str,
     failure_kind: &str,
-) {
-    let missing_result_message = format!("{result_name} should be set");
-    let expected_failure_message = format!("expected {failure_kind}");
-    let inner = result.expect(&missing_result_message);
-    let report = inner.as_ref().expect_err(&expected_failure_message);
+) -> Result<(), String> {
+    let inner = result.ok_or_else(|| format!("{result_name} should be set"))?;
+    let Err(report) = inner else {
+        return Err(format!("expected {failure_kind}"));
+    };
     let first = report
         .diagnostics()
         .first()
-        .expect("at least one diagnostic");
+        .ok_or("at least one diagnostic")?;
     let actual_code = format!("{}", first.code());
-    assert_eq!(
-        actual_code, expected_code,
-        "expected code '{expected_code}', got '{actual_code}'"
-    );
+    if actual_code == expected_code {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected code '{expected_code}', got '{actual_code}'"
+        ))
+    }
 }
 
-fn first_compiled_plan(world: &TestWorld) -> &QueryPlan {
+fn first_compiled_plan(world: &TestWorld) -> Result<&QueryPlan, String> {
     let plans = world
         .compile_result
         .as_ref()
-        .expect("compile result should be set")
+        .ok_or("compile result should be set")?
         .as_ref()
-        .expect("expected successful compilation");
-    plans.first().expect("expected at least one query plan")
+        .map_err(|report| format!("expected successful compilation, got: {report}"))?;
+    plans
+        .first()
+        .ok_or_else(|| String::from("expected at least one query plan"))
 }
 
 // ---------------------------------------------------------------------------
@@ -122,88 +137,131 @@ fn first_compiled_plan(world: &TestWorld) -> &QueryPlan {
 // ---------------------------------------------------------------------------
 
 #[then("the engine has max matches per rule of {count}")]
-fn then_engine_max_matches(world: &mut TestWorld, count: usize) {
-    let engine = world.engine.as_ref().expect("engine should be set");
-    assert_eq!(engine.config().max_matches_per_rule(), count);
+fn then_engine_max_matches(world: &mut TestWorld, count: usize) -> Result<(), String> {
+    let engine = world.engine.as_ref().ok_or("engine should be set")?;
+    let actual = engine.config().max_matches_per_rule();
+    if actual == count {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected max matches per rule {count}, got {actual}"
+        ))
+    }
 }
 
 #[then("compilation fails with code {code}")]
-fn then_compilation_fails(world: &mut TestWorld, code: QuotedString) {
+fn then_compilation_fails(world: &mut TestWorld, code: QuotedString) -> Result<(), String> {
     assert_diagnostic_code(
         world.compile_result.as_ref(),
         code.as_str(),
         "compile result",
         "compilation failure",
-    );
+    )
 }
 
 #[then("the first diagnostic message contains {snippet}")]
-fn then_first_diagnostic_message_contains(world: &mut TestWorld, snippet: QuotedString) {
-    let report = world
+fn then_first_diagnostic_message_contains(
+    world: &mut TestWorld,
+    snippet: QuotedString,
+) -> Result<(), String> {
+    let compile_result = world
         .compile_result
         .as_ref()
-        .expect("compile result should be set")
-        .as_ref()
-        .expect_err("expected compilation failure");
+        .ok_or("compile result should be set")?;
+    let Err(report) = compile_result else {
+        return Err(String::from("expected compilation failure"));
+    };
     let first = report
         .diagnostics()
         .first()
-        .expect("at least one diagnostic");
-    assert!(first.message().contains(snippet.as_str()));
+        .ok_or("at least one diagnostic")?;
+    if first.message().contains(snippet.as_str()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected diagnostic message '{}' to contain '{}'",
+            first.message(),
+            snippet.as_str()
+        ))
+    }
 }
 
 #[then("compilation succeeds with {count} query plan")]
-fn then_compilation_succeeds_with_plans(world: &mut TestWorld, count: usize) {
+fn then_compilation_succeeds_with_plans(world: &mut TestWorld, count: usize) -> Result<(), String> {
     let plans = world
         .compile_result
         .as_ref()
-        .expect("compile result should be set")
+        .ok_or("compile result should be set")?
         .as_ref()
-        .expect("expected successful compilation");
-    assert_eq!(
-        plans.len(),
-        count,
-        "expected {count} query plan(s), got {}",
-        plans.len()
-    );
+        .map_err(|report| format!("expected successful compilation, got: {report}"))?;
+    if plans.len() == count {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected {count} query plan(s), got {}",
+            plans.len()
+        ))
+    }
 }
 
 #[then("the first query plan has rule id {id}")]
-fn then_first_plan_rule_id(world: &mut TestWorld, id: QuotedString) {
-    let first = first_compiled_plan(world);
-    assert_eq!(first.rule_id(), id.as_str());
+fn then_first_plan_rule_id(world: &mut TestWorld, id: QuotedString) -> Result<(), String> {
+    let first = first_compiled_plan(world)?;
+    if first.rule_id() == id.as_str() {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected rule id '{}', got '{}'",
+            id.as_str(),
+            first.rule_id()
+        ))
+    }
 }
 
 #[then("the first query plan formula is pattern atom {text}")]
-fn then_first_plan_formula_is_pattern_atom(world: &mut TestWorld, text: QuotedString) {
-    let first = first_compiled_plan(world);
-    assert!(
-        matches!(&first.formula().node, Formula::Atom(Atom::Pattern(pattern)) if pattern.text == text.as_str()),
-        "expected first query plan formula to be Pattern({:?}), got {:?}",
-        text.as_str(),
-        first.formula().node
-    );
+fn then_first_plan_formula_is_pattern_atom(
+    world: &mut TestWorld,
+    text: QuotedString,
+) -> Result<(), String> {
+    let first = first_compiled_plan(world)?;
+    if matches!(&first.formula().node, Formula::Atom(Atom::Pattern(pattern)) if pattern.text == text.as_str())
+    {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected first query plan formula to be Pattern({:?}), got {:?}",
+            text.as_str(),
+            first.formula().node
+        ))
+    }
 }
 
 #[then("the first query plan formula is Tree-sitter query atom {query}")]
-fn then_first_plan_formula_is_tree_sitter_query_atom(world: &mut TestWorld, query: QuotedString) {
-    let first = first_compiled_plan(world);
-    assert!(
-        matches!(&first.formula().node, Formula::Atom(Atom::TreeSitterQuery(atom)) if atom.query == query.as_str()),
-        "expected first query plan formula to be TreeSitterQuery({:?}), got {:?}",
-        query.as_str(),
-        first.formula().node
-    );
+fn then_first_plan_formula_is_tree_sitter_query_atom(
+    world: &mut TestWorld,
+    query: QuotedString,
+) -> Result<(), String> {
+    let first = first_compiled_plan(world)?;
+    if matches!(&first.formula().node, Formula::Atom(Atom::TreeSitterQuery(atom)) if atom.query == query.as_str())
+    {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected first query plan formula to be TreeSitterQuery({:?}), got {:?}",
+            query.as_str(),
+            first.formula().node
+        ))
+    }
 }
 
 #[then("execution fails with code {code}")]
-fn then_execution_fails(world: &mut TestWorld, code: QuotedString) {
+fn then_execution_fails(world: &mut TestWorld, code: QuotedString) -> Result<(), String> {
     assert_diagnostic_code(
         world.execute_result.as_ref(),
         code.as_str(),
         "execute result",
         "execution failure",
-    );
+    )
 }
 
 // ---------------------------------------------------------------------------

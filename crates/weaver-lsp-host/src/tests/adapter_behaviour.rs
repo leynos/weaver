@@ -22,6 +22,8 @@ struct AdapterTestWorld {
     error_is_binary_not_found: bool,
 }
 
+type StepResult = Result<(), String>;
+
 impl AdapterTestWorld {
     fn new() -> Self {
         Self {
@@ -85,6 +87,12 @@ fn is_binary_not_found_error(error: &LanguageServerError) -> bool {
     false
 }
 
+fn error_mentions_command_path(error: &str) -> bool {
+    ["language server", "spawn", "/nonexistent/"]
+        .iter()
+        .any(|needle| error.contains(needle))
+}
+
 #[when("the adapter is initialized")]
 fn when_adapter_initialized(world: &RefCell<AdapterTestWorld>) {
     let mut borrow = world.borrow_mut();
@@ -100,48 +108,53 @@ fn when_adapter_initialized(world: &RefCell<AdapterTestWorld>) {
 // --- Then steps ---
 
 #[then("the error indicates binary not found")]
-fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) {
+fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) -> StepResult {
     let borrow = world.borrow();
 
     let error = borrow
         .last_error
         .as_ref()
-        .expect("expected an error but got none");
+        .ok_or_else(|| String::from("expected an error but got none"))?;
 
-    assert!(
-        borrow.error_is_binary_not_found,
-        "expected binary not found error flag to be set, got: {:?}",
-        error
-    );
+    if !borrow.error_is_binary_not_found {
+        return Err(format!(
+            "expected binary not found error flag to be set, got: {error:?}"
+        ));
+    }
 
-    let source = error
-        .source()
-        .expect("LanguageServerError is expected to wrap an AdapterError source");
+    let source = error.source().ok_or_else(|| {
+        String::from("LanguageServerError is expected to wrap an AdapterError source")
+    })?;
 
     let adapter_error = source
         .downcast_ref::<AdapterError>()
-        .expect("LanguageServerError source should be an AdapterError");
+        .ok_or_else(|| String::from("LanguageServerError source should be an AdapterError"))?;
 
-    assert!(
-        matches!(adapter_error, AdapterError::BinaryNotFound { .. }),
-        "expected AdapterError::BinaryNotFound, got: {:?}",
-        adapter_error
-    );
+    if matches!(adapter_error, AdapterError::BinaryNotFound { .. }) {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected AdapterError::BinaryNotFound, got: {adapter_error:?}"
+        ))
+    }
 }
 
 #[then("the error message contains the command path")]
-fn then_error_contains_command_path(world: &RefCell<AdapterTestWorld>) {
+fn then_error_contains_command_path(world: &RefCell<AdapterTestWorld>) -> StepResult {
     let borrow = world.borrow();
-    let error = borrow.last_error.as_ref().expect("expected an error");
+    let error = borrow
+        .last_error
+        .as_ref()
+        .ok_or_else(|| String::from("expected an error"))?;
     let error_string = error.to_string();
     // The error should mention the command that failed or language server
-    assert!(
-        error_string.contains("language server")
-            || error_string.contains("spawn")
-            || error_string.contains("/nonexistent/"),
-        "error message should contain relevant context, got: {}",
-        error_string
-    );
+    if error_mentions_command_path(&error_string) {
+        Ok(())
+    } else {
+        Err(format!(
+            "error message should contain relevant context, got: {error_string}"
+        ))
+    }
 }
 
 #[then("the <language> adapter command is <command>")]

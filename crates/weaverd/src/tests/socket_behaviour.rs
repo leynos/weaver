@@ -59,18 +59,26 @@ impl ListenerWorld {
         }
     }
 
-    fn reserve_port(&mut self) {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind reserved port");
-        let port = listener.local_addr().expect("local addr").port();
+    fn reserve_port(&mut self) -> Result<(), String> {
+        let listener = TcpListener::bind(("127.0.0.1", 0))
+            .map_err(|error| format!("bind reserved port: {error}"))?;
+        let port = listener
+            .local_addr()
+            .map_err(|error| format!("get local address: {error}"))?
+            .port();
         self.endpoint = SocketEndpoint::tcp("127.0.0.1", port);
         self.reserved = Some(listener);
+        Ok(())
     }
 
-    fn connect_clients(&self, count: usize) {
-        let addr = self.address.expect("listener address should be set");
+    fn connect_clients(&self, count: usize) -> Result<(), String> {
+        let addr = self
+            .address
+            .ok_or_else(|| String::from("listener address should be set"))?;
         for _ in 0..count {
-            TcpStream::connect(addr).expect("connect client");
+            TcpStream::connect(addr).map_err(|error| format!("connect client: {error}"))?;
         }
+        Ok(())
     }
 
     fn wait_for_connections(&self, expected: usize) -> bool {
@@ -110,13 +118,19 @@ fn given_tcp_listener(world: &RefCell<ListenerWorld>) {
 }
 
 #[given("a TCP socket is already bound")]
-fn given_tcp_in_use(world: &RefCell<ListenerWorld>) { world.borrow_mut().reserve_port(); }
+fn given_tcp_in_use(world: &RefCell<ListenerWorld>) -> Result<(), String> {
+    world.borrow_mut().reserve_port()
+}
 
 #[when("a client connects")]
-fn when_client_connects(world: &RefCell<ListenerWorld>) { world.borrow().connect_clients(1); }
+fn when_client_connects(world: &RefCell<ListenerWorld>) -> Result<(), String> {
+    world.borrow().connect_clients(1)
+}
 
 #[when("two clients connect")]
-fn when_two_clients_connect(world: &RefCell<ListenerWorld>) { world.borrow().connect_clients(2); }
+fn when_two_clients_connect(world: &RefCell<ListenerWorld>) -> Result<(), String> {
+    world.borrow().connect_clients(2)
+}
 
 #[when("the listener starts on the same socket")]
 fn when_listener_starts_same_socket(world: &RefCell<ListenerWorld>) {

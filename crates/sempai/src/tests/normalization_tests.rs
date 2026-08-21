@@ -17,19 +17,19 @@ use serde_json::json;
 use crate::normalize::normalize_search_principal;
 
 /// Helper to normalize a legacy formula and extract the node.
-fn normalize_legacy(formula: LegacyFormula) -> Formula {
+fn normalize_legacy(formula: LegacyFormula) -> Result<Formula, String> {
     let principal = SearchQueryPrincipal::Legacy(formula);
     normalize_search_principal(&principal, None)
-        .expect("legacy formula should normalize")
-        .node
+        .map(|decorated| decorated.node)
+        .map_err(|report| format!("legacy formula should normalize: {report}"))
 }
 
 /// Helper to normalize a v2 match formula and extract the node.
-fn normalize_v2(formula: MatchFormula) -> Formula {
+fn normalize_v2(formula: MatchFormula) -> Result<Formula, String> {
     let principal = SearchQueryPrincipal::Match(formula);
     normalize_search_principal(&principal, None)
-        .expect("v2 formula should normalize")
-        .node
+        .map(|decorated| decorated.node)
+        .map_err(|report| format!("v2 formula should normalize: {report}"))
 }
 
 /// Asserts that a `Decorated<Formula>` wraps a `Pattern` atom with the given text.
@@ -50,20 +50,25 @@ fn assert_two_pattern_branches(
     branches: &[Decorated<Formula>],
     first_text: &str,
     second_text: &str,
-) {
-    assert_eq!(branches.len(), 2);
-    let first = branches.first().expect("expected first branch");
-    let second = branches.get(1).expect("expected second branch");
-    assert!(
-        matches!(&first.node, Formula::Atom(Atom::Pattern(p)) if p.text == first_text),
-        "expected first branch Pattern(\"{first_text}\"), got {:?}",
-        first.node
-    );
-    assert!(
-        matches!(&second.node, Formula::Atom(Atom::Pattern(p)) if p.text == second_text),
-        "expected second branch Pattern(\"{second_text}\"), got {:?}",
-        second.node
-    );
+) -> Result<(), String> {
+    if branches.len() != 2 {
+        return Err(format!("expected two branches, got {}", branches.len()));
+    }
+    let first = branches.first().ok_or("expected first branch")?;
+    let second = branches.get(1).ok_or("expected second branch")?;
+    if !matches!(&first.node, Formula::Atom(Atom::Pattern(p)) if p.text == first_text) {
+        return Err(format!(
+            "expected first branch Pattern(\"{first_text}\"), got {:?}",
+            first.node
+        ));
+    }
+    if !matches!(&second.node, Formula::Atom(Atom::Pattern(p)) if p.text == second_text) {
+        return Err(format!(
+            "expected second branch Pattern(\"{second_text}\"), got {:?}",
+            second.node
+        ));
+    }
+    Ok(())
 }
 
 fn extract_and_branches(f: Formula) -> Vec<Decorated<Formula>> {
@@ -118,13 +123,14 @@ fn legacy_formula_normalizes_to_expected_formula(
     #[case] formula: LegacyFormula,
     #[case] expected: Formula,
 ) {
-    let result = normalize_legacy(formula);
+    let result = normalize_legacy(formula).expect("legacy formula normalizes");
     assert_eq!(result, expected);
 }
 
 #[test]
 fn legacy_pattern_not_regex_normalizes_to_not_regex() {
-    let result = normalize_legacy(LegacyFormula::PatternNotRegex(String::from(r"bar.*")));
+    let result = normalize_legacy(LegacyFormula::PatternNotRegex(String::from(r"bar.*")))
+        .expect("legacy formula normalizes");
     match result {
         Formula::Not(inner) => match inner.node {
             Formula::Atom(Atom::Regex(regex)) => {
@@ -140,7 +146,8 @@ fn legacy_pattern_not_regex_normalizes_to_not_regex() {
 fn legacy_pattern_not_inside_normalizes_to_not_inside() {
     let result = normalize_legacy(LegacyFormula::PatternNotInside(Box::new(
         LegacyValue::String(String::from("class Foo:")),
-    )));
+    )))
+    .expect("legacy formula normalizes");
     match result {
         Formula::Not(not_inner) => match not_inner.node {
             Formula::Inside(inside_inner) => match inside_inner.node {
@@ -172,7 +179,7 @@ fn v2_atom_formula_normalizes_to_expected_formula(
     #[case] formula: MatchFormula,
     #[case] expected: Formula,
 ) {
-    let result = normalize_v2(formula);
+    let result = normalize_v2(formula).expect("v2 formula normalizes");
     assert_eq!(result, expected);
 }
 
@@ -195,9 +202,9 @@ fn v2_branch_formula_normalizes_with_correct_branches(
     #[case] input: MatchFormula,
     #[case] extract: fn(Formula) -> Vec<Decorated<Formula>>,
 ) {
-    let result = normalize_v2(input);
+    let result = normalize_v2(input).expect("v2 formula normalizes");
     let branches = extract(result);
-    assert_two_pattern_branches(&branches, "foo", "bar");
+    assert_two_pattern_branches(&branches, "foo", "bar").expect("two pattern branches");
 }
 
 #[rstest]
@@ -221,7 +228,7 @@ fn v2_unary_wrapper_normalizes_to_inner_pattern(
     #[case] extract: fn(Formula) -> Box<Decorated<Formula>>,
     #[case] expected_text: &str,
 ) {
-    let result = normalize_v2(input);
+    let result = normalize_v2(input).expect("v2 formula normalizes");
     let inner = extract(result);
     assert_wraps_pattern_atom(&inner, expected_text);
 }
@@ -231,7 +238,8 @@ fn legacy_pattern_either_normalizes_to_or() {
     let result = normalize_legacy(LegacyFormula::PatternEither(vec![
         LegacyFormula::Pattern(String::from("first")),
         LegacyFormula::Pattern(String::from("second")),
-    ]));
+    ]))
+    .expect("legacy formula normalizes");
     match result {
         Formula::Or(children) => {
             assert_eq!(children.len(), 2);
@@ -254,7 +262,8 @@ fn legacy_anywhere_normalizes_to_anywhere() {
     // Corresponds to legacy `semgrep-internal-pattern-anywhere: ...`.
     let result = normalize_legacy(LegacyFormula::Anywhere(Box::new(LegacyValue::String(
         String::from("pattern anywhere"),
-    ))));
+    ))))
+    .expect("legacy formula normalizes");
     match result {
         Formula::Anywhere(inner) => match inner.node {
             Formula::Atom(Atom::Pattern(pat)) => assert_eq!(pat.text, "pattern anywhere"),

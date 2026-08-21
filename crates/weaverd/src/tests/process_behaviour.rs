@@ -11,253 +11,333 @@ use crate::{
     tests::support::{ProcessTestWorld, fs as test_fs, snapshot_status},
 };
 
+type ProcessWorldFixture = RefCell<Result<ProcessTestWorld, String>>;
+
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<ProcessTestWorld> { RefCell::new(ProcessTestWorld::new()) }
+fn world() -> ProcessWorldFixture { RefCell::new(ProcessTestWorld::new()) }
 
 #[given("a fresh daemon process world")]
-fn given_world(world: &RefCell<ProcessTestWorld>) { let _ = world; }
+fn given_world(world: &ProcessWorldFixture) -> Result<(), String> {
+    world.borrow().as_ref().map(|_| ()).map_err(Clone::clone)
+}
 
 #[when("the daemon starts in background mode")]
-fn when_daemon_starts_background(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    world.borrow_mut().start_background()?;
+fn when_daemon_starts_background(world: &ProcessWorldFixture) -> Result<(), String> {
+    let mut world_state = world.borrow_mut();
+    world_state
+        .as_mut()
+        .map_err(|error| error.to_string())?
+        .start_background()?;
     Ok(())
 }
 
 #[when("the daemon starts in foreground mode")]
-fn when_daemon_starts_foreground(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    world
-        .borrow_mut()
+fn when_daemon_starts_foreground(world: &ProcessWorldFixture) -> Result<(), String> {
+    let mut world_state = world.borrow_mut();
+    world_state
+        .as_mut()
+        .map_err(|error| error.to_string())?
         .start_foreground(LaunchMode::Foreground, true)?;
     Ok(())
 }
 
 #[when("the daemon starts in foreground mode with invalid configuration")]
-fn when_daemon_starts_invalid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    world.borrow_mut().start_foreground_with_invalid_config()?;
+fn when_daemon_starts_invalid(world: &ProcessWorldFixture) -> Result<(), String> {
+    let mut world_state = world.borrow_mut();
+    world_state
+        .as_mut()
+        .map_err(|error| error.to_string())?
+        .start_foreground_with_invalid_config()?;
     Ok(())
 }
 
 #[when("shutdown is triggered")]
-fn when_shutdown_triggered(world: &RefCell<ProcessTestWorld>) { world.borrow().trigger_shutdown(); }
+fn when_shutdown_triggered(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    world_state
+        .as_ref()
+        .map_err(|error| error.to_string())?
+        .trigger_shutdown();
+    Ok(())
+}
 
 #[when("we wait for the daemon to become ready")]
-fn when_wait_for_ready(world: &RefCell<ProcessTestWorld>) {
-    world.borrow_mut().record_wait_for_status("ready");
+fn when_wait_for_ready(world: &ProcessWorldFixture) -> Result<(), String> {
+    let mut world_state = world.borrow_mut();
+    world_state
+        .as_mut()
+        .map_err(|error| error.to_string())?
+        .record_wait_for_status("ready")?;
+    Ok(())
 }
 
 #[when("the daemon run completes")]
 #[then("the daemon run completes")]
-fn daemon_run_completes(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    world.borrow_mut().join_background()?;
+fn daemon_run_completes(world: &ProcessWorldFixture) -> Result<(), String> {
+    let mut world_state = world.borrow_mut();
+    world_state
+        .as_mut()
+        .map_err(|error| error.to_string())?
+        .join_background()?;
     Ok(())
 }
 
 #[given("stale runtime artefacts exist")]
-fn given_stale_runtime(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    world.borrow().write_stale_runtime()?;
+fn given_stale_runtime(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    world_state
+        .as_ref()
+        .map_err(Clone::clone)?
+        .write_stale_runtime()?;
     Ok(())
 }
 
 #[given("stale runtime artefacts with invalid pid exist")]
-fn given_stale_runtime_invalid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    world.borrow().write_stale_runtime_with_invalid_pid(99999)?;
+fn given_stale_runtime_invalid(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    world_state
+        .as_ref()
+        .map_err(Clone::clone)?
+        .write_stale_runtime_with_invalid_pid(99999)?;
     Ok(())
 }
 
 #[given("a lock without a pid file exists")]
-fn given_lock_without_pid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    world.borrow().write_lock_without_pid()?;
+fn given_lock_without_pid(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    world_state
+        .as_ref()
+        .map_err(Clone::clone)?
+        .write_lock_without_pid()?;
     Ok(())
 }
 
 #[then("daemonisation was requested")]
-fn then_daemonisation_requested(world: &RefCell<ProcessTestWorld>) {
-    world
-        .borrow()
+fn then_daemonisation_requested(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    world_state
+        .as_ref()
+        .map_err(Clone::clone)?
         .wait_for_condition(
-            |state| state.daemonizer_calls() > 0,
+            |state| Ok(state.daemonizer_calls() > 0),
             "daemonisation to be invoked",
         )
-        .expect("expected daemonisation to be invoked at least once");
 }
 
 #[then("the daemon wrote the lock file")]
-fn then_lock_file_exists(world: &RefCell<ProcessTestWorld>) {
-    world
-        .borrow()
+fn then_lock_file_exists(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    world_state
+        .as_ref()
+        .map_err(Clone::clone)?
         .wait_for_condition(
-            |state| test_fs::exists(state.lock_path()).expect("check lock file"),
+            |state| test_fs::exists(state.lock_path()?).map_err(|error| error.to_string()),
             "lock file to be written",
         )
-        .expect("lock file should exist whilst daemon is running");
 }
 
 #[then("the daemon wrote the pid file")]
-fn then_pid_file_exists(world: &RefCell<ProcessTestWorld>) {
+fn then_pid_file_exists(world: &ProcessWorldFixture) -> Result<(), String> {
     {
-        let world_ref = world.borrow();
-        world_ref
+        let world_state = world.borrow();
+        world_state
+            .as_ref()
+            .map_err(|error| error.to_string())?
             .wait_for_condition(
-                |state| test_fs::exists(state.pid_path()).expect("check pid file"),
+                |state| test_fs::exists(state.pid_path()?).map_err(|error| error.to_string()),
                 "pid file to be written",
-            )
-            .expect("pid file should be written");
+            )?;
     }
-    let world = world.borrow();
-    let path = world.pid_path();
-    let content = test_fs::read_to_string(&path).expect("pid file should be readable");
-    let pid: u32 = content
+    let world_state = world.borrow();
+    let path = world_state.as_ref().map_err(Clone::clone)?.pid_path()?;
+    let content = test_fs::read_to_string(&path).map_err(|error| error.to_string())?;
+    let pid = content
         .trim()
-        .parse()
-        .expect("pid file should contain an integer");
-    assert_eq!(
-        pid,
-        std::process::id(),
-        "pid file should record current process",
-    );
+        .parse::<u32>()
+        .map_err(|error| error.to_string())?;
+    if pid == std::process::id() {
+        Ok(())
+    } else {
+        Err(format!("pid file should record current process, got {pid}"))
+    }
 }
 
 #[then("the daemon wrote the ready health snapshot")]
-fn then_health_ready(world: &RefCell<ProcessTestWorld>) {
+fn then_health_ready(world: &ProcessWorldFixture) -> Result<(), String> {
     {
-        let world_ref = world.borrow();
-        world_ref
-            .wait_for_status("ready")
-            .expect("daemon should publish ready health snapshot");
+        let world_state = world.borrow();
+        world_state
+            .as_ref()
+            .map_err(Clone::clone)?
+            .wait_for_status("ready")?;
     }
-    let snapshot = world
-        .borrow()
-        .read_health()
-        .expect("health snapshot should parse");
-    assert_eq!(snapshot_status(&snapshot), "ready");
+    let world_state = world.borrow();
+    let snapshot = world_state.as_ref().map_err(Clone::clone)?.read_health()?;
+    let status = snapshot_status(&snapshot)
+        .ok_or_else(|| "health snapshot should contain a status field".to_string())?;
+    if status == "ready" {
+        Ok(())
+    } else {
+        Err(format!("expected ready health snapshot, got {status}"))
+    }
 }
 
 #[then("the daemon recorded the starting health snapshot")]
-fn then_health_starting(world: &RefCell<ProcessTestWorld>) {
-    world
-        .borrow()
+fn then_health_starting(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    world_state
+        .as_ref()
+        .map_err(|error| error.to_string())?
         .wait_for_condition(
             |state| state.saw_status("starting"),
             "starting health snapshot",
         )
-        .expect("starting health snapshot should have been observed");
 }
 
 #[then("the daemon wrote the stopping health snapshot")]
-fn then_health_stopping(world: &RefCell<ProcessTestWorld>) {
-    world
-        .borrow()
+fn then_health_stopping(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    world_state
+        .as_ref()
+        .map_err(|error| error.to_string())?
         .wait_for_condition(
             |state| state.saw_status("stopping"),
             "stopping health snapshot",
         )
-        .expect("daemon should publish stopping health snapshot");
 }
 
 #[then("the runtime artefacts are removed")]
-fn then_runtime_removed(world: &RefCell<ProcessTestWorld>) {
-    let world = world.borrow();
-    assert!(
-        !test_fs::exists(world.lock_path()).expect("check lock file"),
-        "lock file should be removed after shutdown",
-    );
-    assert!(
-        !test_fs::exists(world.pid_path()).expect("check pid file"),
-        "pid file should be removed after shutdown",
-    );
-    assert!(
-        !test_fs::exists(world.health_path()).expect("check health file"),
-        "health file should be removed after shutdown",
-    );
+fn then_runtime_removed(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    let process = world_state.as_ref().map_err(Clone::clone)?;
+    if test_fs::exists(process.lock_path()?).map_err(|error| error.to_string())? {
+        return Err("lock file should be removed after shutdown".to_string());
+    }
+    if test_fs::exists(process.pid_path()?).map_err(|error| error.to_string())? {
+        return Err("pid file should be removed after shutdown".to_string());
+    }
+    if test_fs::exists(process.health_path()?).map_err(|error| error.to_string())? {
+        return Err("health file should be removed after shutdown".to_string());
+    }
+    Ok(())
 }
 
 #[then("the stale runtime pid is replaced with the current process id")]
-fn then_stale_pid_replaced(world: &RefCell<ProcessTestWorld>) {
-    let pid = world
-        .borrow()
-        .read_pid()
-        .expect("pid file should be readable")
-        .expect("pid file should exist after start");
-    assert_eq!(
-        pid,
-        std::process::id(),
-        "pid file should record the current process id",
-    );
+fn then_stale_pid_replaced(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    let pid = world_state
+        .as_ref()
+        .map_err(Clone::clone)?
+        .read_pid()?
+        .ok_or_else(|| "pid file should exist after start".to_string())?;
+    if pid == std::process::id() {
+        Ok(())
+    } else {
+        Err(format!(
+            "pid file should record current process id, got {pid}"
+        ))
+    }
 }
 
 #[then("the lock file remains in place")]
-fn then_lock_remains(world: &RefCell<ProcessTestWorld>) {
-    assert!(
-        world.borrow().lock_exists(),
-        "lock file should remain when launch is still in progress",
-    );
+fn then_lock_remains(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    if world_state.as_ref().map_err(Clone::clone)?.lock_exists()? {
+        Ok(())
+    } else {
+        Err("lock file should remain when launch is still in progress".to_string())
+    }
 }
 
 #[then("starting the daemon again fails with already running")]
-fn then_duplicate_start_fails(world: &RefCell<ProcessTestWorld>) {
-    world
-        .borrow_mut()
-        .start_foreground(LaunchMode::Foreground, false)
-        .expect("foreground start should complete");
-    let binding = world.borrow();
-    let error = binding
+fn then_duplicate_start_fails(world: &ProcessWorldFixture) -> Result<(), String> {
+    {
+        let mut world_state = world.borrow_mut();
+        world_state
+            .as_mut()
+            .map_err(|error| error.to_string())?
+            .start_foreground(LaunchMode::Foreground, false)?;
+    }
+    let world_state = world.borrow();
+    let error = world_state
+        .as_ref()
+        .map_err(Clone::clone)?
         .last_error()
-        .expect("expected a launch error when re-running daemon");
+        .ok_or_else(|| "expected a launch error when re-running daemon".to_string())?;
     match error {
         LaunchError::AlreadyRunning { pid } => {
-            assert_eq!(pid, &std::process::id(), "pid should match current process");
+            if pid == &std::process::id() {
+                Ok(())
+            } else {
+                Err(format!("pid should match current process, got {pid}"))
+            }
         }
-        other => panic!("unexpected error: {other}"),
+        other => Err(format!("unexpected error: {other}")),
     }
 }
 
 #[then("the daemon run succeeds")]
-fn then_daemon_succeeds(world: &RefCell<ProcessTestWorld>) {
-    let binding = world.borrow();
-    let result = binding
+fn then_daemon_succeeds(world: &ProcessWorldFixture) -> Result<(), String> {
+    let world_state = world.borrow();
+    let result = world_state
+        .as_ref()
+        .map_err(Clone::clone)?
         .last_result()
-        .expect("expected a recorded daemon result");
-    assert!(result.is_ok(), "daemon run should succeed: {result:?}");
+        .ok_or_else(|| "expected a recorded daemon result".to_string())?;
+    if result.is_ok() {
+        Ok(())
+    } else {
+        Err(format!("daemon run should succeed: {result:?}"))
+    }
 }
 
 #[then("the daemon run fails with launch already in progress")]
-fn then_daemon_fails_launch_in_progress(world: &RefCell<ProcessTestWorld>) {
-    assert_daemon_error_contains(world, "launch already in progress");
+fn then_daemon_fails_launch_in_progress(world: &ProcessWorldFixture) -> Result<(), String> {
+    assert_daemon_error_contains(world, "launch already in progress")
 }
 
 #[then("the daemon run fails with invalid configuration")]
-fn then_daemon_fails_invalid_config(world: &RefCell<ProcessTestWorld>) {
-    assert_daemon_error_contains(world, "invalid://socket");
+fn then_daemon_fails_invalid_config(world: &ProcessWorldFixture) -> Result<(), String> {
+    assert_daemon_error_contains(world, "invalid://socket")
 }
 
 #[then("waiting for readiness fails")]
-fn then_wait_ready_fails(world: &RefCell<ProcessTestWorld>) {
-    let error = world
-        .borrow_mut()
+fn then_wait_ready_fails(world: &ProcessWorldFixture) -> Result<(), String> {
+    let mut world_state = world.borrow_mut();
+    let error = world_state
+        .as_mut()
+        .map_err(|error| error.to_string())?
         .take_wait_error()
-        .expect("expected wait error to be recorded");
-    assert!(
-        error.contains("ready"),
-        "wait error should mention ready status, got: {error}",
-    );
+        .ok_or_else(|| "expected wait error to be recorded".to_string())?;
+    if error.contains("ready") {
+        Ok(())
+    } else {
+        Err(format!(
+            "wait error should mention ready status, got: {error}"
+        ))
+    }
 }
 
-fn assert_daemon_error_contains(world: &RefCell<ProcessTestWorld>, needle: &str) {
-    let binding = world.borrow();
-    let result = binding
+fn assert_daemon_error_contains(world: &ProcessWorldFixture, needle: &str) -> Result<(), String> {
+    let world_state = world.borrow();
+    let result = world_state
+        .as_ref()
+        .map_err(Clone::clone)?
         .last_result()
-        .expect("expected a recorded daemon result");
-    assert!(
-        result.is_err(),
-        "daemon run should fail, but got success: {result:?}",
-    );
-    let error_message = result.as_ref().unwrap_err().to_string();
-    assert!(
-        error_message.contains(needle),
-        "expected error to contain '{needle}', got '{error_message}'",
-    );
+        .ok_or_else(|| "expected a recorded daemon result".to_string())?;
+    let error_message = match result {
+        Ok(()) => return Err("daemon run should fail, but got success".to_string()),
+        Err(error) => error.to_string(),
+    };
+    if error_message.contains(needle) {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected error to contain '{needle}', got '{error_message}'"
+        ))
+    }
 }
 
 #[scenario(path = "tests/features/daemon_process.feature")]
-fn daemon_process(#[from(world)] _: RefCell<ProcessTestWorld>) {}
+fn daemon_process(#[from(world)] _: ProcessWorldFixture) -> Result<(), String> { Ok(()) }

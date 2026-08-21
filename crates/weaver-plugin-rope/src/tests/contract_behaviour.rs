@@ -20,6 +20,8 @@ struct World {
     validation_result: Option<Result<(), PluginError>>,
 }
 
+type StepResult = Result<(), String>;
+
 #[allow_fixture_expansion_lints]
 #[fixture]
 fn world() -> World { World::default() }
@@ -47,34 +49,55 @@ fn given_non_diff_response_fixture(world: &mut World) {
 }
 
 #[when("the rope crate validates the shared request fixture")]
-fn when_validating_request_fixture(world: &mut World) {
-    let fixture = world.request_fixture.as_ref().expect("request fixture");
+fn when_validating_request_fixture(world: &mut World) -> StepResult {
+    let fixture = world
+        .request_fixture
+        .as_ref()
+        .ok_or_else(|| String::from("request fixture"))?;
     world.validation_result = Some(validate_rename_symbol_request_fixture(fixture));
+    Ok(())
 }
 
 #[when("the rope crate validates the shared response fixture")]
-fn when_validating_response_fixture(world: &mut World) {
-    let fixture = world.response_fixture.as_ref().expect("response fixture");
+fn when_validating_response_fixture(world: &mut World) -> StepResult {
+    let fixture = world
+        .response_fixture
+        .as_ref()
+        .ok_or_else(|| String::from("response fixture"))?;
     world.validation_result = Some(validate_rename_symbol_response_fixture(fixture));
+    Ok(())
 }
 
 #[then("the shared fixture passes contract validation")]
-fn then_fixture_passes(world: &mut World) {
-    let result = world.validation_result.as_ref().expect("validation result");
-    assert!(result.is_ok(), "expected valid fixture, got: {result:?}");
+fn then_fixture_passes(world: &mut World) -> StepResult {
+    let result = world
+        .validation_result
+        .as_ref()
+        .ok_or_else(|| String::from("validation result"))?;
+    match result {
+        Ok(()) => Ok(()),
+        Err(error) => Err(format!("expected valid fixture, got: {error}")),
+    }
 }
 
 #[then("the shared fixture fails with a message containing {text}")]
-fn then_fixture_fails_with_message(world: &mut World, text: String) {
-    let result = world.validation_result.as_ref().expect("validation result");
+fn then_fixture_fails_with_message(world: &mut World, text: String) -> StepResult {
+    let result = world
+        .validation_result
+        .as_ref()
+        .ok_or_else(|| String::from("validation result"))?;
     let error = result
         .as_ref()
-        .expect_err("expected invalid fixture to fail contract validation");
+        .err()
+        .ok_or_else(|| String::from("expected invalid fixture to fail contract validation"))?;
     let needle = text.trim_matches('"');
-    assert!(
-        error.to_string().contains(needle),
-        "expected contract failure to mention '{needle}', got: {error}"
-    );
+    if error.to_string().contains(needle) {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected contract failure to mention '{needle}', got: {error}"
+        ))
+    }
 }
 
 #[scenario(path = "tests/features/rename_symbol_contract.feature")]

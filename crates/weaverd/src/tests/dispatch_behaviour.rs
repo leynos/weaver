@@ -28,7 +28,7 @@ use crate::{
 
 /// Test fixture providing a configured `DispatchConnectionHandler` with test backends.
 #[fixture]
-fn test_handler() -> Arc<DispatchConnectionHandler> {
+fn test_handler() -> Result<Arc<DispatchConnectionHandler>, String> {
     let config = Config {
         daemon_socket: SocketEndpoint::unix("/tmp/weaver-bdd-test/socket.sock"),
         ..Config::default()
@@ -37,28 +37,28 @@ fn test_handler() -> Arc<DispatchConnectionHandler> {
         SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
     let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
     let backend_manager = BackendManager::new(backends);
-    let workspace_root = std::env::current_dir().expect("workspace root");
-    Arc::new(
-        DispatchConnectionHandler::new(
-            backend_manager,
-            workspace_root,
-            "/tmp/weaver-bdd-test/socket.sock",
-            std::env::temp_dir(),
-        )
-        .expect("absolute workspace root"),
+    let workspace_root =
+        std::env::current_dir().map_err(|error| format!("workspace root: {error}"))?;
+    DispatchConnectionHandler::new(
+        backend_manager,
+        workspace_root,
+        "/tmp/weaver-bdd-test/socket.sock",
+        std::env::temp_dir(),
     )
+    .map(Arc::new)
+    .map_err(|error| format!("create dispatch handler: {error}"))
 }
 
 struct DispatchWorld {
     endpoint: SocketEndpoint,
-    handler: Arc<DispatchConnectionHandler>,
+    handler: Result<Arc<DispatchConnectionHandler>, String>,
     listener: Option<ListenerHandle>,
     address: Option<SocketAddr>,
     response_lines: Vec<String>,
 }
 
 impl DispatchWorld {
-    fn with_handler(handler: Arc<DispatchConnectionHandler>) -> Self {
+    fn with_handler(handler: Result<Arc<DispatchConnectionHandler>, String>) -> Self {
         Self {
             endpoint: SocketEndpoint::tcp("127.0.0.1", 0),
             handler,
@@ -68,33 +68,44 @@ impl DispatchWorld {
         }
     }
 
-    fn start_listener(&mut self) {
-        let listener = SocketListener::bind(&self.endpoint).expect("bind listener");
+    fn start_listener(&mut self) -> Result<(), String> {
+        let listener = SocketListener::bind(&self.endpoint)
+            .map_err(|error| format!("bind listener: {error}"))?;
         self.address = listener.local_addr();
         self.listener = Some(
             listener
-                .start(self.handler.clone())
-                .expect("start listener"),
+                .start(self.handler.as_ref()?.clone())
+                .map_err(|error| format!("start listener: {error}"))?,
         );
+        Ok(())
     }
 
-    fn send_request(&mut self, request: &str) {
-        let addr = self.address.expect("address set");
-        let mut stream = TcpStream::connect(addr).expect("connect");
+    fn send_request(&mut self, request: &str) -> Result<(), String> {
+        let addr = self.address.ok_or_else(|| String::from("address set"))?;
+        let mut stream = TcpStream::connect(addr).map_err(|error| format!("connect: {error}"))?;
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
-            .expect("set read timeout");
+            .map_err(|error| format!("set read timeout: {error}"))?;
 
-        stream.write_all(request.as_bytes()).expect("write request");
-        stream.write_all(b"\n").expect("write newline");
-        stream.flush().expect("flush");
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|error| format!("write request: {error}"))?;
+        stream
+            .write_all(b"\n")
+            .map_err(|error| format!("write newline: {error}"))?;
+        stream.flush().map_err(|error| format!("flush: {error}"))?;
 
         let mut reader = BufReader::new(stream);
         let mut line = String::new();
-        while reader.read_line(&mut line).expect("read") > 0 {
+        while reader
+            .read_line(&mut line)
+            .map_err(|error| format!("read: {error}"))?
+            > 0
+        {
             self.response_lines.push(line.trim().to_string());
             line.clear();
         }
+        Ok(())
     }
 
     fn has_exit_message(&self, status: i32) -> bool {
@@ -147,54 +158,60 @@ impl Drop for DispatchWorld {
 }
 
 #[fixture]
-fn world(test_handler: Arc<DispatchConnectionHandler>) -> RefCell<DispatchWorld> {
+fn world(test_handler: Result<Arc<DispatchConnectionHandler>, String>) -> RefCell<DispatchWorld> {
     RefCell::new(DispatchWorld::with_handler(test_handler))
 }
 
 #[given("a daemon connection is established")]
-fn given_daemon_connection(world: &RefCell<DispatchWorld>) { world.borrow_mut().start_listener(); }
+fn given_daemon_connection(world: &RefCell<DispatchWorld>) -> Result<(), String> {
+    world.borrow_mut().start_listener()
+}
 
 #[when("an observe get-definition request is sent without arguments")]
-fn when_observe_request_without_args(world: &RefCell<DispatchWorld>) {
+fn when_observe_request_without_args(world: &RefCell<DispatchWorld>) -> Result<(), String> {
     world
         .borrow_mut()
-        .send_request(r#"{"command":{"domain":"observe","operation":"get-definition"}}"#);
+        .send_request(r#"{"command":{"domain":"observe","operation":"get-definition"}}"#)
 }
 
 #[when("a valid act apply-patch request is sent")]
-fn when_valid_act_request(world: &RefCell<DispatchWorld>) {
+fn when_valid_act_request(world: &RefCell<DispatchWorld>) -> Result<(), String> {
     world
         .borrow_mut()
-        .send_request(r#"{"command":{"domain":"act","operation":"apply-patch"}}"#);
+        .send_request(r#"{"command":{"domain":"act","operation":"apply-patch"}}"#)
 }
 
 #[when("a valid verify diagnostics request is sent")]
-fn when_valid_verify_request(world: &RefCell<DispatchWorld>) {
+fn when_valid_verify_request(world: &RefCell<DispatchWorld>) -> Result<(), String> {
     world
         .borrow_mut()
-        .send_request(r#"{"command":{"domain":"verify","operation":"diagnostics"}}"#);
+        .send_request(r#"{"command":{"domain":"verify","operation":"diagnostics"}}"#)
 }
 
 #[when("a malformed JSONL request is sent")]
-fn when_malformed_request(world: &RefCell<DispatchWorld>) {
-    world.borrow_mut().send_request("not valid json");
+fn when_malformed_request(world: &RefCell<DispatchWorld>) -> Result<(), String> {
+    world.borrow_mut().send_request("not valid json")
 }
 
 #[when(r#"a request with unknown domain "{domain}" is sent"#)]
-fn when_unknown_domain(world: &RefCell<DispatchWorld>, domain: String) {
+fn when_unknown_domain(world: &RefCell<DispatchWorld>, domain: String) -> Result<(), String> {
     let domain = strip_quotes(&domain);
     world.borrow_mut().send_request(&format!(
         r#"{{"command":{{"domain":"{domain}","operation":"test"}}}}"#
-    ));
+    ))
 }
 
 #[when(r#"a request with unknown operation "{operation}" in domain "{domain}" is sent"#)]
-fn when_unknown_operation(world: &RefCell<DispatchWorld>, operation: String, domain: String) {
+fn when_unknown_operation(
+    world: &RefCell<DispatchWorld>,
+    operation: String,
+    domain: String,
+) -> Result<(), String> {
     let operation = strip_quotes(&operation);
     let domain = strip_quotes(&domain);
     world.borrow_mut().send_request(&format!(
         r#"{{"command":{{"domain":"{domain}","operation":"{operation}"}}}}"#
-    ));
+    ))
 }
 
 #[then("the response includes an exit message with status {status}")]
@@ -249,11 +266,11 @@ fn then_unknown_operation_payload_lists_known_operations(
     world: &RefCell<DispatchWorld>,
     operation: String,
     domain: String,
-) {
+) -> Result<(), String> {
     let payload = world
         .borrow()
         .unknown_operation_payload()
-        .expect("unknown-operation payload should be present");
+        .ok_or_else(|| String::from("unknown-operation payload should be present"))?;
     let domain = strip_quotes(&domain);
     let operation = strip_quotes(&operation);
     let expected = match domain {
@@ -274,7 +291,7 @@ fn then_unknown_operation_payload_lists_known_operations(
             "refactor"
         ]),
         "verify" => serde_json::json!(["diagnostics", "syntax"]),
-        other => panic!("unsupported domain {other}"),
+        other => return Err(format!("unsupported domain {other}")),
     };
 
     assert_eq!(payload["status"], "error");
@@ -285,10 +302,14 @@ fn then_unknown_operation_payload_lists_known_operations(
     assert_eq!(
         payload["details"]["known_operations"]
             .as_array()
-            .expect("known_operations array")
+            .ok_or_else(|| String::from("known_operations array"))?
             .len(),
-        expected.as_array().expect("expected array").len()
+        expected
+            .as_array()
+            .ok_or_else(|| String::from("expected array"))?
+            .len()
     );
+    Ok(())
 }
 
 #[then("the response includes an invalid arguments error")]
@@ -304,4 +325,7 @@ fn then_invalid_arguments_error(world: &RefCell<DispatchWorld>) {
 fn strip_quotes(s: &str) -> &str { s.trim_matches('"') }
 
 #[scenario(path = "tests/features/daemon_dispatch.feature")]
-fn daemon_dispatch(#[from(world)] world: RefCell<DispatchWorld>) { drop(world); }
+fn daemon_dispatch(#[from(world)] world: RefCell<DispatchWorld>) -> Result<(), String> {
+    drop(world);
+    Ok(())
+}

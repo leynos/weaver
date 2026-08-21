@@ -29,7 +29,8 @@ fn parse_extract_rule() {
             }
             _ => panic!("expected Extract principal"),
         }
-    });
+    })
+    .expect("valid extract rule");
 }
 
 #[test]
@@ -47,7 +48,7 @@ fn reject_extract_rule_with_match() {
         "    match: \"bar($Y)\"\n",
     );
 
-    let (code, message, has_span) = first_err_diagnostic(yaml);
+    let (code, message, has_span) = first_err_diagnostic(yaml).expect("schema diagnostic");
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(message.contains("extract mode does not support `match`"));
     assert!(has_span, "expected primary_span for schema error");
@@ -78,7 +79,8 @@ fn parse_join_rule() {
             }
             _ => panic!("expected Join principal"),
         }
-    });
+    })
+    .expect("valid join rule");
 }
 
 #[test]
@@ -96,7 +98,8 @@ fn parse_unknown_mode_rule() {
     check_first_rule(yaml, |rule| match rule.mode() {
         RuleMode::Other(s) => assert_eq!(s, "custom-mode"),
         other => panic!("expected RuleMode::Other, got {other:?}"),
-    });
+    })
+    .expect("valid unknown-mode rule");
 }
 
 #[rstest]
@@ -196,7 +199,7 @@ fn parse_unknown_mode_rule() {
     "taint mode does not support `r2c-internal-project-depends-on`",
 )]
 fn reject_cross_mode_principal_fields(#[case] yaml: &str, #[case] expected_fragment: &str) {
-    let (code, message, has_span) = first_err_diagnostic(yaml);
+    let (code, message, has_span) = first_err_diagnostic(yaml).expect("schema diagnostic");
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(
         message.contains(expected_fragment),

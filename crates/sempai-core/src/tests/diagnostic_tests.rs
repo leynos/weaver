@@ -133,30 +133,54 @@ struct ExpectedDiagnosticCase {
     notes: Vec<String>,
 }
 
-fn assert_single_diagnostic_report(report: &DiagnosticReport, expected: &ExpectedDiagnostic<'_>) {
-    assert_eq!(report.len(), 1);
+fn assert_single_diagnostic_report(
+    report: &DiagnosticReport,
+    expected: &ExpectedDiagnostic<'_>,
+) -> Result<(), String> {
+    if report.len() != 1 {
+        return Err(format!("expected one diagnostic, got {}", report.len()));
+    }
     let first = report
         .diagnostics()
         .first()
-        .expect("at least one diagnostic");
-    assert_eq!(first.code(), expected.code);
-    assert_eq!(first.primary_span(), expected.primary_span.as_ref());
-    assert_eq!(first.message(), expected.message);
-    assert_eq!(first.notes(), expected.notes);
+        .ok_or("at least one diagnostic")?;
+    if first.code() != expected.code {
+        return Err(format!(
+            "expected diagnostic code {}, got {}",
+            expected.code,
+            first.code()
+        ));
+    }
+    if first.primary_span() != expected.primary_span.as_ref() {
+        return Err(String::from(
+            "diagnostic primary span differed from expectation",
+        ));
+    }
+    if first.message() != expected.message {
+        return Err(format!(
+            "expected message {:?}, got {:?}",
+            expected.message,
+            first.message()
+        ));
+    }
+    if first.notes() != expected.notes {
+        return Err(String::from("diagnostic notes differed from expectation"));
+    }
+    Ok(())
 }
 
 fn assert_report_constructor_builds_single_diagnostic(
     constructor: fn(DiagnosticCode, String, Option<SourceSpan>, Vec<String>) -> DiagnosticReport,
     span: Option<SourceSpan>,
     expected: &ExpectedDiagnostic<'_>,
-) {
+) -> Result<(), String> {
     let report = constructor(
         expected.code,
         expected.message.to_owned(),
         span,
         expected.notes.to_vec(),
     );
-    assert_single_diagnostic_report(&report, expected);
+    assert_single_diagnostic_report(&report, expected)
 }
 
 #[test]
@@ -261,7 +285,8 @@ fn diagnostic_report_constructors_build_single_diagnostic(
         message: expected.message,
         notes: &expected.notes,
     };
-    assert_report_constructor_builds_single_diagnostic(constructor, span, &borrowed_expected);
+    assert_report_constructor_builds_single_diagnostic(constructor, span, &borrowed_expected)
+        .expect("a single diagnostic report");
 }
 
 #[test]

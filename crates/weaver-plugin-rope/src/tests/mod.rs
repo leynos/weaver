@@ -259,33 +259,51 @@ fn write_workspace_file_creates_nested_parent_directories() {
 // stdin/stdout dispatch layer tests (run_with_adapter)
 // ---------------------------------------------------------------------------
 
-fn valid_request_json() -> String {
+fn valid_request_json() -> Result<String, serde_json::Error> {
     let request = request_with_args(rename_arguments());
-    serde_json::to_string(&request).expect("serialize request")
+    serde_json::to_string(&request)
 }
 
 /// Dispatches `input` through `run_with_adapter` and parses the response.
-fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> weaver_plugins::protocol::PluginResponse {
+fn dispatch_stdin(
+    input: &[u8],
+    adapter: &MockAdapter,
+) -> Result<weaver_plugins::protocol::PluginResponse, String> {
     let mut stdin = std::io::Cursor::new(input.to_vec());
     let mut stdout = Vec::new();
-    run_with_adapter(&mut stdin, &mut stdout, adapter).expect("dispatch should succeed");
-    let output = String::from_utf8(stdout).expect("utf8 stdout");
-    serde_json::from_str(output.trim()).expect("parse response")
+    run_with_adapter(&mut stdin, &mut stdout, adapter)
+        .map_err(|error| format!("dispatch should succeed: {error}"))?;
+    let output = String::from_utf8(stdout).map_err(|error| format!("utf8 stdout: {error}"))?;
+    serde_json::from_str(output.trim()).map_err(|error| format!("parse response: {error}"))
 }
 
 #[rstest]
-#[case::success(
-    format!("{}\n", valid_request_json()).into_bytes(),
-    adapter_returning(Ok(String::from("def new_name():\n    return 1\n"))),
-    true
-)]
-#[case::empty_stdin(Vec::new(), adapter_unused(), false)]
-#[case::invalid_json(b"not valid json\n".to_vec(), adapter_unused(), false)]
+#[case::success("success", true)]
+#[case::empty_stdin("empty_stdin", false)]
+#[case::invalid_json("invalid_json", false)]
 fn run_with_adapter_dispatch_layer(
-    #[case] input: Vec<u8>,
-    #[case] adapter: MockAdapter,
+    #[case] case: &str,
     #[case] expect_success: bool,
-) {
-    let response = dispatch_stdin(&input, &adapter);
-    assert_eq!(response.is_success(), expect_success);
+) -> Result<(), String> {
+    let (input, adapter) = match case {
+        "success" => (
+            format!(
+                "{}\n",
+                valid_request_json().map_err(|error| error.to_string())?
+            )
+            .into_bytes(),
+            adapter_returning(Ok(String::from("def new_name():\n    return 1\n"))),
+        ),
+        "empty_stdin" => (Vec::new(), adapter_unused()),
+        "invalid_json" => (b"not valid json\n".to_vec(), adapter_unused()),
+        unsupported => return Err(format!("unsupported dispatch test case: {unsupported}")),
+    };
+    let response = dispatch_stdin(&input, &adapter)?;
+    if response.is_success() == expect_success {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected success={expect_success}, got: {response:?}"
+        ))
+    }
 }

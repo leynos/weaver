@@ -81,39 +81,42 @@ fn build_refusal_response(reason: RefusalReason, detail: DetailLevel) -> GetCard
 // ---------------------------------------------------------------------------
 
 #[given("a symbol card at {detail} detail level")]
-fn given_card_at_detail(world: &mut TestWorld, detail: QuotedString) {
-    world.card = Some(build_card(detail.as_str()).expect("valid detail level in feature file"));
+fn given_card_at_detail(world: &mut TestWorld, detail: QuotedString) -> Result<(), String> {
+    world.card = Some(build_card(detail.as_str())?);
+    Ok(())
 }
 
 #[given("a refusal response with reason {reason}")]
-fn given_refusal_response(world: &mut TestWorld, reason: QuotedString) {
-    let parsed_reason =
-        parse_refusal_reason(reason.as_str()).expect("valid refusal reason in feature file");
+fn given_refusal_response(world: &mut TestWorld, reason: QuotedString) -> Result<(), String> {
+    let parsed_reason = parse_refusal_reason(reason.as_str())?;
     let detail = DetailLevel::Structure;
     world.response = Some(build_refusal_response(parsed_reason, detail));
+    Ok(())
 }
 
 #[given("a success response with a {detail} detail card")]
-fn given_success_response(world: &mut TestWorld, detail: QuotedString) {
-    let card = build_card(detail.as_str()).expect("valid detail level in feature file");
+fn given_success_response(world: &mut TestWorld, detail: QuotedString) -> Result<(), String> {
+    let card = build_card(detail.as_str())?;
     world.response = Some(GetCardResponse::Success {
         card: Box::new(card),
     });
+    Ok(())
 }
 
 #[given("a get-card request with no detail flag")]
-fn given_request_no_detail(world: &mut TestWorld) {
+fn given_request_no_detail(world: &mut TestWorld) -> Result<(), String> {
     let args = vec![
         String::from("--uri"),
         String::from("file:///src/main.rs"),
         String::from("--position"),
         String::from("10:5"),
     ];
-    world.request = Some(GetCardRequest::parse(&args).expect("valid request"));
+    world.request = Some(GetCardRequest::parse(&args).map_err(|error| error.to_string())?);
+    Ok(())
 }
 
 #[given("a get-card request with an unknown flag")]
-fn given_request_unknown_flag(world: &mut TestWorld) {
+fn given_request_unknown_flag(world: &mut TestWorld) -> Result<(), String> {
     let args = vec![
         String::from("--uri"),
         String::from("file:///src/main.rs"),
@@ -122,7 +125,8 @@ fn given_request_unknown_flag(world: &mut TestWorld) {
         String::from("--some-unknown"),
         String::from("value"),
     ];
-    world.request = Some(GetCardRequest::parse(&args).expect("unknown flags should be skipped"));
+    world.request = Some(GetCardRequest::parse(&args).map_err(|error| error.to_string())?);
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -130,56 +134,71 @@ fn given_request_unknown_flag(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 #[when("the card is serialized to JSON")]
-fn when_card_serialized(world: &mut TestWorld) {
-    if let Some(c) = world.card.as_ref() {
-        world.json_output = Some(serde_json::to_string(c).expect("serialize card"));
-    } else {
-        panic!("card must be set for this step");
-    }
+fn when_card_serialized(world: &mut TestWorld) -> Result<(), String> {
+    let card = world
+        .card
+        .as_ref()
+        .ok_or("card must be set for this step")?;
+    world.json_output = Some(serde_json::to_string(card).map_err(|error| error.to_string())?);
+    Ok(())
 }
 
 #[when("the response is serialized to JSON")]
-fn when_response_serialized(world: &mut TestWorld) {
-    let response = world.response.as_ref().expect("response should be set");
-    world.json_output = Some(serde_json::to_string(response).expect("serialize response"));
+fn when_response_serialized(world: &mut TestWorld) -> Result<(), String> {
+    let response = world.response.as_ref().ok_or("response should be set")?;
+    world.json_output = Some(serde_json::to_string(response).map_err(|error| error.to_string())?);
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
 // Then steps
 // ---------------------------------------------------------------------------
 
-fn parse_json_and_pointer(world: &TestWorld, field: &QuotedString) -> (serde_json::Value, String) {
-    let json = world.json_output.as_ref().expect("JSON should be set");
-    let parsed: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
+fn parse_json_and_pointer(
+    world: &TestWorld,
+    field: &QuotedString,
+) -> Result<(serde_json::Value, String), String> {
+    let json = world.json_output.as_ref().ok_or("JSON should be set")?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(json).map_err(|error| error.to_string())?;
     let pointer = format!("/{}", field.as_str().replace('.', "/"));
-    (parsed, pointer)
+    Ok((parsed, pointer))
 }
 
 #[then("the JSON contains a {field} field")]
-fn then_json_contains_field(world: &mut TestWorld, field: QuotedString) {
-    let (parsed, pointer) = parse_json_and_pointer(world, &field);
+fn then_json_contains_field(world: &mut TestWorld, field: QuotedString) -> Result<(), String> {
+    let (parsed, pointer) = parse_json_and_pointer(world, &field)?;
     assert!(
         parsed.pointer(&pointer).is_some(),
         "expected JSON to contain field '{}', got: {parsed}",
         field.as_str()
     );
+    Ok(())
 }
 
 #[then("the JSON does not contain a {field} field")]
-fn then_json_does_not_contain_field(world: &mut TestWorld, field: QuotedString) {
-    let (parsed, pointer) = parse_json_and_pointer(world, &field);
+fn then_json_does_not_contain_field(
+    world: &mut TestWorld,
+    field: QuotedString,
+) -> Result<(), String> {
+    let (parsed, pointer) = parse_json_and_pointer(world, &field)?;
     assert!(
         parsed.pointer(&pointer).is_none(),
         "expected JSON NOT to contain field '{}', got: {parsed}",
         field.as_str()
     );
+    Ok(())
 }
 
 #[then("the JSON field {key} has value {value}")]
-fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
-    let (parsed, pointer) = parse_json_and_pointer(world, &key);
+fn then_json_field_has_value(
+    world: &mut TestWorld,
+    key: QuotedString,
+    value: QuotedString,
+) -> Result<(), String> {
+    let (parsed, pointer) = parse_json_and_pointer(world, &key)?;
     let missing_key_message = format!("expected JSON to contain key '{}': {parsed}", key.as_str());
-    let actual = parsed.pointer(&pointer).expect(&missing_key_message);
+    let actual = parsed.pointer(&pointer).ok_or(missing_key_message)?;
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(String::from(value.as_str())));
     assert_eq!(
@@ -190,13 +209,15 @@ fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: Qu
         expected,
         actual
     );
+    Ok(())
 }
 
 #[then("the detail level is {level}")]
-fn then_detail_level_is(world: &mut TestWorld, level: QuotedString) {
-    let request = world.request.as_ref().expect("request should be set");
-    let expected = parse_detail_level(level.as_str()).expect("valid detail level in feature file");
+fn then_detail_level_is(world: &mut TestWorld, level: QuotedString) -> Result<(), String> {
+    let request = world.request.as_ref().ok_or("request should be set")?;
+    let expected = parse_detail_level(level.as_str())?;
     assert_eq!(request.detail, expected);
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

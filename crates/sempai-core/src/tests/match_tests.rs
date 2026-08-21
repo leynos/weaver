@@ -63,7 +63,7 @@ fn match_serde_round_trip() {
 /// Builds a [`Match`] with both `Node` and `Nodes` captures, serializes it
 /// to JSON, and deserializes it back.  Returns the deserialized instance for
 /// per-field assertions in individual tests.
-fn round_trip_match_with_captures() -> Match {
+fn round_trip_match_with_captures() -> Result<Match, serde_json::Error> {
     let span = sample_span();
     let node = CapturedNode::new(
         span.clone(),
@@ -95,13 +95,13 @@ fn round_trip_match_with_captures() -> Match {
         captures,
     );
 
-    let json = serde_json::to_string(&m).expect("serialize with captures");
-    serde_json::from_str(&json).expect("deserialize with captures")
+    let json = serde_json::to_string(&m)?;
+    serde_json::from_str(&json)
 }
 
 #[test]
 fn match_serde_round_trip_preserves_node_capture() {
-    let deserialized = round_trip_match_with_captures();
+    let deserialized = round_trip_match_with_captures().expect("round trip with captures");
 
     assert_eq!(deserialized.rule_id(), "test-rule");
     assert_eq!(deserialized.uri(), "file:///test.py");
@@ -118,7 +118,7 @@ fn match_serde_round_trip_preserves_node_capture() {
 
 #[test]
 fn match_serde_round_trip_preserves_nodes_capture() {
-    let deserialized = round_trip_match_with_captures();
+    let deserialized = round_trip_match_with_captures().expect("round trip with captures");
 
     match deserialized.captures().get("$nodes") {
         Some(CaptureValue::Nodes(ns)) => {

@@ -22,12 +22,15 @@ fn assert_two_pattern_branches(
     branches: &[Decorated<Formula>],
     first_text: &str,
     second_text: &str,
-) {
-    assert_eq!(branches.len(), 2);
-    let first = branches.first().expect("expected first branch");
-    let second = branches.get(1).expect("expected second branch");
+) -> Result<(), String> {
+    if branches.len() != 2 {
+        return Err(format!("expected two branches, got {}", branches.len()));
+    }
+    let first = branches.first().ok_or("expected first branch")?;
+    let second = branches.get(1).ok_or("expected second branch")?;
     assert_wraps_pattern_atom(first, first_text);
     assert_wraps_pattern_atom(second, second_text);
+    Ok(())
 }
 
 fn assert_empty_metadata(formula: &Decorated<Formula>) {
@@ -55,9 +58,13 @@ fn decorated_match_formula(formula: MatchFormula) -> SearchQueryPrincipal {
     })
 }
 
-fn normalize_decorated_with(formula: MatchFormula, span: &SourceSpan) -> Decorated<Formula> {
+fn normalize_decorated_with(
+    formula: MatchFormula,
+    span: &SourceSpan,
+) -> Result<Decorated<Formula>, String> {
     let principal = decorated_match_formula(formula);
-    normalize_search_principal(&principal, Some(span)).expect("formula should normalize")
+    normalize_search_principal(&principal, Some(span))
+        .map_err(|report| format!("formula should normalize: {report}"))
 }
 
 fn extract_and_branches(formula: &Formula) -> &[Decorated<Formula>] {
@@ -145,11 +152,11 @@ fn v2_decorated_over_branches_preserves_metadata_and_spans(
     #[case] extract: fn(&Formula) -> &[Decorated<Formula>],
 ) {
     let span = SourceSpan::new(12, 99, Some(String::from("file:///rule.yaml")));
-    let decorated = normalize_decorated_with(formula, &span);
+    let decorated = normalize_decorated_with(formula, &span).expect("formula normalizes");
 
     assert_decorated_metadata(&decorated, &span);
     let children = extract(&decorated.node);
-    assert_two_pattern_branches(children, "a", "b");
+    assert_two_pattern_branches(children, "a", "b").expect("two pattern branches");
     for child in children {
         assert_empty_metadata_with_span(child, &span);
     }
@@ -173,7 +180,7 @@ fn v2_decorated_over_unary_preserves_metadata_and_spans(
     #[case] extract: fn(&Formula) -> &Decorated<Formula>,
 ) {
     let span = SourceSpan::new(14, 101, Some(String::from("file:///rule.yaml")));
-    let decorated = normalize_decorated_with(formula, &span);
+    let decorated = normalize_decorated_with(formula, &span).expect("formula normalizes");
 
     assert_decorated_metadata(&decorated, &span);
     let inner = extract(&decorated.node);
@@ -204,7 +211,7 @@ fn v2_decorated_over_all_wraps_preserves_metadata() {
         }]
     );
     let children = extract_and_branches(&decorated.node);
-    assert_two_pattern_branches(children, "a", "b");
+    assert_two_pattern_branches(children, "a", "b").expect("two pattern branches");
     for child in children {
         assert!(child.span.is_none());
         assert_empty_metadata(child);

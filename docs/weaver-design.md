@@ -101,8 +101,14 @@ commands can consume directly or after ordinary UNIX filtering:
 
 ```sh
 weaver symbols list --query 'fn $name(...)' --json \
-  | jq 'select(.name | startswith("old_"))' \
-  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+  | jq -c '
+      if .schema == "weaver.selector.v1" then
+        select(.captures.NAME.text | startswith("old_"))
+      else
+        .
+      end
+    ' \
+  | weaver symbols rename --selectors - --replace-prefix old_ --with-prefix new_
 ```
 
 Sempai one-liner queries are a first-class selector form, peer to position
@@ -450,11 +456,17 @@ filtering. For example:
 
 ```sh
 weaver symbols list --query 'fn $name(...)' --json \
-  | weaver symbols rename --from-stdin --suffix _renamed
+  | weaver symbols rename --selectors - --suffix _renamed
 
 weaver symbols list --query 'fn $name(...)' --json \
-  | jq 'select(.name | startswith("old_"))' \
-  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+  | jq -c '
+      if .schema == "weaver.selector.v1" then
+        select(.captures.NAME.text | startswith("old_"))
+      else
+        .
+      end
+    ' \
+  | weaver symbols rename --selectors - --replace-prefix old_ --with-prefix new_
 
 weaver symbols rename --query 'fn process_request(...)' --new-name run_request
 

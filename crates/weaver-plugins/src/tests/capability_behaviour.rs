@@ -52,6 +52,8 @@ struct CapabilityWorld {
     version_b: Option<ContractVersion>,
 }
 
+type StepResult = Result<(), String>;
+
 #[allow_fixture_expansion_lints]
 #[fixture]
 fn world() -> CapabilityWorld { CapabilityWorld::default() }
@@ -109,34 +111,37 @@ fn given_analysis_response(world: &mut CapabilityWorld) {
 }
 
 #[given("a failure response with reason code {code}")]
-fn given_failure_with_reason(world: &mut CapabilityWorld, code: QuotedString) {
-    let reason: ReasonCode =
-        serde_json::from_str(&format!("\"{}\"", code.as_str())).expect("valid reason code");
+fn given_failure_with_reason(world: &mut CapabilityWorld, code: QuotedString) -> StepResult {
+    let reason: ReasonCode = serde_json::from_str(&format!("\"{}\"", code.as_str()))
+        .map_err(|error| format!("valid reason code: {error}"))?;
     let diag = PluginDiagnostic::new(DiagnosticSeverity::Error, "symbol not found")
         .with_reason_code(reason);
     world.response = Some(PluginResponse::failure(vec![diag]));
+    Ok(())
 }
 
 #[given("an actuator manifest with capability {cap}")]
-fn given_actuator_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) {
-    let cap_id: CapabilityId =
-        serde_json::from_str(&format!("\"{}\"", cap.as_str())).expect("valid capability id");
+fn given_actuator_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) -> StepResult {
+    let cap_id: CapabilityId = serde_json::from_str(&format!("\"{}\"", cap.as_str()))
+        .map_err(|error| format!("valid capability id: {error}"))?;
     let meta = PluginMetadata::new("test-plugin", "1.0", PluginKind::Actuator);
     world.manifest = Some(
         PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/test"))
             .with_capabilities(vec![cap_id]),
     );
+    Ok(())
 }
 
 #[given("a sensor manifest with capability {cap}")]
-fn given_sensor_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) {
-    let cap_id: CapabilityId =
-        serde_json::from_str(&format!("\"{}\"", cap.as_str())).expect("valid capability id");
+fn given_sensor_manifest_with_cap(world: &mut CapabilityWorld, cap: QuotedString) -> StepResult {
+    let cap_id: CapabilityId = serde_json::from_str(&format!("\"{}\"", cap.as_str()))
+        .map_err(|error| format!("valid capability id: {error}"))?;
     let meta = PluginMetadata::new("test-sensor", "1.0", PluginKind::Sensor);
     world.manifest = Some(
         PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/test"))
             .with_capabilities(vec![cap_id]),
     );
+    Ok(())
 }
 
 #[given("contract version {major}.{minor}")]
@@ -154,23 +159,41 @@ fn given_version_b(world: &mut CapabilityWorld, major: u16, minor: u16) {
 // ---------------------------------------------------------------------------
 
 #[when("the request is validated")]
-fn when_validate_request(world: &mut CapabilityWorld) {
-    let contract = world.contract.as_ref().expect("contract must be set");
-    let request = world.request.as_ref().expect("request must be set");
+fn when_validate_request(world: &mut CapabilityWorld) -> StepResult {
+    let contract = world
+        .contract
+        .as_ref()
+        .ok_or_else(|| String::from("contract must be set"))?;
+    let request = world
+        .request
+        .as_ref()
+        .ok_or_else(|| String::from("request must be set"))?;
     world.validation_result = Some(contract.validate_request(request));
+    Ok(())
 }
 
 #[when("the response is validated")]
-fn when_validate_response(world: &mut CapabilityWorld) {
-    let contract = world.contract.as_ref().expect("contract must be set");
-    let response = world.response.as_ref().expect("response must be set");
+fn when_validate_response(world: &mut CapabilityWorld) -> StepResult {
+    let contract = world
+        .contract
+        .as_ref()
+        .ok_or_else(|| String::from("contract must be set"))?;
+    let response = world
+        .response
+        .as_ref()
+        .ok_or_else(|| String::from("response must be set"))?;
     world.validation_result = Some(contract.validate_response(response));
+    Ok(())
 }
 
 #[when("the manifest is validated")]
-fn when_validate_manifest(world: &mut CapabilityWorld) {
-    let manifest = world.manifest.as_ref().expect("manifest must be set");
+fn when_validate_manifest(world: &mut CapabilityWorld) -> StepResult {
+    let manifest = world
+        .manifest
+        .as_ref()
+        .ok_or_else(|| String::from("manifest must be set"))?;
     world.validation_result = Some(manifest.validate());
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -178,54 +201,73 @@ fn when_validate_manifest(world: &mut CapabilityWorld) {
 // ---------------------------------------------------------------------------
 
 #[then("validation succeeds")]
-fn then_validation_succeeds(world: &mut CapabilityWorld) {
+fn then_validation_succeeds(world: &mut CapabilityWorld) -> StepResult {
     let result = world
         .validation_result
         .as_ref()
-        .expect("validation must have been run");
-    assert!(
-        result.is_ok(),
-        "expected validation to succeed but got: {}",
-        result.as_ref().expect_err("unreachable")
-    );
+        .ok_or_else(|| String::from("validation must have been run"))?;
+    match result {
+        Ok(()) => Ok(()),
+        Err(error) => Err(format!("expected validation to succeed but got: {error}")),
+    }
 }
 
 #[then("validation fails with {substring}")]
-fn then_validation_fails_with(world: &mut CapabilityWorld, substring: QuotedString) {
+fn then_validation_fails_with(world: &mut CapabilityWorld, substring: QuotedString) -> StepResult {
     let result = world
         .validation_result
         .as_ref()
-        .expect("validation must have been run");
+        .ok_or_else(|| String::from("validation must have been run"))?;
     let err = result
         .as_ref()
-        .expect_err("expected validation to fail but it succeeded");
+        .err()
+        .ok_or_else(|| String::from("expected validation to fail but it succeeded"))?;
     let msg = err.to_string();
-    assert!(
-        msg.to_ascii_lowercase()
-            .contains(&substring.as_str().to_ascii_lowercase()),
-        "expected error to contain '{}' but got: {msg}",
-        substring.as_str()
-    );
+    let contains_substring = msg
+        .to_ascii_lowercase()
+        .contains(&substring.as_str().to_ascii_lowercase());
+    if !contains_substring {
+        return Err(format!(
+            "expected error to contain '{}': {}",
+            substring.as_str(),
+            msg
+        ));
+    }
+    Ok(())
 }
 
 #[then("the versions are compatible")]
-fn then_versions_compatible(world: &mut CapabilityWorld) {
-    let a = world.version_a.as_ref().expect("version_a must be set");
-    let b = world.version_b.as_ref().expect("version_b must be set");
-    assert!(
-        a.is_compatible_with(b),
-        "expected {a} to be compatible with {b}"
-    );
+fn then_versions_compatible(world: &mut CapabilityWorld) -> StepResult {
+    let a = world
+        .version_a
+        .as_ref()
+        .ok_or_else(|| String::from("version_a must be set"))?;
+    let b = world
+        .version_b
+        .as_ref()
+        .ok_or_else(|| String::from("version_b must be set"))?;
+    if a.is_compatible_with(b) {
+        Ok(())
+    } else {
+        Err(format!("expected {a} to be compatible with {b}"))
+    }
 }
 
 #[then("the versions are incompatible")]
-fn then_versions_incompatible(world: &mut CapabilityWorld) {
-    let a = world.version_a.as_ref().expect("version_a must be set");
-    let b = world.version_b.as_ref().expect("version_b must be set");
-    assert!(
-        !a.is_compatible_with(b),
-        "expected {a} to be incompatible with {b}"
-    );
+fn then_versions_incompatible(world: &mut CapabilityWorld) -> StepResult {
+    let a = world
+        .version_a
+        .as_ref()
+        .ok_or_else(|| String::from("version_a must be set"))?;
+    let b = world
+        .version_b
+        .as_ref()
+        .ok_or_else(|| String::from("version_b must be set"))?;
+    if a.is_compatible_with(b) {
+        Err(format!("expected {a} to be incompatible with {b}"))
+    } else {
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------

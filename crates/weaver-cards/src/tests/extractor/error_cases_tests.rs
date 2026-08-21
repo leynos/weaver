@@ -28,7 +28,7 @@ fn extraction_error_cases(
     #[case] request: ExtractRequest<'static>,
     #[case] expected: ExpectedError,
 ) {
-    let err = extract_error(request);
+    let err = extract_error(request).expect("card extraction should fail");
 
     assert!(
         error_matches(&err, expected),

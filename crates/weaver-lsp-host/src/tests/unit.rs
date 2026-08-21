@@ -238,85 +238,95 @@ fn rejects_duplicate_language_registration() {
 }
 
 #[rstest]
-fn reports_unknown_language_on_request() {
+fn reports_unknown_language_on_request() -> Result<(), String> {
     let mut host = crate::LspHost::new(CapabilityMatrix::default());
-    match host.goto_definition(Language::Rust, definition_params()) {
-        Err(LspHostError::UnknownLanguage { .. }) => {}
-        other => panic!("expected unknown language error, got {other:?}"),
+    match host.goto_definition(Language::Rust, definition_params()?) {
+        Err(LspHostError::UnknownLanguage { .. }) => Ok(()),
+        other => Err(format!("expected unknown language error, got {other:?}")),
     }
 }
 
 #[rstest]
-fn propagates_server_error_from_definition() {
+fn propagates_server_error_from_definition() -> Result<(), String> {
+    let parameters = definition_params()?;
     assert_server_error_propagates(FailingDefinitionServer, HostOperation::Definition, |host| {
-        host.goto_definition(Language::Rust, definition_params())
-    });
+        host.goto_definition(Language::Rust, parameters)
+    })
 }
 
 #[rstest]
-fn propagates_server_error_from_did_change() {
+fn propagates_server_error_from_did_change() -> Result<(), String> {
+    let parameters = did_change_params()?;
     assert_server_error_propagates(FailingDidChangeServer, HostOperation::DidChange, |host| {
-        host.did_change(Language::Rust, did_change_params())
-    });
+        host.did_change(Language::Rust, parameters)
+    })
 }
 
 #[rstest]
-fn propagates_server_error_from_did_open() {
+fn propagates_server_error_from_did_open() -> Result<(), String> {
+    let parameters = did_open_params()?;
     assert_server_error_propagates(FailingDidOpenServer, HostOperation::DidOpen, |host| {
-        host.did_open(Language::Rust, did_open_params())
-    });
+        host.did_open(Language::Rust, parameters)
+    })
 }
 
 #[rstest]
-fn propagates_server_error_from_did_close() {
+fn propagates_server_error_from_did_close() -> Result<(), String> {
+    let parameters = did_close_params()?;
     assert_server_error_propagates(FailingDidCloseServer, HostOperation::DidClose, |host| {
-        host.did_close(Language::Rust, did_close_params())
-    });
+        host.did_close(Language::Rust, parameters)
+    })
 }
 
 #[rstest]
-fn calls_initialise_before_requests() {
+fn calls_initialise_before_requests() -> Result<(), String> {
+    let uri = sample_uri()?;
     assert_initialise_before(
-        |host| {
-            let uri = sample_uri();
-            host.diagnostics(Language::Rust, uri)
-        },
+        |host| host.diagnostics(Language::Rust, uri),
         &[CallKind::Initialise],
         "initialise should precede requests",
     );
+    Ok(())
 }
 
 #[rstest]
-fn calls_initialise_before_document_sync() {
+fn calls_initialise_before_document_sync() -> Result<(), String> {
+    let parameters = did_open_params()?;
     assert_initialise_before(
-        |host| host.did_open(Language::Rust, did_open_params()),
+        |host| host.did_open(Language::Rust, parameters),
         &[CallKind::Initialise, CallKind::DidOpen],
         "initialise should precede didOpen",
     );
+    Ok(())
 }
 
 fn assert_server_error_propagates<T, F>(
     server: impl LanguageServer + 'static,
     expected_operation: HostOperation,
     call: F,
-) where
+) -> Result<(), String>
+where
     F: FnOnce(&mut crate::LspHost) -> Result<T, LspHostError>,
     T: std::fmt::Debug,
 {
     let mut host = crate::LspHost::new(CapabilityMatrix::default());
     host.register_language(Language::Rust, Box::new(server))
-        .expect("registration failed");
+        .map_err(|error| format!("registration failed: {error}"))?;
 
     match call(&mut host) {
         Err(LspHostError::Server {
             language,
             operation,
             ..
-        }) => {
-            assert_eq!(language, Language::Rust);
-            assert_eq!(operation, expected_operation);
-        }
-        other => panic!("expected server error, got {other:?}"),
+        }) if language == Language::Rust && operation == expected_operation => Ok(()),
+        Err(LspHostError::Server {
+            language,
+            operation,
+            ..
+        }) => Err(format!(
+            "expected Rust {expected_operation:?} error, got {language:?} {operation:?}"
+        )),
+        other => Err(format!("expected server error, got {other:?}")),
     }
 }
 

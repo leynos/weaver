@@ -21,18 +21,20 @@ struct CacheWorld {
 }
 
 impl CacheWorld {
-    fn request(&self) -> CardExtractionInput<'_> {
-        CardExtractionInput {
-            path: self.path.as_deref().expect("path should be set"),
-            source: self.source.as_deref().expect("source should be set"),
+    fn request(&self) -> Result<CardExtractionInput<'_>, String> {
+        Ok(CardExtractionInput {
+            path: self.path.as_deref().ok_or("path should be set")?,
+            source: self.source.as_deref().ok_or("source should be set")?,
             line: self.line,
             column: self.column,
             detail: DetailLevel::Structure,
-        }
+        })
     }
 
-    fn extractor(&self) -> &TreeSitterCardExtractor {
-        self.extractor.as_ref().expect("extractor should be set")
+    fn extractor(&self) -> Result<&TreeSitterCardExtractor, String> {
+        self.extractor
+            .as_ref()
+            .ok_or_else(|| String::from("extractor should be set"))
     }
 }
 
@@ -63,13 +65,13 @@ fn given_rust_fixture(world: &mut CacheWorld, name: String) {
 }
 
 #[given("a second Rust cache fixture named {name} is extracted once")]
-fn given_second_fixture_extracted(world: &mut CacheWorld, name: String) {
+fn given_second_fixture_extracted(world: &mut CacheWorld, name: String) -> Result<(), String> {
     let fixture_name = name.trim_matches('"');
     world.path = Some(PathBuf::from(
         "/tmp/weaver-cards-tests/cache_behaviour_second.rs",
     ));
     world.source = Some(rust_fixture_source(fixture_name));
-    when_extracted_once(world);
+    when_extracted_once(world)
 }
 
 #[given("an unsupported cache fixture")]
@@ -85,14 +87,14 @@ fn given_request_position(world: &mut CacheWorld, line: u32, column: u32) {
 }
 
 #[when("the fixture is extracted twice")]
-fn when_extracted_twice(world: &mut CacheWorld) {
-    when_extracted_once(world);
-    when_extracted_once(world);
+fn when_extracted_twice(world: &mut CacheWorld) -> Result<(), String> {
+    when_extracted_once(world)?;
+    when_extracted_once(world)
 }
 
 #[when("the fixture is extracted once")]
-fn when_extracted_once(world: &mut CacheWorld) {
-    let result = world.extractor().extract(world.request());
+fn when_extracted_once(world: &mut CacheWorld) -> Result<(), String> {
+    let result = world.extractor()?.extract(world.request()?);
     match result {
         Ok(card) => {
             world.cards.push(card);
@@ -100,6 +102,7 @@ fn when_extracted_once(world: &mut CacheWorld) {
         }
         Err(error) => world.error = Some(error),
     }
+    Ok(())
 }
 
 #[when("the Rust cache fixture changes to {name}")]
@@ -109,46 +112,51 @@ fn when_fixture_changes(world: &mut CacheWorld, name: String) {
 }
 
 #[when("extraction fails")]
-fn when_extraction_fails(world: &mut CacheWorld) {
-    when_extracted_once(world);
+fn when_extraction_fails(world: &mut CacheWorld) -> Result<(), String> {
+    when_extracted_once(world)?;
     assert!(world.error.is_some(), "expected extraction to fail");
+    Ok(())
 }
 
 #[then("the cache records {hits} hit")]
 #[then("the cache records {hits} hits")]
-fn then_cache_hits(world: &mut CacheWorld, hits: u64) {
-    assert_eq!(world.extractor().cache_stats().hits, hits);
+fn then_cache_hits(world: &mut CacheWorld, hits: u64) -> Result<(), String> {
+    assert_eq!(world.extractor()?.cache_stats().hits, hits);
+    Ok(())
 }
 
 #[then("the cache records {misses} miss")]
 #[then("the cache records {misses} misses")]
-fn then_cache_misses(world: &mut CacheWorld, misses: u64) {
-    assert_eq!(world.extractor().cache_stats().misses, misses);
+fn then_cache_misses(world: &mut CacheWorld, misses: u64) -> Result<(), String> {
+    assert_eq!(world.extractor()?.cache_stats().misses, misses);
+    Ok(())
 }
 
 #[then("the extracted_at timestamp is preserved across requests")]
-fn then_timestamp_preserved(world: &mut CacheWorld) {
+fn then_timestamp_preserved(world: &mut CacheWorld) -> Result<(), String> {
     assert_eq!(world.cards.len(), 2);
     let first_timestamp = world
         .cards
         .first()
         .map(|card| card.provenance.extracted_at.as_str())
-        .expect("first cached card should exist");
+        .ok_or("first cached card should exist")?;
     let second_timestamp = world
         .cards
         .get(1)
         .map(|card| card.provenance.extracted_at.as_str())
-        .expect("second cached card should exist");
+        .ok_or("second cached card should exist")?;
     assert_eq!(
         first_timestamp, second_timestamp,
         "cached extraction should preserve the original timestamp"
     );
+    Ok(())
 }
 
 #[then("the cache stores {entries} entry")]
 #[then("the cache stores {entries} entries")]
-fn then_cache_entries(world: &mut CacheWorld, entries: usize) {
-    assert_eq!(world.extractor().cache_len(), entries);
+fn then_cache_entries(world: &mut CacheWorld, entries: usize) -> Result<(), String> {
+    assert_eq!(world.extractor()?.cache_len(), entries);
+    Ok(())
 }
 
 #[scenario(path = "tests/features/card_cache.feature")]

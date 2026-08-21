@@ -23,6 +23,8 @@ struct World {
     adapter_mode: AdapterMode,
 }
 
+type StepResult = Result<(), String>;
+
 #[derive(Default, Clone, Copy)]
 enum AdapterMode {
     #[default]
@@ -118,49 +120,60 @@ fn given_failing_adapter(world: &mut World) { world.adapter_mode = AdapterMode::
 fn given_no_change_adapter(world: &mut World) { world.adapter_mode = AdapterMode::NoChange; }
 
 #[when("the plugin executes the request")]
-fn when_execute(world: &mut World) {
-    let request = world.request.as_ref().expect("request should be present");
+fn when_execute(world: &mut World) -> StepResult {
+    let request = world
+        .request
+        .as_ref()
+        .ok_or_else(|| String::from("request should be present"))?;
     let mut adapter = MockBehaviourAdapter::new();
     if should_invoke_rename(request) {
         configure_adapter_for_mode(&mut adapter, world.adapter_mode);
     }
     world.execute_result = Some(execute_request(&adapter, request));
+    Ok(())
 }
 
 /// Resolves the world's execute result to a `PluginResponse`, converting
 /// `Err` outcomes to failure responses for assertion consistency.
-fn resolved_response(world: &World) -> PluginResponse {
+fn resolved_response(world: &World) -> Result<PluginResponse, String> {
     match world
         .execute_result
         .as_ref()
-        .expect("execute result should be present")
+        .ok_or_else(|| String::from("execute result should be present"))?
     {
-        Ok(resp) => resp.clone(),
-        Err(failure) => failure_response(crate::PluginFailure {
+        Ok(resp) => Ok(resp.clone()),
+        Err(failure) => Ok(failure_response(crate::PluginFailure {
             message: failure.message.clone(),
             reason_code: failure.reason_code,
-        }),
+        })),
     }
 }
 
 #[then("the plugin returns successful diff output")]
-fn then_successful_diff(world: &mut World) {
-    let response = resolved_response(world);
-    assert!(response.is_success());
-    assert!(matches!(response.output(), PluginOutput::Diff { .. }));
+fn then_successful_diff(world: &mut World) -> StepResult {
+    let response = resolved_response(world)?;
+    if response.is_success() && matches!(response.output(), PluginOutput::Diff { .. }) {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected successful diff output, got: {response:?}"
+        ))
+    }
 }
 
 #[then("the plugin returns failure diagnostics")]
-fn then_failure_diagnostics(world: &mut World) {
-    let response = resolved_response(world);
-    assert!(!response.is_success());
-    assert_eq!(response.output(), &PluginOutput::Empty);
-    assert!(
-        response
-            .diagnostics()
-            .iter()
-            .any(|diag| diag.severity() == DiagnosticSeverity::Error)
-    );
+fn then_failure_diagnostics(world: &mut World) -> StepResult {
+    let response = resolved_response(world)?;
+    let has_error_diagnostic = response
+        .diagnostics()
+        .iter()
+        .any(|diag| diag.severity() == DiagnosticSeverity::Error);
+    let has_failure_output = !response.is_success() && response.output() == &PluginOutput::Empty;
+    if has_failure_output && has_error_diagnostic {
+        Ok(())
+    } else {
+        Err(format!("expected failure diagnostics, got: {response:?}"))
+    }
 }
 
 fn assert_any_diagnostic(
@@ -168,29 +181,32 @@ fn assert_any_diagnostic(
     raw_needle: &str,
     predicate: impl Fn(&weaver_plugins::protocol::PluginDiagnostic) -> bool,
     fail_prefix: &str,
-) {
+) -> StepResult {
     let needle = raw_needle.trim_matches('"');
-    let response = resolved_response(world);
+    let response = resolved_response(world)?;
     let diagnostics = response.diagnostics();
-    assert!(
-        diagnostics.iter().any(&predicate),
-        "{fail_prefix} '{needle}' in diagnostics: {diagnostics:?}",
-    );
+    if diagnostics.iter().any(&predicate) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{fail_prefix} '{needle}' in diagnostics: {diagnostics:?}"
+        ))
+    }
 }
 
 #[then("the failure message contains {text}")]
-fn then_failure_contains(world: &mut World, text: String) {
+fn then_failure_contains(world: &mut World, text: String) -> StepResult {
     let needle = text.trim_matches('"').to_owned();
     assert_any_diagnostic(
         world,
         &needle,
         |d| d.message().contains(needle.as_str()),
         "expected diagnostics to contain",
-    );
+    )
 }
 
 #[then("the failure has reason code {code}")]
-fn then_failure_has_reason_code(world: &mut World, code: String) {
+fn then_failure_has_reason_code(world: &mut World, code: String) -> StepResult {
     let needle = code.trim_matches('"').to_owned();
     assert_any_diagnostic(
         world,
@@ -200,7 +216,7 @@ fn then_failure_has_reason_code(world: &mut World, code: String) {
                 .is_some_and(|rc| rc.as_str() == needle.as_str())
         },
         "expected reason code",
-    );
+    )
 }
 
 #[scenario(path = "tests/features/rope_plugin.feature")]

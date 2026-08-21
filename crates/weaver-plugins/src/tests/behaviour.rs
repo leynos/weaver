@@ -69,6 +69,8 @@ struct TestWorld {
     executor_kind: ExecutorKind,
 }
 
+type StepResult = Result<(), String>;
+
 #[derive(Default, Clone, Copy)]
 enum ExecutorKind {
     #[default]
@@ -85,25 +87,31 @@ fn world() -> TestWorld { TestWorld::default() }
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn register_plugin(registry: &mut PluginRegistry, name: &str, language: &str, kind: PluginKind) {
+fn register_plugin(
+    registry: &mut PluginRegistry,
+    name: &str,
+    language: &str,
+    kind: PluginKind,
+) -> StepResult {
     let meta = PluginMetadata::new(name, "1.0", kind);
     let manifest = PluginManifest::new(
         meta,
         vec![language.into()],
         PathBuf::from(format!("/usr/bin/{name}")),
     );
-    registry.register(manifest).expect("register plugin");
+    registry
+        .register(manifest)
+        .map_err(|error| format!("register plugin: {error}"))
 }
 
 /// Extracts a successful `PluginResponse` from the test world.
-/// Panics if no response was captured or if the response was an error.
-fn get_successful_response(world: &TestWorld) -> &PluginResponse {
+fn get_successful_response(world: &TestWorld) -> Result<&PluginResponse, String> {
     world
         .response
         .as_ref()
-        .expect("no response captured")
+        .ok_or_else(|| String::from("no response captured"))?
         .as_ref()
-        .expect("expected success but got error")
+        .map_err(|error| format!("expected success but got error: {error}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -115,18 +123,18 @@ fn given_plugin(
     name: &QuotedString,
     language: &QuotedString,
     kind: PluginKind,
-) {
-    register_plugin(&mut world.registry, name.as_str(), language.as_str(), kind);
+) -> StepResult {
+    register_plugin(&mut world.registry, name.as_str(), language.as_str(), kind)
 }
 
 #[given("a registry with an actuator plugin {name} for {language}")]
-fn given_actuator(world: &mut TestWorld, name: QuotedString, language: QuotedString) {
-    given_plugin(world, &name, &language, PluginKind::Actuator);
+fn given_actuator(world: &mut TestWorld, name: QuotedString, language: QuotedString) -> StepResult {
+    given_plugin(world, &name, &language, PluginKind::Actuator)
 }
 
 #[given("a registry with a sensor plugin {name} for {language}")]
-fn given_sensor(world: &mut TestWorld, name: QuotedString, language: QuotedString) {
-    given_plugin(world, &name, &language, PluginKind::Sensor);
+fn given_sensor(world: &mut TestWorld, name: QuotedString, language: QuotedString) -> StepResult {
+    given_plugin(world, &name, &language, PluginKind::Sensor)
 }
 
 #[given("a mock executor that returns a diff")]
@@ -172,54 +180,56 @@ fn when_query_actuators(world: &mut TestWorld, language: QuotedString) {
 // ---------------------------------------------------------------------------
 
 #[then("the response is successful")]
-fn then_success(world: &mut TestWorld) {
-    let response = get_successful_response(world);
-    assert!(response.is_success(), "response should be successful");
+fn then_success(world: &mut TestWorld) -> StepResult {
+    let response = get_successful_response(world)?;
+    if response.is_success() {
+        Ok(())
+    } else {
+        Err(String::from("response should be successful"))
+    }
 }
 
 #[then("the response output is a diff")]
-fn then_output_is_diff(world: &mut TestWorld) {
-    let response = get_successful_response(world);
-    assert!(
-        matches!(response.output(), PluginOutput::Diff { .. }),
-        "expected diff output, got {:?}",
-        response.output()
-    );
+fn then_output_is_diff(world: &mut TestWorld) -> StepResult {
+    let response = get_successful_response(world)?;
+    if matches!(response.output(), PluginOutput::Diff { .. }) {
+        Ok(())
+    } else {
+        Err(format!("expected diff output, got {:?}", response.output()))
+    }
 }
 
 #[then("the response output is empty")]
-fn then_output_is_empty(world: &mut TestWorld) {
-    let response = get_successful_response(world);
-    assert_eq!(response.output(), &PluginOutput::Empty);
+fn then_output_is_empty(world: &mut TestWorld) -> StepResult {
+    let response = get_successful_response(world)?;
+    if response.output() == &PluginOutput::Empty {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected empty output, got {:?}",
+            response.output()
+        ))
+    }
 }
 
 #[then("the execution fails with {error_kind}")]
-fn then_execution_fails(world: &mut TestWorld, error_kind: ErrorKind) {
+fn then_execution_fails(world: &mut TestWorld, error_kind: ErrorKind) -> StepResult {
     let err = world
         .response
         .as_ref()
-        .expect("no response captured")
+        .ok_or_else(|| String::from("no response captured"))?
         .as_ref()
-        .expect_err("expected error but got success");
-    match error_kind {
-        ErrorKind::NotFound => {
-            assert!(
-                matches!(err, PluginError::NotFound { .. }),
-                "expected NotFound, got: {err}"
-            );
-        }
-        ErrorKind::NonZeroExit => {
-            assert!(
-                matches!(err, PluginError::NonZeroExit { .. }),
-                "expected NonZeroExit, got: {err}"
-            );
-        }
-        ErrorKind::Timeout => {
-            assert!(
-                matches!(err, PluginError::Timeout { .. }),
-                "expected Timeout, got: {err}"
-            );
-        }
+        .err()
+        .ok_or_else(|| String::from("expected error but got success"))?;
+    let matches_kind = match error_kind {
+        ErrorKind::NotFound => matches!(err, PluginError::NotFound { .. }),
+        ErrorKind::NonZeroExit => matches!(err, PluginError::NonZeroExit { .. }),
+        ErrorKind::Timeout => matches!(err, PluginError::Timeout { .. }),
+    };
+    if matches_kind {
+        Ok(())
+    } else {
+        Err(format!("unexpected execution error: {err}"))
     }
 }
 

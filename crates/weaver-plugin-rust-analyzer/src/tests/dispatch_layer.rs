@@ -16,17 +16,19 @@ use super::support::{
 use crate::run_with_adapter;
 
 fn valid_request_json() -> String {
-    let request = request_with_args(rename_arguments());
-    serde_json::to_string(&request).expect("serialize request")
+    String::from(
+        r#"{"operation":"rename-symbol","files":[{"path":"src/main.rs","content":"fn old_name() -> i32 {\n    1\n}\n"}],"arguments":{"uri":"file:///src/main.rs","position":"3","new_name":"new_name"}}"#,
+    )
 }
 
 /// Dispatches `input` through `run_with_adapter` and parses the response.
-fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> PluginResponse {
+fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> Result<PluginResponse, String> {
     let mut stdin = std::io::Cursor::new(input.to_vec());
     let mut stdout = Vec::new();
-    run_with_adapter(&mut stdin, &mut stdout, adapter).expect("dispatch should succeed");
-    let output = String::from_utf8(stdout).expect("utf8 stdout");
-    serde_json::from_str(output.trim()).expect("parse response")
+    run_with_adapter(&mut stdin, &mut stdout, adapter)
+        .map_err(|error| format!("dispatch should succeed: {error}"))?;
+    let output = String::from_utf8(stdout).map_err(|error| format!("utf8 stdout: {error}"))?;
+    serde_json::from_str(output.trim()).map_err(|error| format!("parse response: {error}"))
 }
 
 #[rstest]
@@ -49,7 +51,10 @@ fn run_with_adapter_dispatch_layer(
     #[case] expect_success: bool,
     #[case] expected_message: Option<&str>,
 ) {
-    let response = dispatch_stdin(&input, &adapter);
+    let response = match dispatch_stdin(&input, &adapter) {
+        Ok(response) => response,
+        Err(error) => panic!("dispatch fixture should be valid: {error}"),
+    };
     assert_eq!(response.is_success(), expect_success);
 
     if let Some(needle) = expected_message {
@@ -93,7 +98,10 @@ fn failure_responses_include_reason_codes(
         "{}\n",
         serde_json::to_string(&request).expect("serialize request")
     );
-    let response = dispatch_stdin(input.as_bytes(), &adapter_unused());
+    let response = match dispatch_stdin(input.as_bytes(), &adapter_unused()) {
+        Ok(response) => response,
+        Err(error) => panic!("dispatch fixture should be valid: {error}"),
+    };
 
     assert!(!response.is_success());
     assert!(

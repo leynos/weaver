@@ -15,22 +15,24 @@ use crate::{
     semantic_check::validate_formula,
 };
 
-fn normalize_legacy_decorated(formula: LegacyFormula) -> Decorated<Formula> {
+fn normalize_legacy_decorated(formula: LegacyFormula) -> Result<Decorated<Formula>, String> {
     let principal = SearchQueryPrincipal::Legacy(formula);
-    normalize_search_principal(&principal, None).expect("legacy formula should normalize")
+    normalize_search_principal(&principal, None)
+        .map_err(|report| format!("legacy formula should normalize: {report}"))
 }
 
-fn normalize_v2_decorated(formula: MatchFormula) -> Decorated<Formula> {
+fn normalize_v2_decorated(formula: MatchFormula) -> Result<Decorated<Formula>, String> {
     let principal = SearchQueryPrincipal::Match(formula);
-    normalize_search_principal(&principal, None).expect("v2 formula should normalize")
+    normalize_search_principal(&principal, None)
+        .map_err(|report| format!("v2 formula should normalize: {report}"))
 }
 
-fn first_diagnostic_code(report: &sempai_core::DiagnosticReport) -> DiagnosticCode {
+fn first_diagnostic_code(report: &sempai_core::DiagnosticReport) -> Result<DiagnosticCode, String> {
     report
         .diagnostics()
         .first()
-        .expect("expected diagnostic")
-        .code()
+        .map(sempai_core::Diagnostic::code)
+        .ok_or_else(|| String::from("expected diagnostic"))
 }
 
 fn make_legacy_patterns_with_constraints<const N: usize>(constraints: [Value; N]) -> LegacyFormula {
@@ -42,53 +44,70 @@ fn make_legacy_patterns_with_constraints<const N: usize>(constraints: [Value; N]
     )
 }
 
-fn assert_schema_invalid_normalization(constraint: Value, expected_message: &str) {
+fn assert_schema_invalid_normalization(
+    constraint: Value,
+    expected_message: &str,
+) -> Result<(), String> {
     let principal =
         SearchQueryPrincipal::Legacy(make_legacy_patterns_with_constraints([constraint]));
 
-    let report =
-        normalize_search_principal(&principal, None).expect_err("known malformed constraint fails");
+    let Err(report) = normalize_search_principal(&principal, None) else {
+        return Err(String::from("known malformed constraint should fail"));
+    };
 
-    assert_eq!(
-        first_diagnostic_code(&report),
-        DiagnosticCode::ESempaiSchemaInvalid
-    );
-    assert!(
-        report
-            .diagnostics()
-            .first()
-            .expect("expected diagnostic")
-            .message()
-            .contains(expected_message)
-    );
+    let code = first_diagnostic_code(&report)?;
+    if code != DiagnosticCode::ESempaiSchemaInvalid {
+        return Err(format!("expected schema-invalid code, got {code}"));
+    }
+    let message = report
+        .diagnostics()
+        .first()
+        .ok_or("expected diagnostic")?
+        .message();
+    if !message.contains(expected_message) {
+        return Err(format!(
+            "expected diagnostic message to contain {expected_message:?}, got {message:?}"
+        ));
+    }
+    Ok(())
 }
 
-fn assert_missing_positive_term_in_and_for_decorated(decorated: &Decorated<Formula>) {
-    let err = validate_formula(decorated).expect_err("constraint-only And should fail");
-    let first = err.diagnostics().first().expect("expected diagnostic");
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
+fn assert_missing_positive_term_in_and_for_decorated(
+    decorated: &Decorated<Formula>,
+) -> Result<(), String> {
+    let Err(err) = validate_formula(decorated) else {
+        return Err(String::from("constraint-only And should fail"));
+    };
+    let first = err.diagnostics().first().ok_or("expected diagnostic")?;
+    if first.code() != DiagnosticCode::ESempaiMissingPositiveTermInAnd {
+        return Err(format!(
+            "expected missing-positive code, got {}",
+            first.code()
+        ));
+    }
+    Ok(())
 }
 
-fn assert_compile_yaml_schema_invalid(yaml: &str, expected_message: &str) {
-    let report = Engine::new(EngineConfig::default())
-        .compile_yaml(yaml)
-        .expect_err("malformed known constraint should fail");
+fn assert_compile_yaml_schema_invalid(yaml: &str, expected_message: &str) -> Result<(), String> {
+    let Err(report) = Engine::new(EngineConfig::default()).compile_yaml(yaml) else {
+        return Err(String::from("malformed known constraint should fail"));
+    };
 
-    assert_eq!(
-        first_diagnostic_code(&report),
-        DiagnosticCode::ESempaiSchemaInvalid
-    );
-    assert!(
-        report
-            .diagnostics()
-            .first()
-            .expect("expected diagnostic")
-            .message()
-            .contains(expected_message)
-    );
+    let code = first_diagnostic_code(&report)?;
+    if code != DiagnosticCode::ESempaiSchemaInvalid {
+        return Err(format!("expected schema-invalid code, got {code}"));
+    }
+    let message = report
+        .diagnostics()
+        .first()
+        .ok_or("expected diagnostic")?
+        .message();
+    if !message.contains(expected_message) {
+        return Err(format!(
+            "expected diagnostic message to contain {expected_message:?}, got {message:?}"
+        ));
+    }
+    Ok(())
 }
 
 #[test]
@@ -100,7 +119,7 @@ fn legacy_patterns_propagates_constraints_to_where_clauses() {
         LegacyClause::Constraint(constraint),
     ]);
 
-    let decorated = normalize_legacy_decorated(legacy);
+    let decorated = normalize_legacy_decorated(legacy).expect("legacy formula normalizes");
 
     let children = match &decorated.node {
         Formula::And(children) => children,
@@ -143,7 +162,7 @@ fn constraint_only_patterns_normalize_to_and_and_fail_validation(
     #[case] expected: Constraint,
 ) {
     let legacy = make_legacy_patterns_with_constraints([raw_constraint]);
-    let decorated = normalize_legacy_decorated(legacy);
+    let decorated = normalize_legacy_decorated(legacy).expect("legacy formula normalizes");
 
     assert!(matches!(&decorated.node, Formula::And(children) if children.is_empty()));
     assert_eq!(decorated.where_clauses.len(), 1);
@@ -151,7 +170,8 @@ fn constraint_only_patterns_normalize_to_and_and_fail_validation(
         decorated.where_clauses.first().map(|c| &c.constraint),
         Some(&expected),
     );
-    assert_missing_positive_term_in_and_for_decorated(&decorated);
+    assert_missing_positive_term_in_and_for_decorated(&decorated)
+        .expect("missing positive diagnostic");
 }
 
 #[test]
@@ -159,7 +179,7 @@ fn legacy_patterns_with_unknown_constraint_preserves_other_constraint_text() {
     let constraint =
         json!({"metavariable-comparison": {"metavariable": "$X", "comparison": "$X > 0"}});
     let legacy = LegacyFormula::Patterns(vec![LegacyClause::Constraint(constraint)]);
-    let decorated = normalize_legacy_decorated(legacy);
+    let decorated = normalize_legacy_decorated(legacy).expect("legacy formula normalizes");
 
     assert_eq!(decorated.where_clauses.len(), 1);
     match &decorated
@@ -189,7 +209,8 @@ fn legacy_patterns_with_malformed_known_constraint_fails_normalization(
     #[case] constraint: Value,
     #[case] expected_message: &str,
 ) {
-    assert_schema_invalid_normalization(constraint, expected_message);
+    assert_schema_invalid_normalization(constraint, expected_message)
+        .expect("schema-invalid normalization diagnostic");
 }
 
 #[rstest]
@@ -225,7 +246,8 @@ fn compile_yaml_reports_schema_invalid_for_malformed_where_clause(
     #[case] yaml: &str,
     #[case] expected_message: &str,
 ) {
-    assert_compile_yaml_schema_invalid(yaml, expected_message);
+    assert_compile_yaml_schema_invalid(yaml, expected_message)
+        .expect("schema-invalid compilation diagnostic");
 }
 
 #[test]
@@ -238,7 +260,7 @@ fn v2_decorated_preserves_where_as_and_fix_metadata() {
         fix: Some(String::from("replace_me")),
     };
 
-    let decorated = normalize_v2_decorated(formula);
+    let decorated = normalize_v2_decorated(formula).expect("v2 formula normalizes");
 
     assert!(matches!(
         &decorated.node,

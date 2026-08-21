@@ -80,12 +80,17 @@ pub(super) fn run_extraction(
     )
 }
 
-pub(super) fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
-    run_extraction(request).expect("card extraction should succeed")
+pub(super) fn extract(
+    request: ExtractRequest<'_>,
+) -> Result<crate::SymbolCard, CardExtractionError> {
+    run_extraction(request)
 }
 
-pub(super) fn extract_error(request: ExtractRequest<'_>) -> CardExtractionError {
-    run_extraction(request).expect_err("card extraction should fail")
+pub(super) fn extract_error(request: ExtractRequest<'_>) -> Result<CardExtractionError, String> {
+    match run_extraction(request) {
+        Ok(card) => Err(format!("card extraction unexpectedly succeeded: {card:?}")),
+        Err(error) => Ok(error),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

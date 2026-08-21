@@ -122,7 +122,7 @@ use super::*;
     },
 )]
 fn parse_match_formula_variant(#[case] yaml: &str, #[case] check: fn(&RulePrincipal) -> bool) {
-    check_first_rule(yaml, |rule| assert!(check(rule.principal())));
+    check_first_rule(yaml, |rule| assert!(check(rule.principal()))).expect("valid match rule");
 }
 
 #[rstest]
@@ -163,7 +163,7 @@ fn parse_match_formula_variant(#[case] yaml: &str, #[case] check: fn(&RulePrinci
     "match formula object defines multiple operators",
 )]
 fn reject_invalid_match_rule(#[case] yaml: &str, #[case] expected_fragment: &str) {
-    let (code, message, has_span) = first_err_diagnostic(yaml);
+    let (code, message, has_span) = first_err_diagnostic(yaml).expect("schema diagnostic");
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(message.contains(expected_fragment));
     // Verify span information is present for match formula errors

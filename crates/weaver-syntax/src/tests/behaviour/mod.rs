@@ -49,6 +49,8 @@ struct TestWorld {
     language: Option<SupportedLanguage>,
 }
 
+type StepResult = Result<(), String>;
+
 /// Snapshot of match result data (owned, not borrowed).
 #[derive(Debug)]
 struct MatchResultSnapshot {
@@ -79,10 +81,13 @@ fn world() -> RefCell<TestWorld> { RefCell::new(TestWorld::default()) }
 fn strip_quotes(s: &str) -> &str { s.trim_matches('"') }
 
 #[given("language {language}")]
-fn given_language(world: &RefCell<TestWorld>, language: String) {
+fn given_language(world: &RefCell<TestWorld>, language: String) -> StepResult {
     let mut w = world.borrow_mut();
     let language_str = strip_quotes(&language);
-    w.language = Some(SupportedLanguage::from_str(language_str).expect("language"));
+    w.language = Some(
+        SupportedLanguage::from_str(language_str).map_err(|error| format!("language: {error}"))?,
+    );
+    Ok(())
 }
 
 #[given("a file {filename} with content {content}")]
@@ -95,34 +100,50 @@ fn given_file(world: &RefCell<TestWorld>, filename: String, content: String) {
 }
 
 #[given("Rust source code {code}")]
-fn given_rust_source(world: &RefCell<TestWorld>, code: String) {
+fn given_rust_source(world: &RefCell<TestWorld>, code: String) -> StepResult {
     let mut w = world.borrow_mut();
     w.language = Some(SupportedLanguage::Rust);
     let source_code = strip_quotes(&code);
 
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser init");
-    let parsed = parser.parse(source_code).expect("parse");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).map_err(|error| format!("parser init: {error}"))?;
+    let parsed = parser
+        .parse(source_code)
+        .map_err(|error| format!("parse: {error}"))?;
     w.parsed_source = Some(parsed);
+    Ok(())
 }
 
 #[given("a pattern {pattern}")]
-fn given_pattern(world: &RefCell<TestWorld>, pattern: String) {
+fn given_pattern(world: &RefCell<TestWorld>, pattern: String) -> StepResult {
     let mut w = world.borrow_mut();
     let pat = strip_quotes(&pattern);
-    let language = w.language.expect("language should be set");
-    let compiled = Pattern::compile(pat, language).expect("pattern compile");
+    let language = w
+        .language
+        .ok_or_else(|| String::from("language should be set"))?;
+    let compiled =
+        Pattern::compile(pat, language).map_err(|error| format!("pattern compile: {error}"))?;
     w.pattern = Some(compiled);
+    Ok(())
 }
 
 #[given("a rewrite rule from {from_pattern} to {to_replacement}")]
-fn given_rewrite_rule(world: &RefCell<TestWorld>, from_pattern: String, to_replacement: String) {
+fn given_rewrite_rule(
+    world: &RefCell<TestWorld>,
+    from_pattern: String,
+    to_replacement: String,
+) -> StepResult {
     let mut w = world.borrow_mut();
     let from_pat = strip_quotes(&from_pattern);
     let to_repl = strip_quotes(&to_replacement);
-    let language = w.language.expect("language should be set");
+    let language = w
+        .language
+        .ok_or_else(|| String::from("language should be set"))?;
     // Store the pattern and replacement for later use
-    w.pattern = Some(Pattern::compile(from_pat, language).expect("pattern"));
+    w.pattern =
+        Some(Pattern::compile(from_pat, language).map_err(|error| format!("pattern: {error}"))?);
     w.replacement = Some(to_repl.to_owned());
+    Ok(())
 }
 
 // =============================================================================
@@ -130,22 +151,23 @@ fn given_rewrite_rule(world: &RefCell<TestWorld>, from_pattern: String, to_repla
 // =============================================================================
 
 #[when("the syntactic lock validates the file")]
-fn when_validate_single_file(world: &RefCell<TestWorld>) {
+fn when_validate_single_file(world: &RefCell<TestWorld>) -> StepResult {
     let mut w = world.borrow_mut();
     let lock = TreeSitterSyntacticLock::new();
 
     let (path, content) = w
         .files
         .first()
-        .expect("world should have at least one file to validate");
+        .ok_or_else(|| String::from("world should have at least one file to validate"))?;
     let failures = lock
         .validate_file(path, content)
-        .expect("syntactic lock validation should succeed");
+        .map_err(|error| format!("syntactic lock validation should succeed: {error}"))?;
     w.validation_failures = failures;
+    Ok(())
 }
 
 #[when("the syntactic lock validates all files")]
-fn when_validate_all_files(world: &RefCell<TestWorld>) {
+fn when_validate_all_files(world: &RefCell<TestWorld>) -> StepResult {
     let mut w = world.borrow_mut();
     let lock = TreeSitterSyntacticLock::new();
 
@@ -154,54 +176,62 @@ fn when_validate_all_files(world: &RefCell<TestWorld>) {
         .iter()
         .map(|(p, c)| (p.as_path(), c.as_str()))
         .collect();
-    let failures = lock.validate_files(files).expect("validate");
+    let failures = lock
+        .validate_files(files)
+        .map_err(|error| format!("validate: {error}"))?;
     w.validation_failures = failures;
+    Ok(())
 }
 
 #[when("the pattern is matched against the source")]
-fn when_match_pattern(world: &RefCell<TestWorld>) {
+fn when_match_pattern(world: &RefCell<TestWorld>) -> StepResult {
     let mut w = world.borrow_mut();
 
     let parsed = w
         .parsed_source
         .as_ref()
-        .expect("parsed source should be set before matching");
+        .ok_or_else(|| String::from("parsed source should be set before matching"))?;
     let pattern = w
         .pattern
         .as_ref()
-        .expect("pattern should be set before matching");
+        .ok_or_else(|| String::from("pattern should be set before matching"))?;
 
     let results = pattern.find_all(parsed);
     w.matches = results.iter().map(MatchResultSnapshot::from).collect();
+    Ok(())
 }
 
 #[when("the rewrite is applied")]
-fn when_apply_rewrite(world: &RefCell<TestWorld>) {
+fn when_apply_rewrite(world: &RefCell<TestWorld>) -> StepResult {
     let mut w = world.borrow_mut();
 
     // Get the pattern and source for rewriting
-    let language = w.language.expect("language should be set");
+    let language = w
+        .language
+        .ok_or_else(|| String::from("language should be set"))?;
     let source_text = w
         .parsed_source
         .as_ref()
         .map(|p| p.source().to_owned())
-        .expect("parsed source should be set before applying rewrite");
+        .ok_or_else(|| String::from("parsed source should be set before applying rewrite"))?;
     let pat = w
         .pattern
         .take()
-        .expect("pattern should be set before applying rewrite");
+        .ok_or_else(|| String::from("pattern should be set before applying rewrite"))?;
     let replacement = w
         .replacement
         .take()
-        .expect("replacement should be set before applying rewrite");
+        .ok_or_else(|| String::from("replacement should be set before applying rewrite"))?;
 
     // Apply the rewrite
     let rewriter = Rewriter::new(language);
-    let rule = RewriteRule::new(pat, &replacement).expect("rewrite rule should build");
+    let rule = RewriteRule::new(pat, &replacement)
+        .map_err(|error| format!("rewrite rule should build: {error}"))?;
     let result = rewriter
         .apply(&rule, &source_text)
-        .expect("rewrite should apply");
+        .map_err(|error| format!("rewrite should apply: {error}"))?;
     w.rewrite_result = Some(result);
+    Ok(())
 }
 
 // =============================================================================
@@ -289,27 +319,47 @@ fn then_capture_contains(world: &RefCell<TestWorld>, name: String, expected: Str
 }
 
 #[then("the output contains {text}")]
-fn then_output_contains(world: &RefCell<TestWorld>, text: String) {
+fn then_output_contains(world: &RefCell<TestWorld>, text: String) -> StepResult {
     let w = world.borrow();
     let expected_text = strip_quotes(&text);
-    let result = w.rewrite_result.as_ref().expect("rewrite result");
-    assert!(
-        result.output().contains(expected_text),
-        "Expected output to contain '{expected_text}', got: {}",
-        result.output()
-    );
+    let result = w
+        .rewrite_result
+        .as_ref()
+        .ok_or_else(|| String::from("rewrite result"))?;
+    if result.output().contains(expected_text) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Expected output to contain '{expected_text}', got: {}",
+            result.output()
+        ))
+    }
 }
 
 #[then("the rewrite made changes")]
-fn then_rewrite_changed(world: &RefCell<TestWorld>) {
+fn then_rewrite_changed(world: &RefCell<TestWorld>) -> StepResult {
     let w = world.borrow();
-    let result = w.rewrite_result.as_ref().expect("rewrite result");
-    assert!(result.has_changes(), "Expected rewrite to make changes");
+    let result = w
+        .rewrite_result
+        .as_ref()
+        .ok_or_else(|| String::from("rewrite result"))?;
+    if result.has_changes() {
+        Ok(())
+    } else {
+        Err(String::from("Expected rewrite to make changes"))
+    }
 }
 
 #[then("the rewrite made no changes")]
-fn then_rewrite_unchanged(world: &RefCell<TestWorld>) {
+fn then_rewrite_unchanged(world: &RefCell<TestWorld>) -> StepResult {
     let w = world.borrow();
-    let result = w.rewrite_result.as_ref().expect("rewrite result");
-    assert!(!result.has_changes(), "Expected rewrite to make no changes");
+    let result = w
+        .rewrite_result
+        .as_ref()
+        .ok_or_else(|| String::from("rewrite result"))?;
+    if result.has_changes() {
+        Err(String::from("Expected rewrite to make no changes"))
+    } else {
+        Ok(())
+    }
 }

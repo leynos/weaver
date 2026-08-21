@@ -35,10 +35,10 @@ impl ConfigLoader for PanickingLoader {
 }
 
 /// Renders the bare help block using the given localizer.
-fn render_help(localizer: &dyn Localizer) -> String {
+fn render_help(localizer: &dyn Localizer) -> anyhow::Result<String> {
     let mut buf = Vec::new();
-    write_bare_help(&mut buf, localizer).expect("write bare help");
-    String::from_utf8(buf).expect("utf8")
+    write_bare_help(&mut buf, localizer)?;
+    String::from_utf8(buf).map_err(Into::into)
 }
 
 /// Runs the CLI with no arguments (bare invocation) using a
@@ -134,13 +134,14 @@ fn bare_invocation_produces_no_stdout() {
 }
 
 /// Asserts that the rendered help block contains the expected fragments.
-fn assert_help_text(localizer: &dyn Localizer) {
-    let text = render_help(localizer);
+fn assert_help_text(localizer: &dyn Localizer) -> anyhow::Result<()> {
+    let text = render_help(localizer)?;
     assert!(text.contains("Usage: weaver"));
     assert!(text.contains("observe"));
     assert!(text.contains("act"));
     assert!(text.contains("verify"));
     assert!(text.contains("weaver --help"));
+    Ok(())
 }
 
 #[rstest]
@@ -150,9 +151,9 @@ fn write_bare_help_produces_english(#[case] use_fluent: bool) {
     if use_fluent {
         let localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
             .expect("embedded Fluent catalogue must parse");
-        assert_help_text(&localizer);
+        assert_help_text(&localizer).expect("Fluent help should render");
     } else {
-        assert_help_text(&NoOpLocalizer);
+        assert_help_text(&NoOpLocalizer).expect("fallback help should render");
     }
 }
 
@@ -188,8 +189,8 @@ fn config_only_invocation_emits_bare_help() {
 fn fluent_and_fallback_outputs_are_identical() {
     let fluent_localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
         .expect("embedded Fluent catalogue must parse");
-    let fluent_output = render_help(&fluent_localizer);
-    let fallback_output = render_help(&NoOpLocalizer);
+    let fluent_output = render_help(&fluent_localizer).expect("Fluent help should render");
+    let fallback_output = render_help(&NoOpLocalizer).expect("fallback help should render");
     assert_eq!(
         fluent_output, fallback_output,
         "Fluent catalogue and fallback strings have diverged"
@@ -198,13 +199,13 @@ fn fluent_and_fallback_outputs_are_identical() {
 
 #[test]
 fn bare_help_contains_usage_line() {
-    let text = render_help(&NoOpLocalizer);
+    let text = render_help(&NoOpLocalizer).expect("fallback help should render");
     assert!(text.contains("Usage:"));
 }
 
 #[test]
 fn bare_help_contains_single_help_pointer() {
-    let text = render_help(&NoOpLocalizer);
+    let text = render_help(&NoOpLocalizer).expect("fallback help should render");
     let count = text.matches("weaver --help").count();
     assert_eq!(count, 1, "expected exactly one --help pointer");
 }

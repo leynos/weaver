@@ -37,21 +37,20 @@ pub struct RecordingHealthReporter {
 }
 
 impl RecordingHealthReporter {
-    /// Captures a copy of the recorded events.
-    #[must_use]
-    pub fn events(&self) -> Vec<HealthEvent> {
-        self.events
-            .lock()
-            .expect("health reporter mutex poisoned")
-            .clone()
+    /// Applies an operation to the recorded events, recovering valid test state after a panic.
+    fn with_events<T>(&self, operation: impl FnOnce(&mut Vec<HealthEvent>) -> T) -> T {
+        let mut events = match self.events.lock() {
+            Ok(events) => events,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        operation(&mut events)
     }
 
-    pub fn record(&self, event: HealthEvent) {
-        self.events
-            .lock()
-            .expect("health reporter mutex poisoned")
-            .push(event);
-    }
+    /// Captures a copy of the recorded events.
+    #[must_use]
+    pub fn events(&self) -> Vec<HealthEvent> { self.with_events(|events| events.clone()) }
+
+    pub fn record(&self, event: HealthEvent) { self.with_events(|events| events.push(event)); }
 }
 
 impl HealthReporter for RecordingHealthReporter {

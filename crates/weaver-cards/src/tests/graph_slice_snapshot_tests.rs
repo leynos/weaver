@@ -176,18 +176,25 @@ fn snapshot_spillover_with_frontier() {
 // Component unit tests
 // -----------------------------------------------------------------------
 
-fn assert_serializes_as<T: serde::Serialize>(value: &T, expected: &str) {
-    assert_eq!(serde_json::to_string(value).expect("serialize"), expected);
+fn assert_serializes_as<T: serde::Serialize>(value: &T, expected: &str) -> Result<(), String> {
+    let actual = serde_json::to_string(value).map_err(|error| error.to_string())?;
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!("expected {expected:?}, got {actual:?}"))
+    }
 }
 
 #[test]
 fn resolution_scope_serializes_as_snake_case() {
-    assert_serializes_as(&ResolutionScope::FullSymbolTable, "\"full_symbol_table\"");
+    assert_serializes_as(&ResolutionScope::FullSymbolTable, "\"full_symbol_table\"")
+        .expect("serialization should succeed");
     assert_serializes_as(
         &ResolutionScope::PartialSymbolTable,
         "\"partial_symbol_table\"",
-    );
-    assert_serializes_as(&ResolutionScope::Lsp, "\"lsp\"");
+    )
+    .expect("serialization should succeed");
+    assert_serializes_as(&ResolutionScope::Lsp, "\"lsp\"").expect("serialization should succeed");
 }
 
 #[rstest]
@@ -195,7 +202,7 @@ fn resolution_scope_serializes_as_snake_case() {
 #[case(SliceDirection::Out, "\"out\"")]
 #[case(SliceDirection::Both, "\"both\"")]
 fn slice_direction_serializes_as_snake_case(#[case] value: SliceDirection, #[case] expected: &str) {
-    assert_serializes_as(&value, expected);
+    assert_serializes_as(&value, expected).expect("serialization should succeed");
 }
 
 #[rstest]
@@ -203,7 +210,7 @@ fn slice_direction_serializes_as_snake_case(#[case] value: SliceDirection, #[cas
 #[case(SliceEdgeType::Import, "\"import\"")]
 #[case(SliceEdgeType::Config, "\"config\"")]
 fn slice_edge_type_serializes_as_snake_case(#[case] value: SliceEdgeType, #[case] expected: &str) {
-    assert_serializes_as(&value, expected);
+    assert_serializes_as(&value, expected).expect("serialization should succeed");
 }
 
 #[test]

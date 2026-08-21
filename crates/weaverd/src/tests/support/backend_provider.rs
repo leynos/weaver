@@ -3,7 +3,7 @@
 
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
 };
 
 use weaver_config::Config;
@@ -19,14 +19,14 @@ pub struct RecordingBackendProvider {
 impl RecordingBackendProvider {
     /// Configures the provider to fail for the specified backend.
     pub fn fail_on(&self, kind: BackendKind, message: impl Into<String>) {
-        let mut state = self.state.lock().expect("backend state mutex poisoned");
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         state.failures.insert(kind, message.into());
     }
 
     /// Returns all backends that were requested.
     #[must_use]
     pub fn recorded_starts(&self) -> Vec<BackendKind> {
-        let state = self.state.lock().expect("backend state mutex poisoned");
+        let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         state.starts.clone()
     }
 }
@@ -34,7 +34,7 @@ impl RecordingBackendProvider {
 impl BackendProvider for RecordingBackendProvider {
     fn start_backend(&self, kind: BackendKind, config: &Config) -> Result<(), BackendStartupError> {
         let failure = {
-            let mut state = self.state.lock().expect("backend state mutex poisoned");
+            let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
             state.starts.push(kind);
             state.failures.get(&kind).cloned()
         };

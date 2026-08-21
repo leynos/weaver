@@ -27,27 +27,27 @@ pub use world::{TestServerConfig, TestWorld};
 /// Common URI used by host tests.
 #[allow_fixture_expansion_lints]
 #[fixture]
-pub fn sample_uri() -> Uri { Uri::from_str("file:///workspace/main.rs").expect("invalid test URI") }
+pub fn sample_uri() -> Result<Uri, String> {
+    Uri::from_str("file:///workspace/main.rs").map_err(|error| format!("invalid test URI: {error}"))
+}
 
 /// Builds a definition request for the sample URI.
-#[must_use]
-pub fn definition_params() -> GotoDefinitionParams {
-    GotoDefinitionParams {
+pub fn definition_params() -> Result<GotoDefinitionParams, String> {
+    Ok(GotoDefinitionParams {
         text_document_position_params: TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier { uri: sample_uri() },
+            text_document: TextDocumentIdentifier { uri: sample_uri()? },
             position: lsp_types::Position::new(1, 2),
         },
         work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
         partial_result_params: lsp_types::PartialResultParams::default(),
-    }
+    })
 }
 
 /// Builds a references request for the sample URI.
-#[must_use]
-pub fn reference_params() -> ReferenceParams {
-    ReferenceParams {
+pub fn reference_params() -> Result<ReferenceParams, String> {
+    Ok(ReferenceParams {
         text_document_position: TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier { uri: sample_uri() },
+            text_document: TextDocumentIdentifier { uri: sample_uri()? },
             position: lsp_types::Position::new(1, 2),
         },
         work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
@@ -55,28 +55,26 @@ pub fn reference_params() -> ReferenceParams {
         context: ReferenceContext {
             include_declaration: false,
         },
-    }
+    })
 }
 
 /// Builds a did-open notification for the sample URI.
-#[must_use]
-pub fn did_open_params() -> DidOpenTextDocumentParams {
-    DidOpenTextDocumentParams {
+pub fn did_open_params() -> Result<DidOpenTextDocumentParams, String> {
+    Ok(DidOpenTextDocumentParams {
         text_document: TextDocumentItem {
-            uri: sample_uri(),
+            uri: sample_uri()?,
             language_id: String::from("rust"),
             version: 1,
             text: String::from("fn main() {}"),
         },
-    }
+    })
 }
 
 /// Builds a did-change notification for the sample URI.
-#[must_use]
-pub fn did_change_params() -> DidChangeTextDocumentParams {
-    DidChangeTextDocumentParams {
+pub fn did_change_params() -> Result<DidChangeTextDocumentParams, String> {
+    Ok(DidChangeTextDocumentParams {
         text_document: VersionedTextDocumentIdentifier {
-            uri: sample_uri(),
+            uri: sample_uri()?,
             version: 2,
         },
         content_changes: vec![TextDocumentContentChangeEvent {
@@ -84,13 +82,12 @@ pub fn did_change_params() -> DidChangeTextDocumentParams {
             range_length: None,
             text: String::from("fn main() { println!(\"hi\"); }"),
         }],
-    }
+    })
 }
 
 /// Builds a did-close notification for the sample URI.
-#[must_use]
-pub fn did_close_params() -> DidCloseTextDocumentParams {
-    DidCloseTextDocumentParams {
-        text_document: TextDocumentIdentifier { uri: sample_uri() },
-    }
+pub fn did_close_params() -> Result<DidCloseTextDocumentParams, String> {
+    Ok(DidCloseTextDocumentParams {
+        text_document: TextDocumentIdentifier { uri: sample_uri()? },
+    })
 }

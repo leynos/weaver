@@ -37,9 +37,8 @@ fn suggestion_for_unknown_domain_cases(#[case] input: &str, #[case] expected: Op
     assert_eq!(suggestion_for_unknown_domain(input), expected);
 }
 
-fn fluent_localizer() -> FluentLocalizer {
-    FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
-        .expect("embedded Fluent catalogue must parse")
+fn fluent_localizer() -> anyhow::Result<FluentLocalizer> {
+    FluentLocalizer::with_en_us_defaults([WEAVER_EN_US]).map_err(Into::into)
 }
 
 fn assert_single_error_prefix(output: &str) {
@@ -58,16 +57,18 @@ fn assert_three_part_guidance(
     error_text: &str,
     alternatives_text: &str,
     next_command: &str,
-) {
+) -> anyhow::Result<()> {
     assert_single_error_prefix(output);
-    let error_pos = output.find(error_text).expect("expected error text");
+    let error_pos = output
+        .find(error_text)
+        .ok_or_else(|| anyhow::anyhow!("expected error text"))?;
     let alternatives_pos = output
         .find(alternatives_text)
-        .expect("expected alternatives text");
+        .ok_or_else(|| anyhow::anyhow!("expected alternatives text"))?;
     let next_command_line = format!("Next command:\n  {next_command}");
     let next_command_pos = output
         .find(&next_command_line)
-        .expect("expected exact Next command block");
+        .ok_or_else(|| anyhow::anyhow!("expected exact Next command block"))?;
 
     assert!(
         error_pos < alternatives_pos,
@@ -77,11 +78,12 @@ fn assert_three_part_guidance(
         alternatives_pos < next_command_pos,
         "alternatives block must precede Next command: {output}"
     );
+    Ok(())
 }
 
 #[test]
 fn fluent_missing_operation_guidance_has_single_error_prefix() {
-    let localizer = fluent_localizer();
+    let localizer = fluent_localizer().expect("embedded Fluent catalogue must parse");
     let mut output = Vec::new();
 
     let emitted = write_missing_operation_guidance(&mut output, &localizer, KnownDomain::Observe)
@@ -94,12 +96,13 @@ fn fluent_missing_operation_guidance_has_single_error_prefix() {
         "error: operation required for domain 'observe'",
         "Available operations:\n  get-definition",
         "weaver observe get-definition --help",
-    );
+    )
+    .expect("guidance should use the three-part template");
 }
 
 #[test]
 fn fluent_unknown_domain_guidance_has_single_error_prefix() {
-    let localizer = fluent_localizer();
+    let localizer = fluent_localizer().expect("embedded Fluent catalogue must parse");
     let mut output = Vec::new();
 
     let emitted = write_unknown_domain_guidance(&mut output, &localizer, "unknown-domain")
@@ -112,12 +115,13 @@ fn fluent_unknown_domain_guidance_has_single_error_prefix() {
         "error: unknown domain 'unknown-domain'",
         "Valid domains: observe, act, verify",
         "weaver --help",
-    );
+    )
+    .expect("guidance should use the three-part template");
 }
 
 #[test]
 fn fluent_unknown_domain_guidance_uses_unique_suggestion_when_available() {
-    let localizer = fluent_localizer();
+    let localizer = fluent_localizer().expect("embedded Fluent catalogue must parse");
     let mut output = Vec::new();
 
     let emitted = write_unknown_domain_guidance(&mut output, &localizer, "obsrve")
@@ -134,5 +138,6 @@ fn fluent_unknown_domain_guidance_uses_unique_suggestion_when_available() {
         "error: unknown domain 'obsrve'",
         "Did you mean 'observe'?",
         "weaver observe get-definition --help",
-    );
+    )
+    .expect("guidance should use the three-part template");
 }

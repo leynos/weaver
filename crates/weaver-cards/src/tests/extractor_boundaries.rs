@@ -4,17 +4,20 @@ use std::path::Path;
 
 use crate::{CardExtractionError, CardExtractionInput, DetailLevel, TreeSitterCardExtractor};
 
-fn extract(path: &'static Path, source: &'static str, line: u32, column: u32) -> crate::SymbolCard {
+fn extract(
+    path: &'static Path,
+    source: &'static str,
+    line: u32,
+    column: u32,
+) -> Result<crate::SymbolCard, CardExtractionError> {
     let absolute_path = super::absolute_test_path(path);
-    TreeSitterCardExtractor::new()
-        .extract(CardExtractionInput {
-            path: &absolute_path,
-            source,
-            line,
-            column,
-            detail: DetailLevel::Structure,
-        })
-        .expect("card extraction should succeed")
+    TreeSitterCardExtractor::new().extract(CardExtractionInput {
+        path: &absolute_path,
+        source,
+        line,
+        column,
+        detail: DetailLevel::Structure,
+    })
 }
 
 fn extract_error(
@@ -22,17 +25,18 @@ fn extract_error(
     source: &'static str,
     line: u32,
     column: u32,
-) -> CardExtractionError {
+) -> Result<CardExtractionError, String> {
     let absolute_path = super::absolute_test_path(path);
-    TreeSitterCardExtractor::new()
-        .extract(CardExtractionInput {
-            path: &absolute_path,
-            source,
-            line,
-            column,
-            detail: DetailLevel::Structure,
-        })
-        .expect_err("card extraction should fail")
+    match TreeSitterCardExtractor::new().extract(CardExtractionInput {
+        path: &absolute_path,
+        source,
+        line,
+        column,
+        detail: DetailLevel::Structure,
+    }) {
+        Ok(card) => Err(format!("card extraction unexpectedly succeeded: {card:?}")),
+        Err(error) => Ok(error),
+    }
 }
 
 #[test]
@@ -42,7 +46,8 @@ fn top_level_symbols_keep_preceding_doc_comments() {
         "/// Greets callers.\nfn greet() {}\n",
         2,
         4,
-    );
+    )
+    .expect("card extraction should succeed");
 
     let attachments = card.attachments.expect("attachments");
     assert_eq!(
@@ -53,7 +58,8 @@ fn top_level_symbols_keep_preceding_doc_comments() {
 
 #[test]
 fn trailing_newline_after_symbol_is_not_part_of_symbol_range() {
-    let err = extract_error(Path::new("fixture.rs"), "fn greet() {}\n", 1, 14);
+    let err = extract_error(Path::new("fixture.rs"), "fn greet() {}\n", 1, 14)
+        .expect("card extraction should fail");
 
     assert!(matches!(
         err,
@@ -68,7 +74,8 @@ fn crlf_positions_map_to_the_correct_symbol() {
         "fn first() {}\r\nfn second() {}\r\n",
         2,
         4,
-    );
+    )
+    .expect("card extraction should succeed");
 
     assert_eq!(card.symbol.symbol_ref.name, "second");
 }

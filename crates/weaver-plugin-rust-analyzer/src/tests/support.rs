@@ -3,7 +3,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use mockall::mock;
-use url::Url;
 use weaver_plugins::protocol::{FilePayload, PluginRequest};
 
 use crate::{ByteOffset, RustAnalyzerAdapter, RustAnalyzerAdapterError};
@@ -97,13 +96,4 @@ pub(crate) fn request_with_path(path: &str) -> PluginRequest {
     )
 }
 
-fn file_uri_for_path(path: &str) -> String {
-    let mut url = Url::parse("file:///").expect("static file URL should parse");
-    {
-        let mut segments = url
-            .path_segments_mut()
-            .expect("file URL should accept path segments");
-        segments.extend(path.split('/'));
-    }
-    url.to_string()
-}
+fn file_uri_for_path(path: &str) -> String { format!("file:///{}", path.trim_start_matches('/')) }

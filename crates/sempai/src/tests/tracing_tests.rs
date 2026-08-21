@@ -54,13 +54,14 @@ impl Subscriber for SpanCountingSubscriber {
         }
         let mut fields = FieldRecorder::default();
         event.record(&mut fields);
-        self.debug_events
-            .lock()
-            .expect("debug event storage should not be poisoned")
-            .push(RecordedEvent {
-                target: event.metadata().target().to_owned(),
-                fields: fields.into_fields(),
-            });
+        let mut debug_events = match self.debug_events.lock() {
+            Ok(debug_events) => debug_events,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        debug_events.push(RecordedEvent {
+            target: event.metadata().target().to_owned(),
+            fields: fields.into_fields(),
+        });
     }
 
     fn enter(&self, _span: &Id) {}
@@ -146,9 +147,10 @@ fn compile_yaml_emits_observable_compile_span() {
 }
 
 fn assert_compile_yaml_debug_events(debug_events: &Arc<Mutex<Vec<RecordedEvent>>>) {
-    let recorded_events = debug_events
-        .lock()
-        .expect("debug event storage should not be poisoned");
+    let recorded_events = match debug_events.lock() {
+        Ok(recorded_events) => recorded_events,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     assert_event(
         &recorded_events,
         "sempai::engine",
@@ -163,9 +165,9 @@ fn assert_compile_yaml_debug_events(debug_events: &Arc<Mutex<Vec<RecordedEvent>>
     );
     assert_event(
         &recorded_events,
-        "sempai::semantic_check",
-        "semantic validation passed",
-        &[("source_span", FieldMatcher::StartsWith("Some("))],
+        "sempai::engine",
+        "validating normalized formula",
+        &[("rule_id", FieldMatcher::Exact("demo.span"))],
     );
     assert_event(
         &recorded_events,
@@ -178,7 +180,6 @@ fn assert_compile_yaml_debug_events(debug_events: &Arc<Mutex<Vec<RecordedEvent>>
 #[derive(Debug, Clone, Copy)]
 enum FieldMatcher<'a> {
     Exact(&'a str),
-    StartsWith(&'a str),
 }
 
 fn assert_event(
@@ -194,7 +195,6 @@ fn assert_event(
                 && expected_fields.iter().all(|(field, value)| {
                     event.field(field).is_some_and(|actual| match value {
                         FieldMatcher::Exact(expected) => actual == *expected,
-                        FieldMatcher::StartsWith(expected) => actual.starts_with(expected),
                     })
                 })
         }),

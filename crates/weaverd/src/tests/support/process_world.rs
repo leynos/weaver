@@ -44,13 +44,9 @@ pub struct ProcessTestWorld {
     health_history: RefCell<Vec<String>>,
 }
 
-impl Default for ProcessTestWorld {
-    fn default() -> Self { Self::new() }
-}
-
 impl ProcessTestWorld {
-    pub fn new() -> Self {
-        let loader = TestConfigLoader::new();
+    pub fn new() -> Result<Self, String> {
+        let loader = TestConfigLoader::new()?;
         let world = Self {
             loader,
             reporter: Arc::new(RecordingHealthReporter::default()),
@@ -61,16 +57,15 @@ impl ProcessTestWorld {
             wait_error: None,
             health_history: RefCell::new(Vec::new()),
         };
-        test_support::clear_health_events(world.health_path().as_path())
-            .expect("clear_health_events should succeed");
-        world
+        test_support::clear_health_events(world.health_path()?.as_path())?;
+        Ok(world)
     }
 
     pub fn start_background(&mut self) -> StepResult {
         if self.handle.is_some() {
             return Err("daemon already running".to_string());
         }
-        self.reset_observations();
+        self.reset_observations()?;
         let loader = self.loader.clone();
         let reporter = self.reporter.clone() as Arc<dyn crate::health::HealthReporter>;
         let daemonizer = self.daemonizer.clone();
@@ -93,7 +88,7 @@ impl ProcessTestWorld {
         if self.result.is_some() {
             return Err("result already recorded".to_string());
         }
-        self.reset_observations();
+        self.reset_observations()?;
         let reporter = self.reporter.clone() as Arc<dyn crate::health::HealthReporter>;
         let shutdown_signal = if pretrigger {
             let signal = TestShutdownSignal::new();
@@ -122,7 +117,7 @@ impl ProcessTestWorld {
         if self.result.is_some() {
             return Err("result already recorded".to_string());
         }
-        self.reset_observations();
+        self.reset_observations()?;
         let reporter = self.reporter.clone() as Arc<dyn crate::health::HealthReporter>;
         let plan = LaunchPlan {
             process: ProcessControl {
@@ -156,48 +151,55 @@ impl ProcessTestWorld {
 
     pub fn trigger_shutdown(&self) { self.shutdown.trigger(); }
 
-    pub fn reset_observations(&mut self) {
+    pub fn reset_observations(&mut self) -> StepResult {
         self.wait_error = None;
         self.health_history.borrow_mut().clear();
         self.shutdown = TestShutdownSignal::new();
-        let _ = test_support::clear_health_events(self.health_path().as_path());
+        test_support::clear_health_events(self.health_path()?.as_path())
     }
 
-    pub fn record_wait_for_status(&mut self, expected: &str) {
+    pub fn record_wait_for_status(&mut self, expected: &str) -> StepResult {
         self.wait_error = self.wait_for_status(expected).err();
+        Ok(())
     }
 
     pub fn take_wait_error(&mut self) -> Option<String> { self.wait_error.take() }
 
-    pub fn lock_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.lock") }
+    pub fn lock_path(&self) -> Result<PathBuf, String> {
+        Ok(self.loader.runtime_dir()?.join("weaverd.lock"))
+    }
 
-    pub fn pid_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.pid") }
+    pub fn pid_path(&self) -> Result<PathBuf, String> {
+        Ok(self.loader.runtime_dir()?.join("weaverd.pid"))
+    }
 
-    pub fn health_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.health") }
+    pub fn health_path(&self) -> Result<PathBuf, String> {
+        Ok(self.loader.runtime_dir()?.join("weaverd.health"))
+    }
 
     pub fn read_health(&self) -> Result<Value, String> {
-        let content = fs::read_to_string(self.health_path()).map_err(|error| error.to_string())?;
+        let content = fs::read_to_string(self.health_path()?).map_err(|error| error.to_string())?;
         serde_json::from_str(&content).map_err(|error| error.to_string())
     }
 
     pub fn write_stale_runtime(&self) -> StepResult {
-        fs::write(self.lock_path(), b"").map_err(|error| error.to_string())?;
-        fs::write(self.pid_path(), b"0\n").map_err(|error| error.to_string())?;
+        fs::write(self.lock_path()?, b"").map_err(|error| error.to_string())?;
+        fs::write(self.pid_path()?, b"0\n").map_err(|error| error.to_string())?;
         Ok(())
     }
 
     pub fn write_stale_runtime_with_invalid_pid(&self, pid: u32) -> StepResult {
-        fs::write(self.lock_path(), b"").map_err(|error| error.to_string())?;
-        fs::write(self.pid_path(), format!("{pid}\n")).map_err(|error| error.to_string())?;
+        fs::write(self.lock_path()?, b"").map_err(|error| error.to_string())?;
+        fs::write(self.pid_path()?, format!("{pid}\n")).map_err(|error| error.to_string())?;
         Ok(())
     }
 
     pub fn write_lock_without_pid(&self) -> StepResult {
-        fs::write(self.lock_path(), b"").map_err(|error| error.to_string())
+        fs::write(self.lock_path()?, b"").map_err(|error| error.to_string())
     }
 
     pub fn read_pid(&self) -> Result<Option<u32>, String> {
-        let content = match fs::read_to_string(self.pid_path()) {
+        let content = match fs::read_to_string(self.pid_path()?) {
             Ok(text) => text,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error.to_string()),
@@ -212,17 +214,20 @@ impl ProcessTestWorld {
             .map_err(|error| error.to_string())
     }
 
-    pub fn saw_status(&self, expected: &str) -> bool {
-        self.health_history
+    pub fn saw_status(&self, expected: &str) -> Result<bool, String> {
+        Ok(self
+            .health_history
             .borrow()
             .iter()
             .any(|status| status == expected)
-            || test_support::health_events(self.health_path().as_path())
+            || test_support::health_events(self.health_path()?.as_path())
                 .into_iter()
-                .any(|status| status == expected)
+                .any(|status| status == expected))
     }
 
-    pub fn lock_exists(&self) -> bool { fs::exists(self.lock_path()).expect("check lock file") }
+    pub fn lock_exists(&self) -> Result<bool, String> {
+        fs::exists(self.lock_path()?).map_err(|error| error.to_string())
+    }
 
     pub fn daemonizer_calls(&self) -> usize { self.daemonizer.calls() }
 
@@ -233,7 +238,7 @@ impl ProcessTestWorld {
     pub fn wait_for_status(&self, expected: &str) -> StepResult {
         let deadline = Instant::now() + WAIT_TIMEOUT;
         while Instant::now() < deadline {
-            if self.sample_status().as_deref() == Some(expected) {
+            if self.sample_status()?.as_deref() == Some(expected) {
                 return Ok(());
             }
             thread::sleep(POLL_INTERVAL);
@@ -243,11 +248,11 @@ impl ProcessTestWorld {
 
     pub fn wait_for_condition<F>(&self, predicate: F, description: &str) -> StepResult
     where
-        F: Fn(&Self) -> bool,
+        F: Fn(&Self) -> Result<bool, String>,
     {
         let deadline = Instant::now() + WAIT_TIMEOUT;
         while Instant::now() < deadline {
-            if predicate(self) {
+            if predicate(self)? {
                 return Ok(());
             }
             thread::sleep(POLL_INTERVAL);
@@ -255,14 +260,19 @@ impl ProcessTestWorld {
         Err(format!("timeout waiting for {description}"))
     }
 
-    pub fn sample_status(&self) -> Option<String> {
-        if let Ok(snapshot) = self.read_health() {
-            let status = snapshot_status(&snapshot).to_owned();
-            return Some(self.record_status(status));
+    pub fn sample_status(&self) -> Result<Option<String>, String> {
+        if let Some(status) = self
+            .read_health()
+            .ok()
+            .and_then(|snapshot| snapshot_status(&snapshot).map(str::to_owned))
+        {
+            return Ok(Some(self.record_status(status)));
         }
-        let events = test_support::health_events(self.health_path().as_path());
-        let status = events.last()?.to_string();
-        Some(self.record_status(status))
+        let events = test_support::health_events(self.health_path()?.as_path());
+        let Some(status) = events.last() else {
+            return Ok(None);
+        };
+        Ok(Some(self.record_status(status.to_string())))
     }
 
     fn record_status(&self, status: String) -> String {
@@ -304,7 +314,11 @@ impl TestShutdownSignal {
 
     pub fn trigger(&self) {
         let (lock, cvar) = &*self.inner;
-        let mut triggered = lock.lock().expect("shutdown mutex poisoned");
+        // A panic cannot invalidate the single boolean signal state.
+        let mut triggered = match lock.lock() {
+            Ok(triggered) => triggered,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         *triggered = true;
         cvar.notify_all();
     }
@@ -313,19 +327,21 @@ impl TestShutdownSignal {
 impl ShutdownSignal for TestShutdownSignal {
     fn wait(&self) -> Result<(), ShutdownError> {
         let (lock, cvar) = &*self.inner;
-        let mut triggered = lock.lock().expect("shutdown mutex poisoned");
+        // A panic cannot invalidate the single boolean signal state.
+        let mut triggered = match lock.lock() {
+            Ok(triggered) => triggered,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         while !*triggered {
-            triggered = cvar
-                .wait(triggered)
-                .expect("shutdown mutex poisoned during wait");
+            triggered = match cvar.wait(triggered) {
+                Ok(triggered) => triggered,
+                Err(poisoned) => poisoned.into_inner(),
+            };
         }
         Ok(())
     }
 }
 
-pub fn snapshot_status(snapshot: &Value) -> &str {
-    snapshot
-        .get("status")
-        .and_then(Value::as_str)
-        .expect("health snapshot should contain a status field")
+pub fn snapshot_status(snapshot: &Value) -> Option<&str> {
+    snapshot.get("status").and_then(Value::as_str)
 }

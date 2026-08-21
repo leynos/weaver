@@ -5,15 +5,12 @@
 
 use std::cell::RefCell;
 
+use anyhow::{Result, ensure};
 use rstest_bdd_macros::{given, scenario, then, when};
 use serde_json::json;
 
 use super::support::*;
-use crate::{
-    EMPTY_LINE_LIMIT,
-    lifecycle::{LifecycleCommand, LifecycleError},
-    output::UNKNOWN_OPERATION_TYPE,
-};
+use crate::{EMPTY_LINE_LIMIT, lifecycle::LifecycleError, output::UNKNOWN_OPERATION_TYPE};
 
 /// Test-local mirror of the shared configuration help flags.
 /// Must be kept in sync with `SHARED_CONFIG_HELP_FLAGS` in `lib.rs`.
@@ -45,14 +42,13 @@ fn run_command_with_source_uri(
     world: &RefCell<TestWorld>,
     command_template: &str,
     error_msg: &str,
-) {
-    let uri = world
-        .borrow()
-        .source_uri()
-        .expect("source uri missing")
-        .to_owned();
+) -> Result<()> {
+    let uri = world.borrow().source_uri()?.to_owned();
     let command = command_template.replace("{uri}", &uri);
-    world.borrow_mut().run(&command).expect(error_msg);
+    world
+        .borrow_mut()
+        .run(&command)
+        .map_err(|error| anyhow::anyhow!("{error_msg}: {error}"))
 }
 
 fn assert_output_contains<F>(
@@ -60,20 +56,21 @@ fn assert_output_contains<F>(
     output_getter: F,
     snippet: String,
     output_name: &str,
-) where
+) -> Result<()>
+where
     F: FnOnce(&TestWorld) -> anyhow::Result<String>,
 {
     let world = world.borrow();
-    let Ok(text) = output_getter(&world) else {
-        panic!("{output_name} text missing");
-    };
+    let text = output_getter(&world)
+        .map_err(|error| anyhow::anyhow!("{output_name} text missing: {error}"))?;
     let snippet = snippet.trim_matches('"').replace("\\n", "\n");
-    assert!(
+    ensure!(
         text.contains(&snippet),
         "{output_name} {:?} did not contain {:?}",
         text,
         snippet
     );
+    Ok(())
 }
 
 fn assert_output_does_not_contain<F>(
@@ -81,28 +78,29 @@ fn assert_output_does_not_contain<F>(
     output_getter: F,
     snippet: String,
     output_name: &str,
-) where
+) -> Result<()>
+where
     F: FnOnce(&TestWorld) -> anyhow::Result<String>,
 {
     let world = world.borrow();
-    let Ok(text) = output_getter(&world) else {
-        panic!("{output_name} text missing");
-    };
+    let text = output_getter(&world)
+        .map_err(|error| anyhow::anyhow!("{output_name} text missing: {error}"))?;
     let snippet = snippet.trim_matches('"').replace("\\n", "\n");
-    assert!(
+    ensure!(
         !text.contains(&snippet),
         "{output_name} {:?} unexpectedly contained {:?}",
         text,
         snippet
     );
+    Ok(())
 }
 
 #[given("a running fake daemon")]
-fn given_running_daemon(world: &RefCell<TestWorld>) {
+fn given_running_daemon(world: &RefCell<TestWorld>) -> Result<(), String> {
     world
         .borrow_mut()
         .start_daemon()
-        .expect("failed to start fake daemon");
+        .map_err(|error| error.to_string())
 }
 
 #[given("patch input is available")]
@@ -128,25 +126,25 @@ fn given_capability_override(world: &RefCell<TestWorld>) {
 }
 
 #[given("a running fake daemon sending malformed json")]
-fn given_malformed_daemon(world: &RefCell<TestWorld>) {
+fn given_malformed_daemon(world: &RefCell<TestWorld>) -> Result<(), String> {
     world
         .borrow_mut()
         .start_daemon_with_lines(vec![String::from("not valid json")])
-        .expect("failed to start malformed daemon");
+        .map_err(|error| error.to_string())
 }
 
 #[given("a running fake daemon that closes without exit")]
-fn given_daemon_missing_exit(world: &RefCell<TestWorld>) {
+fn given_daemon_missing_exit(world: &RefCell<TestWorld>) -> Result<(), String> {
     world
         .borrow_mut()
         .start_daemon_with_lines(vec![
             "{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"partial\"}".to_string(),
         ])
-        .expect("failed to start daemon missing exit event");
+        .map_err(|error| error.to_string())
 }
 
 #[given("a running fake daemon that emits empty lines")]
-fn given_daemon_with_empty_lines(world: &RefCell<TestWorld>) {
+fn given_daemon_with_empty_lines(world: &RefCell<TestWorld>) -> Result<(), String> {
     let mut lines = Vec::new();
     for _ in 0..EMPTY_LINE_LIMIT {
         lines.push(String::new());
@@ -154,7 +152,7 @@ fn given_daemon_with_empty_lines(world: &RefCell<TestWorld>) {
     world
         .borrow_mut()
         .start_daemon_with_lines(lines)
-        .expect("failed to start daemon with empty lines");
+        .map_err(|error| error.to_string())
 }
 
 #[given("auto-start will be triggered")]
@@ -167,60 +165,60 @@ fn given_auto_start_triggered(world: &RefCell<TestWorld>) {
 }
 
 #[given("a source file named {filename}")]
-fn given_source_file(world: &RefCell<TestWorld>, filename: String) {
+fn given_source_file(world: &RefCell<TestWorld>, filename: String) -> Result<(), String> {
     let filename = filename.trim_matches('"');
     world
         .borrow_mut()
         .create_source_file(filename, SAMPLE_RUST_SOURCE)
-        .expect("failed to create source file");
+        .map_err(|error| error.to_string())
 }
 
 #[given("a missing source file named {filename}")]
-fn given_missing_source_file(world: &RefCell<TestWorld>, filename: String) {
+fn given_missing_source_file(world: &RefCell<TestWorld>, filename: String) -> Result<(), String> {
     let filename = filename.trim_matches('"');
     world
         .borrow_mut()
         .create_missing_source(filename)
-        .expect("failed to prepare missing source");
+        .map_err(|error| error.to_string())
 }
 
 #[given("a running fake daemon emitting definition output")]
-fn given_daemon_definition_output(world: &RefCell<TestWorld>) {
+fn given_daemon_definition_output(world: &RefCell<TestWorld>) -> Result<(), String> {
     let uri = world
         .borrow()
         .source_uri()
-        .expect("source uri missing")
+        .map_err(|error| error.to_string())?
         .to_owned();
     let payload = serde_json::to_string(&vec![json!({
         "uri": uri,
         "line": 2,
         "column": 5
     })])
-    .expect("serialize definition payload");
-    let lines = daemon_lines_for_stdout(&payload);
+    .map_err(|error| error.to_string())?;
+    let lines = daemon_lines_for_stdout(&payload).map_err(|error| error.to_string())?;
     world
         .borrow_mut()
         .start_daemon_with_lines(lines)
-        .expect("failed to start daemon");
+        .map_err(|error| error.to_string())
 }
 
 #[given("a running fake daemon emitting diagnostics output")]
-fn given_daemon_diagnostics_output(world: &RefCell<TestWorld>) {
+fn given_daemon_diagnostics_output(world: &RefCell<TestWorld>) -> Result<(), String> {
     let payload = serde_json::to_string(&json!({
         "diagnostics": [
             { "line": 2, "column": 5, "message": "boom" }
         ]
     }))
-    .expect("serialize diagnostics payload");
-    let lines = daemon_lines_for_stdout(&payload);
+    .map_err(|error| error.to_string())?;
+    let lines = daemon_lines_for_stdout(&payload).map_err(|error| error.to_string())?;
     world
         .borrow_mut()
         .start_daemon_with_lines(lines)
-        .expect("failed to start daemon");
+        .map_err(|error| error.to_string())
 }
 
 #[given("a running fake daemon emitting an unknown-operation payload")]
-fn given_daemon_unknown_operation_output(world: &RefCell<TestWorld>) {
+fn given_daemon_unknown_operation_output(world: &RefCell<TestWorld>) -> Result<(), String> {
     let payload = serde_json::to_string(&json!({
         "status": "error",
         "type": UNKNOWN_OPERATION_TYPE,
@@ -237,63 +235,66 @@ fn given_daemon_unknown_operation_output(world: &RefCell<TestWorld>) {
             ]
         }
     }))
-    .expect("serialize unknown-operation payload");
-    let lines = daemon_lines_for_stderr(&payload, 1);
+    .map_err(|error| error.to_string())?;
+    let lines = daemon_lines_for_stderr(&payload, 1).map_err(|error| error.to_string())?;
     world
         .borrow_mut()
         .start_daemon_with_lines(lines)
-        .expect("failed to start daemon");
+        .map_err(|error| error.to_string())
 }
 
 #[when("the operator runs {command}")]
-fn when_operator_runs(world: &RefCell<TestWorld>, command: String) {
+fn when_operator_runs(world: &RefCell<TestWorld>, command: String) -> Result<(), String> {
     world
         .borrow_mut()
         .run(&command)
-        .expect("failed to run CLI command");
+        .map_err(|error| error.to_string())
 }
 
 #[when("the operator runs the definition command")]
-fn when_operator_runs_definition(world: &RefCell<TestWorld>) {
+fn when_operator_runs_definition(world: &RefCell<TestWorld>) -> Result<(), String> {
     run_command_with_source_uri(
         world,
         "--output human observe get-definition --uri {uri} --position 2:5",
         "failed to run definition command",
-    );
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[when("the operator runs the diagnostics command")]
-fn when_operator_runs_diagnostics(world: &RefCell<TestWorld>) {
+fn when_operator_runs_diagnostics(world: &RefCell<TestWorld>) -> Result<(), String> {
     run_command_with_source_uri(
         world,
         "--output human verify diagnostics --uri {uri}",
         "failed to run diagnostics command",
-    );
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[when("the operator runs the json definition command")]
-fn when_operator_runs_json_definition(world: &RefCell<TestWorld>) {
+fn when_operator_runs_json_definition(world: &RefCell<TestWorld>) -> Result<(), String> {
     run_command_with_source_uri(
         world,
         "--output json observe get-definition --uri {uri} --position 2:5",
         "failed to run json definition command",
-    );
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[then("the daemon receives {fixture}")]
-fn then_daemon_receives(world: &RefCell<TestWorld>, fixture: String) {
+fn then_daemon_receives(world: &RefCell<TestWorld>, fixture: String) -> Result<(), String> {
     world
         .borrow()
         .assert_golden_request(&fixture)
-        .expect("daemon did not receive expected fixture");
+        .map_err(|error| error.to_string())
 }
 
 #[then("no daemon command was sent")]
-fn then_no_daemon_command(world: &RefCell<TestWorld>) {
+fn then_no_daemon_command(world: &RefCell<TestWorld>) -> Result<(), String> {
     world
         .borrow()
         .assert_no_daemon_requests()
-        .expect("unexpected daemon request recorded");
+        .map_err(|error| error.to_string())
 }
 
 #[then("the lifecycle stub recorded {operation}")]
@@ -309,67 +310,79 @@ fn then_lifecycle_recorded(world: &RefCell<TestWorld>, operation: String) {
 }
 
 #[then("stdout is {expected}")]
-fn then_stdout_is(world: &RefCell<TestWorld>, expected: String) {
+fn then_stdout_is(world: &RefCell<TestWorld>, expected: String) -> Result<(), String> {
     let world = world.borrow();
     let expected = expected.trim_matches('"');
-    let actual = world.stdout_text().expect("stdout text missing");
-    assert_eq!(actual, expected);
+    let actual = world.stdout_text().map_err(|error| error.to_string())?;
+    if actual != expected {
+        return Err(String::from("stdout did not match expected text"));
+    }
+    Ok(())
 }
 
 #[then("stderr is {expected}")]
-fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) {
+fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) -> Result<(), String> {
     let world = world.borrow();
     let expected = expected.trim_matches('"');
-    let actual = world.stderr_text().expect("stderr text missing");
-    assert_eq!(actual, expected);
+    let actual = world.stderr_text().map_err(|error| error.to_string())?;
+    if actual != expected {
+        return Err(String::from("stderr did not match expected text"));
+    }
+    Ok(())
 }
 
 #[then("stderr contains {snippet}")]
-fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) {
-    assert_output_contains(world, |world| world.stderr_text(), snippet, "stderr");
+fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<(), String> {
+    assert_output_contains(world, |world| world.stderr_text(), snippet, "stderr")
+        .map_err(|error| error.to_string())
 }
 
 #[then("stdout contains {snippet}")]
-fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) {
-    assert_output_contains(world, |world| world.stdout_text(), snippet, "stdout");
+fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<(), String> {
+    assert_output_contains(world, |world| world.stdout_text(), snippet, "stdout")
+        .map_err(|error| error.to_string())
 }
 
 #[then("stdout contains the shared configuration flags")]
-fn then_stdout_contains_shared_config_flags(world: &RefCell<TestWorld>) {
+fn then_stdout_contains_shared_config_flags(world: &RefCell<TestWorld>) -> Result<(), String> {
     let world = world.borrow();
-    let text = world.stdout_text().expect("stdout text missing");
+    let text = world.stdout_text().map_err(|error| error.to_string())?;
     for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
-        assert!(text.contains(flag), "stdout missing config flag {flag:?}");
+        if !text.contains(flag) {
+            return Err(format!("stdout missing config flag {flag:?}"));
+        }
     }
+    Ok(())
 }
 
 #[then("stdout does not contain {snippet}")]
-fn then_stdout_does_not_contain(world: &RefCell<TestWorld>, snippet: String) {
-    assert_output_does_not_contain(world, |world| world.stdout_text(), snippet, "stdout");
+fn then_stdout_does_not_contain(world: &RefCell<TestWorld>, snippet: String) -> Result<(), String> {
+    assert_output_does_not_contain(world, |world| world.stdout_text(), snippet, "stdout")
+        .map_err(|error| error.to_string())
 }
 
 #[then("the CLI exits with code {status}")]
-fn then_exit_code(world: &RefCell<TestWorld>, status: u8) {
+fn then_exit_code(world: &RefCell<TestWorld>, status: u8) -> Result<(), String> {
     world
         .borrow()
         .assert_exit_code(status)
-        .expect("exit code assertion failed");
+        .map_err(|error| error.to_string())
 }
 
 #[then("the CLI fails")]
-fn then_exit_failure(world: &RefCell<TestWorld>) {
+fn then_exit_failure(world: &RefCell<TestWorld>) -> Result<(), String> {
     world
         .borrow()
         .assert_failure()
-        .expect("CLI did not fail as expected");
+        .map_err(|error| error.to_string())
 }
 
 #[then("capabilities output is {fixture}")]
-fn then_capabilities(world: &RefCell<TestWorld>, fixture: String) {
+fn then_capabilities(world: &RefCell<TestWorld>, fixture: String) -> Result<(), String> {
     world
         .borrow()
         .assert_capabilities_output(&fixture)
-        .expect("capabilities output mismatch");
+        .map_err(|error| error.to_string())
 }
 
 #[scenario(path = "tests/features/weaver_cli.feature")]
@@ -380,12 +393,3 @@ fn weaver_cli_output_behaviour(world: RefCell<TestWorld>) { let _ = world; }
 
 #[scenario(path = "tests/features/weaver_cli_version.feature")]
 fn weaver_cli_version_behaviour(world: RefCell<TestWorld>) { let _ = world; }
-
-fn parse_lifecycle_command(label: &str) -> LifecycleCommand {
-    match label.trim().to_ascii_lowercase().as_str() {
-        "start" => LifecycleCommand::Start,
-        "stop" => LifecycleCommand::Stop,
-        "status" => LifecycleCommand::Status,
-        other => panic!("unsupported lifecycle command label {other}"),
-    }
-}

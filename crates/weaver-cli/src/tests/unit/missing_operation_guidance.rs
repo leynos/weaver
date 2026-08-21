@@ -24,7 +24,7 @@ struct PreflightOutput {
     stderr: String,
 }
 
-fn run_with_panicking_loader(args: &[&str]) -> PreflightOutput {
+fn run_with_panicking_loader(args: &[&str]) -> anyhow::Result<PreflightOutput> {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut stdin = Cursor::new(Vec::new());
@@ -34,13 +34,13 @@ fn run_with_panicking_loader(args: &[&str]) -> PreflightOutput {
         .map(OsString::from)
         .collect::<Vec<_>>();
     let exit = run_with_loader(cli_args, &mut io, &PanickingLoader);
-    let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
+    let stderr_text = String::from_utf8(stderr)?;
 
-    PreflightOutput {
+    Ok(PreflightOutput {
         exit,
         stdout,
         stderr: stderr_text,
-    }
+    })
 }
 
 fn assert_preflight_failure(output: &PreflightOutput) {
@@ -105,7 +105,10 @@ fn assert_known_domain_operation_guidance(output: &PreflightOutput, domain: &str
 
 /// Verifies the unified three-part error template for known domain without operation.
 /// Per roadmap 2.3.3: error, alternatives, Next command.
-fn assert_three_part_template(output: &PreflightOutput, expected_alternatives: &str) {
+fn assert_three_part_template(
+    output: &PreflightOutput,
+    expected_alternatives: &str,
+) -> anyhow::Result<()> {
     let stderr = &output.stderr;
 
     // Part 1: error line
@@ -118,8 +121,12 @@ fn assert_three_part_template(output: &PreflightOutput, expected_alternatives: &
     );
 
     // Verify ordering
-    let error_pos = stderr.find("error:").expect("error line");
-    let next_cmd_pos = stderr.find("Next command:").expect("Next command line");
+    let error_pos = stderr
+        .find("error:")
+        .ok_or_else(|| anyhow::anyhow!("error line"))?;
+    let next_cmd_pos = stderr
+        .find("Next command:")
+        .ok_or_else(|| anyhow::anyhow!("Next command line"))?;
     assert!(
         error_pos < next_cmd_pos,
         "error line must come before Next command"
@@ -132,6 +139,7 @@ fn assert_three_part_template(output: &PreflightOutput, expected_alternatives: &
         alternatives_pos.is_some(),
         "alternatives block must contain '{expected_alternatives}' between error and Next command"
     );
+    Ok(())
 }
 
 fn assert_no_domain_guidance(output: &PreflightOutput) {
@@ -150,7 +158,8 @@ fn assert_no_domain_guidance(output: &PreflightOutput) {
 
 #[test]
 fn known_domain_without_operation_emits_contextual_guidance() {
-    let output = run_with_panicking_loader(&["observe"]);
+    let output =
+        run_with_panicking_loader(&["observe"]).expect("preflight output must be valid UTF-8");
 
     assert_known_domain_operation_guidance(&output, "observe");
     assert!(output.stderr.contains("get-definition"));
@@ -160,7 +169,8 @@ fn known_domain_without_operation_emits_contextual_guidance() {
             .stderr
             .contains("weaver observe get-definition --help")
     );
-    assert_three_part_template(&output, "Available operations:");
+    assert_three_part_template(&output, "Available operations:")
+        .expect("guidance should use the three-part template");
 }
 
 #[rstest]
@@ -184,10 +194,11 @@ fn unknown_domain_preflight_guidance(
     #[case] required_contains: &[&str],
     #[case] forbidden_contains: &[&str],
 ) {
-    let output = run_with_panicking_loader(args);
+    let output = run_with_panicking_loader(args).expect("preflight output must be valid UTF-8");
 
     assert_unknown_domain_preflight(&output, domain);
-    assert_three_part_template(&output, "Valid domains: observe, act, verify");
+    assert_three_part_template(&output, "Valid domains: observe, act, verify")
+        .expect("guidance should use the three-part template");
 
     if output.stderr.contains("Did you mean 'observe'?") {
         assert!(
