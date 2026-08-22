@@ -70,6 +70,25 @@ fn snapshots_rendered_matrix_shape() {
     "###);
 }
 
+/// Prove generated captions number phase tables in their rendered order.
+#[test]
+fn captions_number_multiple_phase_tables_sequentially() {
+    let manifest = manifest_with_task_ids(vec!["12.1.1".into(), "13.1.1".into()]);
+
+    let rendered = render_matrix(&manifest);
+    let table_1 = rendered
+        .find("_Table 1: OrthoConfig consumer boundary tasks for Phase 12._")
+        .expect("Phase 12 caption should be present");
+    let table_2 = rendered
+        .find("_Table 2: OrthoConfig consumer boundary tasks for Phase 13._")
+        .expect("Phase 13 caption should be present");
+
+    assert!(
+        table_1 < table_2,
+        "phase-table captions must retain render order"
+    );
+}
+
 proptest! {
     #[test]
     /// Prove computed widths accommodate every generated escaped cell.
