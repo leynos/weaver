@@ -53,20 +53,20 @@ jobs:
       should_upload_workflow_artifacts: ${{ steps.release_modes.outputs.should-upload-workflow-artifacts }}
       repo_name: ${{ steps.repo_name.outputs.value }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        # v7.0.1
       - id: repo_name
         name: Determine repository name
         run: echo "value=${GITHUB_REPOSITORY#*/}" >>"$GITHUB_OUTPUT"
       - id: release_modes
         name: Determine release modes
-        uses: leynos/shared-actions/.github/actions/determine-release-modes@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/determine-release-modes@a197301888920eb21fbbc7e7bb6cb0c6f3d81584
         with:
           dry-run: ${{ inputs.dry-run }}
           publish: ${{ inputs.publish }}
       - id: ensure_version
         name: Read package version from Cargo.toml
-        uses: leynos/shared-actions/.github/actions/ensure-cargo-version@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/ensure-cargo-version@a197301888920eb21fbbc7e7bb6cb0c6f3d81584
         with:
           check-tag: ${{ fromJSON(steps.release_modes.outputs.should-publish) }}
           manifests: crates/weaver-cli/Cargo.toml
@@ -132,8 +132,8 @@ jobs:
       - build-freebsd
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        # v7.0.1
       - name: Ensure release exists (draft)
         shell: bash
         run: |
@@ -153,7 +153,7 @@ jobs:
           pattern: ${{ needs.metadata.outputs.repo_name }}-*
       - id: upload_assets
         name: Upload artefacts to release
-        uses: leynos/shared-actions/.github/actions/upload-release-assets@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+        uses: leynos/shared-actions/.github/actions/upload-release-assets@a197301888920eb21fbbc7e7bb6cb0c6f3d81584
         with:
           release-tag: ${{ github.ref_name }}
           bin-name: weaver
