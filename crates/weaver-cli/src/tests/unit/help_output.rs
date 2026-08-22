@@ -30,19 +30,50 @@ struct PanickingLoader;
 
 /// The rendered documentation surfaces that must expose command metadata.
 struct RenderedSurfaces<'surface> {
-    help: &'surface str,
-    manpage: &'surface str,
+    help: RenderedDocument<'surface>,
+    manpage: RenderedDocument<'surface>,
+}
+
+/// A rendered documentation surface with its human-readable identity.
+struct RenderedDocument<'document> {
+    name: &'static str,
+    content: &'document str,
+}
+
+/// A command metadata token and its role in rendered documentation.
+struct SurfaceToken<'token> {
+    value: &'token str,
+    kind: &'static str,
+}
+
+impl RenderedDocument<'_> {
+    /// Asserts that one metadata token is present as a whole token.
+    fn assert_contains(&self, token: &SurfaceToken<'_>) {
+        assert!(
+            self.contains_whole_token(token),
+            "{} is missing {} {:?}",
+            self.name,
+            token.kind,
+            token.value,
+        );
+    }
+
+    /// Reports whether a token is delimited from adjacent command-token characters.
+    fn contains_whole_token(&self, token: &SurfaceToken<'_>) -> bool {
+        self.content.match_indices(token.value).any(|(index, _)| {
+            let before = self.content[..index].chars().next_back();
+            let after = self.content[index + token.value.len()..].chars().next();
+            before.is_none_or(|character| !is_token_character(character))
+                && after.is_none_or(|character| !is_token_character(character))
+        })
+    }
 }
 
 impl RenderedSurfaces<'_> {
     /// Asserts that a token appears whole in each rendered documentation surface.
-    fn assert_token(&self, token: &str, kind: &str) {
-        for (surface, rendered) in [("help", self.help), ("manpage", self.manpage)] {
-            assert!(
-                contains_whole_token(rendered, token),
-                "{surface} is missing {kind} {token:?}",
-            );
-        }
+    fn assert_token(&self, token: &SurfaceToken<'_>) {
+        self.help.assert_contains(token);
+        self.manpage.assert_contains(token);
     }
 }
 
@@ -149,8 +180,14 @@ fn command_ir_structured_surface_coverage_appears_in_rendered_help_and_manpage()
     let rendered_manpage = normalise_manpage(&generated_manpage()?);
 
     let rendered_surfaces = RenderedSurfaces {
-        help: &rendered_help,
-        manpage: &rendered_manpage,
+        help: RenderedDocument {
+            name: "help",
+            content: &rendered_help,
+        },
+        manpage: RenderedDocument {
+            name: "manpage",
+            content: &rendered_manpage,
+        },
     };
     assert_rendered_surface(command_tree::root(), &rendered_surfaces);
     Ok(())
@@ -180,9 +217,16 @@ fn normalise_manpage(manpage: &str) -> String {
 fn assert_rendered_surface(node: &CommandNode, rendered_surfaces: &RenderedSurfaces<'_>) {
     if let CommandSemantics::Structured = node.semantics {
         let path = command_path(node);
-        rendered_surfaces.assert_token(&path, "command path");
+        rendered_surfaces.assert_token(&SurfaceToken {
+            value: &path,
+            kind: "command path",
+        });
         for argument in node.arguments {
-            rendered_surfaces.assert_token(&format!("--{}", argument.long), "long flag");
+            let flag = format!("--{}", argument.long);
+            rendered_surfaces.assert_token(&SurfaceToken {
+                value: &flag,
+                kind: "long flag",
+            });
         }
     }
 
@@ -198,16 +242,6 @@ fn command_path(node: &CommandNode) -> String {
         segments.push(node.verb);
     }
     segments.join(" ")
-}
-
-/// Reports whether a token is delimited from adjacent command-token characters.
-fn contains_whole_token(rendered: &str, token: &str) -> bool {
-    rendered.match_indices(token).any(|(index, _)| {
-        let before = rendered[..index].chars().next_back();
-        let after = rendered[index + token.len()..].chars().next();
-        before.is_none_or(|character| !is_token_character(character))
-            && after.is_none_or(|character| !is_token_character(character))
-    })
 }
 
 /// Identifies characters that would turn a token match into a substring match.
@@ -245,11 +279,23 @@ fn assert_command_surface(command: &clap::Command, node: &CommandNode) {
 
 #[test]
 fn whole_token_matching_rejects_partial_command_paths_and_flags() {
-    assert!(!contains_whole_token(
-        "definitions getter",
-        "definitions get"
-    ));
-    assert!(!contains_whole_token("--uri-value", "--uri"));
+    let command_path = RenderedDocument {
+        name: "test",
+        content: "definitions getter",
+    };
+    assert!(!command_path.contains_whole_token(&SurfaceToken {
+        value: "definitions get",
+        kind: "command path",
+    }));
+
+    let flag = RenderedDocument {
+        name: "test",
+        content: "--uri-value",
+    };
+    assert!(!flag.contains_whole_token(&SurfaceToken {
+        value: "--uri",
+        kind: "long flag",
+    }));
 }
 
 #[test]
