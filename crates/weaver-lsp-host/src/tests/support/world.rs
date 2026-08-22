@@ -149,6 +149,12 @@ impl TestWorld {
         self.active_overrides.clone()
     }
 
+    /// Replaces the server configurations used by the next [`Self::rebuild_host`].
+    ///
+    /// Exists so tests can drive `rebuild_host` into a failing registration and
+    /// assert that a failure leaves the previously built world untouched.
+    pub fn set_configs(&mut self, configs: Vec<TestServerConfig>) { self.configs = configs; }
+
     /// Returns the recorded call sequence for the specified language.
     pub fn calls(&self, language: Language) -> Option<Vec<CallKind>> {
         self.handles
