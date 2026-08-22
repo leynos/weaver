@@ -165,13 +165,18 @@ Stop and escalate rather than improvising when any of these is reached.
       pure tree projects to recursive IR, limits depth to eight, has a
       generated-tree property test, a derived-field differential test, a
       schema pin, round-trip tests, and Fluent resolution checks.
-- [ ] Stage D: route help and manpage rendering through the projection; delete
+- [x] Stage D: route help and manpage rendering through the projection; delete
       the superseded catalogues and `promote_static`. The augmented Clap
       command now consumes the projection, and the legacy operation catalogue
-      now has one home in the tree. Cross-surface coverage against the emitted
-      manual page remains to be added before this stage can complete.
-- [ ] Stage E: boundary manifest, ADR 007, and user- and developer-facing
-      documentation; full gate run.
+      now has one home in the tree. Completed 2026-08-22: the shared reference
+      section names every structured path and its long flags, so both runtime
+      help and the `clap_mangen` page expose `definitions get --uri <URI>
+      --position <LINE:COLUMN>` and daemon lifecycle paths.
+- [x] Stage E: boundary manifest, ADR 007, and user- and developer-facing
+      documentation. Completed 2026-08-22: the regenerated boundary matrix,
+      ADR, design, developer guide, user guide, and roadmap now describe the
+      recursive projection and its remaining wrapper boundary. Final full-gate
+      evidence is captured in the milestone closeout.
 
 ## Surprises & discoveries
 
@@ -272,6 +277,14 @@ Recorded during planning; keep appending during implementation.
   decorate the parser-shaped Clap command. It keeps the framework-independent
   tree and all IR literals outside the renderer.
 
+- Observation: `clap_mangen` renders only the top-level command's direct
+  subcommand synopsis by default, so nested leaf paths and flags would not
+  otherwise appear in `weaver.1`. Evidence: the first generated page named
+  `weaver-definitions(1)` but not `definitions get`. Impact: the shared
+  metadata adapter emits a structured command reference section, which makes
+  the same paths and flags visible in both rendered surfaces without changing
+  runtime parsing.
+
 ## Decision log
 
 - Decision: define INV-6 against `DomainRoutingContext.known_operations`, not
@@ -316,6 +329,13 @@ Recorded during planning; keep appending during implementation.
   fields, so the `Default` bound the derive needs would be a lie that a future
   `OrthoConfig::load()` could act on. Date/Author: 2026-08-21, planning agent,
   after design review.
+
+- Decision: retain `state = "wraps"` and leave `shipped_in` and `adr_anchor`
+  empty for the 12.1.2 boundary row. Rationale: the manifest validator reserves
+  shipped evidence for `consumes` and ADR anchors for `divergent` rows. The
+  recursive IR is available, but Weaver still owns the adapter and awaits the
+  renderer and agent-context contracts needed to remove it. Date/Author:
+  2026-08-22, implementation agent.
 
 - Decision: reject encoding Weaver's semantic fields into `DocMetadata`'s
   `notes` or `examples`. Rationale: `Note` is a single `text_id` field
@@ -368,10 +388,10 @@ Recorded during planning; keep appending during implementation.
 
 Stage A corrected the dependency version in this plan without changing the
 dependency itself. The recursive IR and schema contract are available at the
-actual pin. To be completed at the end of Stage E. Before setting this plan to
-`COMPLETE`, reconcile every implementation discovery against the artefacts
-named in `Conformance basis`, and confirm that the roadmap entry for 12.1.2 has
-been marked done.
+actual pin. Stages B through E established the cross-crate catalogue gate, a
+bounded recursive projection, a shared help/manpage input, and the truthful
+boundary documentation. The roadmap entry is marked complete. Final full-gate
+and CodeRabbit evidence is recorded in the milestone closeout.
 
 ## Context and orientation
 

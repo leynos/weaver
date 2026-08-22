@@ -71,6 +71,15 @@ Options:
   -o, --locale <LOCALE>
           Selects the operator-facing locale
 
+Commands:
+
+  definitions — Query symbol definitions
+  definitions get --uri <URI> --position <LINE:COLUMN> — Returns the definition location for a source position
+  daemon — Runs daemon lifecycle commands
+  daemon start — Starts the daemon and waits for readiness
+  daemon stop — Stops the daemon gracefully
+  daemon status — Prints daemon health information
+
 Domains and operations:
 
   observe — Query code structure and relationships

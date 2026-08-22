@@ -79,7 +79,9 @@ fn apply_passthrough_help(
         return command;
     };
 
-    let mut output = String::from("Domains and operations:\n");
+    let mut output = String::from("Commands:\n\n");
+    append_structured_commands(&mut output, node, &[], localizer);
+    output.push_str("\nDomains and operations:\n");
     debug_assert_eq!(domains, crate::command_tree::domain_operations());
     for domain in crate::command_tree::domain_operations() {
         let summary = localizer.message(domain.summary_id, None, domain.summary);
@@ -94,6 +96,40 @@ fn apply_passthrough_help(
     output.pop();
 
     command.after_help(output)
+}
+
+fn append_structured_commands(
+    output: &mut String,
+    node: &CommandNode,
+    path: &[&str],
+    localizer: &dyn Localizer,
+) {
+    for child in node.children {
+        if let CommandSemantics::Structured = child.semantics {
+            let mut child_path = path.to_vec();
+            child_path.push(child.verb);
+            let summary = localizer.message(child.summary_id, None, child.summary);
+            output.push_str(&format!(
+                "  {} \u{2014} {summary}\n",
+                command_signature(&child_path, child),
+            ));
+            append_structured_commands(output, child, &child_path, localizer);
+        }
+    }
+}
+
+fn command_signature(path: &[&str], node: &CommandNode) -> String {
+    let mut signature = path.join(" ");
+    for argument in node.arguments {
+        signature.push_str(" --");
+        signature.push_str(argument.long);
+        if let Some(value_name) = argument.value_name {
+            signature.push_str(" <");
+            signature.push_str(value_name);
+            signature.push('>');
+        }
+    }
+    signature
 }
 
 fn format_operation_row(operations: &[&str]) -> String {
