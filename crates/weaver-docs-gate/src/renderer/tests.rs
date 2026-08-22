@@ -64,6 +64,8 @@ fn snapshots_rendered_matrix_shape() {
     | Roadmap task                                                                       | Gist                | State      | Upstream OrthoConfig task | Shipped in | Removal gate or divergence | Next review by | Last reviewed |
     | ---------------------------------------------------------------------------------- | ------------------- | ---------- | ------------------------- | ---------- | -------------------------- | -------------- | ------------- |
     | [12.1.1](roadmap.md#121-confirm-reusable-contracts-that-weaver-must-not-duplicate) | Review \| renderer. | ✓ consumes | renderer-contract         | 4339a6f3   | n/a                        | n/a            | 2026-06-20    |
+
+    _Table 1: OrthoConfig consumer boundary tasks for Phase 12._
     <!-- markdownlint-enable MD013 MD060 -->
     "###);
 }
