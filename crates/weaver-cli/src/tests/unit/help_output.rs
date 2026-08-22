@@ -28,6 +28,24 @@ const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
 
 struct PanickingLoader;
 
+/// The rendered documentation surfaces that must expose command metadata.
+struct RenderedSurfaces<'surface> {
+    help: &'surface str,
+    manpage: &'surface str,
+}
+
+impl RenderedSurfaces<'_> {
+    /// Asserts that a token appears whole in each rendered documentation surface.
+    fn assert_token(&self, token: &str, kind: &str) {
+        for (surface, rendered) in [("help", self.help), ("manpage", self.manpage)] {
+            assert!(
+                contains_whole_token(rendered, token),
+                "{surface} is missing {kind} {token:?}",
+            );
+        }
+    }
+}
+
 impl ConfigLoader for PanickingLoader {
     fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
         panic!("help output must not attempt configuration loading");
@@ -130,7 +148,11 @@ fn command_ir_structured_surface_coverage_appears_in_rendered_help_and_manpage()
     let rendered_help = help::command().render_long_help().to_string();
     let rendered_manpage = normalise_manpage(&generated_manpage()?);
 
-    assert_rendered_surface(command_tree::root(), &rendered_help, &rendered_manpage);
+    let rendered_surfaces = RenderedSurfaces {
+        help: &rendered_help,
+        manpage: &rendered_manpage,
+    };
+    assert_rendered_surface(command_tree::root(), &rendered_surfaces);
     Ok(())
 }
 
@@ -155,17 +177,17 @@ fn normalise_manpage(manpage: &str) -> String {
 }
 
 /// Recursively checks each structured command path and long flag in both surfaces.
-fn assert_rendered_surface(node: &CommandNode, help: &str, manpage: &str) {
+fn assert_rendered_surface(node: &CommandNode, rendered_surfaces: &RenderedSurfaces<'_>) {
     if let CommandSemantics::Structured = node.semantics {
         let path = command_path(node);
-        assert_surface_token(&path, "command path", help, manpage);
+        rendered_surfaces.assert_token(&path, "command path");
         for argument in node.arguments {
-            assert_surface_token(&format!("--{}", argument.long), "long flag", help, manpage);
+            rendered_surfaces.assert_token(&format!("--{}", argument.long), "long flag");
         }
     }
 
     for child in node.children {
-        assert_rendered_surface(child, help, manpage);
+        assert_rendered_surface(child, rendered_surfaces);
     }
 }
 
@@ -176,16 +198,6 @@ fn command_path(node: &CommandNode) -> String {
         segments.push(node.verb);
     }
     segments.join(" ")
-}
-
-/// Asserts that a token appears whole in both rendered documentation surfaces.
-fn assert_surface_token(token: &str, kind: &str, help: &str, manpage: &str) {
-    for (surface, rendered) in [("help", help), ("manpage", manpage)] {
-        assert!(
-            contains_whole_token(rendered, token),
-            "{surface} is missing {kind} {token:?}",
-        );
-    }
 }
 
 /// Reports whether a token is delimited from adjacent command-token characters.
