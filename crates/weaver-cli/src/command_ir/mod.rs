@@ -16,35 +16,22 @@ use crate::command_tree::{CommandArgument, CommandNode, CommandSemantics};
 pub(crate) const MAX_COMMAND_DEPTH: usize = 8;
 
 /// Failure to project a command-surface tree.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub(crate) enum ProjectionError {
     /// The tree exceeds the bounded recursive representation Weaver supports.
+    #[error("command tree exceeds the maximum depth of {max_depth}")]
     DepthExceeded {
         /// Largest supported depth, counting the root as depth zero.
         max_depth: usize,
     },
 }
 
-impl std::fmt::Display for ProjectionError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::DepthExceeded { max_depth } => {
-                write!(
-                    formatter,
-                    "command tree exceeds the maximum depth of {max_depth}"
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for ProjectionError {}
-
 /// Projects Weaver's command tree into the OrthoConfig documentation IR.
 pub(crate) fn project(root: &CommandNode) -> Result<DocMetadata, ProjectionError> {
     project_node(root, 0)
 }
 
+/// Projects one tree node after confirming its depth is within Weaver's bound.
 fn project_node(node: &CommandNode, depth: usize) -> Result<DocMetadata, ProjectionError> {
     if depth > MAX_COMMAND_DEPTH {
         return Err(ProjectionError::DepthExceeded {
@@ -65,6 +52,7 @@ fn project_node(node: &CommandNode, depth: usize) -> Result<DocMetadata, Project
     })
 }
 
+/// Joins a node's resource path and verb into its metadata command name.
 fn command_name(node: &CommandNode) -> String {
     let mut segments = node.resource_path.to_vec();
     if segments.last().copied() != Some(node.verb) {
@@ -73,6 +61,7 @@ fn command_name(node: &CommandNode) -> String {
     segments.join(" ")
 }
 
+/// Recursively projects children that represent structured clap subcommands.
 fn project_children(node: &CommandNode, depth: usize) -> Result<Vec<DocMetadata>, ProjectionError> {
     match node.semantics {
         CommandSemantics::Structured => node
@@ -84,6 +73,7 @@ fn project_children(node: &CommandNode, depth: usize) -> Result<Vec<DocMetadata>
     }
 }
 
+/// Projects one command-tree argument into OrthoConfig field metadata.
 fn field_metadata(argument: &CommandArgument) -> FieldMetadata {
     FieldMetadata {
         name: argument.long.to_owned(),
@@ -110,6 +100,7 @@ fn field_metadata(argument: &CommandArgument) -> FieldMetadata {
     }
 }
 
+/// Creates the shared localized section headings for projected command nodes.
 fn sections_metadata() -> SectionsMetadata {
     SectionsMetadata {
         headings_ids: HeadingIds {

@@ -19,6 +19,7 @@ pub(super) fn apply(command: Command, metadata: &DocMetadata, node: &CommandNode
     }
 }
 
+/// Applies one projected node and its descendants to the matching clap command.
 fn apply_node(
     command: Command,
     metadata: &DocMetadata,
@@ -31,6 +32,7 @@ fn apply_node(
     apply_passthrough_help(command, node, localizer)
 }
 
+/// Localizes projected long-flag help onto the matching clap arguments.
 fn apply_arguments(
     mut command: Command,
     metadata: &DocMetadata,
@@ -44,6 +46,7 @@ fn apply_arguments(
     command
 }
 
+/// Recursively applies projected metadata to structured clap subcommands.
 fn apply_subcommands(
     mut command: Command,
     metadata: &DocMetadata,
@@ -60,6 +63,7 @@ fn apply_subcommands(
     command
 }
 
+/// Adds the legacy daemon-passthrough catalogue to the root help command.
 fn apply_passthrough_help(
     command: Command,
     node: &CommandNode,
@@ -98,6 +102,7 @@ fn apply_passthrough_help(
     command.after_help(output)
 }
 
+/// Appends structured command signatures in depth-first display order.
 fn append_structured_commands(
     output: &mut String,
     node: &CommandNode,
@@ -118,6 +123,7 @@ fn append_structured_commands(
     }
 }
 
+/// Formats one command path with its long flags for the shared reference.
 fn command_signature(path: &[&str], node: &CommandNode) -> String {
     let mut signature = path.join(" ");
     for argument in node.arguments {
@@ -132,6 +138,7 @@ fn command_signature(path: &[&str], node: &CommandNode) -> String {
     signature
 }
 
+/// Formats one row of daemon operations for fixed-column help output.
 fn format_operation_row(operations: &[&str]) -> String {
     const SECOND_COLUMN_START: usize = 18;
     const THIRD_COLUMN_START: usize = 37;
@@ -148,6 +155,7 @@ fn format_operation_row(operations: &[&str]) -> String {
     row
 }
 
+/// Pads a row to a fixed display width before the next operation column.
 fn pad_to(row: &mut String, width: usize) {
     if row.len() < width {
         row.extend(std::iter::repeat_n(' ', width - row.len()));

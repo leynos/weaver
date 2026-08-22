@@ -218,7 +218,7 @@ Recorded during planning; keep appending during implementation.
 
 - Observation: `ortho_config::agent_context` already models most of the
   Weaver-specific semantic fields that
-  `crates/weaver-cli/src/command_surface.rs` holds locally. Evidence:
+  `crates/weaver-cli/src/command_surface/mod.rs` holds locally. Evidence:
   `src/agent_context/mod.rs` declares `AgentCommand` (`:97`), `MutationEffect`
   (`:249`), `AsyncSubmission` (`:134`), `DeliveryRoute` (`:154`),
   `SkillManifest` (`:289`), and `ORTHO_AGENT_CONTEXT_SCHEMA_VERSION` (`:15`).
@@ -233,7 +233,7 @@ Recorded during planning; keep appending during implementation.
   `crates/weaver-cli/src/discoverability.rs:60-90` (`DOMAIN_OPERATIONS`);
   `crates/weaver-cli/src/localizer.rs:31-42` (`bare_help`);
   `crates/weaver-cli/locales/en-US/messages.ftl:28-44`;
-  `crates/weaver-cli/src/command_surface.rs:79-80,96-98`; and
+  `crates/weaver-cli/src/command_surface/mod.rs:79-80,96-98`; and
   `crates/weaverd/src/dispatch/router.rs:85-116`
   (`DomainRoutingContext::{OBSERVE, ACT, VERIFY}`). `crates/weaver-cli`
   declares no dependency on `weaverd`, so nothing cross-checks the last one.
@@ -386,7 +386,7 @@ Recorded during planning; keep appending during implementation.
   unconstrained string is `Link.uri`, which is semantically a uniform resource
   identifier and is no better a carrier. Encoding `capability_id` into either
   produces visibly wrong output or unresolved-identifier leakage, and destroys
-  the type safety `command_surface.rs` already has via its closed enums.
+  the type safety `command_surface/mod.rs` already has via its closed enums.
   Date/Author: 2026-08-21, planning agent, after design review.
 
 - Decision: keep the boundary manifest row for 12.1.2 at `state = "wraps"`.
@@ -443,11 +443,11 @@ Weaver is a Rust workspace providing a semantic code-intelligence tool. A
 command-line binary, `weaver`, talks to a background daemon, `weaverd`, over a
 local socket using newline-delimited JSON (JSONL).
 
-OrthoConfig is a separate crate by the same author, consumed by Weaver from
-crates.io. It provides reusable command-contract machinery so that Weaver does
-not rebuild generic command-line infrastructure. Weaver pins Git revision
-`4339a6f3c61dc4fed86493d99ffb05230bee2a1b` at `Cargo.toml:43`, resolving to
-`ortho_config` 0.8.0.
+OrthoConfig is a separate crate by the same author, consumed by Weaver from a
+pinned Git revision. It provides reusable command-contract machinery so that
+Weaver does not rebuild generic command-line infrastructure. Weaver pins Git
+revision `4339a6f3c61dc4fed86493d99ffb05230bee2a1b` at `Cargo.toml:43`,
+resolving to `ortho_config` 0.8.0.
 
 Terms used in this plan:
 
@@ -476,8 +476,8 @@ The files that matter for this task:
 - `crates/weaver-cli/src/help.rs` — builds an augmented `clap::Command` used
   for both runtime help and manual-page generation. It already consumes
   OrthoConfig's flat field metadata via `Config::get_doc_metadata().fields`.
-- `crates/weaver-cli/src/command_surface.rs` — the ADR 007 temporary adapter
-  holding Weaver's semantic command records.
+- `crates/weaver-cli/src/command_surface/mod.rs` — the ADR 007 temporary
+  adapter holding Weaver's semantic command records.
 - `crates/weaver-cli/src/discoverability.rs` — `DOMAIN_OPERATIONS`, the domain
   and operation catalogue used for `after_help` and guidance.
 - `crates/weaver-cli/build.rs` — generates the manual page with `clap_mangen`.
@@ -496,8 +496,8 @@ Upstream artefacts governing this work:
   bound this task's scope.
 - `docs/adr-007-agent-native-command-surface.md` — Weaver's ADR on the
   agent-native command surface, including the boundary-state vocabulary and the
-  removal policy for `command_surface.rs`. Note that OrthoConfig upstream also
-  numbers an ADR 007, on downstream context-command naming; the two are
+  removal policy for `command_surface/mod.rs`. Note that OrthoConfig upstream
+  also numbers an ADR 007, on downstream context-command naming; the two are
   unrelated and prose must say which is meant.
 - `docs/weaver-design.md` — the design document this plan must keep truthful.
 - Upstream OrthoConfig roadmap items 6.1.1 and 6.1.2, both complete and
@@ -662,12 +662,11 @@ to compile or fail for the expected reason.
 
 ### Stage C: the tree and the projection
 
-Introduce `crates/weaver-cli/src/command_surface/` as a module directory,
-absorbing today's `command_surface.rs`, and `crates/weaver-cli/src/command_ir/`
-for the projection. Keep the domain tree free of `clap` and `ortho_config`
-types; keep every `DocMetadata`, `FieldMetadata`, `CliMetadata` and
-`HeadingIds` struct literal inside `command_ir` so that an upstream field
-addition is a one-file compile error.
+Keep the temporary adapter in `crates/weaver-cli/src/command_surface/mod.rs`
+and use `crates/weaver-cli/src/command_ir/` for the projection. Keep the domain
+tree free of `clap` and `ortho_config` types; keep every `DocMetadata`,
+`FieldMetadata`, `CliMetadata` and `HeadingIds` struct literal inside
+`command_ir` so that an upstream field addition is a one-file compile error.
 
 Build a small constructor helper for `HeadingIds` and the `SectionsMetadata`
 skeleton — the upstream types derive no `Default`, so a leaf node requires
@@ -722,7 +721,7 @@ Validation: the full gate sequence in `Concrete steps`.
   deleted. Discharges INV-5. Acceptance: the recursive, non-snapshot coverage
   test plus reviewed snapshots. Recovery: revert Stage D commits; EP-M2 remains
   a coherent plateau.
-- EP-M4 — boundary manifest, ADR and documentation current. Acceptance: the
+- EP-M4 — boundary manifest, ADR, and documentation current. Acceptance: the
   boundary manifest gate and the Markdown gates pass.
 
 No compatibility machinery is required at any milestone. Every interface
@@ -861,6 +860,11 @@ pub(crate) fn project(root: &CommandNode) -> Result<DocMetadata, ProjectionError
 
 ## Boundary classification diagram
 
+For screen readers: this flowchart shows the Weaver-owned command tree flowing
+through the recursive OrthoConfig projection into the shared help and manpage
+renderers, with shell completion and JSON context deferred to later roadmap
+items.
+
 ```mermaid
 flowchart TD
     A["CommandNode tree<br/>(Weaver-owned, pure)"] --> B["command_ir::project"]
@@ -873,6 +877,8 @@ flowchart TD
     A --> I["capability_id, provider_policy<br/>no upstream home"]
     I -.->|divergence, ADR 007| J["boundary row stays 'wraps'"]
 ```
+
+*Figure 1: Command metadata ownership and deferred rendering boundaries.*
 
 The solid edges are delivered by this plan. The dotted edges are the surfaces
 this plan deliberately leaves to later roadmap items, and the divergence that
@@ -911,7 +917,7 @@ Documents to read before starting:
 - `AGENTS.md` — the binding rules.
 - `docs/roadmap.md` sections 12.1 and 13.3 — the scope boundary.
 - `docs/adr-007-agent-native-command-surface.md` — the boundary vocabulary and
-  the removal policy for `command_surface.rs`.
+  the removal policy for `command_surface/mod.rs`.
 - `docs/ortho-config-users-guide.md` — the consumer-facing guide to the
   dependency.
 - `docs/rust-testing-with-rstest-fixtures.md` and
@@ -942,3 +948,9 @@ the 116-file scope-tolerance escalation, marks Stage B complete consistently
 with EP-M1, makes INV-5 executable with a negative control, and documents the
 release-only `test-support` feature-gating repair. No planned command surface
 was added; shell completions and `weaver context --json` remain deferred.
+
+On 2026-08-22, review follow-up replaced the environment-specific manual-page
+fixture with direct `clap_mangen` rendering, rejects duplicate catalogue domain
+entries, and corrects the current-path and accessibility documentation. These
+changes preserve the completed architecture and make its acceptance evidence
+portable across Cargo target directories and build profiles.

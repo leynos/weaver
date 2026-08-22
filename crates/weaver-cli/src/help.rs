@@ -115,22 +115,47 @@ fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
         value_name: cli.value_name.clone(),
     };
 
-    Some(config_arg_from_metadata(&metadata))
+    Some(config_arg_from_metadata(metadata))
 }
 
 /// Maps shared configuration metadata to a `clap::Arg`.
-fn config_arg_from_metadata(field: &ConfigFieldArgMetadata) -> Arg {
-    let mut arg = Arg::new(field.name.clone())
-        .long(field.long.clone())
-        .help(field.help)
+fn config_arg_from_metadata(field: ConfigFieldArgMetadata) -> Arg {
+    let ConfigFieldArgMetadata {
+        name,
+        long,
+        short,
+        help,
+        takes_value,
+        multiple,
+        value_name,
+    } = field;
+    let mut arg = Arg::new(name)
+        .long(long)
+        .help(help)
         .help_heading(CONFIG_HELP_HEADING)
         .global(true);
 
-    arg = apply_arg_shape(arg, field);
+    if let Some(short) = short {
+        arg = arg.short(short);
+    }
+
+    if takes_value {
+        arg = arg.action(if multiple {
+            ArgAction::Append
+        } else {
+            ArgAction::Set
+        });
+        if let Some(value_name) = value_name {
+            arg = arg.value_name(value_name);
+        }
+    } else {
+        arg = arg.action(ArgAction::SetTrue);
+    }
 
     arg
 }
 
+/// Recursively appends the configuration-ordering caveat to help output.
 fn attach_ordering_caveat(command: Command) -> Command {
     let command = command.mut_subcommands(attach_ordering_caveat);
     let after_help = command.get_after_help().map_or_else(
@@ -138,31 +163,6 @@ fn attach_ordering_caveat(command: Command) -> Command {
         |existing| format!("{existing}\n\n{ORDERING_CAVEAT}"),
     );
     command.after_help(after_help)
-}
-
-/// Configures value or flag behaviour, optional short alias, `value_name`, and
-/// intentionally defers allowed-value validation to runtime config parsing.
-fn apply_arg_shape(arg: Arg, field: &ConfigFieldArgMetadata) -> Arg {
-    let mut shaped = arg;
-
-    if let Some(short) = field.short {
-        shaped = shaped.short(short);
-    }
-
-    if field.takes_value {
-        shaped = shaped.action(if field.multiple {
-            ArgAction::Append
-        } else {
-            ArgAction::Set
-        });
-        if let Some(value_name) = &field.value_name {
-            shaped = shaped.value_name(value_name.clone());
-        }
-    } else {
-        shaped = shaped.action(ArgAction::SetTrue);
-    }
-
-    shaped
 }
 
 #[cfg(test)]
@@ -305,7 +305,7 @@ mod tests {
             value_name: Some("VALUE".to_owned()),
         };
         let matches = Command::new("test")
-            .arg(config_arg_from_metadata(&append))
+            .arg(config_arg_from_metadata(append))
             .try_get_matches_from(["test", "--append-field", "one", "--append-field", "two"])
             .expect("append flag should parse");
         let values = matches
@@ -325,13 +325,22 @@ mod tests {
             value_name: None,
         };
         let matches = Command::new("test")
-            .arg(config_arg_from_metadata(&switch))
+            .arg(config_arg_from_metadata(switch))
             .try_get_matches_from(["test", "--switch-field"])
             .expect("switch flag should parse");
         assert_eq!(matches.get_one::<bool>("switch_field").copied(), Some(true));
 
+        let switch = ConfigFieldArgMetadata {
+            name: "switch_field".to_owned(),
+            long: "switch-field".to_owned(),
+            short: None,
+            help: "Enables the example switch",
+            takes_value: false,
+            multiple: false,
+            value_name: None,
+        };
         let error = Command::new("test")
-            .arg(config_arg_from_metadata(&switch))
+            .arg(config_arg_from_metadata(switch))
             .try_get_matches_from(["test", "--switch-field", "value"])
             .expect_err("switch flag should reject a value");
         assert_eq!(error.kind(), ErrorKind::UnknownArgument);
