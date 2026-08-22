@@ -117,6 +117,7 @@ impl DomainRoutingContext {
 }
 
 /// Returns the daemon's domain-to-operation routing catalogue.
+#[cfg(feature = "test-support")]
 pub(crate) fn routing_catalogue() -> [(&'static str, &'static [&'static str]); 3] {
     [
         (
