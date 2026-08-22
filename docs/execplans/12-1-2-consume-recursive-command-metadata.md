@@ -954,3 +954,8 @@ fixture with direct `clap_mangen` rendering, rejects duplicate catalogue domain
 entries, and corrects the current-path and accessibility documentation. These
 changes preserve the completed architecture and make its acceptance evidence
 portable across Cargo target directories and build profiles.
+
+On 2026-08-22, CodeScene reported a string-heavy assertion helper in the new
+cross-surface coverage test. The helper now owns the paired rendered surfaces,
+which keeps the recursive assertion focused on command metadata rather than a
+repeated group of related string arguments.
