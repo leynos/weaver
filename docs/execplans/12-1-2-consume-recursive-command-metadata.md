@@ -955,7 +955,7 @@ entries, and corrects the current-path and accessibility documentation. These
 changes preserve the completed architecture and make its acceptance evidence
 portable across Cargo target directories and build profiles.
 
-On 2026-08-22, CodeScene reported a string-heavy assertion helper in the new
-cross-surface coverage test. The helper now owns the paired rendered surfaces,
-which keeps the recursive assertion focused on command metadata rather than a
-repeated group of related string arguments.
+On 2026-08-22, CodeScene reported string-heavy arguments in the new
+cross-surface coverage test. The test now models rendered documents and
+metadata tokens explicitly, which keeps the recursive assertion focused on
+command metadata rather than repeated groups of related string arguments.
