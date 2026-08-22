@@ -134,26 +134,18 @@ fn command_ir_structured_surface_coverage_appears_in_rendered_help_and_manpage()
     Ok(())
 }
 
+/// Renders the manual page from the same augmented command as the build script.
 fn generated_manpage() -> anyhow::Result<String> {
     use anyhow::Context;
-    use cap_std::{ambient_authority, fs::Dir};
 
-    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let workspace_root = manifest_dir
-        .parent()
-        .context("the manifest directory should have a crates parent")?
-        .parent()
-        .context("the crates directory should have a workspace-root parent")?;
-    let workspace = Dir::open_ambient_dir(workspace_root, ambient_authority())
-        .context("open workspace root")?;
-    let target = format!("{}-unknown-linux-gnu", std::env::consts::ARCH);
-    let path = format!("target/generated-man/{target}/debug/weaver.1");
-
-    workspace
-        .read_to_string(&path)
-        .with_context(|| format!("read generated manual page {path:?}"))
+    let mut manpage = Vec::new();
+    clap_mangen::Man::new(help::command())
+        .render(&mut manpage)
+        .context("render manual page from the augmented help command")?;
+    String::from_utf8(manpage).context("decode rendered manual page as UTF-8")
 }
 
+/// Removes troff escapes that would otherwise hide command and flag tokens.
 fn normalise_manpage(manpage: &str) -> String {
     manpage
         .replace("\\fB", "")
@@ -162,6 +154,7 @@ fn normalise_manpage(manpage: &str) -> String {
         .replace("\\-", "-")
 }
 
+/// Recursively checks each structured command path and long flag in both surfaces.
 fn assert_rendered_surface(node: &CommandNode, help: &str, manpage: &str) {
     if let CommandSemantics::Structured = node.semantics {
         let path = command_path(node);
@@ -176,6 +169,7 @@ fn assert_rendered_surface(node: &CommandNode, help: &str, manpage: &str) {
     }
 }
 
+/// Returns the displayed command path for one structured command-tree node.
 fn command_path(node: &CommandNode) -> String {
     let mut segments = node.resource_path.to_vec();
     if segments.last().copied() != Some(node.verb) {
@@ -184,6 +178,7 @@ fn command_path(node: &CommandNode) -> String {
     segments.join(" ")
 }
 
+/// Asserts that a token appears whole in both rendered documentation surfaces.
 fn assert_surface_token(token: &str, kind: &str, help: &str, manpage: &str) {
     for (surface, rendered) in [("help", help), ("manpage", manpage)] {
         assert!(
@@ -193,6 +188,7 @@ fn assert_surface_token(token: &str, kind: &str, help: &str, manpage: &str) {
     }
 }
 
+/// Reports whether a token is delimited from adjacent command-token characters.
 fn contains_whole_token(rendered: &str, token: &str) -> bool {
     rendered.match_indices(token).any(|(index, _)| {
         let before = rendered[..index].chars().next_back();
@@ -202,6 +198,7 @@ fn contains_whole_token(rendered: &str, token: &str) -> bool {
     })
 }
 
+/// Identifies characters that would turn a token match into a substring match.
 fn is_token_character(character: char) -> bool {
     character.is_ascii_alphanumeric() || matches!(character, '_' | '-')
 }

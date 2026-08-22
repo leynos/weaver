@@ -18,6 +18,7 @@ mod command_tree;
 #[path = "src/help.rs"]
 mod help;
 
+/// Generates the package manual page from the shared augmented help command.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _runtime_help_writer = help::write_help_for_args::<Vec<u8>>;
 

@@ -814,6 +814,19 @@ The augmented command is used in both places that need truthful help text:
 - `clap_mangen` man page generation in `crates/weaver-cli/build.rs`, so the
   generated roff output stays aligned with the runtime help surface.
 
+The build script includes `cli.rs`, `command_surface/tree.rs`,
+`command_ir/mod.rs`, and `help.rs` because it cannot link its own library. When
+changing any of those metadata inputs, keep the corresponding
+`cargo:rerun-if-changed` entry in `crates/weaver-cli/build.rs` so packaging
+regenerates the manual page from the same projection.
+
+The daemon routing catalogue remains private in production. The
+`weaverd::test_support::routing_catalogue()` accessor, its internal re-export,
+and its router definition are all compiled only with the `test-support` feature.
+`crates/weaver-e2e` enables that feature in its development dependency to
+compare the CLI's discoverability catalogue with daemon routing; production
+dependencies must not enable it.
+
 ### 2.2 Augmented command pattern
 
 The CLI deliberately uses two clap command shapes:
