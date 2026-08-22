@@ -160,10 +160,16 @@ Stop and escalate rather than improvising when any of these is reached.
       private routing authority through the existing test-support feature.
       The negative control removed `verify syntax` and failed with the named
       mismatch before the unchanged router was restored.
-- [ ] Stage C: the command tree and its `DocMetadata` projection, with
-      verification artefacts developed alongside.
+- [x] Stage C: the command tree and its `DocMetadata` projection, with
+      verification artefacts developed alongside. Completed 2026-08-22: the
+      pure tree projects to recursive IR, limits depth to eight, has a
+      generated-tree property test, a derived-field differential test, a
+      schema pin, round-trip tests, and Fluent resolution checks.
 - [ ] Stage D: route help and manpage rendering through the projection; delete
-      the superseded catalogues and `promote_static`.
+      the superseded catalogues and `promote_static`. The augmented Clap
+      command now consumes the projection, and the legacy operation catalogue
+      now has one home in the tree. Cross-surface coverage against the emitted
+      manual page remains to be added before this stage can complete.
 - [ ] Stage E: boundary manifest, ADR 007, and user- and developer-facing
       documentation; full gate run.
 
@@ -258,6 +264,13 @@ Recorded during planning; keep appending during implementation.
   `Command::new` all accept `impl Into<…>`. Impact: deleting it removes an
   entire failure class before this plan can amplify it from five config fields
   to a whole recursive tree.
+
+- Observation: the pinned OrthoConfig revision defines the recursive IR but
+  does not provide a renderer for it. Evidence: `src/docs/mod.rs` exports IR
+  types and derives only; no documentation renderer is present. Impact:
+  `help_metadata.rs` is a narrow Weaver adapter that uses the projected IR to
+  decorate the parser-shaped Clap command. It keeps the framework-independent
+  tree and all IR literals outside the renderer.
 
 ## Decision log
 
@@ -630,8 +643,10 @@ Validation: the full gate sequence in `Concrete steps`.
   new test passes and fails when either catalogue is mutated. Recovery: revert
   a single test file. Remaining gaps: everything else. Compatibility decision:
   none required; test-only surface.
-- EP-M2 — command tree and projection exist and are verified, but nothing
-  renders from them yet. Discharges INV-1, INV-2, INV-3, INV-4, INV-7.
+- EP-M2 — command tree and projection exist and are verified. Discharges
+  INV-1, INV-2, INV-3, INV-4, INV-7. The augmented Clap command also consumes
+  the projection, but EP-M3 remains incomplete until the manual-page coverage
+  assertion proves that both rendered surfaces contain every projected node.
   Acceptance: `cargo test -p weaver-cli command_ir`. Recovery: the new modules
   are additive and can be deleted wholesale. Compatibility decision: none;
   `pub(crate)` surface inside a pre-1.0 binary crate.

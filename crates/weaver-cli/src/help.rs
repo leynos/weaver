@@ -11,7 +11,10 @@ use clap::{Arg, ArgAction, Command, CommandFactory};
 use ortho_config::docs::{FieldMetadata, OrthoConfigDocs};
 use weaver_config::{Config, config_field_help};
 
-use crate::cli::Cli;
+use crate::{cli::Cli, command_ir, command_tree};
+
+#[path = "help_metadata.rs"]
+mod metadata;
 
 const CONFIG_PATH_ARG_ID: &str = "config-path";
 const CONFIG_HELP_HEADING: &str = "Options";
@@ -23,13 +26,13 @@ const ORDERING_CAVEAT: &str = "Config flags must appear before the command domai
 static AUGMENTED_COMMAND: OnceLock<Command> = OnceLock::new();
 
 struct ConfigFieldArgMetadata {
-    name: &'static str,
-    long: &'static str,
+    name: String,
+    long: String,
     short: Option<char>,
     help: &'static str,
     takes_value: bool,
     multiple: bool,
-    value_name: Option<&'static str>,
+    value_name: Option<String>,
 }
 
 /// Returns an augmented `clap::Command` that adds shared configuration flags
@@ -62,6 +65,14 @@ pub fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::
 fn build_command() -> Command {
     tracing::debug!("building augmented help command");
     let mut command = Cli::command();
+    match command_ir::project(command_tree::root()) {
+        Ok(projected) => {
+            command = metadata::apply(command, &projected, command_tree::root());
+        }
+        Err(error) => {
+            tracing::error!(error = %error, "failed to project command metadata for help rendering");
+        }
+    }
     command = command.arg(config_path_arg());
 
     for field in Config::get_doc_metadata().fields {
@@ -95,32 +106,22 @@ fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
     }
 
     let metadata = ConfigFieldArgMetadata {
-        name: promote_static(field.name.clone()),
-        long: promote_static(long.to_string()),
+        name: field.name.clone(),
+        long: long.to_owned(),
         short: cli.short,
         help: config_field_help(&field.help_id),
         takes_value: cli.takes_value,
         multiple: cli.multiple,
-        value_name: cli.value_name.clone().map(promote_static),
+        value_name: cli.value_name.clone(),
     };
 
     Some(config_arg_from_metadata(&metadata))
 }
 
-fn promote_static(value: String) -> &'static str {
-    // SAFETY: This intentionally promotes the given `String` to a `'static`
-    // `str` because clap requires process-lifetime metadata for dynamically
-    // built arguments. The leak is effectively process-lifetime and bounded by
-    // the `OnceLock` command cache, which performs this promotion once per
-    // field. This tradeoff satisfies clap's `'static` argument metadata
-    // requirement while avoiding unbounded leaks.
-    Box::leak(value.into_boxed_str())
-}
-
 /// Maps shared configuration metadata to a `clap::Arg`.
 fn config_arg_from_metadata(field: &ConfigFieldArgMetadata) -> Arg {
-    let mut arg = Arg::new(field.name)
-        .long(field.long)
+    let mut arg = Arg::new(field.name.clone())
+        .long(field.long.clone())
         .help(field.help)
         .help_heading(CONFIG_HELP_HEADING)
         .global(true);
@@ -154,8 +155,8 @@ fn apply_arg_shape(arg: Arg, field: &ConfigFieldArgMetadata) -> Arg {
         } else {
             ArgAction::Set
         });
-        if let Some(value_name) = field.value_name {
-            shaped = shaped.value_name(value_name);
+        if let Some(value_name) = &field.value_name {
+            shaped = shaped.value_name(value_name.clone());
         }
     } else {
         shaped = shaped.action(ArgAction::SetTrue);
@@ -295,13 +296,13 @@ mod tests {
     #[test]
     fn apply_arg_shape_supports_append_and_boolean_flags() {
         let append = ConfigFieldArgMetadata {
-            name: "append_field",
-            long: "append-field",
+            name: "append_field".to_owned(),
+            long: "append-field".to_owned(),
             short: None,
             help: "Appends example values",
             takes_value: true,
             multiple: true,
-            value_name: Some("VALUE"),
+            value_name: Some("VALUE".to_owned()),
         };
         let matches = Command::new("test")
             .arg(config_arg_from_metadata(&append))
@@ -315,8 +316,8 @@ mod tests {
         assert_eq!(values, ["one", "two"]);
 
         let switch = ConfigFieldArgMetadata {
-            name: "switch_field",
-            long: "switch-field",
+            name: "switch_field".to_owned(),
+            long: "switch-field".to_owned(),
             short: None,
             help: "Enables the example switch",
             takes_value: false,

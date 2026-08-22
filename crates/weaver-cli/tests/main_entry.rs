@@ -10,7 +10,12 @@ use predicates::{
 };
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use weaver_cli::DOMAIN_OPERATIONS;
+
+
+//! Integration tests for the `weaver` binary entry point.
+//!
+//! and user-facing error handling when required arguments are missing.
+};
 
 const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
     "--config-path <PATH>",
@@ -170,12 +175,13 @@ fn help_output_lists_all_domains_and_operations() {
         combined.contains("Domains and operations:"),
         "weaver --help output missing header"
     );
-    for (domain, _, ops) in DOMAIN_OPERATIONS {
+    for entry in domain_operations() {
         assert!(
-            combined.contains(domain),
-            "weaver --help output missing domain {domain:?}"
+            combined.contains(entry.domain),
+            "weaver --help output missing domain {:?}",
+            entry.domain,
         );
-        for op in *ops {
+        for op in entry.operations {
             assert!(
                 combined.contains(op),
                 "weaver --help output missing operation {op:?}"

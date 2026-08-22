@@ -9,6 +9,12 @@ use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_
 
 #[path = "src/cli.rs"]
 mod cli;
+// The build script cannot depend on its own library, so it includes the same
+// pure command metadata modules used by runtime help. Keep this list bounded.
+#[path = "src/command_ir/mod.rs"]
+mod command_ir;
+#[path = "src/command_surface/tree.rs"]
+mod command_tree;
 #[path = "src/help.rs"]
 mod help;
 
@@ -17,6 +23,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Regenerate the manual page when the CLI or metadata changes.
     println!("cargo:rerun-if-changed=src/cli.rs");
+    println!("cargo:rerun-if-changed=src/command_surface/mod.rs");
+    println!("cargo:rerun-if-changed=src/command_surface/tree.rs");
+    println!("cargo:rerun-if-changed=src/command_ir/mod.rs");
     println!("cargo:rerun-if-changed=src/help.rs");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_NAME");
