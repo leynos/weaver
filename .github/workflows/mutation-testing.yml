@@ -26,7 +26,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # OIDC workflow-source resolution
-    uses: leynos/shared-actions/.github/workflows/mutation-cargo.yml@18bed1ca49a6de3d8882bd72635a32ae3f023d57
+    uses: leynos/shared-actions/.github/workflows/mutation-cargo.yml@a197301888920eb21fbbc7e7bb6cb0c6f3d81584
     with:
       # All workspace crates live under crates/; there is no root src/.
       paths: "crates/"
