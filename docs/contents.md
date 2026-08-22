@@ -32,6 +32,18 @@ readers can find the source of truth without scanning the whole tree.
   surface](adr-007-agent-native-command-surface.md)
   - Decision record for the human-friendly, agent-native 0.1.0 command
     contract and OrthoConfig dependency boundary.
+- [Architectural decision record (ADR) 008: Workspace-scoped daemon
+  tenancy](adr-008-workspace-scoped-daemon-tenancy.md)
+  - Proposed decision for canonical workspace identity beneath one per-user
+    daemon.
+- [Architectural decision record (ADR) 009: Workspace-scoped language-server
+  lifecycle](adr-009-workspace-scoped-language-server-lifecycle.md)
+  - Proposed decision for workspace-owned server pools, execution identity,
+    and explicit Rust toolchain selection.
+- [Architectural decision record (ADR) 010: Workspace-local
+  concurrency](adr-010-workspace-local-concurrency.md)
+  - Proposed decision for workspace-local coordination, mutation isolation,
+    bounded admission, and overload behaviour.
 - [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md)
   - Generated matrix classifying every command-contract roadmap task as an
     OrthoConfig consumer, temporary wrapper, pending dependency, or deliberate
@@ -61,6 +73,10 @@ readers can find the source of truth without scanning the whole tree.
 - [RFC 0001: Local daemon observability](rfcs/0001-o11y.md)
   - Proposed observability contract for the single-user `weaverd` daemon and
     its `weaver` CLI partner.
+- [RFC 0002: Multi-workspace daemon and language-server
+  lifecycle](rfcs/0002-multi-workspace-daemon.md)
+  - Proposed architecture for safe multi-repository tenancy, language-server
+    reuse, Rust toolchain selection, and concurrent request execution.
 - [Ortho-config user's guide](ortho-config-users-guide.md)
   - Operational guide for configuration layering and ortho-config usage.
 - [Ortho-config v0.9.0 migration guide](ortho-config-v0-9-0-migration-guide.md)
