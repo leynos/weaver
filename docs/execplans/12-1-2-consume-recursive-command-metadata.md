@@ -956,3 +956,7 @@ On 2026-08-22, follow-up review aligned the quoted completion boundary and
 router coverage with the roadmap and `DomainRoutingContext`. It also made the
 recorded gate logs safe for slash-containing branch names, documented every
 manual-page build input, and added generated captions to the boundary matrix.
+
+On 2026-08-22, a final renderer review added a multi-phase regression test for
+caption numbering and rendered order. The test protects the generated boundary
+matrix when it contains more than one roadmap phase.
