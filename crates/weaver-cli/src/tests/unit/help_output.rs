@@ -12,6 +12,11 @@ use crate::{
     help,
     run_with_loader,
     tests::support::{self, EXPECTED_SHARED_CONFIG_HELP_FLAGS},
+    command_tree::{self, CommandNode, CommandSemantics},
+};
+
+
+//! Tests for clap help output augmented with shared configuration flags.
 };
 
 fn run_with_args(args: &[&str]) -> anyhow::Result<(ExitCode, String, String)> {
@@ -95,6 +100,38 @@ fn augmented_command_has_expected_arg_structure() {
     }
 }
 
+#[test]
+fn projected_structured_surface_appears_in_the_shared_help_and_manpage_command() {
+    assert_command_surface(&help::command(), command_tree::root());
+}
+
+fn assert_command_surface(command: &clap::Command, node: &CommandNode) {
+    assert_eq!(command.get_name(), node.verb);
+    for argument in node.arguments {
+        assert!(
+            command
+                .get_arguments()
+                .any(|candidate| candidate.get_long() == Some(argument.long)),
+            "command {:?} is missing projected --{}",
+            node.verb,
+            argument.long,
+        );
+    }
+    for child in node.children {
+        if let CommandSemantics::Structured = child.semantics {
+            let Some(subcommand) = command
+                .get_subcommands()
+                .find(|candidate| candidate.get_name() == child.verb)
+            else {
+                panic!(
+                    "command {:?} is missing projected child {:?}",
+                    node.verb, child.verb
+                );
+            };
+            assert_command_surface(subcommand, child);
+        }
+    }
+}
 #[test]
 fn config_flag_after_domain_is_not_extracted_as_config_argument() {
     use std::sync::{
