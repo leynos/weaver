@@ -124,6 +124,88 @@ fn projected_structured_surface_appears_in_the_shared_help_and_manpage_command()
     assert_command_surface(&help::command(), command_tree::root());
 }
 
+#[test]
+fn command_ir_structured_surface_coverage_appears_in_rendered_help_and_manpage()
+-> anyhow::Result<()> {
+    let rendered_help = help::command().render_long_help().to_string();
+    let rendered_manpage = normalise_manpage(&generated_manpage()?);
+
+    assert_rendered_surface(command_tree::root(), &rendered_help, &rendered_manpage);
+    Ok(())
+}
+
+fn generated_manpage() -> anyhow::Result<String> {
+    use anyhow::Context;
+    use cap_std::{ambient_authority, fs::Dir};
+
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+        .parent()
+        .context("the manifest directory should have a crates parent")?
+        .parent()
+        .context("the crates directory should have a workspace-root parent")?;
+    let workspace = Dir::open_ambient_dir(workspace_root, ambient_authority())
+        .context("open workspace root")?;
+    let target = format!("{}-unknown-linux-gnu", std::env::consts::ARCH);
+    let path = format!("target/generated-man/{target}/debug/weaver.1");
+
+    workspace
+        .read_to_string(&path)
+        .with_context(|| format!("read generated manual page {path:?}"))
+}
+
+fn normalise_manpage(manpage: &str) -> String {
+    manpage
+        .replace("\\fB", "")
+        .replace("\\fI", "")
+        .replace("\\fR", "")
+        .replace("\\-", "-")
+}
+
+fn assert_rendered_surface(node: &CommandNode, help: &str, manpage: &str) {
+    if let CommandSemantics::Structured = node.semantics {
+        let path = command_path(node);
+        assert_surface_token(&path, "command path", help, manpage);
+        for argument in node.arguments {
+            assert_surface_token(&format!("--{}", argument.long), "long flag", help, manpage);
+        }
+    }
+
+    for child in node.children {
+        assert_rendered_surface(child, help, manpage);
+    }
+}
+
+fn command_path(node: &CommandNode) -> String {
+    let mut segments = node.resource_path.to_vec();
+    if segments.last().copied() != Some(node.verb) {
+        segments.push(node.verb);
+    }
+    segments.join(" ")
+}
+
+fn assert_surface_token(token: &str, kind: &str, help: &str, manpage: &str) {
+    for (surface, rendered) in [("help", help), ("manpage", manpage)] {
+        assert!(
+            contains_whole_token(rendered, token),
+            "{surface} is missing {kind} {token:?}",
+        );
+    }
+}
+
+fn contains_whole_token(rendered: &str, token: &str) -> bool {
+    rendered.match_indices(token).any(|(index, _)| {
+        let before = rendered[..index].chars().next_back();
+        let after = rendered[index + token.len()..].chars().next();
+        before.is_none_or(|character| !is_token_character(character))
+            && after.is_none_or(|character| !is_token_character(character))
+    })
+}
+
+fn is_token_character(character: char) -> bool {
+    character.is_ascii_alphanumeric() || matches!(character, '_' | '-')
+}
+
 fn assert_command_surface(command: &clap::Command, node: &CommandNode) {
     assert_eq!(command.get_name(), node.verb);
     for argument in node.arguments {
@@ -150,6 +232,15 @@ fn assert_command_surface(command: &clap::Command, node: &CommandNode) {
             assert_command_surface(subcommand, child);
         }
     }
+}
+
+#[test]
+fn whole_token_matching_rejects_partial_command_paths_and_flags() {
+    assert!(!contains_whole_token(
+        "definitions getter",
+        "definitions get"
+    ));
+    assert!(!contains_whole_token("--uri-value", "--uri"));
 }
 
 #[test]
