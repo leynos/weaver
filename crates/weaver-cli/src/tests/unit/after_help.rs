@@ -14,7 +14,11 @@ fn assert_catalogue_complete(text: &str) {
     // starts with a domain heading (e.g. "  observe — …").
     let sections: Vec<&str> = text.split("\n\n").collect();
     for entry in domain_operations() {
-        let Some(section) = sections.iter().find(|s| s.contains(entry.domain)) else {
+        let heading = format!("  {} —", entry.domain);
+        let Some(section) = sections
+            .iter()
+            .find(|section| section.starts_with(&heading))
+        else {
             panic!("after-help missing domain {:?}", entry.domain);
         };
         for op in entry.operations {
