@@ -149,10 +149,17 @@ Stop and escalate rather than improvising when any of these is reached.
 
 - [x] Stage A: orientation and confirmation of upstream facts (no code
       changes). Completed 2026-08-22: the resolved Git source provides the
-      required recursive IR and schema version 1.1; `weaver-e2e` remains the
-      expected cross-crate-test home.
+      required recursive IR and schema version 1.1; `weaver-e2e` can compare
+      the catalogues through a feature-gated daemon test-support accessor.
 - [ ] Stage B: red tests — cross-crate catalogue drift gate and coverage
-      assertions that fail for the expected reason.
+      assertions that fail for the expected reason. INV-6 has completed its
+      red–green loop: the missing test-support accessor failed to compile, and
+      the equality test now passes through the feature-gated accessor.
+- [x] EP-M1: cross-crate catalogue drift gate. Completed 2026-08-22: the
+      `weaver-e2e` test compares the public CLI catalogue with the daemon's
+      private routing authority through the existing test-support feature.
+      The negative control removed `verify syntax` and failed with the named
+      mismatch before the unchanged router was restored.
 - [ ] Stage C: the command tree and its `DocMetadata` projection, with
       verification artefacts developed alongside.
 - [ ] Stage D: route help and manpage rendering through the projection; delete
@@ -209,12 +216,31 @@ Recorded during planning; keep appending during implementation.
   Impact: this is the drift that has actually occurred, and closing it is the
   most valuable part of "converge".
 
+- Observation: `weaver-e2e` already declares development dependencies on both
+  `weaver-cli` and `weaverd` with its `test-support` feature, but neither crate
+  exposes its internal catalogue to another crate. Evidence:
+  `crates/weaver-e2e/Cargo.toml` has both dependencies; `weaverd::dispatch` and
+  `weaverd::dispatch::router` are private modules, and `DomainRoutingContext`
+  fields are `pub(crate)`. Impact: INV-6 must use a narrow, feature-gated
+  `weaverd::test_support::routing_catalogue` accessor. This adds no dependency
+  and leaves the daemon's runtime interface unchanged.
+
 - Observation: the CLI advertises fourteen operations; the daemon routes five.
   Evidence: `router.rs:210-215` routes `get-definition`, `get-card` and
   `graph-slice`; `router.rs:225-238` routes `apply-patch` and `refactor`;
   `route_verify` (`router.rs:241-249`) routes nothing and falls through.
   Impact: generating help from a catalogue that lists fourteen would make
   Weaver more confidently wrong. Recorded for roadmap 13.1/13.3; not fixed here.
+
+- Observation correction: `DomainRoutingContext` declares all fourteen CLI
+  operations as known routing operations. Five currently have dedicated handler
+  branches; the remaining known operations use the router's not-implemented
+  fallback. Evidence: `DomainRoutingContext::{OBSERVE, ACT, VERIFY}` contains
+  the same three-domain, fourteen-operation catalogue as `DOMAIN_OPERATIONS`,
+  and `router/tests.rs` already exercises every known operation. Impact: INV-6
+  correctly protects advertised routing knowledge, but does not claim handler
+  implementation coverage. The earlier five-operation wording describes
+  dedicated handlers, not the router catalogue.
 
 - Observation: `weaverd`'s manual page is covered by no live roadmap task.
   Evidence: `manpage` appears in `docs/roadmap.md` only at 12.1.2's success
@@ -234,6 +260,20 @@ Recorded during planning; keep appending during implementation.
   to a whole recursive tree.
 
 ## Decision log
+
+- Decision: define INV-6 against `DomainRoutingContext.known_operations`, not
+  the subset of operations with dedicated handlers. Rationale: the router
+  explicitly accepts all known operations and provides a stable not-implemented
+  response for those without a handler. The test must prevent discoverability
+  from drifting from that routing contract; requiring handler coverage would be
+  a separate roadmap concern. Date/Author: 2026-08-22, implementation agent.
+
+- Decision: put INV-6 in `crates/weaver-e2e/tests/catalogue_agreement.rs` and
+  expose the daemon catalogue only through its existing `test-support` feature.
+  Rationale: `weaver-e2e` already has both crate dependencies, avoiding a new
+  dependency edge. A feature-gated accessor preserves the router as the single
+  authority while keeping its implementation private in production builds.
+  Date/Author: 2026-08-22, implementation agent.
 
 - Decision: use the recursive documentation contract at the actual pinned
   OrthoConfig Git revision, without changing the dependency. Rationale:
@@ -483,8 +523,8 @@ mock.
   Rationale: these two lists are in different crates with no dependency edge,
   and they have already drifted. This is the one drift that has actually
   occurred. Domain: all three domains and their declared operations. Artefact:
-  a test in `crates/weaver-e2e` or a shared location that can see both crates;
-  confirm the placement in Stage A. Evidence:
+  `crates/weaver-e2e/tests/catalogue_agreement.rs`, using the feature-gated
+  daemon test-support accessor. Evidence:
   `cargo test -p weaver-e2e catalogue_agreement`. Non-vacuity: the test must
   currently pass on set equality but must be shown to fail when one operation
   is removed from either side. Seed that mutation once.
@@ -514,27 +554,30 @@ constraint.
 Re-verify the upstream facts recorded under `Surprises & discoveries`, because
 the plan's scope depends on them. Confirm the pinned Git source provides
 `DocMetadata.subcommands`, and confirm the derive still rejects named-field and
-unit variants. Decide where obligation INV-6's cross-crate test can live such
-that both `weaver-cli` and `weaverd` are visible; `crates/weaver-e2e` already
-depends on the workspace and is the expected home.
+unit variants. Confirm that `crates/weaver-e2e` can access both catalogues
+through its existing development dependencies and the daemon's feature-gated
+test-support accessor.
 
 Validation: no code changes; record findings in `Progress`.
 
 ### Stage B: red tests
 
-Write the failing tests first. In order: INV-6 (cross-crate agreement), because
-it needs no new production code and immediately documents the existing drift;
-then INV-5 (coverage), which must be written against the *current* renderers so
-that it passes before the rewrite and therefore proves the rewrite preserves
-content; then INV-3's schema-version assertion.
+Write the failing tests first. In order: INV-6 (cross-crate agreement), adding
+only the feature-gated test-support accessor needed to compile the cross-crate
+test, then observe its expected data mismatch; then INV-5 (coverage), which
+must be written against the *current* renderers so that it passes before the
+rewrite and therefore proves the rewrite preserves content; then INV-3's
+schema-version assertion.
 
 The coverage test is deliberately written before the projection exists. That
 ordering is the point: it must pass on today's output, so that any regression
 during Stage D is attributable to the rewrite.
 
-Validation: `cargo test -p weaver-cli` and `cargo test -p weaver-e2e` show the
-new tests, with INV-6 and INV-5 passing against current behaviour and the
-projection tests failing to compile or failing for the expected reason.
+Validation: `cargo test -p weaver-cli` and
+`cargo test -p weaver-e2e catalogue_agreement` show the new tests. INV-6 first
+fails for the existing set mismatch, then passes once the catalogue is made
+truthful; INV-5 passes against current behaviour and the projection tests fail
+to compile or fail for the expected reason.
 
 ### Stage C: the tree and the projection
 
@@ -628,7 +671,7 @@ Stages B through D — the focused loop, repeated per obligation:
 
 ```sh
 cargo test -p weaver-cli command_ir 2>&1 | tee "$LOG_BASE-unit.out"
-cargo test -p weaver-e2e catalogue_agreement 2>&1 | tee "$LOG_BASE-e2e.out"
+cargo test -p weaver-e2e --test catalogue_agreement 2>&1 | tee "$LOG_BASE-e2e.out"
 ```
 
 Reviewing snapshot changes — never accept blind:
@@ -807,5 +850,6 @@ Upstream references, read-only:
 On 2026-08-22, Stage A corrected the plan's stale 0.9.0 dependency claim to the
 pinned 0.8.0 Git source. The revision exposes the same recursive IR and schema
 1.1 required by this work, so no dependency change or scope deviation is
-needed. It also records Stage A completion; the remaining milestones are
+needed. It also records Stage A completion and resolves the INV-6 placement to
+the existing `weaver-e2e` development boundary; the remaining milestones are
 unchanged.
