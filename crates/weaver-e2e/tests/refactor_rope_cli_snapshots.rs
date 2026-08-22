@@ -12,7 +12,7 @@ mod refactor_routing;
 use std::io::Write;
 
 use assert_cmd::Command;
-use daemon_harness::{FakeDaemon, output_to_transcript, weaver_binary_path};
+use daemon_harness::{FakeDaemon, output_to_transcript, resolve_or_build_weaver_binary_path};
 use insta::assert_debug_snapshot;
 use rstest::rstest;
 
@@ -55,7 +55,7 @@ fn run_rename_refactor_snapshot(
         "new_name=renamed_symbol".into(),
     ]);
 
-    let mut command = Command::new(weaver_binary_path()?);
+    let mut command = Command::new(resolve_or_build_weaver_binary_path()?);
     let output = command.args(&args).output()?;
 
     let transcript = output_to_transcript(command_string, &output, daemon.requests());
@@ -88,7 +88,8 @@ fn refactor_pipeline_with_observe_and_jq_snapshot() {
 
     let daemon = FakeDaemon::start(2, "renamed_symbol").expect("fake daemon should start");
     let endpoint = daemon.endpoint();
-    let weaver_bin = weaver_binary_path().expect("weaver binary should be locatable");
+    let weaver_bin =
+        resolve_or_build_weaver_binary_path().expect("weaver binary should be locatable");
 
     let shell_script = concat!(
         "\"$WEAVER_BIN\" --daemon-socket \"$WEAVER_ENDPOINT\" --output json ",

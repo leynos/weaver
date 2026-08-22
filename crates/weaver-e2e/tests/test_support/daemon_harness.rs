@@ -52,16 +52,16 @@ const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 #[path = "../support/weaver_binary.rs"]
 mod weaver_binary_resolver;
 
-/// Returns the path to the compiled `weaver` binary for use in end-to-end
-/// tests.
+/// Resolves the compiled `weaver` binary for end-to-end tests, building it
+/// when no prebuilt binary is found.
 ///
-/// This wrapper keeps the `daemon_harness::weaver_binary_path` module path
-/// stable for modules that already import it; callers receive an
-/// `io::Result<PathBuf>` from the underlying resolver.
+/// The name mirrors the underlying resolver deliberately: this is not a pure
+/// lookup, and a cold call may shell out to `cargo build` and write artefacts
+/// into the workspace target directory.
 ///
 /// # Errors
-/// Returns an `io::Error` if the `weaver` binary cannot be located.
-pub fn weaver_binary_path() -> io::Result<std::path::PathBuf> {
+/// Returns an `io::Error` if the `weaver` binary cannot be located or built.
+pub fn resolve_or_build_weaver_binary_path() -> io::Result<std::path::PathBuf> {
     weaver_binary_resolver::resolve_or_build_weaver_binary_path()
         .map(std::path::Path::to_path_buf)
         .map_err(io::Error::other)

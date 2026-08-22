@@ -15,6 +15,12 @@ use std::{
 /// process because the outcome — success or failure — is cached, so every
 /// caller sees the same answer and can decide how to report it.
 ///
+/// The cache is per-process, not per-test: concurrent callers are safe because
+/// `OnceLock` runs the resolver exactly once, which is what stops parallel test
+/// threads racing to spawn competing `cargo build` invocations. The corollary
+/// is that a failure is cached too, so one failed build poisons the remaining
+/// tests in that binary; the next `cargo test` invocation starts afresh.
+///
 /// # Errors
 /// Returns a description of why the binary could not be located or built.
 pub(crate) fn resolve_or_build_weaver_binary_path() -> Result<&'static Path, &'static str> {

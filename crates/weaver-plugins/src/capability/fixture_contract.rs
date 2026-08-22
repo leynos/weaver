@@ -5,7 +5,8 @@
 //! Hosting the suite walk here keeps every rename-capable plugin checking the
 //! same fixtures in the same way instead of duplicating the walk per crate.
 //! [`FixtureError`] lives in [`super::fixture_error`], a leaf module shared
-//! with [`super::test_support`], so neither sibling depends on the other.
+//! with [`super::test_support`], removing that module's dependency on this
+//! module and leaving a one-way dependency graph.
 
 use super::{
     fixture_error::FixtureError,
