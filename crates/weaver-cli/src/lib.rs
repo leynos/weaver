@@ -17,7 +17,10 @@ use ortho_config::Localizer;
 mod actionable_guidance;
 mod cli;
 mod command;
+mod command_ir;
 mod command_surface;
+#[path = "command_surface/tree.rs"]
+mod command_tree;
 mod config;
 mod daemon_output;
 mod discoverability;
@@ -51,11 +54,11 @@ pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
 #[cfg(test)]
 pub(crate) use command_surface::READ_ONLY_COMMANDS;
+pub use command_tree::{DomainOperations, domain_operations};
 use config::prepare_cli_arguments;
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader, split_config_arguments};
 #[cfg(test)]
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
-pub use discoverability::DOMAIN_OPERATIONS;
 pub(crate) use errors::{AppError, is_daemon_not_running};
 use lifecycle::{
     LifecycleContext,
