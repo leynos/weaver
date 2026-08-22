@@ -188,18 +188,12 @@ mod tests {
         validate_provider,
         validate_refactoring,
     };
-    use crate::dispatch::errors::DispatchError;
-
-    fn invalid_arguments_message(error: DispatchError) -> String {
-        match error {
-            DispatchError::InvalidArguments { message } => message,
-            other => panic!("expected invalid arguments error, got: {other:?}"),
-        }
-    }
+    use crate::dispatch::act::refactor::refactor_helpers::errors::invalid_arguments_message;
 
     #[test]
     fn missing_requirements_error_lists_full_contract() {
-        let message = invalid_arguments_message(missing_requirements_error());
+        let message = invalid_arguments_message(missing_requirements_error())
+            .expect("missing requirements should be an invalid-arguments error");
 
         for required in [
             "--provider <plugin>",
@@ -220,7 +214,8 @@ mod tests {
     #[test]
     fn invalid_provider_error_lists_supported_values() {
         let message =
-            invalid_arguments_message(validate_provider("missing-provider").expect_err("invalid"));
+            invalid_arguments_message(validate_provider("missing-provider").expect_err("invalid"))
+                .expect("provider validation should be an invalid-arguments error");
 
         assert!(message.contains("does not support provider 'missing-provider'"));
         assert!(message.contains("Providers: rope, rust-analyzer"));
@@ -229,7 +224,8 @@ mod tests {
     #[test]
     fn invalid_refactoring_error_lists_supported_values() {
         let message =
-            invalid_arguments_message(validate_refactoring("extract-method").expect_err("invalid"));
+            invalid_arguments_message(validate_refactoring("extract-method").expect_err("invalid"))
+                .expect("refactoring validation should be an invalid-arguments error");
 
         assert!(message.contains("does not support refactoring 'extract-method'"));
         assert!(message.contains("Refactorings: rename"));

@@ -2,18 +2,17 @@
 
 use std::{io, net::TcpListener, path::Path, thread, time::Duration};
 
-use anyhow::Result;
 use cap_std::fs::Dir;
 use rstest::rstest;
 use tempfile::TempDir;
-use weaver_config::{Config, RuntimePaths, SocketEndpoint};
+use weaver_config::{RuntimePaths, SocketEndpoint};
 
 use crate::{
     lifecycle::{
         LifecycleError,
         shutdown::{signal_daemon, wait_for_shutdown},
     },
-    tests::support::write_test_file,
+    tests::support::{temp_paths, write_test_file},
 };
 
 #[cfg(unix)]
@@ -75,22 +74,6 @@ fn signal_daemon_rejects_invalid_pid(#[case] invalid_pid: u32, #[case] expected_
     );
 }
 
-/// Creates RuntimePaths for testing using a temporary directory.
-///
-/// Returns both the TempDir (which must be kept alive) and the RuntimePaths.
-/// The RuntimePaths is configured with a Unix socket endpoint pointing to the
-/// temp directory, which ensures the runtime files are written there.
-fn create_temp_runtime_paths() -> Result<(TempDir, RuntimePaths)> {
-    let temp_dir = TempDir::new()?;
-    let socket_path = temp_dir.path().join("test.sock");
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().into_owned()),
-        ..Config::default()
-    };
-    let paths = RuntimePaths::from_config(&config)?;
-    Ok((temp_dir, paths))
-}
-
 fn remove_test_file(path: &Path) -> io::Result<()> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     let file_name = path.file_name().ok_or_else(|| {
@@ -103,9 +86,11 @@ fn remove_test_file(path: &Path) -> io::Result<()> {
     dir.remove_file(file_name)
 }
 
-#[test]
-fn wait_for_shutdown_succeeds_when_pid_and_socket_disappear() {
-    let (_temp_dir, paths) = create_temp_runtime_paths().expect("create temp runtime paths");
+#[rstest]
+fn wait_for_shutdown_succeeds_when_pid_and_socket_disappear(
+    temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
+) {
+    let (_temp_dir, paths) = temp_paths.expect("create temp runtime paths");
 
     // Create PID file to simulate running daemon.
     write_test_file(paths.pid_path(), b"12345").expect("write pid file");
@@ -136,9 +121,11 @@ fn wait_for_shutdown_succeeds_when_pid_and_socket_disappear() {
 /// (ConnectionRefused, NotFound, AddrNotAvailable), the error should be
 /// propagated as SocketProbe rather than being swallowed.
 #[cfg(unix)]
-#[test]
-fn wait_for_shutdown_propagates_socket_probe_errors() {
-    let (_temp_dir, paths) = create_temp_runtime_paths().expect("create temp runtime paths");
+#[rstest]
+fn wait_for_shutdown_propagates_socket_probe_errors(
+    temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
+) {
+    let (_temp_dir, paths) = temp_paths.expect("create temp runtime paths");
 
     // Create PID file so we actually need to check the socket.
     write_test_file(paths.pid_path(), b"12345").expect("write pid file");
@@ -158,10 +145,12 @@ fn wait_for_shutdown_propagates_socket_probe_errors() {
 ///
 /// This test takes 10 seconds to run (the SHUTDOWN_TIMEOUT constant) and is
 /// therefore marked `#[ignore]`. Run with `cargo test -- --ignored` to execute.
-#[test]
+#[rstest]
 #[ignore]
-fn wait_for_shutdown_times_out_when_conditions_persist() {
-    let (_temp_dir, paths) = create_temp_runtime_paths().expect("create temp runtime paths");
+fn wait_for_shutdown_times_out_when_conditions_persist(
+    temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
+) {
+    let (_temp_dir, paths) = temp_paths.expect("create temp runtime paths");
 
     // Create PID file that will persist throughout the test.
     write_test_file(paths.pid_path(), b"12345").expect("write pid file");

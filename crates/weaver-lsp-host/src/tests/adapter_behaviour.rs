@@ -2,6 +2,7 @@
 
 use std::{cell::RefCell, error::Error, path::PathBuf};
 
+use anyhow::{Context as _, Result, ensure};
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_test_macros::allow_fixture_expansion_lints;
@@ -99,50 +100,55 @@ fn when_adapter_initialized(world: &RefCell<AdapterTestWorld>) {
 
 // --- Then steps ---
 
+/// Extracts the `AdapterError` wrapped by a language server error.
+fn adapter_error_source(error: &LanguageServerError) -> Result<&AdapterError> {
+    let source = error
+        .source()
+        .context("LanguageServerError is expected to wrap an AdapterError source")?;
+    source
+        .downcast_ref::<AdapterError>()
+        .context("LanguageServerError source should be an AdapterError")
+}
+
 #[then("the error indicates binary not found")]
-fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) {
+fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) -> Result<()> {
     let borrow = world.borrow();
+    let error = borrow
+        .last_error
+        .as_ref()
+        .context("expected an error but got none")?;
 
-    let Some(error) = borrow.last_error.as_ref() else {
-        panic!("expected an error but got none");
-    };
-
-    assert!(
+    ensure!(
         borrow.error_is_binary_not_found,
-        "expected binary not found error flag to be set, got: {:?}",
-        error
+        "expected binary not found error flag to be set, got: {error:?}"
     );
 
-    let Some(source) = error.source() else {
-        panic!("LanguageServerError is expected to wrap an AdapterError source");
-    };
-
-    let Some(adapter_error) = source.downcast_ref::<AdapterError>() else {
-        panic!("LanguageServerError source should be an AdapterError");
-    };
-
-    assert!(
+    let adapter_error = adapter_error_source(error)?;
+    ensure!(
         matches!(adapter_error, AdapterError::BinaryNotFound { .. }),
-        "expected AdapterError::BinaryNotFound, got: {:?}",
-        adapter_error
+        "expected AdapterError::BinaryNotFound, got: {adapter_error:?}"
     );
+    Ok(())
 }
 
 #[then("the error message contains the command path")]
-fn then_error_contains_command_path(world: &RefCell<AdapterTestWorld>) {
+fn then_error_contains_command_path(world: &RefCell<AdapterTestWorld>) -> Result<()> {
     let borrow = world.borrow();
-    let Some(error) = borrow.last_error.as_ref() else {
-        panic!("expected an error");
-    };
+    let error = borrow.last_error.as_ref().context("expected an error")?;
     let error_string = error.to_string();
-    // The error should mention the command that failed or language server
-    assert!(
+    // The error should mention the command that failed or language server.
+    ensure!(
         error_string.contains("language server")
             || error_string.contains("spawn")
             || error_string.contains("/nonexistent/"),
-        "error message should contain relevant context, got: {}",
-        error_string
+        "error message should contain relevant context, got: {error_string}"
     );
+    Ok(())
+}
+
+/// Returns the file name of a configured command, if it has one.
+fn command_file_name(config: &LspServerConfig) -> Option<&str> {
+    config.command.file_name().and_then(|name| name.to_str())
 }
 
 #[then("the <language> adapter command is <command>")]
@@ -150,29 +156,29 @@ fn then_language_adapter_command_is(
     _world: &RefCell<AdapterTestWorld>,
     language: Language,
     command: &str,
-) {
+) -> Result<()> {
     let config = LspServerConfig::for_language(language);
-    assert_eq!(
-        config.command.file_name().and_then(|s| s.to_str()),
-        Some(command),
-        "{:?} adapter should use {}",
-        language,
-        command
+    ensure!(
+        command_file_name(&config) == Some(command),
+        "{language:?} adapter should use {command}, got {:?}",
+        config.command
     );
+    Ok(())
 }
 
 #[then("the adapter command is my-rust-analyzer")]
-fn then_adapter_command_is_custom(_world: &RefCell<AdapterTestWorld>) {
+fn then_adapter_command_is_custom(_world: &RefCell<AdapterTestWorld>) -> Result<()> {
     let config = LspServerConfig {
         command: PathBuf::from("my-rust-analyzer"),
         args: Vec::new(),
         working_dir: None,
     };
-    assert_eq!(
-        config.command.file_name().and_then(|s| s.to_str()),
-        Some("my-rust-analyzer"),
-        "rust adapter should use my-rust-analyzer"
+    ensure!(
+        command_file_name(&config) == Some("my-rust-analyzer"),
+        "rust adapter should use my-rust-analyzer, got {:?}",
+        config.command
     );
+    Ok(())
 }
 
 #[scenario(path = "tests/features/process_adapter.feature")]

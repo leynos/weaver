@@ -88,13 +88,6 @@ pub fn handle<W: Write>(
     Ok(DispatchResult::success())
 }
 
-// Tests for get-definition handler.
-//
-// Integration tests are in the BDD test suite.
-// Unit tests for argument parsing are in the arguments module.
-// Unit tests for response serialization are in the responses module.
-
-#[cfg(test)]
-mod tests {
-    //! Unit tests for get_definition dispatch handler.
-}
+// Tests for the get-definition handler live elsewhere: integration coverage is
+// in the BDD suite, argument parsing in the `arguments` module, and response
+// serialization in the `responses` module.

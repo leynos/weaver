@@ -35,30 +35,24 @@ fn open_test_dir(paths: &RuntimePaths) -> io::Result<Dir> {
 }
 
 #[rstest]
-fn read_pid_handles_missing_file(
-    temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+fn read_pid_handles_missing_file(temp_paths: anyhow::Result<(TempDir, RuntimePaths)>) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     let dir = open_test_dir(&paths).expect("open test dir");
     assert_eq!(
-        read_pid(&dir, "weaverd.pid", paths.pid_path()).unwrap(),
+        read_pid(&dir, "weaverd.pid", paths.pid_path()).expect("read pid"),
         None
     );
-    Ok(())
 }
 
 #[rstest]
-fn read_pid_parses_integer(
-    temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+fn read_pid_parses_integer(temp_paths: anyhow::Result<(TempDir, RuntimePaths)>) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_test_file(paths.pid_path(), b"42\n").expect("write pid");
     let dir = open_test_dir(&paths).expect("open test dir");
     assert_eq!(
-        read_pid(&dir, "weaverd.pid", paths.pid_path()).unwrap(),
+        read_pid(&dir, "weaverd.pid", paths.pid_path()).expect("read pid"),
         Some(42)
     );
-    Ok(())
 }
 
 #[rstest]
@@ -67,8 +61,8 @@ fn read_pid_parses_integer(
 fn read_health_returns_none_when_absent_or_empty(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
     #[case] content: Option<&[u8]>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     if let Some(bytes) = content {
         write_test_file(paths.health_path(), bytes).expect("write test file");
     }
@@ -78,14 +72,11 @@ fn read_health_returns_none_when_absent_or_empty(
             .expect("failed to read weaverd.health in test"),
         None
     );
-    Ok(())
 }
 
 #[rstest]
-fn read_health_parses_valid_json(
-    temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+fn read_health_parses_valid_json(temp_paths: anyhow::Result<(TempDir, RuntimePaths)>) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_test_file(
         paths.health_path(),
         b"{\"status\":\"ready\",\"pid\":42,\"timestamp\":100}\n",
@@ -98,14 +89,13 @@ fn read_health_parses_valid_json(
     assert_eq!(snapshot.status, DaemonStatus::Ready);
     assert_eq!(snapshot.pid, 42);
     assert_eq!(snapshot.timestamp, 100);
-    Ok(())
 }
 
 #[rstest]
 fn read_health_returns_parse_error_for_invalid_json(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_test_file(paths.health_path(), b"not-json\n").expect("write bad health");
     let dir = open_test_dir(&paths).expect("open test dir");
     let err =
@@ -114,7 +104,6 @@ fn read_health_returns_parse_error_for_invalid_json(
         matches!(err, LifecycleError::ParseHealth { .. }),
         "expected ParseHealth, got: {err:?}"
     );
-    Ok(())
 }
 
 #[test]
@@ -157,8 +146,8 @@ fn snapshot_is_recent_ignores_subsecond_precision() {
 #[rstest]
 fn check_health_snapshot_returns_continue_when_missing(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     let dir = open_test_dir(&paths).expect("open test dir");
     let monitor = ProcessMonitorContext {
         started_at: UNIX_EPOCH + Duration::from_secs(100),
@@ -167,14 +156,13 @@ fn check_health_snapshot_returns_continue_when_missing(
     };
     let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
     assert!(matches!(outcome, HealthCheckOutcome::Continue));
-    Ok(())
 }
 
 #[rstest]
 fn check_health_snapshot_returns_continue_when_pid_mismatch(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_health_snapshot(&paths, "ready", 99, 100).expect("write health snapshot");
     let dir = open_test_dir(&paths).expect("open test dir");
     // Expected PID 42, but snapshot has PID 99 and daemonized is false.
@@ -185,14 +173,13 @@ fn check_health_snapshot_returns_continue_when_pid_mismatch(
     };
     let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
     assert!(matches!(outcome, HealthCheckOutcome::Continue));
-    Ok(())
 }
 
 #[rstest]
 fn check_health_snapshot_returns_continue_when_stale(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_health_snapshot(&paths, "ready", 42, 50).expect("write health snapshot");
     let dir = open_test_dir(&paths).expect("open test dir");
     // Snapshot timestamp 50 is before started_at timestamp 100.
@@ -203,14 +190,13 @@ fn check_health_snapshot_returns_continue_when_stale(
     };
     let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
     assert!(matches!(outcome, HealthCheckOutcome::Continue));
-    Ok(())
 }
 
 #[rstest]
 fn check_health_snapshot_returns_ready_when_valid(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_health_snapshot(&paths, "ready", 42, 100).expect("write health snapshot");
     let dir = open_test_dir(&paths).expect("open test dir");
     let monitor = ProcessMonitorContext {
@@ -226,14 +212,13 @@ fn check_health_snapshot_returns_ready_when_valid(
         }
         other => panic!("expected Ready, got {other:?}"),
     }
-    Ok(())
 }
 
 #[rstest]
 fn check_health_snapshot_skips_pid_check_when_daemonized(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_health_snapshot(&paths, "ready", 99, 100).expect("write health snapshot");
     let dir = open_test_dir(&paths).expect("open test dir");
     // Expected PID 42, but daemonized=true skips PID check.
@@ -244,14 +229,13 @@ fn check_health_snapshot_skips_pid_check_when_daemonized(
     };
     let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
     assert!(matches!(outcome, HealthCheckOutcome::Ready(_)));
-    Ok(())
 }
 
 #[rstest]
 fn check_health_snapshot_returns_aborted_when_stopping(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_health_snapshot(&paths, "stopping", 42, 100).expect("write health snapshot");
     let dir = open_test_dir(&paths).expect("open test dir");
     let monitor = ProcessMonitorContext {
@@ -261,14 +245,13 @@ fn check_health_snapshot_returns_aborted_when_stopping(
     };
     let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
     assert!(matches!(outcome, HealthCheckOutcome::Aborted { .. }));
-    Ok(())
 }
 
 #[rstest]
 fn check_health_snapshot_continues_on_starting_status(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
-    let (_dir, paths) = temp_paths?;
+) {
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_health_snapshot(&paths, "starting", 42, 100).expect("write health snapshot");
     let dir = open_test_dir(&paths).expect("open test dir");
     let monitor = ProcessMonitorContext {
@@ -278,17 +261,16 @@ fn check_health_snapshot_continues_on_starting_status(
     };
     let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
     assert!(matches!(outcome, HealthCheckOutcome::Continue));
-    Ok(())
 }
 
 #[cfg(unix)]
 #[rstest]
 fn wait_for_ready_succeeds_when_health_snapshot_ready(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
+) {
     use std::process::Command;
 
-    let (_dir, paths) = temp_paths?;
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     // /bin/true exits immediately with success, simulating daemonization.
     let mut child = Command::new("/bin/true").spawn().expect("spawn /bin/true");
     let started_at = UNIX_EPOCH + Duration::from_secs(100);
@@ -303,17 +285,16 @@ fn wait_for_ready_succeeds_when_health_snapshot_ready(
         }
         Err(error) => panic!("expected success, got: {error:?}"),
     }
-    Ok(())
 }
 
 #[cfg(unix)]
 #[rstest]
 fn wait_for_ready_returns_timeout_when_no_snapshot(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-) -> anyhow::Result<()> {
+) {
     use std::process::Command;
 
-    let (_dir, paths) = temp_paths?;
+    let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     // /bin/true exits immediately; no health snapshot written.
     let mut child = Command::new("/bin/true").spawn().expect("spawn /bin/true");
     let started_at = SystemTime::now();
@@ -326,5 +307,4 @@ fn wait_for_ready_returns_timeout_when_no_snapshot(
         Ok(snapshot) => panic!("expected timeout, got snapshot: {snapshot:?}"),
         Err(other) => panic!("expected StartupTimeout, got: {other:?}"),
     }
-    Ok(())
 }

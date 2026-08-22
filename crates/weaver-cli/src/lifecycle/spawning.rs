@@ -62,7 +62,7 @@ mod tests {
             std::path::Path::new("/tmp"),
         );
         assert!(result.is_err());
-        let error = result.unwrap_err();
+        let error = result.expect_err("expected spawn failure");
         match error {
             LifecycleError::LaunchDaemon {
                 binary,

@@ -78,11 +78,8 @@ impl RefactorPluginRuntime for MockRuntime {
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn socket_dir() -> TempDir {
-    match TempDir::new() {
-        Ok(temp_dir) => temp_dir,
-        Err(error) => panic!("socket dir: {error}"),
-    }
+fn socket_dir() -> Result<TempDir, String> {
+    TempDir::new().map_err(|error| format!("socket dir: {error}"))
 }
 
 fn run_rename_handle(
@@ -90,14 +87,10 @@ fn run_rename_handle(
     file: &str,
     resolution: MockResolution,
     result: MockRuntimeResult,
-) -> (i32, String) {
-    let workspace = match TempDir::new() {
-        Ok(workspace) => workspace,
-        Err(error) => panic!("workspace: {error}"),
-    };
-    if let Err(error) = test_fs::write(workspace.path().join(file), "hello\n") {
-        panic!("write: {error}");
-    }
+) -> Result<(i32, String), String> {
+    let workspace = TempDir::new().map_err(|error| format!("workspace: {error}"))?;
+    test_fs::write(workspace.path().join(file), "hello\n")
+        .map_err(|error| format!("write: {error}"))?;
 
     let request = command_request(vec![
         String::from("--provider"),
@@ -115,7 +108,7 @@ fn run_rename_handle(
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
-    let dispatch_result = match handle(
+    let dispatch_result = handle(
         &request,
         &mut writer,
         RefactorContext {
@@ -123,16 +116,11 @@ fn run_rename_handle(
             workspace_root: workspace.path(),
             runtime: &runtime,
         },
-    ) {
-        Ok(dispatch_result) => dispatch_result,
-        Err(error) => panic!("dispatch result: {error}"),
-    };
+    )
+    .map_err(|error| format!("dispatch result: {error}"))?;
 
-    let stderr = match String::from_utf8(output) {
-        Ok(stderr) => stderr,
-        Err(error) => panic!("stderr utf8: {error}"),
-    };
-    (dispatch_result.status, stderr)
+    let stderr = String::from_utf8(output).map_err(|error| format!("stderr utf8: {error}"))?;
+    Ok((dispatch_result.status, stderr))
 }
 
 fn automatic_selection(provider: &str, language: &str) -> CapabilityResolutionEnvelope {
@@ -156,13 +144,15 @@ fn automatic_selection(provider: &str, language: &str) -> CapabilityResolutionEn
 // FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
 // replaced with an encapsulated metrics actor or registry.
 #[serial]
-fn handle_runtime_error_returns_status_one(socket_dir: TempDir) {
+fn handle_runtime_error_returns_status_one(socket_dir: Result<TempDir, String>) {
+    let dir = socket_dir.expect("socket dir fixture");
     let (status, stderr) = run_rename_handle(
-        &socket_dir,
+        &dir,
         "notes.py",
         MockResolution::Success(automatic_selection("rope", "python")),
         MockRuntimeResult::NotFound(String::from("rope")),
-    );
+    )
+    .expect("rename dispatch should complete");
 
     assert_eq!(status, 1);
     assert!(stderr.contains("CapabilityResolution"));
@@ -177,8 +167,9 @@ fn handle_runtime_error_returns_status_one(socket_dir: TempDir) {
 #[serial]
 fn handle_non_diff_output_returns_status_one(
     #[case] output_variant: PluginOutput,
-    socket_dir: TempDir,
+    socket_dir: Result<TempDir, String>,
 ) {
+    let dir = socket_dir.expect("socket dir fixture");
     let workspace = TempDir::new().expect("workspace");
     test_fs::write(workspace.path().join("notes.py"), "hello\n").expect("write");
 
@@ -196,7 +187,7 @@ fn handle_non_diff_output_returns_status_one(
         resolution: MockResolution::Success(automatic_selection("rope", "python")),
         result: MockRuntimeResult::Success(PluginResponse::success(output_variant)),
     };
-    let socket_path = socket_dir.path().join("socket.sock");
+    let socket_path = dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
@@ -221,7 +212,10 @@ fn handle_non_diff_output_returns_status_one(
 // FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
 // replaced with an encapsulated metrics actor or registry.
 #[serial]
-fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: TempDir) {
+fn handle_diff_output_applies_patch_through_apply_patch_pipeline(
+    socket_dir: Result<TempDir, String>,
+) {
+    let dir = socket_dir.expect("socket dir fixture");
     let workspace = TempDir::new().expect("workspace");
     let relative_file = String::from("notes.txt");
     let file_path = workspace.path().join(&relative_file);
@@ -251,7 +245,7 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
         String::from("--position"),
         String::from("1:1"),
     ]);
-    let socket_path = socket_dir.path().join("socket.sock");
+    let socket_path = dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
@@ -301,7 +295,8 @@ fn default_runtime_returns_shared_trait_object() {
 // FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
 // replaced with an encapsulated metrics actor or registry.
 #[serial]
-fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
+fn handle_returns_error_for_unsupported_refactoring(socket_dir: Result<TempDir, String>) {
+    let dir = socket_dir.expect("socket dir fixture");
     let workspace = TempDir::new().expect("workspace");
     let request = command_request(vec![
         String::from("--provider"),
@@ -313,7 +308,7 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
         String::from("--position"),
         String::from("1:1"),
     ]);
-    let socket_path = socket_dir.path().join("socket.sock");
+    let socket_path = dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
@@ -342,13 +337,15 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
 // FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
 // replaced with an encapsulated metrics actor or registry.
 #[serial]
-fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
+fn handle_exits_with_error_when_resolution_fails(socket_dir: Result<TempDir, String>) {
+    let dir = socket_dir.expect("socket dir fixture");
     let (status, stderr) = run_rename_handle(
-        &socket_dir,
+        &dir,
         "notes.py",
         MockResolution::Error(String::from("bad manifest")),
         MockRuntimeResult::Panic,
-    );
+    )
+    .expect("rename dispatch should complete");
 
     assert_eq!(status, 1);
     assert!(
@@ -361,8 +358,12 @@ fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
 // FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
 // replaced with an encapsulated metrics actor or registry.
 #[serial]
-fn handle_exits_with_error_when_resolution_refused_with_provider(socket_dir: TempDir) {
+fn handle_exits_with_error_when_resolution_refused_with_provider(
+    socket_dir: Result<TempDir, String>,
+) {
     use crate::dispatch::act::refactor::resolution::RefusalReason::UnsupportedLanguage;
+
+    let dir = socket_dir.expect("socket dir fixture");
 
     let refused_envelope =
         CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
@@ -377,11 +378,12 @@ fn handle_exits_with_error_when_resolution_refused_with_provider(socket_dir: Tem
         });
 
     let (status, stderr) = run_rename_handle(
-        &socket_dir,
+        &dir,
         "notes.txt",
         MockResolution::Success(refused_envelope),
         MockRuntimeResult::Panic,
-    );
+    )
+    .expect("rename dispatch should complete");
 
     assert_eq!(status, 1);
     assert!(

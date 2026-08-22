@@ -8,15 +8,15 @@ use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom, TreeSitterQuer
 
 use super::engine_test_support::{
     SingleRuleDiagnosticCase,
+    assert_pattern_formula,
     compile_and_first,
     compile_yaml_text,
     default_engine,
+    first_diagnostic_of,
     simple_rule_yaml,
 };
 use crate::{
-    Diagnostic,
     DiagnosticCode,
-    DiagnosticReport,
     Engine,
     EngineConfig,
     EngineLimits,
@@ -24,19 +24,6 @@ use crate::{
     engine::QueryPlan,
     semantic_check::{MAX_FORMULA_DEPTH, validate_formula},
 };
-
-fn first_diagnostic_of_err<T>(
-    result: Result<T, DiagnosticReport>,
-) -> AnyResult<(DiagnosticCode, Diagnostic)> {
-    let report = result
-        .err()
-        .ok_or_else(|| anyhow::anyhow!("expected an error result"))?;
-    let first: &Diagnostic = report
-        .diagnostics()
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("expected at least one diagnostic"))?;
-    Ok((first.code(), first.clone()))
-}
 
 fn dummy_formula() -> Decorated<Formula> {
     Decorated {
@@ -64,17 +51,6 @@ fn deeply_nested_formula(depth: usize) -> Decorated<Formula> {
     formula
 }
 
-fn assert_pattern_formula(formula: &Decorated<Formula>, expected_text: &str) {
-    assert!(
-        matches!(
-            &formula.node,
-            Formula::Atom(Atom::Pattern(pattern)) if pattern.text == expected_text
-        ),
-        "expected Pattern atom with text \"{expected_text}\", got {:?}",
-        formula.node
-    );
-}
-
 #[test]
 fn engine_new_with_default_config() {
     let engine = Engine::new(EngineConfig::default());
@@ -89,14 +65,23 @@ fn engine_new_with_custom_config() {
     assert!(engine.config().enable_hcl());
 }
 
+/// Expected shape of the single query plan a compilation case produces.
+struct ExpectedPlan {
+    rule_id: &'static str,
+    language: Language,
+    formula: Formula,
+}
+
 #[rstest]
 #[case::legacy_pattern(
     "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
-    "demo.rule",
-    Language::Rust,
-    Formula::Atom(Atom::Pattern(PatternAtom {
-        text: String::from("foo($X)"),
-    })),
+    ExpectedPlan {
+        rule_id: "demo.rule",
+        language: Language::Rust,
+        formula: Formula::Atom(Atom::Pattern(PatternAtom {
+            text: String::from("foo($X)"),
+        })),
+    },
 )]
 #[case::project_depends_on(
     concat!(
@@ -109,31 +94,31 @@ fn engine_new_with_custom_config() {
         "      namespace: pypi\n",
         "      package: requests\n",
     ),
-    "demo.depends",
-    Language::Python,
-    Formula::Atom(Atom::TreeSitterQuery(TreeSitterQueryAtom {
-        query: String::from("(__NONEXISTENT_NODE__) @_dependency_check"),
-    })),
+    ExpectedPlan {
+        rule_id: "demo.depends",
+        language: Language::Python,
+        formula: Formula::Atom(Atom::TreeSitterQuery(TreeSitterQueryAtom {
+            query: String::from("(__NONEXISTENT_NODE__) @_dependency_check"),
+        })),
+    },
 )]
 fn compile_yaml_normalizes_and_returns_query_plans(
+    default_engine: Engine,
     #[case] yaml: &str,
-    #[case] expected_rule_id: &str,
-    #[case] expected_language: Language,
-    #[case] expected_formula: Formula,
+    #[case] expected: ExpectedPlan,
 ) {
-    let engine = default_engine();
-    let plans = engine
+    let plans = default_engine
         .compile_yaml(yaml)
         .expect("should successfully compile");
     assert_eq!(plans.len(), 1);
     let plan = plans.first().expect("should have first plan");
-    assert_eq!(plan.rule_id(), expected_rule_id);
-    assert_eq!(plan.language(), expected_language);
-    assert_eq!(&plan.formula().node, &expected_formula);
+    assert_eq!(plan.rule_id(), expected.rule_id);
+    assert_eq!(plan.language(), expected.language);
+    assert_eq!(&plan.formula().node, &expected.formula);
 }
 
-#[test]
-fn compile_yaml_plan_formula_matches_normalization() {
+#[rstest]
+fn compile_yaml_plan_formula_matches_normalization(default_engine: Engine) -> anyhow::Result<()> {
     let yaml = concat!(
         "rules:\n",
         "  - id: demo.formula.check\n",
@@ -142,11 +127,11 @@ fn compile_yaml_plan_formula_matches_normalization() {
         "    severity: ERROR\n",
         "    pattern: foo($X)\n",
     );
-    let engine = default_engine();
-    let plans = engine.compile_yaml(yaml).expect("should compile");
+    let plans = default_engine.compile_yaml(yaml).expect("should compile");
     let plan = plans.first().expect("should have one plan");
     let formula = plan.formula();
-    assert_pattern_formula(formula, "foo($X)");
+    assert_pattern_formula(formula, "foo($X)")?;
+    Ok(())
 }
 
 #[test]
@@ -168,7 +153,8 @@ fn compile_yaml_multiple_languages_yields_multiple_plans() {
     assert!(languages.contains(&Language::Python));
     for plan in &plans {
         assert_eq!(plan.rule_id(), "demo.multi");
-        assert_pattern_formula(plan.formula(), "foo($X)");
+        assert_pattern_formula(plan.formula(), "foo($X)")
+            .expect("plan formula should be the pattern atom");
     }
 }
 
@@ -196,8 +182,10 @@ fn compile_yaml_multiple_rules_return_expected_plans() {
         assert_eq!(plan.language(), Language::Rust);
         seen.insert(plan.rule_id().to_owned());
         match plan.rule_id() {
-            "demo.first" => assert_pattern_formula(plan.formula(), "foo($X)"),
-            "demo.second" => assert_pattern_formula(plan.formula(), "bar($Y)"),
+            "demo.first" => assert_pattern_formula(plan.formula(), "foo($X)")
+                .expect("first plan formula should be the pattern atom"),
+            "demo.second" => assert_pattern_formula(plan.formula(), "bar($Y)")
+                .expect("second plan formula should be the pattern atom"),
             other => panic!("unexpected rule id {other}"),
         }
     }
@@ -303,9 +291,7 @@ fn compile_yaml_returns_expected_diagnostic_for_single_rule_cases(
 }
 
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) -> AnyResult<()> {
-    let engine = default_engine();
-    let result = engine.compile_yaml(yaml);
-    let (code, diag) = first_diagnostic_of_err(result)?;
+    let (code, diag) = compile_and_first(yaml)?;
     ensure!(
         code == DiagnosticCode::ESempaiUnsupportedMode,
         "expected unsupported-mode diagnostic, got {code:?}"
@@ -324,9 +310,7 @@ fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str
 }
 
 fn assert_compile_yaml_semantic_error(yaml: &str, expected_code: DiagnosticCode) -> AnyResult<()> {
-    let engine = default_engine();
-    let result = engine.compile_yaml(yaml);
-    let (code, _diag) = first_diagnostic_of_err(result)?;
+    let (code, _diag) = compile_and_first(yaml)?;
     ensure!(
         code == expected_code,
         "expected {expected_code:?}, got {code:?}"
@@ -334,45 +318,42 @@ fn assert_compile_yaml_semantic_error(yaml: &str, expected_code: DiagnosticCode)
     Ok(())
 }
 
-#[test]
-fn compile_yaml_returns_unsupported_mode_for_extract_rules() -> AnyResult<()> {
-    assert_compile_yaml_unsupported_mode(
-        concat!(
-            "rules:\n",
-            "  - id: demo.extract\n",
-            "    mode: extract\n",
-            "    message: extract foo\n",
-            "    languages: [python]\n",
-            "    severity: WARNING\n",
-            "    dest-language: python\n",
-            "    extract: foo($X)\n",
-            "    pattern: source($X)\n",
-        ),
-        "extract",
-    )
+const EXTRACT_MODE_RULE_YAML: &str = concat!(
+    "rules:\n",
+    "  - id: demo.extract\n",
+    "    mode: extract\n",
+    "    message: extract foo\n",
+    "    languages: [python]\n",
+    "    severity: WARNING\n",
+    "    dest-language: python\n",
+    "    extract: foo($X)\n",
+    "    pattern: source($X)\n",
+);
+
+const CUSTOM_MODE_RULE_YAML: &str = concat!(
+    "rules:\n",
+    "  - id: demo.custom\n",
+    "    mode: custom-mode\n",
+    "    message: custom mode\n",
+    "    languages: [python]\n",
+    "    severity: WARNING\n",
+    "    pattern: foo($X)\n",
+);
+
+#[rstest]
+#[case::extract_rules(EXTRACT_MODE_RULE_YAML, "extract")]
+#[case::unknown_modes(CUSTOM_MODE_RULE_YAML, "custom-mode")]
+fn compile_yaml_returns_unsupported_mode(
+    #[case] yaml: &str,
+    #[case] expected_mode_fragment: &str,
+) -> AnyResult<()> {
+    assert_compile_yaml_unsupported_mode(yaml, expected_mode_fragment)
 }
 
-#[test]
-fn compile_yaml_returns_unsupported_mode_for_unknown_modes() -> AnyResult<()> {
-    assert_compile_yaml_unsupported_mode(
-        concat!(
-            "rules:\n",
-            "  - id: demo.custom\n",
-            "    mode: custom-mode\n",
-            "    message: custom mode\n",
-            "    languages: [python]\n",
-            "    severity: WARNING\n",
-            "    pattern: foo($X)\n",
-        ),
-        "custom-mode",
-    )
-}
-
-#[test]
-fn compile_dsl_returns_not_implemented() -> AnyResult<()> {
-    let engine = default_engine();
-    let result = engine.compile_dsl("test-rule", Language::Python, "pattern(\"def $F\")");
-    let (code, diag) = first_diagnostic_of_err(result)?;
+#[rstest]
+fn compile_dsl_returns_not_implemented(default_engine: Engine) -> AnyResult<()> {
+    let result = default_engine.compile_dsl("test-rule", Language::Python, "pattern(\"def $F\")");
+    let (code, diag) = first_diagnostic_of(result)?;
     ensure!(
         code == DiagnosticCode::NotImplemented,
         "expected not-implemented diagnostic, got {code:?}"
@@ -381,16 +362,15 @@ fn compile_dsl_returns_not_implemented() -> AnyResult<()> {
     Ok(())
 }
 
-#[test]
-fn execute_returns_not_implemented() -> AnyResult<()> {
-    let engine = default_engine();
+#[rstest]
+fn execute_returns_not_implemented(default_engine: Engine) -> AnyResult<()> {
     let plan = QueryPlan::new(
         String::from("test-rule"),
         Language::Rust,
         Arc::new(dummy_formula()),
     );
-    let result = engine.execute(&plan, "file:///test.rs", "fn main() {}");
-    let (code, diag) = first_diagnostic_of_err(result)?;
+    let result = default_engine.execute(&plan, "file:///test.rs", "fn main() {}");
+    let (code, diag) = first_diagnostic_of(result)?;
     ensure!(
         code == DiagnosticCode::NotImplemented,
         "expected not-implemented diagnostic, got {code:?}"

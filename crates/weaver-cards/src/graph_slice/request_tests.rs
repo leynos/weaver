@@ -1,37 +1,48 @@
 //! Unit tests for graph-slice request parsing.
 
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 use super::*;
 use crate::DetailLevel;
 
 fn args(items: &[&str]) -> Vec<String> { items.iter().map(|s| String::from(*s)).collect() }
 
+/// Parses a minimal argument list carrying only the required `--uri` and
+/// `--position` flags, so every optional field falls back to its default.
+#[fixture]
 fn parse_minimal() -> Result<GraphSliceRequest, GraphSliceError> {
     let arguments = args(&["--uri", "file:///src/main.rs", "--position", "10:5"]);
     GraphSliceRequest::parse(&arguments)
 }
 
-#[test]
-fn parses_minimal_position_and_uri() {
-    let request = parse_minimal().expect("should parse");
+#[rstest]
+fn parses_minimal_position_and_uri(parse_minimal: Result<GraphSliceRequest, GraphSliceError>) {
+    let request = parse_minimal.expect("should parse");
     assert_eq!(request.uri(), "file:///src/main.rs");
     assert_eq!(request.line(), 10);
     assert_eq!(request.column(), 5);
 }
 
-#[test]
-fn parses_minimal_defaults() {
-    let request = parse_minimal().expect("should parse");
+#[rstest]
+fn parses_minimal_defaults(parse_minimal: Result<GraphSliceRequest, GraphSliceError>) {
+    let request = parse_minimal.expect("should parse");
     assert_eq!(request.depth(), DEFAULT_DEPTH);
     assert_eq!(request.direction(), SliceDirection::Both);
     assert_eq!(request.edge_types(), SliceEdgeType::all());
-    assert!((request.min_confidence() - DEFAULT_MIN_CONFIDENCE).abs() < f64::EPSILON);
+    // Bit-level equality avoids float arithmetic; the parser stores the
+    // default constant unchanged, so the representations match exactly.
+    assert_eq!(
+        request.min_confidence().to_bits(),
+        DEFAULT_MIN_CONFIDENCE.to_bits()
+    );
     assert_eq!(request.budget(), &SliceBudget::default());
     assert_eq!(request.entry_detail(), DetailLevel::Structure);
     assert_eq!(request.node_detail(), DetailLevel::Minimal);
 }
 
+/// Parses an argument list that sets every optional flag, exercising the
+/// full parser surface in one shared fixture.
+#[fixture]
 fn parse_all_flags() -> Result<GraphSliceRequest, GraphSliceError> {
     let arguments = args(&[
         "--uri",
@@ -60,29 +71,31 @@ fn parse_all_flags() -> Result<GraphSliceRequest, GraphSliceError> {
     GraphSliceRequest::parse(&arguments)
 }
 
-#[test]
-fn parses_all_flags_position_and_uri() {
-    let request = parse_all_flags().expect("should parse");
+#[rstest]
+fn parses_all_flags_position_and_uri(parse_all_flags: Result<GraphSliceRequest, GraphSliceError>) {
+    let request = parse_all_flags.expect("should parse");
     assert_eq!(request.uri(), "file:///src/lib.rs");
     assert_eq!(request.line(), 42);
     assert_eq!(request.column(), 17);
 }
 
-#[test]
-fn parses_all_flags_traversal() {
-    let request = parse_all_flags().expect("should parse");
+#[rstest]
+fn parses_all_flags_traversal(parse_all_flags: Result<GraphSliceRequest, GraphSliceError>) {
+    let request = parse_all_flags.expect("should parse");
     assert_eq!(request.depth(), 3);
     assert_eq!(request.direction(), SliceDirection::Out);
     assert_eq!(
         request.edge_types(),
         &[SliceEdgeType::Call, SliceEdgeType::Import]
     );
-    assert!((request.min_confidence() - 0.8).abs() < f64::EPSILON);
+    // Bit-level equality avoids float arithmetic; `"0.8".parse::<f64>()`
+    // yields exactly the 0.8 literal, so the representations match exactly.
+    assert_eq!(request.min_confidence().to_bits(), 0.8_f64.to_bits());
 }
 
-#[test]
-fn parses_all_flags_budget_and_detail() {
-    let request = parse_all_flags().expect("should parse");
+#[rstest]
+fn parses_all_flags_budget_and_detail(parse_all_flags: Result<GraphSliceRequest, GraphSliceError>) {
+    let request = parse_all_flags.expect("should parse");
     assert_eq!(request.budget().max_cards(), 10);
     assert_eq!(request.budget().max_edges(), 50);
     assert_eq!(request.budget().max_estimated_tokens(), 2000);

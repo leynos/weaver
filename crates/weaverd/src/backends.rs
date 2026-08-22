@@ -184,11 +184,13 @@ mod tests {
     }
 
     impl RecordingProvider {
+        /// Poisoning carries no risk here: the guarded value is an append-only
+        /// record of calls, so a partially observed list is still meaningful.
         fn calls(&self) -> Vec<BackendKind> {
-            match self.calls.lock() {
-                Ok(calls) => calls.clone(),
-                Err(error) => panic!("recording provider mutex poisoned: {error}"),
-            }
+            self.calls
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone()
         }
     }
 
@@ -198,11 +200,10 @@ mod tests {
             kind: BackendKind,
             _config: &Config,
         ) -> Result<(), BackendStartupError> {
-            let mut calls = match self.calls.lock() {
-                Ok(calls) => calls,
-                Err(error) => panic!("recording provider mutex poisoned: {error}"),
-            };
-            calls.push(kind);
+            self.calls
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(kind);
             Ok(())
         }
     }
@@ -250,11 +251,13 @@ mod tests {
     }
 
     impl FailingProvider {
+        /// Poisoning carries no risk here: the guarded value is a monotonic
+        /// call counter, so the recovered count is still meaningful.
         fn calls(&self) -> usize {
-            match self.calls.lock() {
-                Ok(calls) => *calls,
-                Err(error) => panic!("failing provider mutex poisoned: {error}"),
-            }
+            *self
+                .calls
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
         }
     }
 
@@ -264,10 +267,10 @@ mod tests {
             kind: BackendKind,
             _config: &Config,
         ) -> Result<(), BackendStartupError> {
-            let mut calls = match self.calls.lock() {
-                Ok(calls) => calls,
-                Err(error) => panic!("failing provider mutex poisoned: {error}"),
-            };
+            let mut calls = self
+                .calls
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             *calls += 1;
             Err(BackendStartupError::new(
                 kind,

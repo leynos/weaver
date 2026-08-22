@@ -2268,6 +2268,7 @@ dependencies = [
 name = "sempai_core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "insta",
  "rstest",
  "rstest-bdd",
@@ -3381,6 +3382,7 @@ dependencies = [
 name = "weaver-lsp-host"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "lsp-types",
  "rstest",
  "rstest-bdd",
@@ -3415,6 +3417,7 @@ dependencies = [
 name = "weaver-plugin-rust-analyzer"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "camino",
  "cap-std 4.0.2",
  "lsp-types",
@@ -3435,6 +3438,7 @@ dependencies = [
 name = "weaver-plugins"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "mockall",
  "rstest",
  "rstest-bdd",
@@ -3452,6 +3456,7 @@ dependencies = [
 name = "weaver-sandbox"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "birdcage",
  "once_cell",
  "rstest",

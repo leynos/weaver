@@ -56,6 +56,8 @@ pub struct TestWorld {
     configs: Vec<TestServerConfig>,
     /// Host instance under test.
     pub host: LspHost,
+    /// Capability overrides currently applied to `host`.
+    active_overrides: weaver_config::CapabilityMatrix,
     handles: HashMap<Language, RecordingServerHandle>,
     /// Last error observed while exercising the host.
     pub last_error: Option<LspHostError>,
@@ -106,21 +108,45 @@ macro_rules! notification_method {
 }
 
 impl TestWorld {
-    /// Builds a world populated with the supplied stub servers.
+    /// Builds a world with no stub servers registered.
+    ///
+    /// Registration is the only fallible part of world construction, so an
+    /// empty world stays infallible and can back a BDD fixture directly.
     #[must_use]
-    pub fn new(configs: Vec<TestServerConfig>, overrides: weaver_config::CapabilityMatrix) -> Self {
-        let mut world = Self {
-            configs,
+    pub fn empty(overrides: weaver_config::CapabilityMatrix) -> Self {
+        Self {
+            configs: Vec::new(),
             host: LspHost::new(overrides.clone()),
+            active_overrides: overrides,
             handles: HashMap::new(),
             last_error: None,
             last_definition: None,
             last_references: None,
             last_diagnostics: None,
             last_capabilities: None,
-        };
-        world.rebuild_host(overrides);
-        world
+        }
+    }
+
+    /// Builds a world populated with the supplied stub servers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LspHostError`] if a stub server cannot be registered, for
+    /// example when two configs claim the same language.
+    pub fn new(
+        configs: Vec<TestServerConfig>,
+        overrides: weaver_config::CapabilityMatrix,
+    ) -> Result<Self, LspHostError> {
+        let mut world = Self::empty(overrides.clone());
+        world.configs = configs;
+        world.rebuild_host(overrides)?;
+        Ok(world)
+    }
+
+    /// Returns the capability overrides currently applied to the host.
+    #[must_use]
+    pub fn active_overrides(&self) -> weaver_config::CapabilityMatrix {
+        self.active_overrides.clone()
     }
 
     /// Returns the recorded call sequence for the specified language.
@@ -190,14 +216,18 @@ impl TestWorld {
     );
 
     /// Rebuilds the host using the stored server configs and supplied overrides.
-    pub fn rebuild_host(&mut self, overrides: weaver_config::CapabilityMatrix) {
-        self.host = LspHost::new(overrides);
-        self.handles.clear();
-        self.last_error = None;
-        self.last_definition = None;
-        self.last_references = None;
-        self.last_diagnostics = None;
-        self.last_capabilities = None;
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LspHostError`] if a stub server cannot be registered.
+    pub fn rebuild_host(
+        &mut self,
+        overrides: weaver_config::CapabilityMatrix,
+    ) -> Result<(), LspHostError> {
+        // Build the replacement host and handle map in locals so a mid-loop
+        // registration failure leaves the world untouched rather than torn.
+        let mut new_host = LspHost::new(overrides.clone());
+        let mut new_handles: HashMap<Language, RecordingServerHandle> = HashMap::new();
 
         for config in &self.configs {
             let server = match &config.initialization_error {
@@ -212,16 +242,19 @@ impl TestWorld {
             };
 
             let handle = server.handle();
-            if let Err(error) = self
-                .host
-                .register_language(config.language, Box::new(server))
-            {
-                panic!(
-                    "failed to register stub server for {}: {}",
-                    config.language, error
-                );
-            }
-            self.handles.insert(config.language, handle);
+            new_host.register_language(config.language, Box::new(server))?;
+            new_handles.insert(config.language, handle);
         }
+
+        self.host = new_host;
+        self.handles = new_handles;
+        self.active_overrides = overrides;
+        self.last_error = None;
+        self.last_definition = None;
+        self.last_references = None;
+        self.last_diagnostics = None;
+        self.last_capabilities = None;
+
+        Ok(())
     }
 }

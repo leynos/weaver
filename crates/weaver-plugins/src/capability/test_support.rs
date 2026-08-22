@@ -5,6 +5,7 @@
 
 use serde_json::json;
 
+use super::fixture_error::FixtureError;
 use crate::{
     capability::{CapabilityContract, ReasonCode, RenameSymbolContract},
     error::PluginError,
@@ -70,14 +71,26 @@ impl FixtureOperation {
 }
 
 /// Finds a named shared request fixture.
-#[must_use]
-pub fn rename_symbol_request_fixture_named(name: &str) -> RenameSymbolRequestFixture {
+///
+/// # Errors
+///
+/// Returns [`FixtureError::Missing`] when no shared request fixture carries
+/// the requested name.
+pub fn rename_symbol_request_fixture_named(
+    name: &str,
+) -> Result<RenameSymbolRequestFixture, FixtureError> {
     fixture_named(rename_symbol_request_fixtures(), name, "request")
 }
 
 /// Finds a named shared response fixture.
-#[must_use]
-pub fn rename_symbol_response_fixture_named(name: &str) -> RenameSymbolResponseFixture {
+///
+/// # Errors
+///
+/// Returns [`FixtureError::Missing`] when no shared response fixture carries
+/// the requested name.
+pub fn rename_symbol_response_fixture_named(
+    name: &str,
+) -> Result<RenameSymbolResponseFixture, FixtureError> {
     fixture_named(rename_symbol_response_fixtures(), name, "response")
 }
 
@@ -173,58 +186,18 @@ pub fn validate_rename_symbol_response_fixture(
     RenameSymbolContract.validate_response(fixture.payload())
 }
 
-/// Asserts that one shared request fixture matches the contract expectation.
-pub fn assert_rename_symbol_request_fixture_contract(fixture: &RenameSymbolRequestFixture) {
-    assert_fixture_contract(
-        fixture,
-        validate_rename_symbol_request_fixture(fixture),
-        "request",
-    );
-}
-
-/// Asserts that one shared response fixture matches the contract expectation.
-pub fn assert_rename_symbol_response_fixture_contract(fixture: &RenameSymbolResponseFixture) {
-    assert_fixture_contract(
-        fixture,
-        validate_rename_symbol_response_fixture(fixture),
-        "response",
-    );
-}
-
-fn fixture_named<T: Clone>(
+fn fixture_named<T>(
     fixtures: Vec<RenameSymbolFixture<T>>,
     name: &str,
-    fixture_kind: &str,
-) -> RenameSymbolFixture<T> {
-    let Some(fixture) = fixtures.into_iter().find(|fixture| fixture.name() == name) else {
-        panic!("missing {fixture_kind} fixture '{name}'");
-    };
-    fixture
-}
-
-fn assert_fixture_contract<T>(
-    fixture: &RenameSymbolFixture<T>,
-    result: Result<(), PluginError>,
-    fixture_kind: &str,
-) {
-    match fixture.expected_error_fragment() {
-        None => assert!(
-            result.is_ok(),
-            "{fixture_kind} fixture '{}' should be valid, got: {result:?}",
-            fixture.name()
-        ),
-        Some(needle) => {
-            let error = match result {
-                Ok(()) => panic!("invalid fixture should fail contract validation"),
-                Err(error) => error,
-            };
-            assert!(
-                error.to_string().contains(needle),
-                "{fixture_kind} fixture '{}' should mention '{needle}', got: {error}",
-                fixture.name()
-            );
-        }
-    }
+    kind: &'static str,
+) -> Result<RenameSymbolFixture<T>, FixtureError> {
+    fixtures
+        .into_iter()
+        .find(|fixture| fixture.name() == name)
+        .ok_or_else(|| FixtureError::Missing {
+            kind,
+            name: name.to_owned(),
+        })
 }
 
 fn valid_arguments() -> std::collections::HashMap<String, serde_json::Value> {
@@ -318,4 +291,51 @@ fn arguments_with_value(
     let mut arguments = valid_arguments();
     arguments.insert(String::from(field), value);
     arguments
+}
+
+#[cfg(test)]
+mod tests {
+    //! Covers the named-fixture lookups, whose misses must name the fixture
+    //! kind and the requested name so a caller can tell which collection was
+    //! searched.
+
+    use rstest::rstest;
+
+    use super::{
+        FixtureError,
+        rename_symbol_request_fixture_named,
+        rename_symbol_response_fixture_named,
+    };
+
+    /// Named-lookup helper reduced to the failure it reports, so both
+    /// collections can share one table-driven case.
+    type MissingLookup = fn(&str) -> Option<FixtureError>;
+
+    fn request_lookup_error(name: &str) -> Option<FixtureError> {
+        rename_symbol_request_fixture_named(name).err()
+    }
+
+    fn response_lookup_error(name: &str) -> Option<FixtureError> {
+        rename_symbol_response_fixture_named(name).err()
+    }
+
+    #[rstest]
+    #[case::request(request_lookup_error as MissingLookup, "request")]
+    #[case::response(response_lookup_error as MissingLookup, "response")]
+    fn named_lookup_reports_missing_fixture(
+        #[case] lookup: MissingLookup,
+        #[case] expected_kind: &str,
+    ) {
+        let requested = "definitely_not_a_fixture";
+
+        let error = lookup(requested).expect("an unknown fixture name should not resolve");
+
+        match error {
+            FixtureError::Missing { kind, name } => {
+                assert_eq!(kind, expected_kind);
+                assert_eq!(name, requested);
+            }
+            other => panic!("expected a missing-fixture error, got: {other}"),
+        }
+    }
 }

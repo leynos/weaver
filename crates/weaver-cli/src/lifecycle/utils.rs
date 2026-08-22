@@ -131,8 +131,8 @@ mod tests {
     #[rstest]
     fn try_auto_start_daemon_failure_behaviour(
         temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-    ) -> anyhow::Result<()> {
-        let (dir, _paths) = temp_paths?;
+    ) {
+        let (dir, _paths) = temp_paths.expect("create temp runtime paths");
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
                 dir.path()
@@ -156,12 +156,11 @@ mod tests {
 
         // Verify the spawn failure is propagated.
         assert!(result.is_err(), "expected spawn failure");
-        let error = result.unwrap_err();
+        let error = result.expect_err("expected spawn failure");
         assert!(
             matches!(error, LifecycleError::LaunchDaemon { .. }),
             "expected LaunchDaemon error, got: {error:?}"
         );
-        Ok(())
     }
 
     /// Success path: try_auto_start_daemon spawns daemon and returns Ok when
@@ -174,8 +173,8 @@ mod tests {
     #[rstest]
     fn try_auto_start_daemon_succeeds_when_ready(
         temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-    ) -> anyhow::Result<()> {
-        let (dir, _paths) = temp_paths?;
+    ) {
+        let (dir, _paths) = temp_paths.expect("create temp runtime paths");
         let health_path = dir.path().join("weaverd.health");
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
@@ -211,7 +210,6 @@ mod tests {
             output.contains("Waiting for daemon start..."),
             "expected waiting message, got: {output:?}"
         );
-        Ok(())
     }
 
     /// Timeout path: try_auto_start_daemon returns StartupTimeout when daemon
@@ -224,8 +222,8 @@ mod tests {
     #[rstest]
     fn try_auto_start_daemon_times_out_when_daemon_slow(
         temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
-    ) -> anyhow::Result<()> {
-        let (dir, _paths) = temp_paths?;
+    ) {
+        let (dir, _paths) = temp_paths.expect("create temp runtime paths");
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
                 dir.path()
@@ -248,7 +246,7 @@ mod tests {
         let result = try_auto_start_daemon(context, &mut stderr);
 
         assert!(result.is_err(), "expected timeout error");
-        let error = result.unwrap_err();
+        let error = result.expect_err("expected timeout error");
         assert!(
             matches!(error, LifecycleError::StartupTimeout { .. }),
             "expected StartupTimeout, got: {error:?}"
@@ -258,6 +256,5 @@ mod tests {
             output.contains("Waiting for daemon start..."),
             "expected waiting message, got: {output:?}"
         );
-        Ok(())
     }
 }

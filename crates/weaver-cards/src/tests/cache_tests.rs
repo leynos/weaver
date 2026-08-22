@@ -23,6 +23,21 @@ fn rust_path() -> &'static Path { Path::new("/tmp/weaver-cards-tests/cache.rs") 
 
 fn rust_source(name: &str) -> String { format!("fn {name}() -> usize {{\n    1\n}}\n") }
 
+/// Builds a `CardCacheKey` for a Rust source at line 1, column 4, varying
+/// only the path, source text, and detail level under test.
+fn cache_key(path: &Path, source: &str, detail: DetailLevel) -> CardCacheKey {
+    CardCacheKey::new(
+        path,
+        source,
+        CardCacheAddress {
+            language: SupportedLanguage::Rust,
+            detail,
+            line: 1,
+            column: 4,
+        },
+    )
+}
+
 fn extract_card(
     extractor: &TreeSitterCardExtractor,
     source: &str,
@@ -40,16 +55,7 @@ fn extract_card(
 fn cache_hit_returns_same_card() {
     let cache = CardCache::new(4);
     let card = fixtures::build_card_at_level(DetailLevel::Structure);
-    let key = CardCacheKey::new(
-        rust_path(),
-        "fn greet() {}\n",
-        CardCacheAddress {
-            language: SupportedLanguage::Rust,
-            detail: DetailLevel::Structure,
-            line: 1,
-            column: 4,
-        },
-    );
+    let key = cache_key(rust_path(), "fn greet() {}\n", DetailLevel::Structure);
 
     cache.insert(key.clone(), card.clone());
 
@@ -60,16 +66,7 @@ fn cache_hit_returns_same_card() {
 #[rstest]
 fn cache_miss_returns_none() {
     let cache = CardCache::new(4);
-    let key = CardCacheKey::new(
-        rust_path(),
-        "fn greet() {}\n",
-        CardCacheAddress {
-            language: SupportedLanguage::Rust,
-            detail: DetailLevel::Structure,
-            line: 1,
-            column: 4,
-        },
-    );
+    let key = cache_key(rust_path(), "fn greet() {}\n", DetailLevel::Structure);
 
     assert_eq!(cache.get(&key), None);
     assert_eq!(cache.stats().misses, 1);
@@ -95,26 +92,8 @@ fn content_change_invalidates_cache() {
 #[rstest]
 fn path_invalidation_removes_all_entries() {
     let cache = CardCache::new(8);
-    let first_key = CardCacheKey::new(
-        rust_path(),
-        "fn first() {}\n",
-        CardCacheAddress {
-            language: SupportedLanguage::Rust,
-            detail: DetailLevel::Structure,
-            line: 1,
-            column: 4,
-        },
-    );
-    let second_key = CardCacheKey::new(
-        rust_path(),
-        "fn first() {}\n",
-        CardCacheAddress {
-            language: SupportedLanguage::Rust,
-            detail: DetailLevel::Signature,
-            line: 1,
-            column: 4,
-        },
-    );
+    let first_key = cache_key(rust_path(), "fn first() {}\n", DetailLevel::Structure);
+    let second_key = cache_key(rust_path(), "fn first() {}\n", DetailLevel::Signature);
     cache.insert(
         first_key.clone(),
         fixtures::build_card_at_level(DetailLevel::Structure),
@@ -134,35 +113,20 @@ fn path_invalidation_removes_all_entries() {
 #[rstest]
 fn lru_eviction_removes_oldest() {
     let cache = CardCache::new(2);
-    let first_key = CardCacheKey::new(
+    let first_key = cache_key(
         Path::new("/tmp/weaver-cards-tests/first.rs"),
         "fn first() {}\n",
-        CardCacheAddress {
-            language: SupportedLanguage::Rust,
-            detail: DetailLevel::Structure,
-            line: 1,
-            column: 4,
-        },
+        DetailLevel::Structure,
     );
-    let second_key = CardCacheKey::new(
+    let second_key = cache_key(
         Path::new("/tmp/weaver-cards-tests/second.rs"),
         "fn second() {}\n",
-        CardCacheAddress {
-            language: SupportedLanguage::Rust,
-            detail: DetailLevel::Structure,
-            line: 1,
-            column: 4,
-        },
+        DetailLevel::Structure,
     );
-    let third_key = CardCacheKey::new(
+    let third_key = cache_key(
         Path::new("/tmp/weaver-cards-tests/third.rs"),
         "fn third() {}\n",
-        CardCacheAddress {
-            language: SupportedLanguage::Rust,
-            detail: DetailLevel::Structure,
-            line: 1,
-            column: 4,
-        },
+        DetailLevel::Structure,
     );
 
     cache.insert(

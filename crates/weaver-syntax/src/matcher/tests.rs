@@ -6,127 +6,154 @@ use rstest::*;
 use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::*;
-use crate::{language::SupportedLanguage, parser::Parser};
+use crate::{error::SyntaxError, language::SupportedLanguage, parser::Parser};
 
-/// Fixture providing a Rust parser.
-#[allow_fixture_expansion_lints]
-#[fixture]
-fn rust_parser() -> Parser { result_or_panic(Parser::new(SupportedLanguage::Rust), "parser") }
+/// Failures raised by the matcher test extractors.
+///
+/// The extractors return this rather than panicking so that each test supplies
+/// its own diagnostic context at the call site.
+#[derive(Debug, thiserror::Error)]
+enum MatcherTestError {
+    #[error(transparent)]
+    Syntax(#[from] SyntaxError),
 
-fn result_or_panic<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
-    match result {
-        Ok(value) => value,
-        Err(error) => panic!("{context}: {error}"),
-    }
+    #[error("pattern found no match in the source")]
+    NoMatch,
+
+    #[error("match did not capture `{0}`")]
+    MissingCapture(String),
+
+    #[error("capture `{0}` is not a multiple metavariable")]
+    NotMultiple(String),
 }
 
-/// Helper to parse source and compile a pattern.
+/// Fixture providing a Rust parser; tests unwrap at the boundary.
+#[allow_fixture_expansion_lints]
+#[fixture]
+fn rust_parser() -> Result<Parser, SyntaxError> { Parser::new(SupportedLanguage::Rust) }
+
+/// Parses `source` and compiles `pattern_str` against the Rust grammar.
+///
+/// # Errors
+/// Returns the underlying [`SyntaxError`] when parsing or pattern compilation
+/// fails.
 fn parse_and_pattern(
     parser: &mut Parser,
     source: &str,
     pattern_str: &str,
-) -> (crate::parser::ParseResult, Pattern) {
-    let parsed = result_or_panic(parser.parse(source), "parse");
-    let pattern = result_or_panic(
-        Pattern::compile(pattern_str, SupportedLanguage::Rust),
-        "pattern",
-    );
-    (parsed, pattern)
+) -> Result<(crate::parser::ParseResult, Pattern), SyntaxError> {
+    let parsed = parser.parse(source)?;
+    let pattern = Pattern::compile(pattern_str, SupportedLanguage::Rust)?;
+    Ok((parsed, pattern))
 }
 
+/// Returns the first match of `pattern` within `source`.
+///
+/// # Errors
+/// Returns [`MatcherTestError::NoMatch`] when the pattern matches nothing.
 fn first_rust_match<'a>(
     pattern: &Pattern,
     source: &'a crate::parser::ParseResult,
-) -> MatchResult<'a> {
-    let Some(result) = pattern.find_first(source) else {
-        panic!("should find a match");
-    };
-    result
+) -> Result<MatchResult<'a>, MatcherTestError> {
+    pattern.find_first(source).ok_or(MatcherTestError::NoMatch)
 }
 
-/// Helper to parse and return a multiple metavariable capture's text.
+/// Returns the text of a multiple metavariable capture for `pattern_str`.
+///
+/// # Errors
+/// Returns an error when parsing, pattern compilation, matching, or capture
+/// extraction fails.
 fn extract_multiple_capture_text(
     parser: &mut Parser,
     source: &str,
     pattern_str: &str,
     capture_name: &str,
-) -> String {
-    let (parsed, pattern) = parse_and_pattern(parser, source, pattern_str);
-    let m = first_rust_match(&pattern, &parsed);
-    let nodes = extract_multiple_capture(&m, capture_name);
-    nodes.text().to_owned()
+) -> Result<String, MatcherTestError> {
+    let (parsed, pattern) = parse_and_pattern(parser, source, pattern_str)?;
+    let matched = first_rust_match(&pattern, &parsed)?;
+    let nodes = extract_multiple_capture(&matched, capture_name)?;
+    Ok(nodes.text().to_owned())
 }
 
-/// Helper to extract a multiple metavariable capture from a match result.
+/// Extracts a multiple metavariable capture from a match result.
+///
+/// # Errors
+/// Returns an error when the metavariable is absent or captured a single node.
 fn extract_multiple_capture<'a>(
     match_result: &'a MatchResult<'a>,
     var_name: &str,
-) -> &'a CapturedNodes<'a> {
-    let Some(capture) = match_result.capture(var_name) else {
-        panic!("should capture {var_name}");
-    };
-    let Some(captured) = capture.as_multiple() else {
-        panic!("{var_name} should be multiple");
-    };
-    captured
+) -> Result<&'a CapturedNodes<'a>, MatcherTestError> {
+    let capture = match_result
+        .capture(var_name)
+        .ok_or_else(|| MatcherTestError::MissingCapture(var_name.to_owned()))?;
+    capture
+        .as_multiple()
+        .ok_or_else(|| MatcherTestError::NotMultiple(var_name.to_owned()))
 }
 
 #[rstest]
-fn find_literal_pattern(mut rust_parser: Parser) {
-    let (source, pattern) =
-        parse_and_pattern(&mut rust_parser, "fn main() { let x = 1; }", "let x = 1");
+fn find_literal_pattern(rust_parser: Result<Parser, SyntaxError>) {
+    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let (source, pattern) = parse_and_pattern(&mut parser, "fn main() { let x = 1; }", "let x = 1")
+        .expect("literal pattern should compile against parsed source");
 
     let matches = pattern.find_all(&source);
     assert!(!matches.is_empty());
 }
 
 #[rstest]
-fn find_pattern_with_metavariable(mut rust_parser: Parser) {
+fn find_pattern_with_metavariable(rust_parser: Result<Parser, SyntaxError>) {
+    let mut parser = rust_parser.expect("Rust parser should initialise");
     let (source, pattern) = parse_and_pattern(
-        &mut rust_parser,
+        &mut parser,
         "fn main() { let x = 1; let y = 2; }",
         "let $VAR = $VAL",
-    );
+    )
+    .expect("metavariable pattern should compile against parsed source");
 
     let matches = pattern.find_all(&source);
     assert!(!matches.is_empty());
 }
 
 #[rstest]
-fn capture_metavariable_text(mut rust_parser: Parser) {
-    let (source, pattern) = parse_and_pattern(&mut rust_parser, "fn hello() {}", "fn $NAME() {}");
+fn capture_metavariable_text(rust_parser: Result<Parser, SyntaxError>) {
+    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let (source, pattern) = parse_and_pattern(&mut parser, "fn hello() {}", "fn $NAME() {}")
+        .expect("named pattern should compile against parsed source");
 
-    let m = first_rust_match(&pattern, &source);
+    let m = first_rust_match(&pattern, &source).expect("pattern should match the source");
     let capture = m.capture("NAME").expect("should capture NAME");
     assert_eq!(capture.text(), "hello");
 }
 
 #[rstest]
-fn no_match_returns_empty(mut rust_parser: Parser) {
-    let (source, pattern) = parse_and_pattern(&mut rust_parser, "fn main() {}", "struct $NAME {}");
+fn no_match_returns_empty(rust_parser: Result<Parser, SyntaxError>) {
+    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let (source, pattern) = parse_and_pattern(&mut parser, "fn main() {}", "struct $NAME {}")
+        .expect("struct pattern should compile against parsed source");
 
     let matches = pattern.find_all(&source);
     assert!(matches.is_empty());
 }
 
 #[rstest]
-fn match_result_has_position(mut rust_parser: Parser) {
-    let (source, pattern) = parse_and_pattern(&mut rust_parser, "fn test() {}", "fn $NAME() {}");
+fn match_result_has_position(rust_parser: Result<Parser, SyntaxError>) {
+    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let (source, pattern) = parse_and_pattern(&mut parser, "fn test() {}", "fn $NAME() {}")
+        .expect("named pattern should compile against parsed source");
 
-    let m = first_rust_match(&pattern, &source);
+    let m = first_rust_match(&pattern, &source).expect("pattern should match the source");
     let (line, col) = m.start_position();
     assert_eq!(line, 1);
     assert_eq!(col, 1);
 }
 
 #[rstest]
-fn trailing_multiple_metavariable_can_match_empty(mut rust_parser: Parser) {
-    let text = extract_multiple_capture_text(
-        &mut rust_parser,
-        "fn main() {}",
-        "fn main() { $$$BODY }",
-        "BODY",
-    );
+fn trailing_multiple_metavariable_can_match_empty(rust_parser: Result<Parser, SyntaxError>) {
+    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let text =
+        extract_multiple_capture_text(&mut parser, "fn main() {}", "fn main() { $$$BODY }", "BODY")
+            .expect("trailing multiple metavariable should capture");
     assert!(
         text.trim().is_empty(),
         "expected empty capture, got {text:?}"
@@ -134,14 +161,16 @@ fn trailing_multiple_metavariable_can_match_empty(mut rust_parser: Parser) {
 }
 
 #[rstest]
-fn empty_multiple_metavariable_has_anchored_byte_range(mut rust_parser: Parser) {
+fn empty_multiple_metavariable_has_anchored_byte_range(rust_parser: Result<Parser, SyntaxError>) {
+    let mut parser = rust_parser.expect("Rust parser should initialise");
     let (source, pattern) = parse_and_pattern(
-        &mut rust_parser,
+        &mut parser,
         "fn main() { let x = 1; }",
         "fn main() { let x = 1; $$$BODY }",
-    );
-    let m = first_rust_match(&pattern, &source);
-    let nodes = extract_multiple_capture(&m, "BODY");
+    )
+    .expect("anchored pattern should compile against parsed source");
+    let m = first_rust_match(&pattern, &source).expect("pattern should match the source");
+    let nodes = extract_multiple_capture(&m, "BODY").expect("BODY should capture multiple nodes");
     assert!(nodes.text().trim().is_empty());
 
     let brace_anchor = source
@@ -173,11 +202,13 @@ struct MultipleMetavariableCaptureCase {
     must_not_contain: &["tail"],
 })]
 fn multiple_metavariable_capture_behaves(
-    mut rust_parser: Parser,
+    rust_parser: Result<Parser, SyntaxError>,
     #[case] case: MultipleMetavariableCaptureCase,
 ) {
+    let mut parser = rust_parser.expect("Rust parser should initialise");
     let text =
-        extract_multiple_capture_text(&mut rust_parser, case.source_code, case.pattern_str, "BODY");
+        extract_multiple_capture_text(&mut parser, case.source_code, case.pattern_str, "BODY")
+            .expect("BODY should capture multiple nodes");
 
     for expected in case.must_contain {
         assert!(
@@ -195,11 +226,13 @@ fn multiple_metavariable_capture_behaves(
 }
 
 #[rstest]
-fn operator_tokens_must_match(mut rust_parser: Parser) {
+fn operator_tokens_must_match(rust_parser: Result<Parser, SyntaxError>) {
+    let mut parser = rust_parser.expect("Rust parser should initialise");
     let (source, pattern) = parse_and_pattern(
-        &mut rust_parser,
+        &mut parser,
         "fn main() { let _ = 1 - 2; }",
         "let _ = 1 + 2;",
-    );
+    )
+    .expect("operator pattern should compile against parsed source");
     assert!(pattern.find_first(&source).is_none());
 }

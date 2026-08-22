@@ -7,20 +7,22 @@
 mod fixture_io;
 #[path = "definition_snapshots/fixtures_impl.rs"]
 mod fixtures_impl;
+#[path = "support/pyrefly.rs"]
+mod pyrefly;
 #[path = "definition_snapshots/test_impl.rs"]
 mod test_impl;
+#[path = "support/uri.rs"]
+mod uri;
 
 use std::path::Path;
 
 use fixtures_impl::{linear_chain_context, python_class_context, python_functions_context};
 use lsp_types::{GotoDefinitionResponse, Location, Uri};
+use pyrefly::require_pyrefly;
 use rstest::rstest;
 use tempfile::TempDir;
-use url::Url;
-use weaver_e2e::{
-    lsp_client::{LspClient, LspClientError},
-    pyrefly_available,
-};
+use uri::{FileUriError, file_uri, parse_uri};
+use weaver_e2e::lsp_client::{LspClient, LspClientError};
 
 /// Test error type for definition snapshot tests.
 #[derive(Debug, thiserror::Error)]
@@ -31,37 +33,14 @@ enum TestError {
     #[error("LSP client error: {0}")]
     LspClient(#[from] LspClientError),
 
-    #[error("invalid file path: cannot convert to URI")]
-    InvalidFilePath,
-
-    #[error("invalid URI: {0}")]
-    InvalidUri(String),
+    #[error(transparent)]
+    FileUri(#[from] FileUriError),
 
     #[error("expected error but operation succeeded")]
     ExpectedError,
 
     #[error("expected NotInitialized error, got: {actual}")]
     WrongErrorType { actual: String },
-}
-
-/// Creates a file URI from a path, handling cross-platform differences correctly.
-fn file_uri(path: &Path) -> Result<Uri, TestError> {
-    let url = Url::from_file_path(path).map_err(|()| TestError::InvalidFilePath)?;
-    url.as_str()
-        .parse()
-        .map_err(|_| TestError::InvalidUri(url.to_string()))
-}
-
-/// Skips the test if Pyrefly is not available.
-macro_rules! require_pyrefly {
-    () => {
-        if !pyrefly_available() {
-            eprintln!(
-                "Skipping test: Pyrefly not available (install with `uv tool install pyrefly`)"
-            );
-            return Ok(());
-        }
-    };
 }
 
 fn assert_error_before_init<F, A>(mut action: F, assert_extra: A) -> Result<(), TestError>
@@ -206,9 +185,7 @@ impl From<Option<GotoDefinitionResponse>> for DefinitionSnapshot {
 /// Spawns an uninitialized LSP client for error testing.
 fn spawn_uninitialized_client() -> Result<(LspClient, Uri), TestError> {
     let client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
-    let uri: Uri = "file:///tmp/test.py"
-        .parse()
-        .map_err(|_| TestError::InvalidUri("file:///tmp/test.py".to_owned()))?;
+    let uri = parse_uri("file:///tmp/test.py")?;
     Ok((client, uri))
 }
 

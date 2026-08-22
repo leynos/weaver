@@ -3,8 +3,12 @@
 //! These tests validate structural code search using patterns with metavariables
 //! across Rust, Python, and TypeScript.
 
+#[path = "support/error_assertions.rs"]
+mod error_assertions;
+
 use std::collections::BTreeMap;
 
+use error_assertions::assert_error_mentions;
 use insta::assert_debug_snapshot;
 use weaver_e2e::fixtures;
 use weaver_syntax::{Parser, Pattern, SupportedLanguage};
@@ -82,17 +86,14 @@ fn find_matches(
         .collect())
 }
 
-/// Helper to assert that a pattern fails to compile with an expected error substring.
-fn assert_pattern_error(pattern: &str, expected_substring: &str) {
-    let result = find_matches(DUMMY_RUST_SOURCE, pattern, SupportedLanguage::Rust);
-    let Err(err) = result else {
-        panic!("expected error for pattern: {pattern}");
-    };
-    let msg = err.to_string();
-    assert!(
-        msg.contains(expected_substring),
-        "error message should mention '{expected_substring}': {msg}"
-    );
+/// Checks that `pattern` fails to compile with an expected error substring.
+///
+/// # Errors
+/// Returns a description of the mismatch when the pattern compiles or when the
+/// compilation error does not mention `expected_substring`.
+fn assert_pattern_error(pattern: &str, expected_substring: &str) -> Result<(), String> {
+    let outcome = find_matches(DUMMY_RUST_SOURCE, pattern, SupportedLanguage::Rust);
+    assert_error_mentions(outcome, &format!("pattern `{pattern}`"), expected_substring)
 }
 
 // =============================================================================
@@ -374,17 +375,20 @@ fn grep_wildcard_patterns() -> Result<(), TestError> {
 #[test]
 fn grep_invalid_pattern_syntax_returns_error() {
     // Pattern with unclosed parenthesis should fail to compile
-    assert_pattern_error("fn $NAME(", "pattern");
+    assert_pattern_error("fn $NAME(", "pattern")
+        .expect("unclosed parenthesis should be rejected as an invalid pattern");
 }
 
 #[test]
 fn grep_invalid_metavariable_syntax_returns_error() {
     // $$VAR is invalid (must be $ or $$$, not $$)
-    assert_pattern_error("$$INVALID", "metavariable");
+    assert_pattern_error("$$INVALID", "metavariable")
+        .expect("`$$` should be rejected as invalid metavariable syntax");
 }
 
 #[test]
 fn grep_empty_metavariable_name_returns_error() {
     // $ without a name following it is invalid
-    assert_pattern_error("let $ = 1", "metavariable");
+    assert_pattern_error("let $ = 1", "metavariable")
+        .expect("an unnamed metavariable should be rejected");
 }

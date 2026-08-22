@@ -291,6 +291,36 @@ enum FieldMatcher<'a> {
     StartsWith(&'a str),
 }
 
+/// Pure query: does a single recorded event match the target, message, and
+/// every expected field?
+fn event_matches(
+    event: &RecordedEvent,
+    target: &str,
+    message: &str,
+    expected_fields: &[(&str, FieldMatcher<'_>)],
+) -> bool {
+    event.target == target
+        && event.message() == Some(message)
+        && expected_fields.iter().all(|(field, value)| {
+            event.field(field).is_some_and(|actual| match value {
+                FieldMatcher::Exact(expected) => actual == *expected,
+                FieldMatcher::StartsWith(expected) => actual.starts_with(expected),
+            })
+        })
+}
+
+/// Searches `debug_events` for one matching `target`/`message`/fields.
+fn find_matching_event<'a>(
+    debug_events: &'a [RecordedEvent],
+    target: &str,
+    message: &str,
+    expected_fields: &[(&str, FieldMatcher<'_>)],
+) -> Option<&'a RecordedEvent> {
+    debug_events
+        .iter()
+        .find(|event| event_matches(event, target, message, expected_fields))
+}
+
 fn assert_event(
     debug_events: &[RecordedEvent],
     target: &str,
@@ -298,16 +328,7 @@ fn assert_event(
     expected_fields: &[(&str, FieldMatcher<'_>)],
 ) {
     assert!(
-        debug_events.iter().any(|event| {
-            event.target == target
-                && event.message() == Some(message)
-                && expected_fields.iter().all(|(field, value)| {
-                    event.field(field).is_some_and(|actual| match value {
-                        FieldMatcher::Exact(expected) => actual == *expected,
-                        FieldMatcher::StartsWith(expected) => actual.starts_with(expected),
-                    })
-                })
-        }),
+        find_matching_event(debug_events, target, message, expected_fields).is_some(),
         "expected debug event `{message}` with fields {expected_fields:?}, got {debug_events:?}",
     );
 }

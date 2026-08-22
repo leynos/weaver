@@ -8,7 +8,7 @@ use predicates::{
     prelude::PredicateBooleanExt,
     str::{contains, is_empty},
 };
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_cli::DOMAIN_OPERATIONS;
 
@@ -21,28 +21,35 @@ const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
     "--locale <LOCALE>",
 ];
 
-fn isolated_command(temp_dir: &TempDir) -> assert_cmd::Command {
+/// Builds a scratch `$HOME`/XDG environment and a `weaver` command
+/// pre-configured to use it, so integration tests never touch the
+/// invoking user's real configuration.
+#[fixture]
+fn isolated_environment() -> anyhow::Result<(TempDir, assert_cmd::Command)> {
+    let temp_dir = TempDir::new()?;
     let mut command = cargo_bin_cmd!("weaver");
     command
         .env_clear()
         .env("HOME", temp_dir.path())
         .env("XDG_CONFIG_HOME", temp_dir.path().join("xdg-config"))
         .env("XDG_CACHE_HOME", temp_dir.path().join("xdg-cache"));
-    command
+    Ok((temp_dir, command))
 }
 
-#[test]
-fn capabilities_probe_succeeds() {
-    let temp_dir = TempDir::new().expect("create temporary home");
-    let mut command = isolated_command(&temp_dir);
+#[rstest]
+fn capabilities_probe_succeeds(
+    isolated_environment: anyhow::Result<(TempDir, assert_cmd::Command)>,
+) {
+    let (_temp_dir, mut command) = isolated_environment.expect("build isolated environment");
     command.arg("--capabilities");
     command.assert().success();
 }
 
 #[rstest]
-fn invalid_child_environment_locale_fails_capabilities() {
-    let temp_dir = TempDir::new().expect("create temporary home");
-    let mut command = isolated_command(&temp_dir);
+fn invalid_child_environment_locale_fails_capabilities(
+    isolated_environment: anyhow::Result<(TempDir, assert_cmd::Command)>,
+) {
+    let (_temp_dir, mut command) = isolated_environment.expect("build isolated environment");
     command.env("WEAVER_LOCALE", "not_a_locale");
     command.arg("--capabilities");
 
@@ -54,9 +61,10 @@ fn invalid_child_environment_locale_fails_capabilities() {
 }
 
 #[rstest]
-fn cli_locale_overrides_invalid_child_environment_locale() {
-    let temp_dir = TempDir::new().expect("create temporary home");
-    let mut command = isolated_command(&temp_dir);
+fn cli_locale_overrides_invalid_child_environment_locale(
+    isolated_environment: anyhow::Result<(TempDir, assert_cmd::Command)>,
+) {
+    let (_temp_dir, mut command) = isolated_environment.expect("build isolated environment");
     command
         .env("WEAVER_LOCALE", "not_a_locale")
         .args(["--locale", "en-GB", "--capabilities"]);
@@ -65,10 +73,12 @@ fn cli_locale_overrides_invalid_child_environment_locale() {
 }
 
 #[rstest]
-fn missing_extends_parent_is_reported_by_the_binary() {
+fn missing_extends_parent_is_reported_by_the_binary(
+    isolated_environment: anyhow::Result<(TempDir, assert_cmd::Command)>,
+) {
     use cap_std::{ambient_authority, fs::Dir};
 
-    let temp_dir = TempDir::new().expect("create temporary configuration directory");
+    let (temp_dir, mut command) = isolated_environment.expect("build isolated environment");
     let config_path = temp_dir.path().join("weaver.toml");
     let missing_path = temp_dir.path().join("missing.toml");
     let directory = Dir::open_ambient_dir(temp_dir.path(), ambient_authority())
@@ -77,7 +87,6 @@ fn missing_extends_parent_is_reported_by_the_binary() {
         .write("weaver.toml", "extends = \"missing.toml\"\n")
         .expect("write extending configuration");
 
-    let mut command = isolated_command(&temp_dir);
     command.args([
         "--config-path",
         config_path.to_str().expect("temporary path is UTF-8"),
