@@ -2,12 +2,12 @@
 
 use std::collections::BTreeMap;
 
-use weaver_cli::DOMAIN_OPERATIONS;
+use weaver_cli::domain_operations;
 
 fn cli_catalogue() -> BTreeMap<&'static str, Vec<&'static str>> {
-    DOMAIN_OPERATIONS
+    domain_operations()
         .iter()
-        .map(|(domain, _, operations)| (*domain, operations.to_vec()))
+        .map(|entry| (entry.domain, entry.operations.to_vec()))
         .collect()
 }
 

@@ -42,21 +42,6 @@ pub enum OutputFormat {
         "Configuration flags such as --config-path and --daemon-socket\n",
         "must appear before the command domain.",
     ),
-    after_help = concat!(
-        "Domains and operations:\n",
-        "\n",
-        "  observe \u{2014} Query code structure and relationships\n",
-        "    get-definition    find-references    grep\n",
-        "    diagnostics       call-hierarchy     get-card\n",
-        "    graph-slice\n",
-        "\n",
-        "  act \u{2014} Perform code modifications\n",
-        "    rename-symbol     apply-edits        apply-patch\n",
-        "    apply-rewrite     refactor\n",
-        "\n",
-        "  verify \u{2014} Validate code correctness\n",
-        "    diagnostics       syntax",
-    )
 )]
 pub(crate) struct Cli {
     /// Prints the negotiated capability matrix and exits.
