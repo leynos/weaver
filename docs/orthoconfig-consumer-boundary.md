@@ -20,6 +20,8 @@ diverges under ADR 007.
 | [12.1.4](roadmap.md#121-confirm-reusable-contracts-that-weaver-must-not-duplicate) | Consume canonical vocabulary and behavioural metadata. | ~ wraps    | OrthoConfig 7.1, OrthoConfig 7.2, OrthoConfig 8.1                      | n/a                                      | Replace Weaver-local vocabulary, renderer, JSON, exit-code, bounded-list, mutation, and provenance checks once OrthoConfig 7.1, 7.2, and 8.1 ship those contracts. | n/a            | 2026-06-14    |
 | [12.1.5](roadmap.md#121-confirm-reusable-contracts-that-weaver-must-not-duplicate) | Consume compounding primitive contracts.               | ? pending  | OrthoConfig 9.1, OrthoConfig 9.2.1, OrthoConfig 9.2.2, OrthoConfig 9.3 | n/a                                      | n/a                                                                                                                                                                | 2026-12-31     | 2026-06-14    |
 
+_Table 1: OrthoConfig consumer boundary tasks for Phase 12._
+
 ## Phase 13
 
 | Roadmap task                                           | Gist                                                                           | State       | Upstream OrthoConfig task                                                | Shipped in | Removal gate or divergence                                                                                                                       | Next review by | Last reviewed |
@@ -35,6 +37,8 @@ diverges under ADR 007.
 | [13.3.3](roadmap.md#13-command-contract-proving-slice) | Generate help, manpage input, completions, and skill paths.                    | ~ wraps     | OrthoConfig 6.3, OrthoConfig 8.1                                         | n/a        | Replace local generated-reference metadata once OrthoConfig 6.3 and 8.1 ship skill and reference-CLI contracts.                                  | n/a            | 2026-06-14    |
 | [13.3.4](roadmap.md#13-command-contract-proving-slice) | Add command-surface drift gates for the pilot.                                 | ~ wraps     | OrthoConfig 6.1, OrthoConfig 7.1, OrthoConfig 8.1                        | n/a        | Replace local drift checks for generic command metadata, vocabulary, and renderer surfaces once OrthoConfig ships reusable policy gates.         | n/a            | 2026-06-14    |
 
+_Table 2: OrthoConfig consumer boundary tasks for Phase 13._
+
 ## Phase 14
 
 | Roadmap task                                    | Gist                                                                        | State     | Upstream OrthoConfig task          | Shipped in | Removal gate or divergence                                                                                                        | Next review by | Last reviewed |
@@ -49,6 +53,8 @@ diverges under ADR 007.
 | [14.3.1](roadmap.md#14-code-reading-loop-slice) | Prototype symbols list pattern search over weaver-syntax and optional srgn. | ? pending | OrthoConfig 6.1, OrthoConfig 7.1   | n/a        | n/a                                                                                                                               | 2026-12-31     | 2026-06-14    |
 | [14.3.2](roadmap.md#14-code-reading-loop-slice) | Decide whether the static-search pilot graduates.                           | ? pending | OrthoConfig 7.1                    | n/a        | n/a                                                                                                                               | 2026-12-31     | 2026-06-14    |
 
+_Table 3: OrthoConfig consumer boundary tasks for Phase 14._
+
 ## Phase 15
 
 | Roadmap task                                           | Gist                                                                             | State   | Upstream OrthoConfig task          | Shipped in | Removal gate or divergence                                                                                                        | Next review by | Last reviewed |
@@ -59,6 +65,8 @@ diverges under ADR 007.
 | [15.3.3](roadmap.md#15-sempai-query-to-selector-slice) | Define stable JSONL request and response schemas for Sempai query operations.    | ~ wraps | OrthoConfig 7.2.4                  | n/a        | Replace generic machine-renderer field and schema metadata once OrthoConfig 7.2.4 ships the reusable contract.                    | n/a            | 2026-06-14    |
 | [15.3.5](roadmap.md#15-sempai-query-to-selector-slice) | Implement actuation handoff contract using focus-first selection.                | ~ wraps | OrthoConfig 7.2.7                  | n/a        | Replace generic selector handoff provenance once OrthoConfig capability/provenance metadata can carry downstream mutation inputs. | n/a            | 2026-06-14    |
 | [15.3.6](roadmap.md#15-sempai-query-to-selector-slice) | Add diagnostics conformance suites for Sempai error categories.                  | ~ wraps | OrthoConfig 7.2.5, OrthoConfig 8.1 | n/a        | Replace generic structured-error conformance once OrthoConfig reference-CLI and renderer gates cover the shared error contract.   | n/a            | 2026-06-14    |
+
+_Table 4: OrthoConfig consumer boundary tasks for Phase 15._
 
 ## Phase 16
 
@@ -75,6 +83,8 @@ diverges under ADR 007.
 | [16.3.3](roadmap.md#16-safe-change-loop-slice)  | Add symbols move command contract and discovery output.                          | ~ wraps | OrthoConfig 7.2.7                                                                           | n/a        | Replace generic command discovery and capability/provenance metadata once OrthoConfig 7.2.7 can express symbols move and extricate-symbol.           | n/a            | 2026-06-14    |
 | [16.3.5](roadmap.md#16-safe-change-loop-slice)  | Extend refusal diagnostics and rollback guarantees for extrication.              | ~ wraps | OrthoConfig 7.2.5                                                                           | n/a        | Replace generic refusal diagnostic and error-code metadata once OrthoConfig structured-error contracts cover the shared surface.                     | n/a            | 2026-06-14    |
 
+_Table 5: OrthoConfig consumer boundary tasks for Phase 16._
+
 ## Phase 17
 
 | Roadmap task                                     | Gist                                                                  | State   | Upstream OrthoConfig task          | Shipped in | Removal gate or divergence                                                                                      | Next review by | Last reviewed |
@@ -82,11 +92,15 @@ diverges under ADR 007.
 | [17.1.5](roadmap.md#17-impact-and-history-slice) | Implement budgeted traversal and graph-slice command integration.     | ~ wraps | OrthoConfig 6.1, OrthoConfig 7.2.6 | n/a        | Replace generic command and bounded-output metadata once OrthoConfig can express graph-slices get.              | n/a            | 2026-06-14    |
 | [17.2.2](roadmap.md#17-impact-and-history-slice) | Implement slice reconstruction per commit with data-quality metadata. | ~ wraps | OrthoConfig 7.2.4                  | n/a        | Replace generic machine-output field metadata once OrthoConfig renderer contracts cover history slice payloads. | n/a            | 2026-06-14    |
 
+_Table 6: OrthoConfig consumer boundary tasks for Phase 17._
+
 ## Phase 18
 
 | Roadmap task                                     | Gist                                                             | State   | Upstream OrthoConfig task | Shipped in | Removal gate or divergence                                                                                             | Next review by | Last reviewed |
 | ------------------------------------------------ | ---------------------------------------------------------------- | ------- | ------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------- | -------------- | ------------- |
 | [18.2.1](roadmap.md#18-provider-ecosystem-slice) | Wire provider summaries into capabilities list and context JSON. | ~ wraps | OrthoConfig 7.2.7         | n/a        | Replace local provider summary envelope metadata once OrthoConfig 7.2.7 ships reusable capability/provenance metadata. | n/a            | 2026-06-14    |
+
+_Table 7: OrthoConfig consumer boundary tasks for Phase 18._
 
 ## Phase 19
 
@@ -98,6 +112,8 @@ diverges under ADR 007.
 | [19.1.4](roadmap.md#19-agent-workflow-and-assurance-slice) | Implement feedback create, list, and send.                        | ? pending | OrthoConfig 9.2.2                  | n/a        | n/a                                                                                                                       | 2026-12-31     | 2026-06-14    |
 | [19.2.2](roadmap.md#19-agent-workflow-and-assurance-slice) | Implement explicit interactive review as an opt-in workflow.      | ~ wraps   | OrthoConfig 7.2.1                  | n/a        | Replace generic non-interactive and mutation-policy metadata once OrthoConfig 7.2.1 ships reusable interaction contracts. | n/a            | 2026-06-14    |
 
+_Table 8: OrthoConfig consumer boundary tasks for Phase 19._
+
 ## Phase 20
 
 | Roadmap task                                                               | Gist                                                                      | State     | Upstream OrthoConfig task | Shipped in | Removal gate or divergence | Next review by | Last reviewed |
@@ -105,4 +121,6 @@ diverges under ADR 007.
 | [20.1.1](roadmap.md#20-deferred-extensions-after-the-core-product-promise) | Decide whether to generate MCP descriptions from context JSON.            | ? pending | OrthoConfig 10.1.1        | n/a        | n/a                        | 2026-12-31     | 2026-06-14    |
 | [20.1.2](roadmap.md#20-deferred-extensions-after-the-core-product-promise) | Decide whether SDK or OpenAPI-shaped runtime explorers are in scope.      | ? pending | OrthoConfig 10.1.2        | n/a        | n/a                        | 2026-12-31     | 2026-06-14    |
 | [20.3.3](roadmap.md#20-deferred-extensions-after-the-core-product-promise) | Decide whether weaver daemon status JSON belongs in the command contract. | ? pending | OrthoConfig 6.2.3         | n/a        | n/a                        | 2026-12-31     | 2026-06-14    |
+
+_Table 9: OrthoConfig consumer boundary tasks for Phase 20._
 <!-- markdownlint-enable MD013 MD060 -->

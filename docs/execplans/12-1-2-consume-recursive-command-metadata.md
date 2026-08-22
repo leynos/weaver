@@ -16,8 +16,10 @@ The roadmap states the goal for this task as:
 
 > 12.1.2. Consume recursive command metadata.
 > Depends on OrthoConfig 6.1.1 and 6.1.2.
-> Success: generated help, manpage, completion, and context output converge on
-> the OrthoConfig recursive metadata shape.
+> Success: generated help and the manual page converge on the OrthoConfig
+> recursive metadata shape. This item establishes the input shape for shell
+> completion and `weaver context --json`; those outputs remain deferred to
+> 13.3.3 and 13.3.1 respectively.
 
 After this change, Weaver has exactly one in-process description of its own
 command surface, and that description is shaped by a contract Weaver does not
@@ -34,13 +36,8 @@ own. Concretely, a reader can observe all of the following:
 - `cargo test -p weaver-cli` fails loudly, with a named test, if OrthoConfig
   ever changes its metadata schema version out from under Weaver.
 
-The word "converge" in the success criterion is a conformance predicate, not a
-construction predicate. Two of the four named surfaces do not exist in Weaver
-today and are owned by later roadmap items: shell completion and
-`weaver context --json` are built by 13.3.3 and 13.3.1 respectively. This plan
-therefore converges the two surfaces that exist, and establishes the metadata
-shape that 13.3.1 and 13.3.3 will converge onto. That boundary is argued in
-full under `Decision log`.
+The completed surfaces establish the metadata shape that later completion and
+context work will consume. That boundary is argued in full under `Decision log`.
 
 ## Why this matters now
 
@@ -124,13 +121,12 @@ Stop and escalate rather than improvising when any of these is reached.
   mechanical and local. Note that `docs::ir` types are not `#[non_exhaustive]`
   and have no builder, so hand-assembly is field-exact by construction.
 
-- Risk: the generated help becomes more confidently wrong. The CLI advertises
-  fourteen operations; the daemon router implements five. Severity: medium.
-  Likelihood: high if unaddressed. Mitigation: do not silently propagate the
-  fourteen. Stage B adds the cross-crate coverage test that makes the
-  discrepancy explicit and fails the build if the two catalogues disagree.
-  Record the advertised-versus-routed gap as a finding for roadmap 13.1/13.3
-  rather than fixing routing here.
+- Risk: the generated help drifts from known daemon routing operations. The CLI
+  and routing catalogue both enumerate fourteen operations, but only five have
+  dedicated handler branches. Severity: medium. Likelihood: high if
+  unaddressed. Mitigation: Stage B adds the cross-crate coverage test that
+  fails the build if the catalogues disagree. Record the handler-implementation
+  gap as a finding for roadmap 13.1/13.3 rather than changing routing here.
 
 - Risk: the build script's `#[path]` include list grows and becomes fragile.
   Severity: medium. Likelihood: medium. Mitigation: keep the projection module
@@ -249,22 +245,15 @@ Recorded during planning; keep appending during implementation.
   `weaverd::test_support::routing_catalogue` accessor. This adds no dependency
   and leaves the daemon's runtime interface unchanged.
 
-- Observation: the CLI advertises fourteen operations; the daemon routes five.
-  Evidence: `router.rs:210-215` routes `get-definition`, `get-card` and
-  `graph-slice`; `router.rs:225-238` routes `apply-patch` and `refactor`;
-  `route_verify` (`router.rs:241-249`) routes nothing and falls through.
-  Impact: generating help from a catalogue that lists fourteen would make
-  Weaver more confidently wrong. Recorded for roadmap 13.1/13.3; not fixed here.
-
-- Observation correction: `DomainRoutingContext` declares all fourteen CLI
+- Observation: `DomainRoutingContext` declares all fourteen CLI
   operations as known routing operations. Five currently have dedicated handler
   branches; the remaining known operations use the router's not-implemented
   fallback. Evidence: `DomainRoutingContext::{OBSERVE, ACT, VERIFY}` contains
   the same three-domain, fourteen-operation catalogue as `DOMAIN_OPERATIONS`,
   and `router/tests.rs` already exercises every known operation. Impact: INV-6
-  correctly protects advertised routing knowledge, but does not claim handler
-  implementation coverage. The earlier five-operation wording describes
-  dedicated handlers, not the router catalogue.
+  protects advertised routing knowledge, but does not claim handler
+  implementation coverage. The handler-implementation gap is recorded for
+  roadmap 13.1/13.3 rather than fixed here.
 
 - Observation: `weaverd`'s manual page is covered by no live roadmap task.
   Evidence: `manpage` appears in `docs/roadmap.md` only at 12.1.2's success
@@ -734,7 +723,8 @@ Run everything from the repository root. Per `AGENTS.md`, capture gate output
 to a log rather than relying on truncated terminal output.
 
 ```sh
-export LOG_BASE="/tmp/$(git branch --show-current)"
+branch_name=$(git branch --show-current | tr '/' '-')
+export LOG_BASE="/tmp/${branch_name:-detached-head}"
 ```
 
 Stage A — confirm upstream facts:
@@ -773,12 +763,14 @@ cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture \
   2>&1 | tee "$LOG_BASE-boundary.out"
 ```
 
-Full gate sequence, run sequentially — never in parallel, because the build
+Full gate sequence, run sequentially — never in parallel because the build
 cache is shared:
 
 ```sh
+make fmt         2>&1 | tee "$LOG_BASE-fmt.out"
 make check-fmt   2>&1 | tee "$LOG_BASE-checkfmt.out"
 make lint        2>&1 | tee "$LOG_BASE-lint.out"
+make typecheck   2>&1 | tee "$LOG_BASE-typecheck.out"
 make test        2>&1 | tee "$LOG_BASE-test.out"
 make markdownlint 2>&1 | tee "$LOG_BASE-mdlint.out"
 make nixie       2>&1 | tee "$LOG_BASE-nixie.out"
@@ -959,3 +951,8 @@ On 2026-08-22, CodeScene reported string-heavy arguments in the new
 cross-surface coverage test. The test now models rendered documents and
 metadata tokens explicitly, which keeps the recursive assertion focused on
 command metadata rather than repeated groups of related string arguments.
+
+On 2026-08-22, follow-up review aligned the quoted completion boundary and
+router coverage with the roadmap and `DomainRoutingContext`. It also made the
+recorded gate logs safe for slash-containing branch names, documented every
+manual-page build input, and added generated captions to the boundary matrix.
