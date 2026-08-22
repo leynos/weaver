@@ -62,6 +62,11 @@ pub(super) fn send_notification(
     write_lsp_message(writer, &payload)
 }
 
+/// Reads inbound messages until the response with `expected_id` arrives.
+///
+/// Server-initiated requests are answered and notifications skipped along the
+/// way. The loop is bounded so a chatty or wedged server cannot hang the
+/// plugin indefinitely.
 fn read_response_for_id(
     reader: &mut impl BufRead,
     writer: &mut impl Write,
@@ -91,12 +96,18 @@ fn read_response_for_id(
     })
 }
 
+/// Deserializes one framed payload into the permissive [`JsonRpcMessage`] view.
 fn parse_jsonrpc_message(message: &str) -> Result<JsonRpcMessage, RustAnalyzerAdapterError> {
     serde_json::from_str(message).map_err(|source| RustAnalyzerAdapterError::InvalidOutput {
         message: format!("failed to deserialize JSON-RPC message: {source}"),
     })
 }
 
+/// Answers a server-initiated request, reporting whether the message was
+/// consumed.
+///
+/// Returns `true` for any message carrying a method, meaning a request or
+/// notification that the caller should skip rather than treat as its response.
 fn acknowledge_server_request_if_needed(
     writer: &mut impl Write,
     rpc: &JsonRpcMessage,
@@ -110,6 +121,9 @@ fn acknowledge_server_request_if_needed(
     Ok(true)
 }
 
+/// Unwraps a response into its result, converting an error object into an
+/// [`RustAnalyzerAdapterError::EngineFailed`]. A response with neither field
+/// yields JSON null.
 fn response_result(rpc: JsonRpcMessage) -> Result<serde_json::Value, RustAnalyzerAdapterError> {
     if let Some(error) = rpc.error {
         return Err(RustAnalyzerAdapterError::EngineFailed {
@@ -122,6 +136,7 @@ fn response_result(rpc: JsonRpcMessage) -> Result<serde_json::Value, RustAnalyze
     Ok(rpc.result.unwrap_or(serde_json::Value::Null))
 }
 
+/// Writes the canned reply for a server-initiated request.
 fn acknowledge_server_request(
     writer: &mut impl Write,
     request_id: i64,
@@ -143,6 +158,11 @@ fn acknowledge_server_request(
     write_lsp_message(writer, &payload)
 }
 
+/// Supplies the minimal acceptable result for each server request we honour.
+///
+/// Configuration requests receive an empty array and capability or progress
+/// requests receive null; anything else is refused rather than answered with
+/// a guess.
 fn server_request_result(method: &str) -> Result<serde_json::Value, RustAnalyzerAdapterError> {
     match method {
         "workspace/configuration" => Ok(json!([])),
@@ -155,6 +175,7 @@ fn server_request_result(method: &str) -> Result<serde_json::Value, RustAnalyzer
     }
 }
 
+/// Frames `content` with a `Content-Length` header and flushes it to the server.
 fn write_lsp_message(
     writer: &mut impl Write,
     content: &str,
@@ -177,6 +198,7 @@ fn write_lsp_message(
         })
 }
 
+/// Reads one length-framed message and decodes its body as UTF-8.
 fn read_lsp_message(reader: &mut impl BufRead) -> Result<String, RustAnalyzerAdapterError> {
     let content_length = read_content_length(reader)?;
     let mut content = vec![0_u8; content_length];
@@ -191,6 +213,9 @@ fn read_lsp_message(reader: &mut impl BufRead) -> Result<String, RustAnalyzerAda
     })
 }
 
+/// Consumes header lines up to the blank separator and returns the declared
+/// body length. Unknown headers are ignored; a missing `Content-Length` is an
+/// error.
 fn read_content_length(reader: &mut impl BufRead) -> Result<usize, RustAnalyzerAdapterError> {
     let mut content_length: Option<usize> = None;
 
@@ -210,6 +235,8 @@ fn read_content_length(reader: &mut impl BufRead) -> Result<usize, RustAnalyzerA
     })
 }
 
+/// Reads a single header line, treating end of stream as an engine failure
+/// because the server has died mid-message.
 fn read_header_line(reader: &mut impl BufRead) -> Result<String, RustAnalyzerAdapterError> {
     let mut line = String::new();
     let bytes_read =
@@ -226,6 +253,7 @@ fn read_header_line(reader: &mut impl BufRead) -> Result<String, RustAnalyzerAda
     Ok(line)
 }
 
+/// Parses a `Content-Length` header, returning [`None`] for any other header.
 fn parse_content_length_header(line: &str) -> Result<Option<usize>, RustAnalyzerAdapterError> {
     let Some(value) = line.strip_prefix("Content-Length: ") else {
         return Ok(None);
@@ -238,44 +266,67 @@ fn parse_content_length_header(line: &str) -> Result<Option<usize>, RustAnalyzer
         })
 }
 
+/// Wire form of an outgoing client request.
 #[derive(Debug, Serialize)]
 struct JsonRpcRequest<'a> {
+    /// Protocol version marker, always `"2.0"`.
     jsonrpc: &'static str,
+    /// Correlation id the server must echo in its response.
     id: i64,
+    /// LSP method being invoked, such as `textDocument/rename`.
     method: &'a str,
+    /// Method parameters, omitted from the wire form when absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     params: Option<serde_json::Value>,
 }
 
+/// Wire form of an outgoing client notification, which expects no response.
 #[derive(Debug, Serialize)]
 struct JsonRpcNotification<'a> {
+    /// Protocol version marker, always `"2.0"`.
     jsonrpc: &'static str,
+    /// LSP method being notified, such as `initialized`.
     method: &'a str,
+    /// Method parameters, omitted from the wire form when absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     params: Option<serde_json::Value>,
 }
 
+/// Wire form of the client's reply to a server-initiated request.
 #[derive(Debug, Serialize)]
 struct JsonRpcServerResponse {
+    /// Protocol version marker, always `"2.0"`.
     jsonrpc: &'static str,
+    /// Id copied from the server request being answered.
     id: i64,
+    /// Result payload; the client only ever replies with defaults.
     result: serde_json::Value,
 }
 
+/// Permissive view of any inbound message, covering responses, server requests,
+/// and notifications so one read loop can triage all three.
 #[derive(Debug, Deserialize)]
 struct JsonRpcMessage {
+    /// Correlation id; absent for notifications.
     #[serde(default)]
     id: Option<i64>,
+    /// Method name; present only on server requests and notifications, so it
+    /// distinguishes those from responses to our own requests.
     #[serde(default)]
     method: Option<String>,
+    /// Successful response payload.
     #[serde(default)]
     result: Option<serde_json::Value>,
+    /// Error payload, mutually exclusive with `result`.
     #[serde(default)]
     error: Option<JsonRpcError>,
 }
 
+/// Error object carried by a failed JSON-RPC response.
 #[derive(Debug, Deserialize)]
 struct JsonRpcError {
+    /// Numeric JSON-RPC or LSP error code.
     code: i64,
+    /// Server-supplied explanation, surfaced verbatim in adapter errors.
     message: String,
 }

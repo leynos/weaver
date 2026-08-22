@@ -116,7 +116,10 @@ impl std::fmt::Display for CapabilityId {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ContractVersion {
+    /// Breaking-change counter; contracts with different major versions are
+    /// never compatible.
     major: u16,
+    /// Additive-change counter; ignored by [`ContractVersion::is_compatible_with`].
     minor: u16,
 }
 

@@ -18,10 +18,15 @@ use tracing::{debug, warn};
 mod renderer;
 pub use renderer::render_matrix;
 
+/// Remediation text shown in load-failure diagnostics, so a failing check
+/// points a contributor straight at the fix instead of just the symptom.
 const MANIFEST_REMEDIATION: &str = "update docs/orthoconfig-consumer-boundary.toml, regenerate \
                                     docs/orthoconfig-consumer-boundary.md, then rerun cargo test \
                                     -p weaver-docs-gate";
+/// Name of the counter metric incremented on every manifest load attempt.
 const METRIC_LOAD_TOTAL: &str = "weaver_docs_gate_boundary_manifest_load_total";
+/// Tracing target used for manifest-load spans and events, kept distinct
+/// from the crate's default target so log filters can isolate this path.
 const OBSERVABILITY_TARGET: &str = "weaver_docs_gate::boundary_manifest";
 
 /// One boundary classification state for a Weaver roadmap task.
@@ -453,6 +458,9 @@ where
     Ok((!value.is_empty()).then_some(value))
 }
 
+/// Record a successful manifest load: increment the load counter and emit a
+/// debug event carrying the source and task counts, so operators can see
+/// load activity without the volume of a per-field trace.
 fn record_success(source: &'static str, path: Option<&Utf8Path>, manifest: &BoundaryManifest) {
     counter!(METRIC_LOAD_TOTAL, "source" => source, "outcome" => "success").increment(1);
     if let Some(manifest_path) = path {

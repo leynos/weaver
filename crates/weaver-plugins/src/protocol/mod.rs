@@ -34,8 +34,12 @@ use crate::capability::ReasonCode;
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PluginRequest {
+    /// Name of the operation the plugin should perform (e.g. `"rename"`).
     operation: String,
+    /// Files the plugin needs to inspect or transform.
     files: Vec<FilePayload>,
+    /// Operation-specific arguments, opaque to the broker and interpreted
+    /// only by the plugin.
     #[serde(default)]
     arguments: HashMap<String, serde_json::Value>,
 }
@@ -84,7 +88,9 @@ impl PluginRequest {
 /// the sandboxed plugin does not need filesystem access.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FilePayload {
+    /// Absolute path of the file, as seen by the broker's host filesystem.
     path: PathBuf,
+    /// Full text content of the file at the time of the request.
     content: String,
 }
 
@@ -112,8 +118,13 @@ impl FilePayload {
 /// Serialized as a single JSONL line terminated by a newline character.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PluginResponse {
+    /// Whether the plugin completed its operation without a fatal error.
     success: bool,
+    /// The plugin's result payload; [`PluginOutput::Empty`] when the
+    /// response reports failure.
     output: PluginOutput,
+    /// Diagnostic messages accumulated while performing the operation,
+    /// present regardless of overall success.
     #[serde(default)]
     diagnostics: Vec<PluginDiagnostic>,
 }
@@ -177,12 +188,18 @@ pub enum PluginOutput {
 /// A diagnostic message emitted by a plugin.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PluginDiagnostic {
+    /// How serious the condition is; drives how the broker surfaces it.
     severity: DiagnosticSeverity,
+    /// Human-readable description of the condition.
     message: String,
+    /// File the diagnostic applies to, when it can be pinpointed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     file: Option<PathBuf>,
+    /// Line number within `file` the diagnostic applies to, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     line: Option<u32>,
+    /// Stable machine-readable code identifying the diagnostic's cause, for
+    /// callers that need to match on it rather than parse `message`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     reason_code: Option<ReasonCode>,
 }

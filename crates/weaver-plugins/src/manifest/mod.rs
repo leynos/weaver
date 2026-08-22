@@ -66,8 +66,11 @@ impl std::fmt::Display for PluginKind {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PluginMetadata {
+    /// Plugin name, used for lookup and error messages.
     name: String,
+    /// Plugin version string, opaque to Weaver and not semver-checked.
     version: String,
+    /// Whether the plugin senses or acts.
     kind: PluginKind,
 }
 
@@ -121,19 +124,33 @@ impl PluginMetadata {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PluginManifest {
+    /// Plugin name, used for lookup and error messages.
     name: String,
+    /// Plugin version string, opaque to Weaver and not semver-checked.
     version: String,
+    /// Whether the plugin senses or acts; sensors must not declare
+    /// capabilities (enforced by [`PluginManifest::validate`]).
     kind: PluginKind,
+    /// Languages the plugin supports, matched against a target's language
+    /// to decide whether the plugin applies.
     languages: Vec<String>,
+    /// Absolute filesystem path to the plugin's executable; validated as
+    /// absolute by [`PluginManifest::validate`].
     executable: PathBuf,
+    /// Extra arguments prepended to every invocation of the executable.
     #[serde(default)]
     args: Vec<String>,
+    /// Maximum time in seconds the plugin is allowed to run before the
+    /// runner treats it as hung and terminates it.
     #[serde(default = "default_timeout_secs")]
     timeout_secs: u64,
+    /// Capabilities this plugin advertises support for.
     #[serde(default)]
     capabilities: Vec<CapabilityId>,
 }
 
+/// Supplies [`PluginManifest::timeout_secs`]'s serde default so manifests
+/// omitting the field fall back to [`DEFAULT_TIMEOUT_SECS`].
 const fn default_timeout_secs() -> u64 { DEFAULT_TIMEOUT_SECS }
 
 impl PluginManifest {

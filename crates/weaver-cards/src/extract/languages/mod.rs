@@ -10,6 +10,8 @@ use weaver_syntax::SupportedLanguage;
 
 use super::{EntityCandidate, InterstitialCandidate};
 
+/// Dispatches entity extraction to the language-specific collector for
+/// `language`, so callers need not match on [`SupportedLanguage`] themselves.
 pub(super) fn collect_entities(
     language: SupportedLanguage,
     root: Node<'_>,
@@ -22,6 +24,10 @@ pub(super) fn collect_entities(
     }
 }
 
+/// Builds an [`InterstitialCandidate`] spanning the first contiguous run of
+/// top-level import blocks, or `None` when the file has no imports. Only the
+/// leading run is kept: a later, separated import group would otherwise widen
+/// the span across intervening code that is not itself import material.
 pub(super) fn collect_import_interstitial(
     language: SupportedLanguage,
     root: Node<'_>,

@@ -76,11 +76,16 @@ pub enum LspClientError {
 
 /// A simple LSP client for E2E testing.
 pub struct LspClient {
+    /// Kept alive so the process is not reaped and its pipes closed.
     #[expect(dead_code, reason = "child must be kept alive for the process to run")]
     child: Child,
+    /// Reads framed JSON-RPC messages from the server's stdout.
     reader: BufReader<ChildStdout>,
+    /// Writes framed JSON-RPC messages to the server's stdin.
     writer: BufWriter<ChildStdin>,
+    /// Next request id; atomic so the client tolerates an `Arc` wrapper.
     next_id: AtomicI64,
+    /// Set once `initialize` succeeds; gates other requests.
     initialized: bool,
 }
 
@@ -174,7 +179,6 @@ impl LspClient {
     }
 
     /// Prepares call hierarchy at the given position.
-    ///
     /// # Errors
     /// Returns an error if the client is not initialized or if the request fails.
     pub fn prepare_call_hierarchy(
@@ -185,7 +189,6 @@ impl LspClient {
     }
 
     /// Gets incoming calls for a call hierarchy item.
-    ///
     /// # Errors
     /// Returns an error if the client is not initialized or if the request fails.
     pub fn incoming_calls(
@@ -196,7 +199,6 @@ impl LspClient {
     }
 
     /// Gets outgoing calls for a call hierarchy item.
-    ///
     /// # Errors
     /// Returns an error if the client is not initialized or if the request fails.
     pub fn outgoing_calls(
@@ -207,7 +209,6 @@ impl LspClient {
     }
 
     /// Gets the definition location for a symbol at the given position.
-    ///
     /// # Errors
     /// Returns an error if the client is not initialized or if the request fails.
     pub fn goto_definition(
@@ -272,6 +273,7 @@ impl LspClient {
         )
     }
 
+    /// Blocks for the matching response, skipping interleaved notifications.
     fn request<T: for<'de> Deserialize<'de>>(
         &mut self,
         method: &str,
@@ -313,6 +315,7 @@ impl LspClient {
         Err(LspClientError::ResponseTimeout(id))
     }
 
+    /// Sends a fire-and-forget notification (no `id`, no response expected).
     fn notify(&mut self, method: &str, params: Option<Value>) -> Result<(), LspClientError> {
         let notification = Notification {
             jsonrpc: "2.0",
@@ -323,6 +326,7 @@ impl LspClient {
         self.send_message(&serde_json::to_string(&notification).map_err(LspClientError::Json)?)
     }
 
+    /// Writes `content` with the LSP `Content-Length` framing header.
     fn send_message(&mut self, content: &str) -> Result<(), LspClientError> {
         let header = format!("Content-Length: {}\r\n\r\n", content.len());
         self.writer
@@ -335,6 +339,7 @@ impl LspClient {
         Ok(())
     }
 
+    /// Reads one framed LSP message per the `Content-Length` header.
     fn read_response(&mut self) -> Result<Response, LspClientError> {
         // Read headers
         let mut content_length: Option<usize> = None;

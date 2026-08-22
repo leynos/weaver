@@ -110,6 +110,10 @@ pub(super) fn normalise_import(language: SupportedLanguage, raw: &str) -> String
     }
 }
 
+/// Strips a leading Rust visibility modifier (`pub`, `pub(crate)`,
+/// `pub(in path)`, ...) from `raw`, so downstream trimming of `use`/`extern
+/// crate` keywords sees a clean prefix. Returns `raw` unchanged when there is
+/// no `pub` prefix, or when a `pub(` scope is left unterminated.
 fn strip_rust_visibility(raw: &str) -> &str {
     let Some(after_pub) = raw.strip_prefix("pub") else {
         return raw;

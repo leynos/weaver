@@ -31,31 +31,53 @@ use self::{
 };
 use crate::{ByteOffset, RustAnalyzerAdapter, RustAnalyzerAdapterError, write_workspace_file};
 
+/// Binary name looked up on `PATH` when no override is configured.
 const RUST_ANALYZER_BINARY: &str = "rust-analyzer";
+/// Environment variable that overrides the rust-analyzer binary, letting
+/// tests point at a stub server.
 const RUST_ANALYZER_BINARY_ENV: &str = "WEAVER_RUST_ANALYZER_BINARY";
+/// JSON-RPC id for the `initialize` request; ids are fixed because a session
+/// issues each request at most once.
 const INITIALIZE_REQUEST_ID: i64 = 1;
+/// JSON-RPC id for the `textDocument/rename` request.
 const RENAME_REQUEST_ID: i64 = 2;
+/// JSON-RPC id for the `shutdown` request.
 const SHUTDOWN_REQUEST_ID: i64 = 3;
 
 /// Adapter implementation that delegates rename operations to rust-analyzer.
 pub struct RustAnalyzerLspAdapter;
 
+/// Temporary single-file crate staged on disk for rust-analyzer to analyse.
 struct PreparedWorkspace {
+    /// Owns the staging directory; dropping it removes the workspace, so it is
+    /// held for the lifetime of the session.
     workspace: TempDir,
+    /// `file://` URI of the staged copy of the payload file.
     file_uri: Uri,
+    /// `file://` URI of the workspace root, sent as the LSP `rootUri`.
     workspace_uri: Uri,
 }
 
+/// A running rust-analyzer child process together with its framed pipes.
 struct RustAnalyzerProcess {
+    /// Handle used to reap or kill the server once the session ends.
     child: Child,
+    /// Buffered server stdout, from which LSP-framed messages are read.
     reader: BufReader<ChildStdout>,
+    /// Buffered server stdin; flushed after each message so the server can
+    /// make progress.
     writer: BufWriter<ChildStdin>,
 }
 
 #[derive(Clone, Copy)]
+/// The caller-supplied inputs for one rename, grouped to keep helper
+/// signatures short.
 struct RenameInputs<'a> {
+    /// Source file the rename targets, as received in the request.
     file: &'a FilePayload,
+    /// Byte offset of the symbol occurrence to rename.
     offset: ByteOffset,
+    /// Replacement identifier passed through to the server verbatim.
     new_name: &'a str,
 }
 
@@ -88,6 +110,8 @@ impl RustAnalyzerAdapter for RustAnalyzerLspAdapter {
     }
 }
 
+/// Drives initialize, didOpen, and rename against a started server, returning
+/// the rewritten file content.
 fn run_rename_session(
     process: &mut RustAnalyzerProcess,
     prepared: &PreparedWorkspace,
@@ -115,6 +139,8 @@ fn run_rename_session(
     )
 }
 
+/// Stages the payload file plus a stub `Cargo.toml` in a temporary directory,
+/// so rust-analyzer sees a loadable crate.
 fn prepare_workspace(file: &FilePayload) -> Result<PreparedWorkspace, RustAnalyzerAdapterError> {
     let workspace =
         TempDir::new().map_err(|source| RustAnalyzerAdapterError::WorkspaceCreate { source })?;
@@ -131,6 +157,10 @@ fn prepare_workspace(file: &FilePayload) -> Result<PreparedWorkspace, RustAnalyz
     })
 }
 
+/// Spawns rust-analyzer with piped stdio, rooted at the staged workspace.
+///
+/// Server stderr is discarded: diagnostics travel over the protocol, and the
+/// plugin's own stdout must stay a clean channel.
 fn start_rust_analyzer(
     prepared: &PreparedWorkspace,
 ) -> Result<RustAnalyzerProcess, RustAnalyzerAdapterError> {
@@ -163,6 +193,10 @@ fn start_rust_analyzer(
     })
 }
 
+/// Completes the LSP handshake and returns the negotiated position encoding.
+///
+/// Both UTF-8 and UTF-16 are offered so offsets can be converted without an
+/// unnecessary re-encoding pass when the server supports UTF-8.
 fn initialize_session(
     process: &mut RustAnalyzerProcess,
     workspace_uri: &Uri,
@@ -194,6 +228,8 @@ fn initialize_session(
     Ok(position_encoding)
 }
 
+/// Announces the staged file to the server via `textDocument/didOpen`, which
+/// makes the in-memory content authoritative for the rename.
 fn open_document(
     process: &mut RustAnalyzerProcess,
     file_uri: &Uri,
@@ -219,6 +255,7 @@ fn open_document(
     )
 }
 
+/// Issues `textDocument/rename` at `position` and parses the workspace edit.
 fn request_rename_edit(
     process: &mut RustAnalyzerProcess,
     file_uri: &Uri,
@@ -244,6 +281,8 @@ fn request_rename_edit(
     parse_workspace_edit(result)
 }
 
+/// Sends the `shutdown` request followed by the `exit` notification, the
+/// protocol-mandated order for a clean stop.
 fn shutdown_session(process: &mut RustAnalyzerProcess) -> Result<(), RustAnalyzerAdapterError> {
     send_request(
         &mut process.writer,
@@ -258,6 +297,8 @@ fn shutdown_session(process: &mut RustAnalyzerProcess) -> Result<(), RustAnalyze
     send_notification(&mut process.writer, "exit", None)
 }
 
+/// Shuts the server down cleanly, falling back to termination if the shutdown
+/// handshake fails.
 fn close_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAdapterError> {
     if let Err(error) = shutdown_session(&mut process) {
         terminate_session(process);
@@ -267,12 +308,18 @@ fn close_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAda
     finish_session(process)
 }
 
+/// Abandons a session, closing the pipes and killing the server.
+///
+/// Used on the error path, where the server may be wedged and unable to
+/// answer a shutdown request.
 fn terminate_session(mut process: RustAnalyzerProcess) {
     drop(process.writer);
     drop(process.reader);
     force_terminate_process(&mut process.child);
 }
 
+/// Closes the pipes, waits for the server, and reports a non-zero exit as an
+/// engine failure.
 fn finish_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAdapterError> {
     drop(process.writer);
     drop(process.reader);
@@ -296,11 +343,16 @@ fn finish_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAd
     Ok(())
 }
 
+/// Kills the child and reaps it, ignoring errors because the process may
+/// already have exited.
 fn force_terminate_process(child: &mut Child) {
     child.kill().ok();
     child.wait().ok();
 }
 
+/// Reads the server's chosen position encoding from the initialize result.
+///
+/// A server that omits the field is treated as UTF-16, the protocol default.
 fn parse_position_encoding(
     initialize_result: &serde_json::Value,
 ) -> Result<PositionEncoding, RustAnalyzerAdapterError> {
@@ -321,6 +373,8 @@ fn parse_position_encoding(
     }
 }
 
+/// Picks the server binary, preferring a non-blank override from
+/// [`RUST_ANALYZER_BINARY_ENV`] over [`RUST_ANALYZER_BINARY`].
 fn resolve_rust_analyzer_binary() -> String {
     std::env::var(RUST_ANALYZER_BINARY_ENV)
         .ok()

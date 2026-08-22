@@ -34,7 +34,11 @@ use weaver_plugins::{
 use crate::arguments::parse_rename_symbol_arguments;
 pub(crate) use crate::workspace_fs::write_workspace_file;
 
+/// Interpreter used to run the embedded rename script; must be on `PATH` with
+/// the `rope` package installed.
 const PYTHON_BINARY: &str = "python3";
+/// Inline Python program that drives the `rope` library's rename refactor
+/// and prints the modified file to stdout; passed via `python3 -c`.
 const PYTHON_RENAME_SCRIPT: &str = concat!(
     "import os,sys\n",
     "from rope.base.project import Project\n",
@@ -183,7 +187,11 @@ pub enum RopeAdapterError {
 /// Structured failure carrying an optional reason code for diagnostics.
 #[derive(Debug)]
 pub(crate) struct PluginFailure {
+    /// Human-readable failure description, forwarded to the diagnostic
+    /// message shown to the caller.
     message: String,
+    /// Stable machine-readable classification, when the failure mode is
+    /// known; `None` for miscellaneous errors.
     reason_code: Option<ReasonCode>,
 }
 
@@ -247,6 +255,8 @@ pub fn run(stdin: &mut impl BufRead, stdout: &mut impl Write) -> Result<(), Plug
     run_with_adapter(stdin, stdout, &PythonRopeAdapter)
 }
 
+/// Reads and parses exactly one JSONL request line from `stdin`; an empty
+/// first read (EOF) is treated as a failure rather than silently succeeding.
 fn read_request(stdin: &mut impl BufRead) -> Result<PluginRequest, PluginFailure> {
     let mut line = String::new();
     let bytes_read = stdin
@@ -261,6 +271,8 @@ fn read_request(stdin: &mut impl BufRead) -> Result<PluginRequest, PluginFailure
         .map_err(|error| PluginFailure::plain(format!("invalid plugin request JSON: {error}")))
 }
 
+/// Dispatches a parsed request to the handler for its `operation`; this
+/// crate currently only implements `rename-symbol`.
 fn execute_request<R: RopeAdapter>(
     adapter: &R,
     request: &PluginRequest,
@@ -274,6 +286,10 @@ fn execute_request<R: RopeAdapter>(
     }
 }
 
+/// Validates the request, runs the rename via `adapter`, and packages the
+/// result as a search/replace diff. Requires exactly one file payload
+/// because rope renames a single file at a time; rejects a no-op rename so
+/// callers can detect a symbol that was not actually found.
 fn execute_rename<R: RopeAdapter>(
     adapter: &R,
     request: &PluginRequest,
@@ -321,6 +337,8 @@ fn execute_rename<R: RopeAdapter>(
     }))
 }
 
+/// Rejects paths that could escape the sandboxed workspace: absolute paths,
+/// `..` traversal, and Windows drive/UNC prefixes.
 fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {
     if path.is_absolute() {
         return Err(RopeAdapterError::InvalidPath {
@@ -342,6 +360,10 @@ fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {
     Ok(())
 }
 
+/// Renders a whole-file rewrite as a Weaver SEARCH/REPLACE patch. Rope returns
+/// complete file contents rather than a diff, so the whole original body forms
+/// the search block; trailing newlines are supplied when absent so each block
+/// terminator starts on its own line.
 fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> String {
     let unix_path = path_to_slash(path);
     let sep_after_original = if original.ends_with('\n') { "" } else { "\n" };
@@ -364,6 +386,9 @@ fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> St
     )
 }
 
+/// Renders a workspace-relative path with forward slashes for patch headers.
+/// Only [`Component::Normal`] segments survive, so output is platform-stable;
+/// callers must first reject escaping paths via [`validate_relative_path`].
 fn path_to_slash(path: &Path) -> String {
     path.components()
         .filter_map(|component| match component {
@@ -374,6 +399,8 @@ fn path_to_slash(path: &Path) -> String {
         .join("/")
 }
 
+/// Wraps a [`PluginFailure`] as a protocol response carrying one error
+/// diagnostic, attaching the machine-readable reason code when one is present.
 pub(crate) fn failure_response(failure: PluginFailure) -> PluginResponse {
     let mut diagnostic = PluginDiagnostic::new(DiagnosticSeverity::Error, failure.message);
     if let Some(code) = failure.reason_code {

@@ -15,8 +15,12 @@ use crate::{
 /// Shared fixture for `rename-symbol` contract validation payloads.
 #[derive(Debug, Clone)]
 pub struct RenameSymbolFixture<T> {
+    /// Identifies the fixture in lookups and in failure messages.
     name: &'static str,
+    /// Request or response value under test.
     payload: T,
+    /// Substring an error must contain when `payload` is expected to fail
+    /// contract validation; `None` when `payload` is expected to be valid.
     expected_error_fragment: Option<&'static str>,
 }
 
@@ -55,13 +59,19 @@ pub type RenameSymbolRequestFixture = RenameSymbolFixture<PluginRequest>;
 /// Shared response fixture alias for `rename-symbol` contract validation.
 pub type RenameSymbolResponseFixture = RenameSymbolFixture<PluginResponse>;
 
+/// Operation label a request fixture is built with; `ExtractMethod` exists
+/// only to exercise the "wrong operation" rejection path.
 #[derive(Clone, Copy)]
 enum FixtureOperation {
+    /// The operation under contract test.
     RenameSymbol,
+    /// A different, valid operation label used to prove the contract
+    /// rejects requests that target the wrong operation.
     ExtractMethod,
 }
 
 impl FixtureOperation {
+    /// Returns the wire-format operation string for this variant.
     const fn as_str(self) -> &'static str {
         match self {
             Self::RenameSymbol => "rename-symbol",
@@ -186,6 +196,8 @@ pub fn validate_rename_symbol_response_fixture(
     RenameSymbolContract.validate_response(fixture.payload())
 }
 
+/// Finds the fixture named `name` in `fixtures`, tagging a miss with `kind`
+/// so the caller knows which collection was searched.
 fn fixture_named<T>(
     fixtures: Vec<RenameSymbolFixture<T>>,
     name: &str,
@@ -200,6 +212,8 @@ fn fixture_named<T>(
         })
 }
 
+/// Builds a complete, contract-valid `rename-symbol` argument map, used as
+/// the baseline that edge-case fixtures mutate one field at a time.
 fn valid_arguments() -> std::collections::HashMap<String, serde_json::Value> {
     [
         ("uri", json!("file:///src/main.py")),
@@ -211,6 +225,8 @@ fn valid_arguments() -> std::collections::HashMap<String, serde_json::Value> {
     .collect()
 }
 
+/// Returns fixtures covering each per-field rejection: blank, wrong type,
+/// or (for `position`) negative, one fixture per field/failure combination.
 fn request_edge_case_fixtures() -> [RenameSymbolRequestFixture; 7] {
     [
         request_fixture(
@@ -258,6 +274,8 @@ fn request_edge_case_fixtures() -> [RenameSymbolRequestFixture; 7] {
     ]
 }
 
+/// Assembles a named request fixture for `operation` from `arguments`,
+/// pairing it with the error fragment expected when it fails validation.
 fn request_fixture(
     name: &'static str,
     operation: FixtureOperation,
@@ -271,12 +289,16 @@ fn request_fixture(
     )
 }
 
+/// Returns [`valid_arguments`] with `field` removed, for exercising the
+/// missing-field rejection path.
 fn arguments_without(field: &str) -> std::collections::HashMap<String, serde_json::Value> {
     let mut arguments = valid_arguments();
     arguments.remove(field);
     arguments
 }
 
+/// Returns [`valid_arguments`] with `field` overwritten by the string
+/// `value`, for exercising blank- or whitespace-only field rejections.
 fn arguments_with_string(
     field: &str,
     value: &str,
@@ -284,6 +306,8 @@ fn arguments_with_string(
     arguments_with_value(field, json!(value))
 }
 
+/// Returns [`valid_arguments`] with `field` overwritten by an arbitrary JSON
+/// `value`, for exercising wrong-type or out-of-range field rejections.
 fn arguments_with_value(
     field: &str,
     value: serde_json::Value,

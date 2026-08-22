@@ -79,6 +79,7 @@ blanket_clippy_restriction_lints = "deny"
 cognitive_complexity = "deny"
 needless_pass_by_value = "deny"
 implicit_hasher = "deny"
+missing_docs_in_private_items = "deny"
 
 # 2. debugging leftovers
 dbg_macro = "deny"

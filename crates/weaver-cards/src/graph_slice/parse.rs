@@ -31,16 +31,27 @@ use crate::DetailLevel;
 /// Identifies a recognized CLI flag for error-reporting purposes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::graph_slice) enum Flag {
+    /// `--uri`, the file to slice from.
     Uri,
+    /// `--position`, the `LINE:COL` entry point.
     Position,
+    /// `--depth`, the traversal depth limit.
     Depth,
+    /// `--direction`, the edge-traversal direction.
     Direction,
+    /// `--edge-types`, the comma-separated edge type filter.
     EdgeTypes,
+    /// `--min-confidence`, the minimum edge confidence to include.
     MinConfidence,
+    /// `--max-cards`, the budget cap on returned cards.
     MaxCards,
+    /// `--max-edges`, the budget cap on returned edges.
     MaxEdges,
+    /// `--max-estimated-tokens`, the budget cap on estimated response size.
     MaxEstimatedTokens,
+    /// `--entry-detail`, the detail level for the entry card.
     EntryDetail,
+    /// `--node-detail`, the detail level for non-entry cards.
     NodeDetail,
 }
 
@@ -70,14 +81,24 @@ impl From<Flag> for String {
 /// [`GraphSliceRequest`].
 #[derive(Default)]
 pub(super) struct RequestBuilder {
+    /// Parsed `--uri`, required before [`RequestBuilder::build`] succeeds.
     uri: Option<String>,
+    /// Parsed `--position` as `(line, column)`, required before `build`.
     position: Option<(u32, u32)>,
+    /// Parsed `--depth`, defaulting to [`DEFAULT_DEPTH`] if absent.
     depth: Option<u32>,
+    /// Parsed `--direction`, defaulting to [`SliceDirection::default`] if absent.
     direction: Option<SliceDirection>,
+    /// Parsed `--edge-types`, defaulting to all edge types if absent.
     edge_types: Option<Vec<SliceEdgeType>>,
+    /// Parsed `--min-confidence`, defaulting to [`DEFAULT_MIN_CONFIDENCE`] if absent.
     min_confidence: Option<f64>,
+    /// Accumulated budget flags (`--max-cards`, `--max-edges`,
+    /// `--max-estimated-tokens`), applied incrementally as each is seen.
     budget: SliceBudget,
+    /// Parsed `--entry-detail`, defaulting to [`DetailLevel::Structure`] if absent.
     entry_detail: Option<DetailLevel>,
+    /// Parsed `--node-detail`, defaulting to [`DetailLevel::Minimal`] if absent.
     node_detail: Option<DetailLevel>,
 }
 
@@ -124,6 +145,10 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Handles the traversal-related flags (`--uri`, `--position`, `--depth`,
+    /// `--direction`, `--edge-types`, `--min-confidence`).
+    ///
+    /// Returns `Ok(false)` without consuming input if `flag` is not one of these.
     fn try_apply_traversal_flag<'a, I>(
         &mut self,
         flag: &str,
@@ -143,6 +168,10 @@ impl RequestBuilder {
         }
     }
 
+    /// Handles the budget flags (`--max-cards`, `--max-edges`,
+    /// `--max-estimated-tokens`).
+    ///
+    /// Returns `Ok(false)` without consuming input if `flag` is not one of these.
     fn try_apply_budget_flag<'a, I>(
         &mut self,
         flag: &str,
@@ -159,6 +188,9 @@ impl RequestBuilder {
         }
     }
 
+    /// Handles the detail-level flags (`--entry-detail`, `--node-detail`).
+    ///
+    /// Returns `Ok(false)` without consuming input if `flag` is not one of these.
     fn try_apply_detail_flag<'a, I>(
         &mut self,
         flag: &str,
@@ -174,6 +206,7 @@ impl RequestBuilder {
         }
     }
 
+    /// Consumes and stores the `--uri` value.
     fn apply_uri_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
@@ -183,6 +216,7 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Consumes and stores the `--position` value.
     fn apply_position_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
@@ -192,6 +226,7 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Consumes and stores the `--depth` value.
     fn apply_depth_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
@@ -201,6 +236,7 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Consumes and stores the `--direction` value.
     fn apply_direction_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
@@ -210,6 +246,7 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Consumes and stores the `--edge-types` value.
     fn apply_edge_types_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
@@ -219,6 +256,7 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Consumes and stores the `--min-confidence` value.
     fn apply_min_confidence_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
@@ -228,6 +266,8 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Consumes a `u32` value for a budget flag and folds it into `self.budget`
+    /// via `apply`, sharing the parse-and-apply logic across the budget flags.
     fn apply_u32_budget_flag<'a, I>(
         &mut self,
         iter: &mut I,
@@ -243,6 +283,10 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Consumes and stores the `--max-cards` value.
+    ///
+    /// Rejects zero explicitly (unlike the other budget flags) because a
+    /// zero-card budget would make the slice request meaningless.
     fn apply_max_cards_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
@@ -259,6 +303,7 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Consumes and stores the `--max-edges` value.
     fn apply_max_edges_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
@@ -266,6 +311,7 @@ impl RequestBuilder {
         self.apply_u32_budget_flag(iter, Flag::MaxEdges, SliceBudget::with_max_edges)
     }
 
+    /// Consumes and stores the `--max-estimated-tokens` value.
     fn apply_max_estimated_tokens_flag<'a, I>(
         &mut self,
         iter: &mut I,
@@ -280,6 +326,7 @@ impl RequestBuilder {
         )
     }
 
+    /// Consumes and stores the `--entry-detail` value.
     fn apply_entry_detail_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
@@ -289,6 +336,7 @@ impl RequestBuilder {
         Ok(())
     }
 
+    /// Consumes and stores the `--node-detail` value.
     fn apply_node_detail_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,

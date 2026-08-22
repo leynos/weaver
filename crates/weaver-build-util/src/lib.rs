@@ -12,18 +12,36 @@ use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::fs::Dir;
 use time::{OffsetDateTime, format_description::well_known::Iso8601};
 
+/// Date substituted when `SOURCE_DATE_EPOCH` is unset or unusable, so man
+/// pages remain reproducible even without an explicit build timestamp.
 const FALLBACK_DATE: &str = "1970-01-01";
+/// Process-wide counter mixed into staging file names so concurrent man-page
+/// writes within the same process never collide on a temporary file.
 static MAN_PAGE_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+/// A `SOURCE_DATE_EPOCH` value parsed and resolved to a concrete instant.
 struct SourceDate {
+    /// Original `SOURCE_DATE_EPOCH` string, kept for use in diagnostics.
     raw: String,
+    /// Parsed timestamp used to format the man page date.
     value: OffsetDateTime,
 }
 
+/// Reasons `SOURCE_DATE_EPOCH` could not be turned into a `SourceDate`.
 enum SourceDateError {
+    /// `SOURCE_DATE_EPOCH` was not set; no warning is needed for this case.
     Missing,
-    InvalidInteger { raw: String },
-    InvalidTimestamp { raw: String },
+    /// The value was set but was not a valid integer of seconds.
+    InvalidInteger {
+        /// The unparsed value, reported back to the caller.
+        raw: String,
+    },
+    /// The value parsed as an integer but is not a representable Unix
+    /// timestamp.
+    InvalidTimestamp {
+        /// The unparsed value, reported back to the caller.
+        raw: String,
+    },
 }
 
 /// Derive the manual page date from a `SOURCE_DATE_EPOCH` value.
@@ -76,6 +94,12 @@ pub fn manual_date_from_env(warnings: &mut Vec<String>) -> String {
     manual_date(source_date_epoch.as_deref(), warnings)
 }
 
+/// Parse and resolve a raw `SOURCE_DATE_EPOCH` value into a `SourceDate`.
+///
+/// # Errors
+/// Returns `SourceDateError::Missing` if `source_date_epoch` is `None`,
+/// `InvalidInteger` if it is not a base-10 integer, or `InvalidTimestamp`
+/// if it parses but is out of range for `OffsetDateTime`.
 fn source_date_time(source_date_epoch: Option<&str>) -> Result<SourceDate, SourceDateError> {
     let Some(raw) = source_date_epoch else {
         return Err(SourceDateError::Missing);
@@ -93,6 +117,10 @@ fn source_date_time(source_date_epoch: Option<&str>) -> Result<SourceDate, Sourc
     })
 }
 
+/// Translate a `SourceDateError` into a human-readable warning, if any.
+///
+/// `Missing` produces no warning: an unset `SOURCE_DATE_EPOCH` is expected
+/// in most builds and is not worth flagging to the caller.
 fn push_source_date_warning(warnings: &mut Vec<String>, error: &SourceDateError) {
     match error {
         SourceDateError::Missing => {}
@@ -186,6 +214,12 @@ fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Walk `dir` upward until an already-existing directory is found.
+///
+/// Used before capability-based directory creation, since `cap_std` needs an
+/// existing ancestor to open before it can create the missing descendants.
+/// Falls back to `"."` if no ancestor exists (for example a relative path
+/// with no existing prefix).
 fn find_existing_ancestor(dir: &Utf8Path) -> &Utf8Path {
     let mut candidate = dir;
     loop {
@@ -203,6 +237,12 @@ fn find_existing_ancestor(dir: &Utf8Path) -> &Utf8Path {
     Utf8Path::new(".")
 }
 
+/// Open `relative_path` under `base_dir`, creating any missing components.
+///
+/// # Errors
+/// Returns any I/O error from directory creation or opening. An empty
+/// `relative_path` is treated as "no subdirectory needed" and returns
+/// `base_dir` unchanged.
 fn ensure_target_dir(base_dir: Dir, relative_path: &Utf8Path) -> io::Result<Dir> {
     if relative_path.as_str().is_empty() {
         return Ok(base_dir);
@@ -211,6 +251,11 @@ fn ensure_target_dir(base_dir: Dir, relative_path: &Utf8Path) -> io::Result<Dir>
     base_dir.open_dir(relative_path)
 }
 
+/// Build a unique staging file name for a man page write.
+///
+/// Mixes the process ID, wall-clock nanoseconds, and a monotonic counter so
+/// concurrent invocations (same process or sibling processes) cannot collide
+/// on the temporary file before the atomic rename into place.
 fn staging_file_name(page_name: &str) -> String {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -264,11 +309,22 @@ pub fn write_man_page(data: &[u8], dir: &Utf8Path, page_name: &str) -> io::Resul
     Ok(dir.join(page_name))
 }
 
+/// Decide whether a failed rename-into-place should be retried.
+///
+/// Covers the two cases where the destination is occupied: `AlreadyExists`
+/// on platforms that reject renaming over an existing file, and, on
+/// Windows specifically, `PermissionDenied`, which that platform can also
+/// raise when the destination is in use.
 fn should_retry_replace(error: &io::Error) -> bool {
     error.kind() == io::ErrorKind::AlreadyExists
         || (cfg!(windows) && error.kind() == io::ErrorKind::PermissionDenied)
 }
 
+/// Remove `name` from `dir`, treating an already-absent file as success.
+///
+/// # Errors
+/// Returns any I/O error other than `NotFound`, which is swallowed so the
+/// caller's retry-then-remove-then-rename sequence stays idempotent.
 fn remove_existing_file(dir: &Dir, name: &str) -> io::Result<()> {
     match dir.remove_file(name) {
         Ok(()) => Ok(()),

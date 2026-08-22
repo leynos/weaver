@@ -91,6 +91,19 @@ pub enum CardExtractionError {
     },
 }
 
+/// Runs the full extraction pipeline for a file already resolved to
+/// `language`: parses `input.source` with `parser`, locates the entity or
+/// module candidate covering the requested position, and assembles the
+/// resulting card.
+///
+/// # Errors
+///
+/// Returns [`CardExtractionError::PositionOutOfRange`] when the requested
+/// line/column is outside the source text, [`CardExtractionError::Parse`]
+/// when `parser` fails, [`CardExtractionError::NoSymbolAtPosition`] when no
+/// entity or interstitial covers the position, and
+/// [`CardExtractionError::InvalidPath`] when the source path cannot be
+/// rendered as a file URI.
 fn extract_for_language<F>(
     input: CardExtractionInput<'_>,
     language: SupportedLanguage,
@@ -141,30 +154,55 @@ where
     extract_for_language(input, language, parser)
 }
 
+/// Doc comments and decorators collected immediately before a symbol,
+/// normalised into the shape the card's attachment sections expect.
 #[derive(Debug, Clone)]
 struct LeadingAttachments {
+    /// Doc comment lines, in source order, oldest first.
     doc_comments: Vec<String>,
+    /// Raw decorator tokens, in source order.
     decorators: Vec<String>,
 }
 
 impl LeadingAttachments {
+    /// Reports whether no doc comments or decorators were collected, used to
+    /// suppress an empty [`crate::AttachmentsInfo`] section on the card.
     const fn is_empty(&self) -> bool { self.doc_comments.is_empty() && self.decorators.is_empty() }
 }
 
+/// One consecutive run of import statements, as detected by a language's
+/// import-block scanner in `extract::languages`. Built per-language and
+/// consumed by the interstitial-candidate assembly.
 #[derive(Debug, Clone)]
 struct ImportBlock {
+    /// Byte offset where the import block starts.
     byte_start: usize,
+    /// Byte offset where the import block ends.
     byte_end: usize,
+    /// Normalised, one-entry-per-line rendering of the imports.
     normalized: Vec<String>,
 }
 
+/// Bundles the per-candidate inputs shared across the `build_*` helpers that
+/// assemble a [`SymbolCard`], avoiding a long, repeated parameter list.
 #[derive(Clone, Copy)]
 struct CardBuildContext<'a> {
+    /// Source language of the file being processed.
     language: SupportedLanguage,
+    /// Path of the source file, used to build the symbol's URI.
     path: &'a Path,
+    /// Requested detail level, gating which card sections are populated.
     detail: DetailLevel,
+    /// Full source text, used for attachment scanning.
     source: &'a str,
 }
+/// Assembles the full [`SymbolCard`] for `candidate`, delegating each
+/// optional section to a `build_*` helper gated on `context.detail`.
+///
+/// # Errors
+///
+/// Returns [`CardExtractionError::InvalidPath`] when `context.path` cannot
+/// be rendered as a file URI.
 fn build_card(
     candidate: &EntityCandidate,
     context: CardBuildContext<'_>,
@@ -207,6 +245,11 @@ fn build_card(
     })
 }
 
+/// Resolves the leading doc comments and decorators for `candidate`.
+///
+/// When the candidate has no attachment anchor, there is no byte offset to
+/// scan backwards from, so the result falls back to the candidate's own
+/// decorator list with no doc comments rather than scanning the whole file.
 fn leading_attachments(
     candidate: &EntityCandidate,
     source: &str,
@@ -223,6 +266,10 @@ fn leading_attachments(
     )
 }
 
+/// Builds the card's `doc` section. Suppressed below
+/// [`DetailLevel::Structure`]; otherwise prefers a parse-tree docstring over
+/// collected doc comments when both are present. Returns `None` when
+/// neither source yields any text.
 fn build_doc(
     candidate: &EntityCandidate,
     attachments: &LeadingAttachments,
@@ -242,6 +289,9 @@ fn build_doc(
     })
 }
 
+/// Builds the card's `attachments` section. Suppressed below
+/// [`DetailLevel::Structure`] and when there is nothing to report, so the
+/// card omits an empty section rather than emitting empty vectors.
 fn build_attachment_info(
     attachments: &LeadingAttachments,
     detail: DetailLevel,
@@ -267,6 +317,9 @@ fn build_attachment_info(
     })
 }
 
+/// Builds the card's `signature` section. Suppressed below
+/// [`DetailLevel::Signature`], and also omitted when the candidate carries
+/// no rendered signature (e.g. a plain variable).
 fn build_signature(candidate: &EntityCandidate, detail: DetailLevel) -> Option<SignatureInfo> {
     if detail < DetailLevel::Signature {
         return None;
@@ -282,6 +335,8 @@ fn build_signature(candidate: &EntityCandidate, detail: DetailLevel) -> Option<S
         })
 }
 
+/// Builds the card's `structure` section, suppressed below
+/// [`DetailLevel::Structure`].
 fn build_structure(candidate: &EntityCandidate, detail: DetailLevel) -> Option<StructureInfo> {
     (detail >= DetailLevel::Structure).then(|| StructureInfo {
         locals: candidate.locals.clone(),
@@ -289,6 +344,10 @@ fn build_structure(candidate: &EntityCandidate, detail: DetailLevel) -> Option<S
     })
 }
 
+/// Builds the card's `metrics` section, suppressed below
+/// [`DetailLevel::Structure`]. Cyclomatic complexity is approximated as one
+/// plus the number of detected branch points; fan-in/fan-out are left
+/// unset, since this extractor performs no cross-file analysis.
 fn build_metrics(candidate: &EntityCandidate, detail: DetailLevel) -> Option<MetricsInfo> {
     (detail >= DetailLevel::Structure).then(|| MetricsInfo {
         lines: candidate.lines,
@@ -298,6 +357,8 @@ fn build_metrics(candidate: &EntityCandidate, detail: DetailLevel) -> Option<Met
     })
 }
 
+/// Builds the card's `interstitial` section from the candidate's captured
+/// import block, if any. Only the synthetic module candidate carries one.
 fn build_interstitial(candidate: &EntityCandidate) -> Option<InterstitialInfo> {
     candidate
         .interstitial
@@ -312,6 +373,8 @@ fn build_interstitial(candidate: &EntityCandidate) -> Option<InterstitialInfo> {
         })
 }
 
+/// Extracts a one-line summary from `text`'s first non-blank line, falling
+/// back to the whole trimmed text when every line is blank.
 fn summarise(text: &str) -> String {
     text.lines()
         .find_map(|line| {
