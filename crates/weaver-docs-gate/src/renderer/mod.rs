@@ -117,8 +117,8 @@ pub fn render_matrix(manifest: &BoundaryManifest) -> String {
         "diverges under ADR 007.\n\n",
     ));
 
-    for (phase, rows) in grouped_rows(manifest) {
-        push_phase(&mut rendered, phase, &rows);
+    for (table_number, (phase, rows)) in grouped_rows(manifest).into_iter().enumerate() {
+        push_phase(&mut rendered, table_number + 1, phase, &rows);
     }
 
     while rendered.ends_with("\n\n") {
@@ -143,7 +143,7 @@ fn grouped_rows(manifest: &BoundaryManifest) -> BTreeMap<&str, Vec<MatrixRow>> {
 }
 
 /// Append one phase heading and table to the rendered matrix.
-fn push_phase(rendered: &mut String, phase: &str, rows: &[MatrixRow]) {
+fn push_phase(rendered: &mut String, table_number: usize, phase: &str, rows: &[MatrixRow]) {
     let widths = ColumnWidths::for_rows(rows);
 
     rendered.push_str("## Phase ");
@@ -154,7 +154,11 @@ fn push_phase(rendered: &mut String, phase: &str, rows: &[MatrixRow]) {
     for row in rows {
         push_row(rendered, row, &widths);
     }
-    rendered.push('\n');
+    rendered.push_str("\n_Table ");
+    rendered.push_str(&table_number.to_string());
+    rendered.push_str(": OrthoConfig consumer boundary tasks for Phase ");
+    rendered.push_str(phase);
+    rendered.push_str("._\n\n");
 }
 
 /// Append a Markdown table header using the computed column widths.

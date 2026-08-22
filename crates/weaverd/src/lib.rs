@@ -39,6 +39,23 @@ mod semantic_provider;
 mod telemetry;
 mod transport;
 
+#[cfg(feature = "test-support")]
+pub mod test_support {
+    //! Exposes daemon contracts to workspace integration tests only.
+
+    /// Returns the daemon's domain-to-operation routing catalogue.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let catalogue = weaverd::test_support::routing_catalogue();
+    /// assert!(catalogue.iter().any(|(domain, _)| *domain == "observe"));
+    /// ```
+    pub fn routing_catalogue() -> [(&'static str, &'static [&'static str]); 3] {
+        crate::dispatch::routing_catalogue()
+    }
+}
+
 pub use backends::{
     BackendKind,
     BackendKindParseError,
