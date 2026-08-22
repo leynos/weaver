@@ -438,6 +438,13 @@ ship a local adapter before the corresponding OrthoConfig dependency is
 available, the roadmap task must state the dependency, the temporary scope, and
 the removal condition.
 
+For roadmap 12.1.2, Weaver's pure command tree projects into OrthoConfig's
+recursive documentation IR. The projected value drives the shared Clap help
+command used by runtime help and manual-page generation. The legacy daemon
+domain catalogue is part of that tree and is checked against daemon routing;
+completion and `weaver context --json` remain deferred to their assigned
+roadmap items.
+
 #### 2.1.2. Selector and pipeline contract
 
 Selectors are first-class inputs. A selector is any stable way to identify one

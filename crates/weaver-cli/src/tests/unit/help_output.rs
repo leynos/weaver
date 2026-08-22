@@ -5,7 +5,14 @@ use std::{ffi::OsString, io::Cursor, process::ExitCode};
 use rstest::rstest;
 use weaver_config::Config;
 
-use crate::{AppError, ConfigLoader, IoStreams, help, run_with_loader};
+use crate::{
+    AppError,
+    ConfigLoader,
+    IoStreams,
+    command_tree::{self, CommandNode, CommandSemantics},
+    help,
+    run_with_loader,
+};
 
 /// Test-local mirror of the shared configuration help flags.
 /// Must be kept in sync with `SHARED_CONFIG_HELP_FLAGS` in `lib.rs`.
@@ -109,6 +116,39 @@ fn augmented_command_has_expected_arg_structure() {
             format!("{expected_action:?}"),
             "arg --{long} action mismatch"
         );
+    }
+}
+
+#[test]
+fn projected_structured_surface_appears_in_the_shared_help_and_manpage_command() {
+    assert_command_surface(&help::command(), command_tree::root());
+}
+
+fn assert_command_surface(command: &clap::Command, node: &CommandNode) {
+    assert_eq!(command.get_name(), node.verb);
+    for argument in node.arguments {
+        assert!(
+            command
+                .get_arguments()
+                .any(|candidate| candidate.get_long() == Some(argument.long)),
+            "command {:?} is missing projected --{}",
+            node.verb,
+            argument.long,
+        );
+    }
+    for child in node.children {
+        if let CommandSemantics::Structured = child.semantics {
+            let Some(subcommand) = command
+                .get_subcommands()
+                .find(|candidate| candidate.get_name() == child.verb)
+            else {
+                panic!(
+                    "command {:?} is missing projected child {:?}",
+                    node.verb, child.verb
+                );
+            };
+            assert_command_surface(subcommand, child);
+        }
     }
 }
 

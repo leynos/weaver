@@ -372,9 +372,12 @@ This output does not require a configuration file or a running daemon.
 Running `weaver --help` displays the full command reference to standard output
 and exits with code 0. The output includes a purpose statement, quick-start
 examples, global options, the `daemon` subcommand, and a catalogue of all
-domains and operations. It also includes the shared configuration flags
-`--config-path`, `--daemon-socket`, `--log-filter`, `--log-format`,
-`--capability-overrides`, and `--locale` in the `Options:` section:
+domains and operations. A `Commands:` section lists structured command paths
+and their long flags, including
+`definitions get --uri <URI> --position <LINE:COLUMN>`. It also includes the
+shared configuration flags `--config-path`, `--daemon-socket`, `--log-filter`,
+`--log-format`, `--capability-overrides`, and `--locale` in the `Options:`
+section:
 
 ```text
 Domains and operations:

@@ -67,7 +67,7 @@ Boundary classifications for this step are tracked in the
     invariants, and trybuild public API checks.
   - Success: every command-contract task says whether it consumes OrthoConfig,
     wraps it temporarily, or records a deliberate divergence in ADR 007.
-- [ ] 12.1.2. Consume recursive command metadata.
+- [x] 12.1.2. Consume recursive command metadata.
   - Depends on OrthoConfig 6.1.1 and 6.1.2.
   - Success: generated help, manpage, completion, and context output converge
     on the OrthoConfig recursive metadata shape.
