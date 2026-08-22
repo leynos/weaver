@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// Rejection message used when the payload is not a mapping carrying both
+/// required string keys; shared so every rejection path reads identically.
 const MISSING_NS_PKG_MSG: &str = concat!(
     "`r2c-internal-project-depends-on` must define string `namespace` ",
     "and `package` fields",
@@ -12,7 +14,10 @@ const MISSING_NS_PKG_MSG: &str = concat!(
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "Value", into = "Value")]
 pub struct ProjectDependsOnPayload {
+    /// Ecosystem the dependency belongs to, such as `pypi` or `npm`.
     namespace: String,
+    /// Package name within that ecosystem, as published rather than as
+    /// imported.
     package: String,
 }
 
