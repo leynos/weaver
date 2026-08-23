@@ -61,6 +61,7 @@ jobs:
             --rev "${WHITAKER_REV}" \
             whitaker-installer
           whitaker_source_dir="${XDG_DATA_HOME:-${HOME}/.local/share}/whitaker"
+          mkdir -p "$(dirname "${whitaker_source_dir}")"
           git clone https://github.com/leynos/whitaker "${whitaker_source_dir}"
           git -C "${whitaker_source_dir}" checkout --detach "${WHITAKER_REV}"
           whitaker-installer --build-only --no-update --cranelift
