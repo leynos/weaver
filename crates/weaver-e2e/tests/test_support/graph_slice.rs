@@ -9,11 +9,17 @@ use crate::test_support::{TestDaemon, Transcript, run_cli};
 /// Input parameters for a single `observe graph-slice` CLI invocation in tests.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GraphSliceRequest<'a> {
+    /// `file://` Uniform Resource Identifier of the source file to slice.
     pub uri: &'a str,
+    /// 1-indexed source line of the entry position (`--position` line half).
     pub line: u32,
+    /// 1-indexed source column of the entry position (`--position` column half).
     pub column: u32,
+    /// `--entry-detail` value: `"structure"` or `"semantic"`.
     pub entry_detail: &'a str,
+    /// `--node-detail` value: `"structure"` or `"semantic"`.
     pub node_detail: &'a str,
+    /// Optional `--max-cards` budget; omitted when `None`.
     pub max_cards: Option<u32>,
 }
 

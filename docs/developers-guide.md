@@ -80,6 +80,40 @@ If a workflow's behaviour genuinely depends on a feature only present from a
 particular commit onwards, express that as a comment or a changelog note, not
 as a test assertion on the SHA string.
 
+## Whitaker CI setup
+
+CI pins Whitaker, Weaver's external lint engine, to a fixed revision through
+the `WHITAKER_REV` environment variable in `.github/workflows/ci.yml`. The
+`Install Whitaker` step then does three things, in order:
+
+1. Installs the installer binary with:
+
+   ```sh
+   cargo install --locked \
+     --git https://github.com/leynos/whitaker \
+     --rev "${WHITAKER_REV}" \
+     whitaker-installer
+   ```
+
+2. Clones the Whitaker source into
+   `${XDG_DATA_HOME:-${HOME}/.local/share}/whitaker` and checks out
+   `${WHITAKER_REV}` detached.
+3. Runs `whitaker-installer --build-only --no-update --cranelift` to prebuild
+   the Cranelift-accelerated lint libraries.
+
+The clone is a separate step from `cargo install` because the installer
+expects the Whitaker source tree to already exist at that well-known path
+when it builds the lint libraries; `cargo install` only produces the
+installer binary, not the source checkout it operates on. `--no-update` stops
+the installer from fetching a different revision than the one just checked
+out, and `--build-only` skips any installer behaviour beyond compiling the
+libraries. Together, pinning the clone and the installer to the same
+`WHITAKER_REV` and disabling the installer's own update step is what keeps
+the CI lint environment reproducible across runs.
+
+See the [Whitaker user's guide](whitaker-users-guide.md) for day-to-day usage
+of the installed lints.
+
 ## Adding or renaming public commands
 
 ADR 007 makes the 0.1.0 public command surface resource-first and generated
@@ -1233,6 +1267,34 @@ readable after automated wrapping:
   values, and a next-command example derived from the first supported
   provider/refactoring or the `<plugin>` / `<operation>` placeholders. Called
   by the argument-builder when one or more required flags are absent.
+
+## `weaver-lsp-host` BDD world rebuild guarantee
+
+`crates/weaver-lsp-host/src/tests/support/world.rs` defines `TestWorld`, the
+BDD fixture that owns the `LspHost` under test plus its registered stub
+language servers. Steps mutate a `TestWorld` through methods such as
+`request_definition`, `notify_did_open`, and `rebuild_host`, then assert on
+the recorded `last_error`, `last_definition`, `last_references`,
+`last_diagnostics`, or `last_capabilities` fields.
+
+`TestWorld::rebuild_host(overrides)` replaces the host and its stub-server
+registrations using the configs previously set with
+`TestWorld::set_configs`. Registration can fail partway through — for
+example when a config's `initialization_error` causes
+`RecordingLanguageServer::failing_initialize` to report a registration
+failure for one of several stub servers. `rebuild_host` builds the
+replacement `LspHost` and handle map in local variables and only assigns
+them to `self.host` and `self.handles` after every registration in the loop
+has succeeded. A mid-loop failure therefore returns `Err` without mutating
+`self.host`, `self.handles`, or `self.active_overrides`, leaving the
+previously built world exactly as it was before the failed call. Tests that
+want to exercise this path call `set_configs` with a config that is known to
+fail, call `rebuild_host` again, and assert that the pre-existing host and
+handles are unchanged.
+
+This guarantee is specific to `TestWorld::rebuild_host`; other crates
+(`weaverd`, `weaver-sandbox`, `weaver-cli`) have their own internal
+`TestWorld`-style harnesses that are not covered by this section.
 
 ## Act-refactor position parsing and byte-offset conversion
 

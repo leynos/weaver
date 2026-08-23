@@ -1,11 +1,102 @@
 //! Resolves the workspace `weaver` binary for end-to-end tests.
+//!
+//! The resolution rules live in [`resolve_binary_with`], which performs no I/O
+//! of its own: it consults a [`Probe`] holding an environment lookup, a
+//! file-existence predicate, and a build runner. Production code supplies the
+//! real collaborators; tests supply stubs, so every branch — including the
+//! build fallback and its failure modes — is exercised without touching the
+//! process environment or invoking `cargo`.
 
 use std::{
     env,
+    ffi::OsString,
     path::{Path, PathBuf},
     process::Command,
     sync::OnceLock,
 };
+
+#[cfg(test)]
+#[path = "weaver_binary_tests.rs"]
+mod tests;
+
+/// Name of the environment variable Cargo sets for the `weaver` binary.
+///
+/// Cargo only sets this for the crate that owns the binary (`weaver-cli`), so
+/// the lookup never succeeds from `weaver-e2e`; it is honoured anyway so the
+/// resolver stays correct if the module is reused from `weaver-cli`.
+const CARGO_BIN_EXE_VAR: &str = "CARGO_BIN_EXE_weaver";
+
+/// Result of running the workspace build command to completion.
+///
+/// A non-zero exit is not an I/O error, so it is reported as data rather than
+/// as `Err`; the exit status is captured as its rendered form because
+/// `ExitStatus` cannot be constructed portably in tests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum BuildOutcome {
+    /// The build command exited successfully.
+    Succeeded,
+    /// The build command ran to completion but exited non-zero.
+    Failed {
+        /// The rendered exit status, as `ExitStatus` displays it.
+        status: String,
+    },
+}
+
+/// The effectful collaborators the resolution rules depend upon.
+///
+/// Bundling them keeps [`resolve_binary_with`] within the workspace argument
+/// limit and makes the injection points explicit at every call site.
+pub(crate) struct Probe<E, X, B> {
+    /// Reads a process environment variable by name.
+    pub(crate) env_var: E,
+    /// Reports whether a path names an existing regular file.
+    pub(crate) exists: X,
+    /// Runs the workspace build that produces the `weaver` binary.
+    pub(crate) build: B,
+}
+
+/// The locations searched for a prebuilt `weaver` binary, in probe order.
+pub(crate) struct BinaryCandidates {
+    /// The binary sitting beside the running test executable, that is, the
+    /// active Cargo target directory with any trailing `deps` segment stripped.
+    pub(crate) target_dir: PathBuf,
+    /// The conventional `<workspace root>/target/debug/weaver` location, used
+    /// when the tests run from a target directory that holds no CLI binary.
+    pub(crate) target_debug: PathBuf,
+}
+
+impl BinaryCandidates {
+    /// Derives both candidate paths from the running process and the workspace
+    /// layout.
+    ///
+    /// # Errors
+    /// Returns a description if the current executable path or the workspace
+    /// root cannot be determined.
+    fn from_environment() -> Result<Self, String> {
+        Ok(Self {
+            target_dir: target_dir_binary_path()?,
+            target_debug: target_debug_binary_path()?,
+        })
+    }
+
+    /// Returns the first candidate the predicate accepts, or `None` if neither
+    /// exists yet.
+    fn first_existing(&self, exists: &impl Fn(&Path) -> bool) -> Option<PathBuf> {
+        [&self.target_dir, &self.target_debug]
+            .into_iter()
+            .find(|candidate| exists(candidate.as_path()))
+            .cloned()
+    }
+
+    /// Describes both probed locations for inclusion in a failure message.
+    fn describe(&self) -> String {
+        format!(
+            "checked {} and {}",
+            self.target_dir.display(),
+            self.target_debug.display()
+        )
+    }
+}
 
 /// Resolves the `weaver` binary used by e2e tests, building it if necessary.
 ///
@@ -25,50 +116,90 @@ use std::{
 /// Returns a description of why the binary could not be located or built.
 pub(crate) fn resolve_or_build_weaver_binary_path() -> Result<&'static Path, &'static str> {
     static WEAVER_BINARY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
-    match WEAVER_BINARY.get_or_init(resolve_weaver_binary) {
+    memoized_binary_path(&WEAVER_BINARY, resolve_weaver_binary)
+}
+
+/// Runs `resolve` at most once per cell and borrows the cached outcome.
+///
+/// Both success and failure are cached deliberately: a failed build means the
+/// workspace does not compile, which will not right itself mid-run, and
+/// retrying would let every parallel test thread spawn its own `cargo build`.
+///
+/// # Errors
+/// Returns the cached failure description when `resolve` failed.
+pub(crate) fn memoized_binary_path(
+    cell: &OnceLock<Result<PathBuf, String>>,
+    resolve: impl FnOnce() -> Result<PathBuf, String>,
+) -> Result<&Path, &str> {
+    match cell.get_or_init(resolve) {
         Ok(path) => Ok(path.as_path()),
         Err(error) => Err(error.as_str()),
     }
 }
 
+/// Applies the resolution rules with the real filesystem, environment, and
+/// `cargo` collaborators.
+///
+/// # Errors
+/// Returns a description of why the binary could not be located or built.
 fn resolve_weaver_binary() -> Result<PathBuf, String> {
-    if let Some(cargo_bin) = cargo_bin_from_env("weaver") {
-        return Ok(cargo_bin);
-    }
-
-    let target_dir_candidate = target_dir_binary_path("weaver")?;
-    if target_dir_candidate.is_file() {
-        return Ok(target_dir_candidate);
-    }
-
-    let fallback = target_debug_binary_path()?;
-    if fallback.is_file() {
-        return Ok(fallback);
-    }
-
-    build_workspace_binary()?;
-    if target_dir_candidate.is_file() {
-        return Ok(target_dir_candidate);
-    }
-    if fallback.is_file() {
-        return Ok(fallback);
-    }
-
-    Err(format!(
-        "failed to locate built weaver binary after cargo build: checked {} and {}",
-        target_dir_candidate.display(),
-        fallback.display()
-    ))
+    let candidates = BinaryCandidates::from_environment()?;
+    let probe = Probe {
+        env_var: |name: &str| env::var_os(name),
+        exists: |path: &Path| path.is_file(),
+        build: run_workspace_build,
+    };
+    resolve_binary_with(&probe, &candidates)
 }
 
-fn cargo_bin_from_env(name: &str) -> Option<PathBuf> {
-    let variable_name = format!("CARGO_BIN_EXE_{name}");
-    env::var_os(variable_name)
+/// Applies the resolution rules against the supplied collaborators.
+///
+/// The Cargo-provided path wins when it names an existing file; otherwise the
+/// candidates are probed, the build is run once, and the candidates are probed
+/// again.
+///
+/// # Errors
+/// Returns a description when the build fails or when neither candidate exists
+/// after a successful build.
+pub(crate) fn resolve_binary_with<E, X, B>(
+    probe: &Probe<E, X, B>,
+    candidates: &BinaryCandidates,
+) -> Result<PathBuf, String>
+where
+    E: Fn(&str) -> Option<OsString>,
+    X: Fn(&Path) -> bool,
+    B: Fn() -> Result<BuildOutcome, String>,
+{
+    let from_cargo = (probe.env_var)(CARGO_BIN_EXE_VAR)
         .map(PathBuf::from)
-        .filter(|path| path.is_file())
+        .filter(|path| (probe.exists)(path.as_path()));
+    if let Some(path) = from_cargo {
+        return Ok(path);
+    }
+
+    if let Some(found) = candidates.first_existing(&probe.exists) {
+        return Ok(found);
+    }
+
+    if let BuildOutcome::Failed { status } = (probe.build)()? {
+        return Err(format!(
+            "building workspace weaver binary failed with status {status}"
+        ));
+    }
+
+    candidates.first_existing(&probe.exists).ok_or_else(|| {
+        format!(
+            "failed to locate built weaver binary after cargo build: {}",
+            candidates.describe()
+        )
+    })
 }
 
-fn target_dir_binary_path(name: &str) -> Result<PathBuf, String> {
+/// Locates `weaver` beside the running test executable.
+///
+/// # Errors
+/// Returns a description if the current executable path is unavailable.
+fn target_dir_binary_path() -> Result<PathBuf, String> {
     let mut target_dir =
         env::current_exe().map_err(|error| format!("current executable path: {error}"))?;
     target_dir.pop();
@@ -76,17 +207,27 @@ fn target_dir_binary_path(name: &str) -> Result<PathBuf, String> {
         target_dir.pop();
     }
 
-    let binary_path = target_dir.join(format!("{name}{}", env::consts::EXE_SUFFIX));
-    Ok(binary_path)
+    Ok(target_dir.join(weaver_file_name()))
 }
 
+/// Locates `weaver` in the workspace's default debug target directory.
+///
+/// # Errors
+/// Returns a description if the workspace root cannot be determined.
 fn target_debug_binary_path() -> Result<PathBuf, String> {
     Ok(workspace_root()?
         .join("target")
         .join("debug")
-        .join(format!("weaver{}", env::consts::EXE_SUFFIX)))
+        .join(weaver_file_name()))
 }
 
+/// Returns the platform-specific file name of the `weaver` executable.
+fn weaver_file_name() -> String { format!("weaver{}", env::consts::EXE_SUFFIX) }
+
+/// Returns the workspace root, derived from this crate's manifest directory.
+///
+/// # Errors
+/// Returns a description if the manifest directory has no grandparent.
 fn workspace_root() -> Result<PathBuf, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_dir
@@ -96,7 +237,12 @@ fn workspace_root() -> Result<PathBuf, String> {
         .ok_or_else(|| String::from("workspace root should exist for e2e tests"))
 }
 
-fn build_workspace_binary() -> Result<(), String> {
+/// Builds the workspace `weaver` binary with `cargo`.
+///
+/// # Errors
+/// Returns a description if `cargo` could not be spawned; a non-zero exit is
+/// reported as [`BuildOutcome::Failed`] rather than as an error.
+fn run_workspace_build() -> Result<BuildOutcome, String> {
     let status = Command::new("cargo")
         .current_dir(workspace_root()?)
         .args(["build", "-p", "weaver-cli", "--bin", "weaver"])
@@ -104,10 +250,10 @@ fn build_workspace_binary() -> Result<(), String> {
         .map_err(|error| format!("failed to build workspace weaver binary: {error}"))?;
 
     if status.success() {
-        Ok(())
+        Ok(BuildOutcome::Succeeded)
     } else {
-        Err(format!(
-            "building workspace weaver binary failed with status {status}"
-        ))
+        Ok(BuildOutcome::Failed {
+            status: status.to_string(),
+        })
     }
 }
