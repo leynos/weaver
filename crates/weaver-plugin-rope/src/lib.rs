@@ -5,6 +5,7 @@
 //! executes a refactoring operation, and writes one JSONL response to stdout.
 
 mod arguments;
+mod rename;
 mod workspace_fs;
 
 #[cfg(test)]
@@ -13,7 +14,7 @@ mod tests;
 use std::{
     fmt,
     io::{BufRead, Write},
-    path::{Component, Path, PathBuf},
+    path::PathBuf,
     process::Command,
 };
 
@@ -86,7 +87,7 @@ impl RopeAdapter for PythonRopeAdapter {
             TempDir::new().map_err(|source| RopeAdapterError::WorkspaceCreate { source })?;
         write_workspace_file(workspace.path(), file.path(), file.content())?;
 
-        let relative_path = path_to_slash(file.path());
+        let relative_path = rename::path_to_slash(file.path());
         let mut command = Command::new(PYTHON_BINARY);
         command.arg("-c");
         command.arg(PYTHON_RENAME_SCRIPT);
@@ -311,7 +312,7 @@ fn execute_rename<R: RopeAdapter>(
         }
     };
 
-    validate_relative_path(file.path()).map_err(|error| {
+    rename::validate_relative_path(file.path()).map_err(|error| {
         PluginFailure::with_reason(error.to_string(), ReasonCode::IncompletePayload)
     })?;
 
@@ -331,72 +332,10 @@ fn execute_rename<R: RopeAdapter>(
         ));
     }
 
-    let patch = build_search_replace_patch(file.path(), file.content(), &modified);
+    let patch = rename::build_search_replace_patch(file.path(), file.content(), &modified);
     Ok(PluginResponse::success(PluginOutput::Diff {
         content: patch,
     }))
-}
-
-/// Rejects paths that could escape the sandboxed workspace: absolute paths,
-/// `..` traversal, and Windows drive/UNC prefixes.
-fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {
-    if path.is_absolute() {
-        return Err(RopeAdapterError::InvalidPath {
-            message: String::from("absolute paths are not allowed"),
-        });
-    }
-
-    if path.components().any(|c| matches!(c, Component::ParentDir)) {
-        return Err(RopeAdapterError::InvalidPath {
-            message: String::from("path traversal is not allowed"),
-        });
-    }
-    if path.components().any(|c| matches!(c, Component::Prefix(_))) {
-        return Err(RopeAdapterError::InvalidPath {
-            message: String::from("windows path prefixes are not allowed"),
-        });
-    }
-
-    Ok(())
-}
-
-/// Renders a whole-file rewrite as a Weaver SEARCH/REPLACE patch. Rope returns
-/// complete file contents rather than a diff, so the whole original body forms
-/// the search block; trailing newlines are supplied when absent so each block
-/// terminator starts on its own line.
-fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> String {
-    let unix_path = path_to_slash(path);
-    let sep_after_original = if original.ends_with('\n') { "" } else { "\n" };
-    let sep_after_modified = if modified.ends_with('\n') { "" } else { "\n" };
-
-    format!(
-        concat!(
-            "diff --git a/{unix_path} b/{unix_path}\n",
-            "<<<<<<< SEARCH\n",
-            "{original}{sep_a}",
-            "=======\n",
-            "{modified}{sep_b}",
-            ">>>>>>> REPLACE\n",
-        ),
-        unix_path = unix_path,
-        original = original,
-        sep_a = sep_after_original,
-        modified = modified,
-        sep_b = sep_after_modified,
-    )
-}
-
-/// Renders a workspace-relative path with forward slashes for patch headers.
-/// Only [`Component::Normal`] segments survive, so output is platform-stable;
-/// callers must first reject escaping paths via [`validate_relative_path`].
-fn path_to_slash(path: &Path) -> String {
-    path.components()
-        .filter_map(|component| match component {
-            Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
-            _ => None,
-        })
-        .collect::<Vec<String>>()
-        .join("/")
 }
 
 /// Wraps a [`PluginFailure`] as a protocol response carrying one error
