@@ -243,28 +243,54 @@ fn accept_before_deadline(listener: &TcpListener) -> Result<TcpStream, String> {
     let deadline = Instant::now() + ACCEPT_TIMEOUT;
     loop {
         match listener.accept() {
-            Ok((stream, _)) => {
-                stream
-                    .set_nonblocking(false)
-                    .map_err(|error| format!("blocking mode should be supported: {error}"))?;
-                return Ok(stream);
-            }
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                if Instant::now() >= deadline {
-                    return Err(format!(
-                        "test daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
-                    ));
-                }
-                thread::sleep(ACCEPT_POLL_INTERVAL);
-            }
-            Err(error) => {
-                return Err(format!(
-                    "test daemon listener {} failed before {ACCEPT_TIMEOUT:?}: {error}",
-                    listener_address(listener)
-                ));
-            }
+            Ok((stream, _)) => return restore_blocking_stream(stream),
+            Err(error) => handle_accept_error(&error, deadline, listener)?,
         }
     }
+}
+
+/// Returns an accepted `stream` to blocking mode before handing it on.
+///
+/// The listener polls non-blocking, so an accepted stream inherits that mode
+/// and must be reset before the handler reads from it.
+///
+/// # Errors
+/// Returns a description if the stream rejects blocking mode.
+fn restore_blocking_stream(stream: TcpStream) -> Result<TcpStream, String> {
+    stream
+        .set_nonblocking(false)
+        .map_err(|error| format!("blocking mode should be supported: {error}"))?;
+    Ok(stream)
+}
+
+/// Decides whether an accept failure should be retried or reported.
+///
+/// Returns `Ok(())` once it has slept for [`ACCEPT_POLL_INTERVAL`], meaning the
+/// caller should poll again.
+///
+/// # Errors
+/// Returns the timeout diagnostic when `error` is `WouldBlock` at or after
+/// `deadline`, and the listener diagnostic for any other failure.
+fn handle_accept_error(
+    error: &io::Error,
+    deadline: Instant,
+    listener: &TcpListener,
+) -> Result<(), String> {
+    if error.kind() != io::ErrorKind::WouldBlock {
+        return Err(format!(
+            "test daemon listener {} failed before {ACCEPT_TIMEOUT:?}: {error}",
+            listener_address(listener)
+        ));
+    }
+
+    if Instant::now() >= deadline {
+        return Err(format!(
+            "test daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
+        ));
+    }
+
+    thread::sleep(ACCEPT_POLL_INTERVAL);
+    Ok(())
 }
 
 /// Renders the listener's local address for a diagnostic, falling back to a
