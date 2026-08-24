@@ -1,0 +1,12 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+#
+# The seed below was produced by deliberately bypassing the OnceLock in
+# memoized_binary_path so the resolver ran once per caller, to prove
+# prop_racing_callers_share_one_cached_outcome can fail. It is the smallest
+# case that detects a lost memoization: two callers and a one-segment path.
+cc 3680cfdadf8a0ece6744686ddaa3fb2f28488377431ea4c06170966b88760c4c # shrinks to outcome = Ok("/a"), callers = 2

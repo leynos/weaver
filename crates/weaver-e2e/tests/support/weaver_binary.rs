@@ -10,11 +10,17 @@
 use std::{
     env,
     ffi::OsString,
+    io::ErrorKind,
     path::{Path, PathBuf},
     process::Command,
     sync::OnceLock,
 };
 
+use cap_std::{ambient_authority, fs::Dir};
+
+#[cfg(test)]
+#[path = "weaver_binary_cache_tests.rs"]
+mod cache_tests;
 #[cfg(test)]
 #[path = "weaver_binary_tests.rs"]
 mod tests;
@@ -50,6 +56,10 @@ pub(crate) struct Probe<E, X, B> {
     /// Reads a process environment variable by name.
     pub(crate) env_var: E,
     /// Reports whether a path names an existing regular file.
+    ///
+    /// The callback is fallible so that an inaccessible path — a permissions
+    /// failure, say — is reported as an error rather than being flattened into
+    /// "absent", which would send the resolver off to run a pointless build.
     pub(crate) exists: X,
     /// Runs the workspace build that produces the `weaver` binary.
     pub(crate) build: B,
@@ -81,11 +91,20 @@ impl BinaryCandidates {
 
     /// Returns the first candidate the predicate accepts, or `None` if neither
     /// exists yet.
-    fn first_existing(&self, exists: &impl Fn(&Path) -> bool) -> Option<PathBuf> {
-        [&self.target_dir, &self.target_debug]
-            .into_iter()
-            .find(|candidate| exists(candidate.as_path()))
-            .cloned()
+    ///
+    /// # Errors
+    /// Returns the predicate's error as soon as one candidate cannot be
+    /// inspected; later candidates are then left unprobed.
+    fn first_existing(
+        &self,
+        exists: &impl Fn(&Path) -> Result<bool, String>,
+    ) -> Result<Option<PathBuf>, String> {
+        for candidate in [&self.target_dir, &self.target_debug] {
+            if exists(candidate.as_path())? {
+                return Ok(Some(candidate.clone()));
+            }
+        }
+        Ok(None)
     }
 
     /// Describes both probed locations for inclusion in a failure message.
@@ -146,10 +165,61 @@ fn resolve_weaver_binary() -> Result<PathBuf, String> {
     let candidates = BinaryCandidates::from_environment()?;
     let probe = Probe {
         env_var: |name: &str| env::var_os(name),
-        exists: |path: &Path| path.is_file(),
+        exists: is_regular_file,
         build: run_workspace_build,
     };
     resolve_binary_with(&probe, &candidates)
+}
+
+/// Reports whether `path` names an existing regular file.
+///
+/// This deliberately does not use [`Path::is_file`], which collapses every
+/// metadata failure into `false`. Only [`ErrorKind::NotFound`] means "absent";
+/// anything else — a permissions failure on the parent directory, for instance
+/// — is a genuine filesystem error and is reported as one, so the resolver
+/// never mistakes an unreadable binary for a missing one and never runs a
+/// build that could not possibly fix the problem.
+///
+/// The stat goes through a [`Dir`] capability opened on the parent rather than
+/// through `std::fs`, per the workspace's capability-based filesystem policy.
+/// Opening the parent is itself the first half of the distinction: a parent
+/// that does not exist means the candidate is absent, whereas a parent that
+/// exists but cannot be opened is an error.
+///
+/// # Errors
+/// Returns a description when the path has no parent or no file name, or when
+/// the parent directory or the candidate's metadata cannot be read for any
+/// reason other than not existing.
+fn is_regular_file(path: &Path) -> Result<bool, String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("candidate weaver binary has no parent: {}", path.display()))?;
+    let file_name = path.file_name().ok_or_else(|| {
+        format!(
+            "candidate weaver binary has no file name: {}",
+            path.display()
+        )
+    })?;
+
+    let dir = match Dir::open_ambient_dir(parent, ambient_authority()) {
+        Ok(dir) => dir,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(format!(
+                "failed to open directory holding candidate weaver binary {}: {error}",
+                parent.display()
+            ));
+        }
+    };
+
+    match dir.metadata(file_name) {
+        Ok(metadata) => Ok(metadata.is_file()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(format!(
+            "failed to inspect candidate weaver binary {}: {error}",
+            path.display()
+        )),
+    }
 }
 
 /// Applies the resolution rules against the supplied collaborators.
@@ -159,25 +229,26 @@ fn resolve_weaver_binary() -> Result<PathBuf, String> {
 /// again.
 ///
 /// # Errors
-/// Returns a description when the build fails or when neither candidate exists
-/// after a successful build.
+/// Returns a description when a candidate cannot be inspected, when the build
+/// fails, or when neither candidate exists after a successful build. An
+/// existence-probe failure short-circuits before the build runs.
 pub(crate) fn resolve_binary_with<E, X, B>(
     probe: &Probe<E, X, B>,
     candidates: &BinaryCandidates,
 ) -> Result<PathBuf, String>
 where
     E: Fn(&str) -> Option<OsString>,
-    X: Fn(&Path) -> bool,
+    X: Fn(&Path) -> Result<bool, String>,
     B: Fn() -> Result<BuildOutcome, String>,
 {
-    let from_cargo = (probe.env_var)(CARGO_BIN_EXE_VAR)
-        .map(PathBuf::from)
-        .filter(|path| (probe.exists)(path.as_path()));
-    if let Some(path) = from_cargo {
+    let from_cargo = (probe.env_var)(CARGO_BIN_EXE_VAR).map(PathBuf::from);
+    if let Some(path) = from_cargo
+        && (probe.exists)(path.as_path())?
+    {
         return Ok(path);
     }
 
-    if let Some(found) = candidates.first_existing(&probe.exists) {
+    if let Some(found) = candidates.first_existing(&probe.exists)? {
         return Ok(found);
     }
 
@@ -187,7 +258,7 @@ where
         ));
     }
 
-    candidates.first_existing(&probe.exists).ok_or_else(|| {
+    candidates.first_existing(&probe.exists)?.ok_or_else(|| {
         format!(
             "failed to locate built weaver binary after cargo build: {}",
             candidates.describe()

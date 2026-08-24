@@ -4,6 +4,13 @@
 //! daemon, transcript capture, and snapshot assertion. Command-specific request
 //! builders live in sibling files (`get_card.rs`, `graph_slice.rs`) so that each
 //! test binary compiles only the helpers it actually uses.
+//!
+//! Every fallible operation here reports failure as `Result<_, String>` and is
+//! propagated to the test boundary. `String` is the error type because nothing
+//! in the harness ever matches on a failure — the only consumer is a test that
+//! renders the description and stops — so an enum would add variants with no
+//! reader. It also composes directly with the resolver's existing
+//! `Result<PathBuf, String>` cache contract.
 
 use std::{
     io,
@@ -49,101 +56,144 @@ pub(crate) struct Transcript {
 pub(crate) struct TestDaemon {
     address: SocketAddr,
     backend_manager: BackendManager,
-    join_handle: Option<thread::JoinHandle<()>>,
+    join_handle: Option<thread::JoinHandle<Result<(), String>>>,
 }
 
 impl TestDaemon {
     /// Starts the daemon, binding to an ephemeral loopback port and awaiting `expected_requests`
     /// connections.
-    pub(crate) fn start(expected_requests: usize) -> Self {
+    ///
+    /// # Errors
+    /// Returns a description if the CLI binary cannot be located, the loopback
+    /// listener cannot be bound, the working directory is unavailable, or the
+    /// dispatch handler rejects the workspace root.
+    pub(crate) fn start(expected_requests: usize) -> Result<Self, String> {
         // Resolve (and if necessary build) the CLI before the daemon starts
         // serving, so a missing binary fails with a clear message up front.
-        let _binary = required_result(
-            resolve_or_build_weaver_binary_path(),
-            "locate weaver binary",
-        );
-        let listener = required_result(TcpListener::bind(("127.0.0.1", 0)), "bind test listener");
-        let address = required_result(listener.local_addr(), "listener address");
-        let config = Config {
-            daemon_socket: SocketEndpoint::tcp("127.0.0.1", 0),
-            ..Config::default()
-        };
-        let provider =
-            SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-        let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
-        let backend_manager = BackendManager::new(Arc::clone(&backends));
-        let workspace_root = required_result(std::env::current_dir(), "workspace root");
-        let endpoint = format!("tcp://{address}");
-        let handler = Arc::new(required_result(
-            DispatchConnectionHandler::new(
-                backend_manager.clone(),
-                workspace_root,
-                endpoint,
-                std::env::temp_dir(),
-            ),
-            "absolute workspace root",
-        ));
+        resolve_or_build_weaver_binary_path()
+            .map_err(|error| format!("locate weaver binary: {error}"))?;
+        let listener = TcpListener::bind(("127.0.0.1", 0))
+            .map_err(|error| format!("bind test listener: {error}"))?;
+        let address = listener
+            .local_addr()
+            .map_err(|error| format!("listener address: {error}"))?;
+        let backend_manager = BackendManager::new(new_backends());
+        let handler = Arc::new(new_handler(&backend_manager, address)?);
 
-        let join_handle = thread::spawn(move || {
-            serve_requests(&listener, expected_requests, &handler);
-        });
+        let join_handle =
+            thread::spawn(move || serve_requests(&listener, expected_requests, &handler));
 
-        Self {
+        Ok(Self {
             address,
             backend_manager,
             join_handle: Some(join_handle),
-        }
+        })
     }
 
     /// Returns the `tcp://<addr>` string the CLI passes to `--daemon-socket`.
     pub(crate) fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
     /// Returns the daemon's current card-cache statistics.
-    pub(crate) fn cache_stats(&self) -> weaver_cards::CacheStats {
-        let stats = self
-            .backend_manager
+    ///
+    /// # Errors
+    /// Returns a description if the backend registry cannot be locked.
+    pub(crate) fn cache_stats(&self) -> Result<weaver_cards::CacheStats, String> {
+        self.backend_manager
             .with_backends(|backends| backends.provider().card_extractor().cache_stats())
-            .map_err(|error| error.to_string());
-        required_result(stats, "cache stats should be available")
+            .map_err(|error| format!("cache stats should be available: {error}"))
     }
 
-    /// Waits for the daemon thread to finish and asserts all expected requests were served.
-    pub(crate) fn join(mut self) {
-        let join_handle = required_result(
-            self.join_handle.take().ok_or("daemon join handle missing"),
-            "daemon join handle",
-        );
-        if let Err(panic_payload) = join_handle.join() {
-            std::panic::resume_unwind(panic_payload);
+    /// Waits for the daemon thread to finish and confirms all expected requests
+    /// were served.
+    ///
+    /// # Errors
+    /// Returns a description if the handle has already been taken, if the
+    /// serving loop failed, or if the cache statistics are unreachable
+    /// afterwards. A panic on the daemon thread is re-raised on this thread so
+    /// its original location survives.
+    pub(crate) fn join(mut self) -> Result<(), String> {
+        let join_handle = self
+            .join_handle
+            .take()
+            .ok_or_else(|| String::from("daemon join handle missing"))?;
+        match join_handle.join() {
+            Ok(served) => served?,
+            Err(panic_payload) => std::panic::resume_unwind(panic_payload),
         }
-        let _ = self.cache_stats();
+        self.cache_stats()?;
+        Ok(())
     }
 }
 
+/// Builds the shared fusion backend registry the test daemon serves from.
+fn new_backends() -> Arc<Mutex<FusionBackends<SemanticBackendProvider>>> {
+    let config = Config {
+        daemon_socket: SocketEndpoint::tcp("127.0.0.1", 0),
+        ..Config::default()
+    };
+    let provider =
+        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
+    Arc::new(Mutex::new(FusionBackends::new(config, provider)))
+}
+
+/// Builds the dispatch handler serving requests for `address`.
+///
+/// # Errors
+/// Returns a description if the current working directory is unavailable or
+/// the handler rejects it as a workspace root.
+fn new_handler(
+    backend_manager: &BackendManager,
+    address: SocketAddr,
+) -> Result<DispatchConnectionHandler, String> {
+    let workspace_root =
+        std::env::current_dir().map_err(|error| format!("workspace root: {error}"))?;
+    DispatchConnectionHandler::new(
+        backend_manager.clone(),
+        workspace_root,
+        format!("tcp://{address}"),
+        std::env::temp_dir(),
+    )
+    .map_err(|error| format!("absolute workspace root: {error}"))
+}
+
 /// Writes a card fixture file into `temp_dir` and returns its `file://` URI string.
-pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
-    let path = required_result(
-        write_fixture_path(temp_dir, case.file_name, case.source),
-        "write fixture path",
-    );
-    let uri = Url::from_file_path(&path).map_err(|()| "fixture path to URI".to_owned());
-    required_result(uri, "fixture path to URI").to_string()
+///
+/// # Errors
+/// Returns a description if the fixture cannot be written or if its path has no
+/// `file://` URI representation.
+pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> Result<String, String> {
+    let path = write_fixture_path(temp_dir, case.file_name, case.source)
+        .map_err(|error| format!("write fixture path: {error}"))?;
+    path_uri(&path)
+}
+
+/// Converts a filesystem path into its `file://` URI string.
+///
+/// # Errors
+/// Returns a description if the path cannot be expressed as a `file://` URI,
+/// which `url` reports for relative paths.
+pub(crate) fn path_uri(path: &Path) -> Result<String, String> {
+    Url::from_file_path(path)
+        .map(|uri| uri.to_string())
+        .map_err(|()| format!("fixture path to URI: {}", path.display()))
 }
 
 /// Runs the `weaver` CLI with `cli_args` and captures the result as a `Transcript`.
 ///
 /// `command` is the sanitised display form recorded in the snapshot, with the
 /// ephemeral endpoint and temporary paths already replaced by placeholders.
-pub(crate) fn run_cli(command: String, cli_args: &[String]) -> Transcript {
-    let binary = required_result(
-        resolve_or_build_weaver_binary_path(),
-        "locate weaver binary",
-    );
-    let output = required_result(
-        assert_cmd::Command::new(binary).args(cli_args).output(),
-        "CLI should execute",
-    );
-    output_to_transcript(command, &output)
+///
+/// # Errors
+/// Returns a description if the CLI binary cannot be located or if the process
+/// cannot be spawned and run to completion.
+pub(crate) fn run_cli(command: String, cli_args: &[String]) -> Result<Transcript, String> {
+    let binary = resolve_or_build_weaver_binary_path()
+        .map_err(|error| format!("locate weaver binary: {error}"))?;
+    let output = assert_cmd::Command::new(binary)
+        .args(cli_args)
+        .output()
+        .map_err(|error| format!("CLI should execute: {error}"))?;
+    Ok(output_to_transcript(command, &output))
 }
 
 /// Asserts an insta snapshot stored under `tests/snapshots/<name>.snap`.
@@ -160,50 +210,69 @@ pub(crate) fn assert_named_snapshot(name: &str, content: &str) {
     });
 }
 
+/// Serves exactly `expected_requests` connections, then returns.
+///
+/// Runs on the daemon thread, so its outcome is surfaced by
+/// [`TestDaemon::join`] rather than being raised here.
+///
+/// # Errors
+/// Returns a description if the listener rejects non-blocking mode or if any
+/// connection fails to arrive before the accept deadline.
 fn serve_requests(
     listener: &TcpListener,
     expected_requests: usize,
     handler: &Arc<DispatchConnectionHandler>,
-) {
-    required_result(
-        listener.set_nonblocking(true),
-        "non-blocking mode should be supported",
-    );
+) -> Result<(), String> {
+    listener
+        .set_nonblocking(true)
+        .map_err(|error| format!("non-blocking mode should be supported: {error}"))?;
     for _ in 0..expected_requests {
-        let stream = accept_before_deadline(listener);
+        let stream = accept_before_deadline(listener)?;
         handler.handle(ConnectionStream::Tcp(stream));
     }
+    Ok(())
 }
 
-fn accept_before_deadline(listener: &TcpListener) -> TcpStream {
+/// Polls `listener` until one connection arrives or [`ACCEPT_TIMEOUT`] elapses.
+///
+/// # Errors
+/// Returns a description if the deadline passes with no connection, if the
+/// listener itself fails, or if the accepted stream cannot be returned to
+/// blocking mode.
+fn accept_before_deadline(listener: &TcpListener) -> Result<TcpStream, String> {
     let deadline = Instant::now() + ACCEPT_TIMEOUT;
     loop {
         match listener.accept() {
             Ok((stream, _)) => {
-                required_result(
-                    stream.set_nonblocking(false),
-                    "blocking mode should be supported",
-                );
-                return stream;
+                stream
+                    .set_nonblocking(false)
+                    .map_err(|error| format!("blocking mode should be supported: {error}"))?;
+                return Ok(stream);
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                assert!(
-                    Instant::now() < deadline,
-                    "test daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
-                );
+                if Instant::now() >= deadline {
+                    return Err(format!(
+                        "test daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
+                    ));
+                }
                 thread::sleep(ACCEPT_POLL_INTERVAL);
             }
             Err(error) => {
-                let listener_address = listener
-                    .local_addr()
-                    .map_or_else(|_| String::from("<unknown>"), |address| address.to_string());
-                panic!(
-                    "test daemon listener {listener_address} failed before {ACCEPT_TIMEOUT:?}: \
-                     {error}"
-                );
+                return Err(format!(
+                    "test daemon listener {} failed before {ACCEPT_TIMEOUT:?}: {error}",
+                    listener_address(listener)
+                ));
             }
         }
     }
+}
+
+/// Renders the listener's local address for a diagnostic, falling back to a
+/// placeholder when even that lookup fails.
+fn listener_address(listener: &TcpListener) -> String {
+    listener
+        .local_addr()
+        .map_or_else(|_| String::from("<unknown>"), |address| address.to_string())
 }
 
 fn output_to_transcript(command: String, output: &Output) -> Transcript {
@@ -269,17 +338,5 @@ fn normalize_message_value(value: &mut serde_json::Value) {
         if let Some((prefix, _)) = message.split_once("/tmp/") {
             *message = format!("{prefix}<path>");
         }
-    }
-}
-
-/// The single intentional panic boundary of this harness.
-///
-/// Setup failures inside an end-to-end fixture cannot be reported to the test
-/// body without threading `Result` through every rstest fixture, so they are
-/// converted here into a panic carrying `context`.
-fn required_result<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
-    match result {
-        Ok(resolved) => resolved,
-        Err(error) => panic!("{context}: {error}"),
     }
 }

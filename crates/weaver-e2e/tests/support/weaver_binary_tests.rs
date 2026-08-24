@@ -6,27 +6,27 @@
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},
-    sync::{
-        OnceLock,
-        atomic::{AtomicUsize, Ordering},
-    },
-    thread,
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use rstest::rstest;
 
-use super::{BinaryCandidates, BuildOutcome, Probe, memoized_binary_path, resolve_binary_with};
+use super::{
+    BinaryCandidates,
+    BuildOutcome,
+    Probe,
+    cache_tests::race_memoized,
+    resolve_binary_with,
+};
 
 /// Boxed environment lookup backed by [`Stubs`].
 type EnvStub<'a> = Box<dyn Fn(&str) -> Option<OsString> + 'a>;
-/// Boxed file-existence predicate backed by [`Stubs`].
-type ExistsStub<'a> = Box<dyn Fn(&Path) -> bool + 'a>;
+/// Boxed fallible file-existence predicate backed by [`Stubs`].
+type ExistsStub<'a> = Box<dyn Fn(&Path) -> Result<bool, String> + 'a>;
 /// Boxed build runner backed by [`Stubs`].
 type BuildStub<'a> = Box<dyn Fn() -> Result<BuildOutcome, String> + 'a>;
 /// A [`Probe`] assembled entirely from stubbed collaborators.
 type StubProbe<'a> = Probe<EnvStub<'a>, ExistsStub<'a>, BuildStub<'a>>;
-/// Shared cache cell used by the concurrency cases.
-type ResolutionCell = OnceLock<Result<PathBuf, String>>;
 
 /// Path Cargo would report through `CARGO_BIN_EXE_weaver`.
 const CARGO_BIN: &str = "/cargo/target/debug/weaver";
@@ -57,6 +57,9 @@ struct Stubs {
     existing_after_build: Vec<PathBuf>,
     /// Result the build runner yields.
     outcome: Result<BuildOutcome, String>,
+    /// When set, every existence probe fails with this description instead of
+    /// answering from the path lists.
+    exists_error: Option<String>,
     /// Number of times the build runner has been invoked.
     builds: AtomicUsize,
 }
@@ -70,6 +73,7 @@ impl Stubs {
             existing_before_build: Vec::new(),
             existing_after_build: Vec::new(),
             outcome: Ok(BuildOutcome::Succeeded),
+            exists_error: None,
             builds: AtomicUsize::new(0),
         }
     }
@@ -100,6 +104,13 @@ impl Stubs {
         self
     }
 
+    /// Makes every existence probe fail, standing in for a filesystem error
+    /// such as a permissions failure on a candidate's parent directory.
+    fn with_exists_error(mut self, message: &str) -> Self {
+        self.exists_error = Some(String::from(message));
+        self
+    }
+
     /// Number of build invocations recorded so far.
     fn build_count(&self) -> usize { self.builds.load(Ordering::SeqCst) }
 
@@ -122,13 +133,20 @@ impl Stubs {
 
     /// Reports whether the path exists, switching to the post-build view once
     /// the build runner has been called.
-    fn path_exists(&self, path: &Path) -> bool {
+    ///
+    /// # Errors
+    /// Returns the configured description when [`Stubs::with_exists_error`] has
+    /// been applied.
+    fn path_exists(&self, path: &Path) -> Result<bool, String> {
+        if let Some(error) = self.exists_error.as_ref() {
+            return Err(error.clone());
+        }
         let known = if self.build_count() == 0 {
             &self.existing_before_build
         } else {
             &self.existing_after_build
         };
-        known.iter().any(|candidate| candidate == path)
+        Ok(known.iter().any(|candidate| candidate == path))
     }
 
     /// Records a build invocation and yields the configured result.
@@ -235,42 +253,33 @@ fn build_spawn_failure_propagates() {
     );
 }
 
+/// A filesystem failure while probing a candidate must not be read as "the
+/// binary is missing", because that would send the resolver off to run a build
+/// that cannot fix the problem. Both entry points into the probe are covered:
+/// the Cargo-provided path and the two conventional candidates.
+#[rstest]
+#[case::cargo_provided_path(Some(CARGO_BIN))]
+#[case::probed_candidates(None)]
+fn existence_probe_failure_propagates_without_building(#[case] env_value: Option<&str>) {
+    const PERMISSION_DENIED: &str = "failed to inspect candidate weaver binary: permission denied";
+
+    let mut stubs = Stubs::new().with_exists_error(PERMISSION_DENIED);
+    if let Some(value) = env_value {
+        stubs = stubs.with_env(value);
+    }
+
+    let error = resolve(&stubs).expect_err("an unreadable candidate should fail resolution");
+
+    assert_eq!(error, PERMISSION_DENIED);
+    assert_eq!(
+        stubs.build_count(),
+        0,
+        "a probe failure should short-circuit before the build runs"
+    );
+}
+
 /// Number of threads racing the memoizing shell.
 const RACING_THREADS: usize = 8;
-
-/// Resolves through `cell` from several threads at once and returns each
-/// thread's view of the cached outcome alongside the resolver call count.
-fn race_memoized(outcome: &Result<PathBuf, String>) -> (Vec<Result<PathBuf, String>>, usize) {
-    let cell = ResolutionCell::new();
-    let calls = AtomicUsize::new(0);
-
-    let seen = thread::scope(|scope| {
-        let handles: Vec<_> = (0..RACING_THREADS)
-            .map(|_| scope.spawn(|| observe_cached(&cell, &calls, outcome)))
-            .collect();
-        handles
-            .into_iter()
-            .map(|handle| handle.join().expect("racing thread should not panic"))
-            .collect::<Vec<_>>()
-    });
-
-    (seen, calls.load(Ordering::SeqCst))
-}
-
-/// Reads the cached outcome through the memoizing shell, counting how often the
-/// resolver itself runs, and returns an owned copy of what this caller saw.
-fn observe_cached(
-    cell: &ResolutionCell,
-    calls: &AtomicUsize,
-    outcome: &Result<PathBuf, String>,
-) -> Result<PathBuf, String> {
-    memoized_binary_path(cell, || {
-        calls.fetch_add(1, Ordering::SeqCst);
-        outcome.clone()
-    })
-    .map(Path::to_path_buf)
-    .map_err(str::to_owned)
-}
 
 #[rstest]
 #[case::success(Ok(PathBuf::from(TARGET_DIR_BIN)))]
@@ -278,7 +287,7 @@ fn observe_cached(
     "building workspace weaver binary failed with status exit status: 101"
 )))]
 fn concurrent_callers_share_one_cached_outcome(#[case] outcome: Result<PathBuf, String>) {
-    let (seen, calls) = race_memoized(&outcome);
+    let (seen, calls) = race_memoized(RACING_THREADS, &outcome);
 
     assert_eq!(calls, 1, "the resolver should run exactly once");
     assert!(

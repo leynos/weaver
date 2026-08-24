@@ -26,7 +26,14 @@ pub(crate) struct GetCardRequest<'a> {
 }
 
 /// Executes `weaver observe get-card` via the test daemon and returns a `Transcript`.
-pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> Transcript {
+///
+/// # Errors
+/// Returns a description if the CLI binary cannot be located or the invocation
+/// cannot be run to completion.
+pub(crate) fn run_get_card(
+    daemon: &TestDaemon,
+    request: GetCardRequest<'_>,
+) -> Result<Transcript, String> {
     let position = format!("{}:{}", request.line, request.column);
     let command = format!(
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri \
