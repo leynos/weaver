@@ -40,6 +40,26 @@ struct SnapshotHarness {
 }
 
 impl SnapshotHarness {
+    /// Creates a temporary workspace and delegates fixture-specific URI
+    /// creation to `build_uri`.
+    ///
+    /// The `TempDir` is retained in the returned [`WorkspaceUri`] so the
+    /// workspace outlives the URI it produced.
+    ///
+    /// # Errors
+    /// Returns a description if the temporary directory cannot be created, or
+    /// whatever `build_uri` reports.
+    fn workspace_with(
+        build_uri: impl FnOnce(&TempDir) -> Result<String, String>,
+    ) -> Result<WorkspaceUri, String> {
+        let temp_dir = TempDir::new().map_err(|error| format!("creating temp dir: {error}"))?;
+        let uri = build_uri(&temp_dir)?;
+        Ok(WorkspaceUri {
+            _temp_dir: temp_dir,
+            uri,
+        })
+    }
+
     /// Writes `case` into a fresh temporary workspace and returns its URI.
     ///
     /// # Errors
@@ -48,12 +68,7 @@ impl SnapshotHarness {
     fn workspace_for_case(
         case: weaver_e2e::card_fixtures::CardFixtureCase,
     ) -> Result<WorkspaceUri, String> {
-        let temp_dir = TempDir::new().map_err(|error| format!("creating temp dir: {error}"))?;
-        let uri = fixture_uri(&temp_dir, case)?;
-        Ok(WorkspaceUri {
-            _temp_dir: temp_dir,
-            uri,
-        })
+        Self::workspace_with(|temp_dir| fixture_uri(temp_dir, case))
     }
 
     /// Builds a workspace holding a file the language router cannot classify.
@@ -62,12 +77,7 @@ impl SnapshotHarness {
     /// Returns a description if the temporary directory or the fixture file
     /// cannot be created.
     fn unsupported_workspace() -> Result<WorkspaceUri, String> {
-        let temp_dir = TempDir::new().map_err(|error| format!("creating temp dir: {error}"))?;
-        let uri = unsupported_fixture_uri(&temp_dir)?;
-        Ok(WorkspaceUri {
-            _temp_dir: temp_dir,
-            uri,
-        })
+        Self::workspace_with(unsupported_fixture_uri)
     }
 
     /// Starts a daemon expecting `expected_requests`, or the harness default.
