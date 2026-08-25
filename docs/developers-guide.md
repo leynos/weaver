@@ -45,6 +45,13 @@ repository's 400-line limit.
 
 The workspace targets `ortho_config` v0.9.0 and Rust 1.89.
 
+## Workspace lint policy
+
+The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates
+that opt into `[lints] workspace = true` must therefore document their private
+items as well as their public API. The existing `missing_docs` rustc lint
+continues to deny undocumented public items.
+
 ## Workflow pins and Dependabot
 
 Dependabot owns the upgrade of GitHub Actions and reusable workflows, including
@@ -82,8 +89,8 @@ as a test assertion on the SHA string.
 
 ## Whitaker CI setup
 
-CI pins Whitaker, Weaver's external lint engine, to a fixed revision through
-the `WHITAKER_REV` environment variable in `.github/workflows/ci.yml`. The
+CI pins Whitaker, Weaver's external lint engine, to a fixed revision through the
+`WHITAKER_REV` environment variable in `.github/workflows/ci.yml`. The
 `Install Whitaker` step then does three things, in order:
 
 1. Installs the installer binary with:
@@ -101,15 +108,15 @@ the `WHITAKER_REV` environment variable in `.github/workflows/ci.yml`. The
 3. Runs `whitaker-installer --build-only --no-update --cranelift` to prebuild
    the Cranelift-accelerated lint libraries.
 
-The clone is a separate step from `cargo install` because the installer
-expects the Whitaker source tree to already exist at that well-known path
-when it builds the lint libraries; `cargo install` only produces the
-installer binary, not the source checkout it operates on. `--no-update` stops
-the installer from fetching a different revision than the one just checked
-out, and `--build-only` skips any installer behaviour beyond compiling the
-libraries. Together, pinning the clone and the installer to the same
-`WHITAKER_REV` and disabling the installer's own update step is what keeps
-the CI lint environment reproducible across runs.
+The clone is a separate step from `cargo install` because the installer expects
+the Whitaker source tree to already exist at that well-known path when it
+builds the lint libraries; `cargo install` only produces the installer binary,
+not the source checkout it operates on. `--no-update` stops the installer from
+fetching a different revision than the one just checked out, and `--build-only`
+skips any installer behaviour beyond compiling the libraries. Together, pinning
+the clone and the installer to the same `WHITAKER_REV` and disabling the
+installer's own update step is what keeps the CI lint environment reproducible
+across runs.
 
 See the [Whitaker user's guide](whitaker-users-guide.md) for day-to-day usage
 of the installed lints.
@@ -269,7 +276,7 @@ per-language query plans for later execution.
     `anywhere`, and decorated metadata propagation
   - Special handling: `r2c-internal-project-depends-on` lowers to
     `(__NONEXISTENT_NODE__) @_dependency_check`
-- Semantic validation (`crates/sempai/src/semantic_check.rs`):
+- Semantic validation (`crates/sempai/src/semantic_check/mod.rs`):
   - `InvalidNotInOr`
   - `MissingPositiveTermInAnd`
   - Span precedence rules: node span -> first child -> fallback
@@ -277,6 +284,18 @@ per-language query plans for later execution.
   - Parse -> validate modes -> normalize -> validate semantics -> compile
     per-language `QueryPlan`
   - `QueryPlan::formula()` exposure for tests and integration
+
+The Sempai implementation keeps the raw and semantic boundaries explicit:
+
+- `crates/sempai-yaml/src/raw/mod.rs` defines the serde-facing raw YAML shapes;
+  `crates/sempai-yaml/src/raw/convert.rs` converts them into validated model
+  values and reports semantic diagnostics.
+- `crates/sempai/src/semantic_check/mod.rs` coordinates structural formula
+  validation; `crates/sempai/src/semantic_check/analysis.rs` performs the
+  recursive formula-tree analysis.
+- `crates/weaver-plugin-rope/src/lib.rs` owns the plugin entrypoint and
+  dispatch, while `crates/weaver-plugin-rope/src/rename.rs` contains the
+  focused path and patch helpers used by the rename operation.
 
 ### Constraint boundary and validation passes
 
@@ -1273,24 +1292,23 @@ readable after automated wrapping:
 `crates/weaver-lsp-host/src/tests/support/world.rs` defines `TestWorld`, the
 BDD fixture that owns the `LspHost` under test plus its registered stub
 language servers. Steps mutate a `TestWorld` through methods such as
-`request_definition`, `notify_did_open`, and `rebuild_host`, then assert on
-the recorded `last_error`, `last_definition`, `last_references`,
+`request_definition`, `notify_did_open`, and `rebuild_host`, then assert on the
+recorded `last_error`, `last_definition`, `last_references`,
 `last_diagnostics`, or `last_capabilities` fields.
 
 `TestWorld::rebuild_host(overrides)` replaces the host and its stub-server
-registrations using the configs previously set with
-`TestWorld::set_configs`. Registration can fail partway through — for
-example when a config's `initialization_error` causes
-`RecordingLanguageServer::failing_initialize` to report a registration
-failure for one of several stub servers. `rebuild_host` builds the
-replacement `LspHost` and handle map in local variables and only assigns
-them to `self.host` and `self.handles` after every registration in the loop
-has succeeded. A mid-loop failure therefore returns `Err` without mutating
-`self.host`, `self.handles`, or `self.active_overrides`, leaving the
-previously built world exactly as it was before the failed call. Tests that
-want to exercise this path call `set_configs` with a config that is known to
-fail, call `rebuild_host` again, and assert that the pre-existing host and
-handles are unchanged.
+registrations using the configs previously set with `TestWorld::set_configs`.
+Registration can fail partway through — for example when a config's
+`initialization_error` causes `RecordingLanguageServer::failing_initialize` to
+report a registration failure for one of several stub servers. `rebuild_host`
+builds the replacement `LspHost` and handle map in local variables and only
+assigns them to `self.host` and `self.handles` after every registration in the
+loop has succeeded. A mid-loop failure therefore returns `Err` without mutating
+`self.host`, `self.handles`, or `self.active_overrides`, leaving the previously
+built world exactly as it was before the failed call. Tests that want to
+exercise this path call `set_configs` with a config that is known to fail, call
+`rebuild_host` again, and assert that the pre-existing host and handles are
+unchanged.
 
 This guarantee is specific to `TestWorld::rebuild_host`; other crates
 (`weaverd`, `weaver-sandbox`, `weaver-cli`) have their own internal

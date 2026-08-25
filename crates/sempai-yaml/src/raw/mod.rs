@@ -1,15 +1,17 @@
 //! Raw serde-deserializable types mirroring the YAML schema.
 //!
 //! These types capture the on-disk shape of a Semgrep rule document exactly as
-//! written, before any semantic validation: nearly every field is `Option` so
-//! that a missing or misplaced key becomes a span-carrying diagnostic rather
-//! than an opaque serde failure. The conversion into the typed `model` layer
+//! written, before semantic validation. Serde validates this raw shape,
+//! rejecting unknown fields on strict mappings, while conversion into the
+//! typed `model` layer applies additional semantic constraints and reports
+//! violations as [`sempai_core::DiagnosticReport`] values. The conversion code
 //! lives in [`convert`].
 use serde::Deserialize;
 use serde_json::Value;
 use serde_saphyr::Spanned;
 /// Whole rule document: the top level of a Semgrep YAML file is a mapping
-/// whose only recognized key is `rules`.
+/// whose only recognized key is `rules`. Serde rejects unknown top-level
+/// fields; semantic constraints are applied during conversion.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawRuleFile {
@@ -101,7 +103,9 @@ pub(crate) enum RawLegacyValue {
 }
 
 /// Legacy formula mapping, in which each present key contributes one operand
-/// and the operands are implicitly conjoined.
+/// and the operands are implicitly conjoined. Serde rejects unknown operator
+/// fields; conversion checks that the mapping is semantically valid and
+/// reports violations as diagnostic reports.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawLegacyFormulaObject {
@@ -144,8 +148,10 @@ pub(crate) enum RawMatchFormula {
     Object(Box<RawMatchFormulaObject>),
 }
 
-/// Operator mapping of the modern `match:` syntax. Exactly one core operator
-/// key may be present; the remaining keys decorate that operator.
+/// Operator mapping of the modern `match:` syntax. Serde rejects unknown
+/// operator fields. Exactly one core operator key may be present; conversion
+/// enforces that semantic constraint and reports violations as diagnostic
+/// reports.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawMatchFormulaObject {

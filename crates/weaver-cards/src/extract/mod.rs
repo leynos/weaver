@@ -155,7 +155,7 @@ where
 }
 
 /// Doc comments and decorators collected immediately before a symbol,
-/// normalised into the shape the card's attachment sections expect.
+/// normalized into the shape the card's attachment sections expect.
 #[derive(Debug, Clone)]
 struct LeadingAttachments {
     /// Doc comment lines, in source order, oldest first.
@@ -179,7 +179,7 @@ struct ImportBlock {
     byte_start: usize,
     /// Byte offset where the import block ends.
     byte_end: usize,
-    /// Normalised, one-entry-per-line rendering of the imports.
+    /// Normalized, one-entry-per-line rendering of the imports.
     normalized: Vec<String>,
 }
 

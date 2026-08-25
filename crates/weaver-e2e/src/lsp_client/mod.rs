@@ -3,8 +3,13 @@
 //! This module provides a simple LSP client that can spawn a language server
 //! process and communicate with it via JSON-RPC over stdin/stdout.
 
+mod response;
+
+#[cfg(test)]
+mod tests;
+
 use std::{
-    io::{BufRead, BufReader, BufWriter, Read, Write},
+    io::{BufReader, BufWriter, Write},
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
     sync::atomic::{AtomicI64, Ordering},
 };
@@ -76,8 +81,7 @@ pub enum LspClientError {
 
 /// A simple LSP client for E2E testing.
 pub struct LspClient {
-    /// Kept alive so the process is not reaped and its pipes closed.
-    #[expect(dead_code, reason = "child must be kept alive for the process to run")]
+    /// Owns the server process so every shutdown path can terminate and reap it.
     child: Child,
     /// Reads framed JSON-RPC messages from the server's stdout.
     reader: BufReader<ChildStdout>,
@@ -246,9 +250,23 @@ impl LspClient {
     /// # Errors
     /// Returns an error if shutdown fails.
     pub fn shutdown(&mut self) -> Result<(), LspClientError> {
-        let _: Option<()> = self.request("shutdown", None)?;
-        self.notify("exit", None)?;
-        Ok(())
+        let shutdown_result: Result<Option<()>, LspClientError> = self.request("shutdown", None);
+        if let Err(error) = shutdown_result {
+            self.terminate_and_reap();
+            return Err(error);
+        }
+        if let Err(error) = self.notify("exit", None) {
+            self.terminate_and_reap();
+            return Err(error);
+        }
+
+        match self.child.wait() {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                self.terminate_and_reap();
+                Err(LspClientError::Io(error))
+            }
+        }
     }
 
     /// Returns an error if the client has not been initialized.
@@ -341,45 +359,19 @@ impl LspClient {
 
     /// Reads one framed LSP message per the `Content-Length` header.
     fn read_response(&mut self) -> Result<Response, LspClientError> {
-        // Read headers
-        let mut content_length: Option<usize> = None;
-        loop {
-            let mut line_buf = String::new();
-            self.reader
-                .read_line(&mut line_buf)
-                .map_err(LspClientError::Io)?;
-
-            let trimmed = line_buf.trim();
-            if trimmed.is_empty() {
-                break;
-            }
-
-            if let Some(len_str) = trimmed.strip_prefix("Content-Length: ") {
-                content_length = len_str.parse().ok();
-            }
-        }
-
-        let len = content_length.ok_or_else(|| {
-            LspClientError::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "missing Content-Length header",
-            ))
-        })?;
-
-        // Read content
-        let mut buffer = vec![0u8; len];
-        self.reader
-            .read_exact(&mut buffer)
-            .map_err(LspClientError::Io)?;
-
-        let content = String::from_utf8(buffer).map_err(|e| {
-            LspClientError::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("invalid UTF-8 in response: {e}"),
-            ))
-        })?;
-        serde_json::from_str(&content).map_err(LspClientError::Json)
+        response::read_response(&mut self.reader)
     }
+
+    /// Terminates the child if necessary and reaps it, ignoring cleanup errors
+    /// because this is used while preserving the original protocol failure.
+    fn terminate_and_reap(&mut self) {
+        self.child.kill().ok();
+        self.child.wait().ok();
+    }
+}
+
+impl Drop for LspClient {
+    fn drop(&mut self) { self.terminate_and_reap(); }
 }
 
 /// Returns client capabilities for LSP features including call hierarchy and definition.

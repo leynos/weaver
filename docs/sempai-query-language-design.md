@@ -430,7 +430,7 @@ Legacy (`pattern*`) and v2 (`match`) syntaxes lower into the shared
 is preserved as an opaque search principal and normalizes to a degenerate
 Tree-sitter query atom that cannot match real code. Semantic checks for
 `E_SEMPAI_INVALID_NOT_IN_OR` and `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND` live in
-`crates/sempai/src/semantic_check.rs`. `WhereClause` values are stored as
+`crates/sempai/src/semantic_check/mod.rs`. `WhereClause` values are stored as
 opaque `serde_json::Value` values and interpreted later. `extract`, `taint`,
 `join`, and forward-compatible unknown modes still fail deterministically with
 `E_SEMPAI_UNSUPPORTED_MODE`, preferring the `mode` field span before falling

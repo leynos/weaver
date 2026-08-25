@@ -71,7 +71,7 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
   - `sempai_yaml` owns the parsed `LegacyFormula` and `MatchFormula` types.
   - `sempai` (facade) wires parsing → normalization → validation → plan
     construction. Normalization lives in `crates/sempai/src/normalize.rs` and
-    semantic validation in `crates/sempai/src/semantic_check.rs`.
+    semantic validation in `crates/sempai/src/semantic_check/mod.rs`.
 - Maintain the stable diagnostics contract from 4.1.2:
   `code`, `message`, `primary_span`, and `notes` remain the only emitted fields.
 - Use `DiagnosticReport::validation_error(...)` for semantic constraint
@@ -360,7 +360,8 @@ structurally equivalent `Formula` values.
 
 ### Stage D: Implement semantic validation
 
-Add a new module `crates/sempai/src/semantic_check.rs` (< 200 lines) with:
+Add a new module `crates/sempai/src/semantic_check/mod.rs` (< 200 lines) with
+the structural validation entrypoint and its `analysis.rs` helper:
 
 - `pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport>`
 - Internal checks:
@@ -669,7 +670,7 @@ pub(crate) fn normalize_search_principal(
 ) -> Decorated<Formula>;
 ```
 
-### New functions in `crates/sempai/src/semantic_check.rs`
+### New functions in `crates/sempai/src/semantic_check/mod.rs`
 
 ```rust
 /// Validates semantic constraints on a normalized formula.

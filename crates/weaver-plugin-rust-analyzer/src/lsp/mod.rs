@@ -5,11 +5,14 @@
 //! file content for diff generation.
 
 mod jsonrpc;
+mod process;
 mod text_edits;
 
 use std::{
-    io::{BufReader, BufWriter},
-    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+    io::BufWriter,
+    process::{Child, ChildStdin, Command, Stdio},
+    sync::mpsc::Receiver,
+    thread::JoinHandle,
 };
 
 use lsp_types::{DidOpenTextDocumentParams, TextDocumentItem, Uri, WorkspaceEdit};
@@ -18,7 +21,8 @@ use tempfile::TempDir;
 use weaver_plugins::protocol::FilePayload;
 
 use self::{
-    jsonrpc::{JsonRpcRequestSpec, send_notification, send_request},
+    jsonrpc::{JsonRpcRequestSpec, send_notification, send_request, spawn_message_reader},
+    process::{close_session, terminate_session},
     text_edits::{
         PositionEncoding,
         apply_workspace_edit,
@@ -62,8 +66,11 @@ struct PreparedWorkspace {
 struct RustAnalyzerProcess {
     /// Handle used to reap or kill the server once the session ends.
     child: Child,
-    /// Buffered server stdout, from which LSP-framed messages are read.
-    reader: BufReader<ChildStdout>,
+    /// Complete inbound LSP messages produced by the deadline-bound reader.
+    reader: Receiver<Result<String, RustAnalyzerAdapterError>>,
+    /// Joins the reader after its process has exited so no background task
+    /// outlives a short-lived adapter session.
+    reader_thread: JoinHandle<()>,
     /// Buffered server stdin; flushed after each message so the server can
     /// make progress.
     writer: BufWriter<ChildStdin>,
@@ -186,9 +193,11 @@ fn start_rust_analyzer(
             message: String::from("rust-analyzer stdout pipe was unavailable"),
         })?;
 
+    let (reader, reader_thread) = spawn_message_reader(stdout);
     Ok(RustAnalyzerProcess {
         child,
-        reader: BufReader::new(stdout),
+        reader,
+        reader_thread,
         writer: BufWriter::new(stdin),
     })
 }
@@ -203,7 +212,7 @@ fn initialize_session(
 ) -> Result<PositionEncoding, RustAnalyzerAdapterError> {
     let initialize_result = send_request(
         &mut process.writer,
-        &mut process.reader,
+        &process.reader,
         JsonRpcRequestSpec {
             id: INITIALIZE_REQUEST_ID,
             method: "initialize",
@@ -264,7 +273,7 @@ fn request_rename_edit(
 ) -> Result<WorkspaceEdit, RustAnalyzerAdapterError> {
     let result = send_request(
         &mut process.writer,
-        &mut process.reader,
+        &process.reader,
         JsonRpcRequestSpec {
             id: RENAME_REQUEST_ID,
             method: "textDocument/rename",
@@ -286,7 +295,7 @@ fn request_rename_edit(
 fn shutdown_session(process: &mut RustAnalyzerProcess) -> Result<(), RustAnalyzerAdapterError> {
     send_request(
         &mut process.writer,
-        &mut process.reader,
+        &process.reader,
         JsonRpcRequestSpec {
             id: SHUTDOWN_REQUEST_ID,
             method: "shutdown",
@@ -295,59 +304,6 @@ fn shutdown_session(process: &mut RustAnalyzerProcess) -> Result<(), RustAnalyze
     )?;
 
     send_notification(&mut process.writer, "exit", None)
-}
-
-/// Shuts the server down cleanly, falling back to termination if the shutdown
-/// handshake fails.
-fn close_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAdapterError> {
-    if let Err(error) = shutdown_session(&mut process) {
-        terminate_session(process);
-        return Err(error);
-    }
-
-    finish_session(process)
-}
-
-/// Abandons a session, closing the pipes and killing the server.
-///
-/// Used on the error path, where the server may be wedged and unable to
-/// answer a shutdown request.
-fn terminate_session(mut process: RustAnalyzerProcess) {
-    drop(process.writer);
-    drop(process.reader);
-    force_terminate_process(&mut process.child);
-}
-
-/// Closes the pipes, waits for the server, and reports a non-zero exit as an
-/// engine failure.
-fn finish_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAdapterError> {
-    drop(process.writer);
-    drop(process.reader);
-
-    let status = match process.child.wait() {
-        Ok(status) => status,
-        Err(source) => {
-            force_terminate_process(&mut process.child);
-            return Err(RustAnalyzerAdapterError::EngineFailed {
-                message: format!("failed to wait for rust-analyzer process: {source}"),
-            });
-        }
-    };
-
-    if !status.success() {
-        return Err(RustAnalyzerAdapterError::EngineFailed {
-            message: format!("rust-analyzer exited with status {status}"),
-        });
-    }
-
-    Ok(())
-}
-
-/// Kills the child and reaps it, ignoring errors because the process may
-/// already have exited.
-fn force_terminate_process(child: &mut Child) {
-    child.kill().ok();
-    child.wait().ok();
 }
 
 /// Reads the server's chosen position encoding from the initialize result.

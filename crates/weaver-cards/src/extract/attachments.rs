@@ -107,7 +107,7 @@ pub(super) fn collect_leading_attachments(
     }
 }
 
-/// Builds the normalised decorator representation for the card payload.
+/// Builds the normalized decorator representation for the card payload.
 pub(super) fn normalised_decorators(decorators: &[Decorator]) -> Vec<String> {
     decorators.iter().map(Decorator::normalise).collect()
 }
@@ -158,7 +158,7 @@ fn normalise_comment_line(line: &str, language: SupportedLanguage) -> Option<Str
 
 /// Strips a Rust line- or block-comment marker (`///`, `//!`, `/**`, `/*!`,
 /// `//`, or a block continuation/closer) from `line`. Returns `None` when
-/// `line` carries no recognised comment marker, signalling the end of the
+/// `line` carries no recognized comment marker, signalling the end of the
 /// leading comment block to the caller.
 fn rust_comment(line: &str) -> Option<String> {
     for prefix in ["///", "//!", "/**", "/*!", "//", "*/", "*"] {
@@ -177,7 +177,7 @@ fn python_comment(line: &str) -> Option<String> {
 
 /// Strips a TypeScript/JSDoc line- or block-comment marker (`/**`, `/*`,
 /// `*/`, a block continuation `*`, or `//`) from `line`. Returns `None` when
-/// `line` carries no recognised comment marker.
+/// `line` carries no recognized comment marker.
 fn ts_comment(line: &str) -> Option<String> {
     for prefix in ["/**", "/*", "*/", "*", "//"] {
         if let Some(rest) = line.strip_prefix(prefix) {

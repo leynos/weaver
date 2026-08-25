@@ -140,7 +140,7 @@ impl Pattern {
     pub const fn has_metavariables(&self) -> bool { !self.metavariables.is_empty() }
 }
 
-/// Un-normalised pattern source, before metavariable substitution.
+/// Un-normalized pattern source, before metavariable substitution.
 #[derive(Clone, Copy)]
 struct RawSource<'a>(&'a str);
 
@@ -149,11 +149,11 @@ struct RawSource<'a>(&'a str);
 struct NormalizedSource(String);
 
 impl NormalizedSource {
-    /// Borrows the normalised pattern text.
+    /// Borrows the normalized pattern text.
     fn as_str(&self) -> &str { &self.0 }
 }
 
-/// Wraps a normalised pattern in a synthetic function so a bare expression
+/// Wraps a normalized pattern in a synthetic function so a bare expression
 /// or statement fragment (not a complete top-level item) can still be parsed
 /// by a grammar that only accepts complete items at the top level.
 fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &NormalizedSource) -> String {

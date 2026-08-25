@@ -282,7 +282,7 @@ impl ParserRegistry {
     ///
     /// # Errors
     ///
-    /// Returns a parser initialisation or parse error, or an internal error if
+    /// Returns a parser initialization or parse error, or an internal error if
     /// one of the parser mutexes has been poisoned.
     pub fn parse(
         &self,
@@ -302,7 +302,7 @@ impl ParserRegistry {
     /// # Errors
     ///
     /// Returns an internal error if the registry mutex has been poisoned, or a
-    /// parser initialisation error if a new parser cannot be built.
+    /// parser initialization error if a new parser cannot be built.
     fn parser(&self, language: SupportedLanguage) -> Result<Arc<Mutex<Parser>>, SyntaxError> {
         let mut guard = self
             .parsers

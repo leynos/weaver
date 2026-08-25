@@ -61,7 +61,7 @@ pub(crate) struct InterstitialCandidate {
     pub(crate) byte_range: std::ops::Range<usize>,
     /// Raw, unmodified import block text.
     pub(crate) raw: String,
-    /// Normalised, one-entry-per-line rendering of the imports.
+    /// Normalized, one-entry-per-line rendering of the imports.
     pub(crate) normalized: Vec<String>,
     /// Imports grouped by the language extractor's grouping rules (e.g.
     /// std/external/local), each inner vector being one group's entries.

@@ -1,11 +1,26 @@
 //! JSON-RPC helpers for the rust-analyzer adapter.
 
-use std::io::{BufRead, Write};
+mod message;
 
-use serde::{Deserialize, Serialize};
+#[cfg(test)]
+mod tests;
+
+use std::{
+    io::{BufRead, BufReader, Write},
+    process::ChildStdout,
+    sync::mpsc::{self, Receiver, RecvTimeoutError},
+    thread::{self, JoinHandle},
+    time::Duration,
+};
+
 use serde_json::json;
 
+use self::message::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcServerResponse};
 use crate::RustAnalyzerAdapterError;
+
+/// Maximum time an individual header-and-body read may block before the
+/// adapter abandons a wedged rust-analyzer session.
+const INBOUND_MESSAGE_DEADLINE: Duration = Duration::from_secs(30);
 
 /// Parameters for issuing a JSON-RPC request.
 pub(super) struct JsonRpcRequestSpec<'a> {
@@ -20,7 +35,7 @@ pub(super) struct JsonRpcRequestSpec<'a> {
 /// Sends a JSON-RPC request and waits for the matching response ID.
 pub(super) fn send_request(
     writer: &mut impl Write,
-    reader: &mut impl BufRead,
+    reader: &Receiver<Result<String, RustAnalyzerAdapterError>>,
     spec: JsonRpcRequestSpec<'_>,
 ) -> Result<serde_json::Value, RustAnalyzerAdapterError> {
     let request = JsonRpcRequest {
@@ -62,22 +77,58 @@ pub(super) fn send_notification(
     write_lsp_message(writer, &payload)
 }
 
+/// Starts the session-local reader that turns blocking pipe reads into
+/// deadline-bound complete messages for a single rust-analyzer process.
+///
+/// This deliberately remains local to the process session: callers consume
+/// frames in request order and must join the worker after the child exits.
+pub(super) fn spawn_message_reader(
+    stdout: ChildStdout,
+) -> (
+    Receiver<Result<String, RustAnalyzerAdapterError>>,
+    JoinHandle<()>,
+) {
+    let (sender, receiver) = mpsc::channel();
+    let reader_thread = thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        loop {
+            let message = read_lsp_message(&mut reader);
+            let should_stop = message.is_err();
+            if sender.send(message).is_err() || should_stop {
+                break;
+            }
+        }
+    });
+    (receiver, reader_thread)
+}
+
 /// Reads inbound messages until the response with `expected_id` arrives.
 ///
-/// Server-initiated requests are answered and notifications skipped along the
-/// way. The loop is bounded so a chatty or wedged server cannot hang the
-/// plugin indefinitely.
+/// Supported server-initiated requests are answered and notifications skipped
+/// along the way. The loop bounds completed messages, while each message has a
+/// separate I/O deadline so a partial frame cannot hang the plugin indefinitely.
 fn read_response_for_id(
-    reader: &mut impl BufRead,
+    reader: &Receiver<Result<String, RustAnalyzerAdapterError>>,
     writer: &mut impl Write,
     expected_id: i64,
+) -> Result<serde_json::Value, RustAnalyzerAdapterError> {
+    read_response_for_id_with_deadline(reader, writer, expected_id, INBOUND_MESSAGE_DEADLINE)
+}
+
+/// Reads until the response with `expected_id` arrives or one message exceeds
+/// `deadline`.
+fn read_response_for_id_with_deadline(
+    reader: &Receiver<Result<String, RustAnalyzerAdapterError>>,
+    writer: &mut impl Write,
+    expected_id: i64,
+    deadline: Duration,
 ) -> Result<serde_json::Value, RustAnalyzerAdapterError> {
     const MAX_RESPONSE_ATTEMPTS: usize = 128;
 
     let mut attempts = 0_usize;
     while attempts < MAX_RESPONSE_ATTEMPTS {
         attempts += 1;
-        let message = read_lsp_message(reader)?;
+        let message = read_message_with_deadline(reader, expected_id, deadline)?;
         let rpc = parse_jsonrpc_message(&message)?;
         if acknowledge_server_request_if_needed(writer, &rpc)? {
             continue;
@@ -94,6 +145,28 @@ fn read_response_for_id(
              {MAX_RESPONSE_ATTEMPTS} attempts"
         ),
     })
+}
+
+/// Waits for one complete LSP message, translating a worker timeout or
+/// disconnection into the adapter's domain errors.
+fn read_message_with_deadline(
+    reader: &Receiver<Result<String, RustAnalyzerAdapterError>>,
+    expected_id: i64,
+    deadline: Duration,
+) -> Result<String, RustAnalyzerAdapterError> {
+    match reader.recv_timeout(deadline) {
+        Ok(message) => message,
+        Err(RecvTimeoutError::Timeout) => Err(RustAnalyzerAdapterError::ResponseTimeout {
+            message: format!(
+                "timed out after {} seconds waiting for a complete LSP message for request id \
+                 {expected_id}",
+                deadline.as_secs()
+            ),
+        }),
+        Err(RecvTimeoutError::Disconnected) => Err(RustAnalyzerAdapterError::EngineFailed {
+            message: String::from("rust-analyzer LSP reader stopped before sending a response"),
+        }),
+    }
 }
 
 /// Deserializes one framed payload into the permissive [`JsonRpcMessage`] view.
@@ -199,7 +272,9 @@ fn write_lsp_message(
 }
 
 /// Reads one length-framed message and decodes its body as UTF-8.
-fn read_lsp_message(reader: &mut impl BufRead) -> Result<String, RustAnalyzerAdapterError> {
+pub(super) fn read_lsp_message(
+    reader: &mut impl BufRead,
+) -> Result<String, RustAnalyzerAdapterError> {
     let content_length = read_content_length(reader)?;
     let mut content = vec![0_u8; content_length];
     std::io::Read::read_exact(reader, &mut content).map_err(|source| {
@@ -264,69 +339,4 @@ fn parse_content_length_header(line: &str) -> Result<Option<usize>, RustAnalyzer
         .map_err(|source| RustAnalyzerAdapterError::InvalidOutput {
             message: format!("invalid Content-Length header '{value}': {source}"),
         })
-}
-
-/// Wire form of an outgoing client request.
-#[derive(Debug, Serialize)]
-struct JsonRpcRequest<'a> {
-    /// Protocol version marker, always `"2.0"`.
-    jsonrpc: &'static str,
-    /// Correlation id the server must echo in its response.
-    id: i64,
-    /// LSP method being invoked, such as `textDocument/rename`.
-    method: &'a str,
-    /// Method parameters, omitted from the wire form when absent.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    params: Option<serde_json::Value>,
-}
-
-/// Wire form of an outgoing client notification, which expects no response.
-#[derive(Debug, Serialize)]
-struct JsonRpcNotification<'a> {
-    /// Protocol version marker, always `"2.0"`.
-    jsonrpc: &'static str,
-    /// LSP method being notified, such as `initialized`.
-    method: &'a str,
-    /// Method parameters, omitted from the wire form when absent.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    params: Option<serde_json::Value>,
-}
-
-/// Wire form of the client's reply to a server-initiated request.
-#[derive(Debug, Serialize)]
-struct JsonRpcServerResponse {
-    /// Protocol version marker, always `"2.0"`.
-    jsonrpc: &'static str,
-    /// Id copied from the server request being answered.
-    id: i64,
-    /// Result payload; the client only ever replies with defaults.
-    result: serde_json::Value,
-}
-
-/// Permissive view of any inbound message, covering responses, server requests,
-/// and notifications so one read loop can triage all three.
-#[derive(Debug, Deserialize)]
-struct JsonRpcMessage {
-    /// Correlation id; absent for notifications.
-    #[serde(default)]
-    id: Option<i64>,
-    /// Method name; present only on server requests and notifications, so it
-    /// distinguishes those from responses to our own requests.
-    #[serde(default)]
-    method: Option<String>,
-    /// Successful response payload.
-    #[serde(default)]
-    result: Option<serde_json::Value>,
-    /// Error payload, mutually exclusive with `result`.
-    #[serde(default)]
-    error: Option<JsonRpcError>,
-}
-
-/// Error object carried by a failed JSON-RPC response.
-#[derive(Debug, Deserialize)]
-struct JsonRpcError {
-    /// Numeric JSON-RPC or LSP error code.
-    code: i64,
-    /// Server-supplied explanation, surfaced verbatim in adapter errors.
-    message: String,
 }

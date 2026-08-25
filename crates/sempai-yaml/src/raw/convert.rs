@@ -1,10 +1,10 @@
 //! Conversion of the raw YAML shapes in [`super`] into the validated `model`
 //! types.
 //!
-//! Every conversion is fallible: the raw layer accepts any syntactically valid
-//! document, and it is here that semantic constraints — such as a formula
-//! object naming exactly one operator — are enforced and reported as
-//! `DiagnosticReport`s.
+//! Serde deserialization validates the raw document shape, including rejecting
+//! unknown fields on strict mappings. Every conversion is fallible: this layer
+//! enforces additional semantic constraints — such as a formula object naming
+//! exactly one operator — and reports violations as `DiagnosticReport`s.
 use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
 use serde_saphyr::Spanned;
 

@@ -88,7 +88,8 @@ impl PluginRequest {
 /// the sandboxed plugin does not need filesystem access.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FilePayload {
-    /// Absolute path of the file, as seen by the broker's host filesystem.
+    /// Workspace-relative path, subject to the `validate_relative_path`
+    /// contract, as interpreted by the broker's host filesystem.
     path: PathBuf,
     /// Full text content of the file at the time of the request.
     content: String,
