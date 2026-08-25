@@ -7,7 +7,11 @@
 pub(crate) mod builders;
 #[path = "refactor_helpers/content.rs"]
 pub(crate) mod content;
+#[path = "refactor_helpers/errors.rs"]
+pub(crate) mod errors;
 #[path = "refactor_helpers/resolutions.rs"]
 pub(crate) mod resolutions;
 #[path = "refactor_helpers/rollback.rs"]
 pub(crate) mod rollback;
+#[path = "refactor_helpers/stub_runtime.rs"]
+pub(crate) mod stub_runtime;

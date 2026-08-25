@@ -2,20 +2,24 @@
 
 #[path = "support/fixture_io.rs"]
 mod fixture_io;
+#[path = "test_support/graph_slice.rs"]
+mod graph_slice_support;
 mod test_support;
 #[path = "support/weaver_binary.rs"]
 mod weaver_binary;
 
-use rstest::{fixture, rstest};
-use tempfile::TempDir;
-use test_support::{
+use graph_slice_support::{
     GraphSliceRequest,
-    TestDaemon,
-    assert_named_snapshot,
-    fixture_uri,
+    assert_graph_slice_envelope,
+    assert_populated_slice,
+    assert_refusal,
+    assert_truncated_to_single_card,
+    is_success,
     run_graph_slice,
 };
-use url::Url;
+use rstest::{fixture, rstest};
+use tempfile::TempDir;
+use test_support::{TestDaemon, assert_named_snapshot, fixture_uri, path_uri};
 use weaver_e2e::graph_slice_fixtures::{GraphSliceFixtureCase, PYTHON_CASES, RUST_CASES};
 
 use crate::fixture_io::write_fixture_path;
@@ -33,35 +37,41 @@ struct SnapshotHarness {
 }
 
 impl SnapshotHarness {
-    #[expect(
-        clippy::expect_used,
-        reason = "test helper failures should panic with explicit setup messages"
-    )]
-    fn workspace_for_case(case: GraphSliceFixtureCase) -> WorkspaceUri {
-        let temp_dir = TempDir::new().expect("creating temp dir");
-        let uri = fixture_uri(&temp_dir, case);
-        WorkspaceUri {
+    /// Writes `case` into a fresh temporary workspace and returns its URI.
+    ///
+    /// # Errors
+    /// Returns a description if the temporary directory or the fixture file
+    /// cannot be created.
+    fn workspace_for_case(case: GraphSliceFixtureCase) -> Result<WorkspaceUri, String> {
+        let temp_dir = TempDir::new().map_err(|error| format!("creating temp dir: {error}"))?;
+        let uri = fixture_uri(&temp_dir, case)?;
+        Ok(WorkspaceUri {
             _temp_dir: temp_dir,
             uri,
-        }
+        })
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "test helper failures should panic with explicit setup messages"
-    )]
-    fn unsupported_workspace() -> WorkspaceUri {
-        let temp_dir = TempDir::new().expect("creating temp dir");
+    /// Builds a workspace holding a file the language router cannot classify.
+    ///
+    /// # Errors
+    /// Returns a description if the temporary directory or the fixture file
+    /// cannot be created.
+    fn unsupported_workspace() -> Result<WorkspaceUri, String> {
+        let temp_dir = TempDir::new().map_err(|error| format!("creating temp dir: {error}"))?;
         let path = write_fixture_path(&temp_dir, "notes.txt", "plain text\n")
-            .expect("write unsupported fixture");
-        let uri = Url::from_file_path(&path).expect("unsupported path to URI");
-        WorkspaceUri {
+            .map_err(|error| format!("write unsupported fixture: {error}"))?;
+        let uri = path_uri(&path)?;
+        Ok(WorkspaceUri {
             _temp_dir: temp_dir,
-            uri: uri.to_string(),
-        }
+            uri,
+        })
     }
 
-    fn daemon(self, expected_requests: Option<usize>) -> TestDaemon {
+    /// Starts a daemon expecting `expected_requests`, or the harness default.
+    ///
+    /// # Errors
+    /// Returns a description if the daemon cannot bind or start serving.
+    fn daemon(self, expected_requests: Option<usize>) -> Result<TestDaemon, String> {
         TestDaemon::start(expected_requests.unwrap_or(self.default_expected_requests))
     }
 
@@ -90,55 +100,12 @@ const fn snapshot_harness() -> SnapshotHarness {
 }
 
 /// Serialises a transcript to pretty-printed JSON for snapshot comparison.
-#[expect(
-    clippy::expect_used,
-    reason = "snapshot helper failures should panic with explicit context"
-)]
-fn render_snapshot<T: serde::Serialize>(transcript: &T) -> String {
-    serde_json::to_string_pretty(transcript).expect("serialize transcript")
-}
-
-#[expect(
-    clippy::expect_used,
-    reason = "snapshot assertions should panic with explicit context"
-)]
-fn assert_and_parse_stdout(stdout: &str) -> serde_json::Value {
-    assert!(!stdout.is_empty(), "transcript stdout should not be empty");
-    serde_json::from_str(stdout).expect("transcript stdout should be valid JSON")
-}
-
-fn assert_schema_version(value: &serde_json::Value, context: &str) {
-    assert_eq!(
-        value.pointer("/schema_version"),
-        Some(&serde_json::json!("graph_slice.v1")),
-        "{context} schema_version should be graph_slice.v1"
-    );
-}
-
-fn expected_exit_status(value: &serde_json::Value) -> i32 {
-    match value.get("status").and_then(serde_json::Value::as_str) {
-        Some("success") => 0,
-        Some("refusal") => match value
-            .pointer("/refusal/reason")
-            .and_then(serde_json::Value::as_str)
-        {
-            Some("unsupported_language") => 10,
-            Some("no_symbol_at_position") => 11,
-            Some("position_out_of_range") => 12,
-            Some("not_yet_implemented") => 13,
-            Some("backend_unavailable") => 14,
-            Some(_) | None => 15,
-        },
-        Some(_) | None => 15,
-    }
-}
-
-fn assert_exit_status(actual: i32, value: &serde_json::Value, context: &str) {
-    assert_eq!(
-        actual,
-        expected_exit_status(value),
-        "{context} exit status should match payload"
-    );
+///
+/// # Errors
+/// Returns a description if the transcript cannot be serialised.
+fn render_snapshot<T: serde::Serialize>(transcript: &T) -> Result<String, String> {
+    serde_json::to_string_pretty(transcript)
+        .map_err(|error| format!("serialize transcript: {error}"))
 }
 
 #[rstest]
@@ -185,69 +152,25 @@ fn assert_exit_status(actual: i32, value: &serde_json::Value, context: &str) {
 fn graph_slice_semantic_snapshots_cover_python_and_rust_fixture_battery(
     #[case] case: GraphSliceFixtureCase,
     snapshot_harness: SnapshotHarness,
-) {
-    let workspace = SnapshotHarness::workspace_for_case(case);
-    let daemon = snapshot_harness.daemon(None);
+) -> Result<(), String> {
+    let workspace = SnapshotHarness::workspace_for_case(case)?;
+    let daemon = snapshot_harness.daemon(None)?;
     let transcript = run_graph_slice(
         &daemon,
         SnapshotHarness::request(&workspace.uri, case.line, case.column, None),
-    );
+    )?;
     // Parse and assert structural shape so regressions surface even if snapshots are not reviewed.
-    {
-        let value = assert_and_parse_stdout(&transcript.stdout);
-        assert_schema_version(&value, case.name);
-        assert_exit_status(transcript.status, &value, case.name);
-        if value.get("status") == Some(&serde_json::json!("success")) {
-            assert!(
-                value
-                    .pointer("/constraints/budget/max_cards")
-                    .and_then(serde_json::Value::as_u64)
-                    .unwrap_or(0)
-                    > 0,
-                "graph_slice_{} budget.max_cards should be positive",
-                case.name
-            );
-            assert_eq!(
-                value.get("edges"),
-                Some(&serde_json::json!([])),
-                "graph_slice_{} edges should be empty",
-                case.name
-            );
-            assert!(
-                value
-                    .get("spillover")
-                    .is_some_and(serde_json::Value::is_object),
-                "graph_slice_{} spillover should be present",
-                case.name
-            );
-            assert!(
-                value
-                    .get("cards")
-                    .and_then(serde_json::Value::as_array)
-                    .is_some_and(|cards| !cards.is_empty()),
-                "graph_slice_{} cards should be non-empty",
-                case.name
-            );
-        } else {
-            assert_eq!(
-                value.get("status"),
-                Some(&serde_json::json!("refusal")),
-                "graph_slice_{} should return success or refusal",
-                case.name
-            );
-            assert_eq!(
-                value.pointer("/refusal/reason"),
-                Some(&serde_json::json!("no_symbol_at_position")),
-                "graph_slice_{} refusal reason should match the snapshot contract",
-                case.name
-            );
-        }
+    let snapshot_name = format!("graph_slice_{}", case.name);
+    let value = assert_graph_slice_envelope(&transcript, &snapshot_name)?;
+    if is_success(&value) {
+        assert_populated_slice(&value, &snapshot_name);
+    } else {
+        assert_refusal(&value, "no_symbol_at_position", &snapshot_name);
     }
-    daemon.join();
-    assert_named_snapshot(
-        &format!("graph_slice_{}", case.name),
-        &render_snapshot(&transcript),
-    );
+
+    daemon.join()?;
+    assert_named_snapshot(&snapshot_name, &render_snapshot(&transcript)?);
+    Ok(())
 }
 
 #[rstest]
@@ -256,140 +179,107 @@ fn graph_slice_semantic_snapshots_cover_python_and_rust_fixture_battery(
 fn graph_slice_truncation_snapshots(
     #[case] case: GraphSliceFixtureCase,
     snapshot_harness: SnapshotHarness,
-) {
-    let workspace = SnapshotHarness::workspace_for_case(case);
-    let daemon = snapshot_harness.daemon(None);
+) -> Result<(), String> {
+    let workspace = SnapshotHarness::workspace_for_case(case)?;
+    let daemon = snapshot_harness.daemon(None)?;
     let transcript = run_graph_slice(
         &daemon,
         SnapshotHarness::request(&workspace.uri, case.line, case.column, Some(1)),
-    );
-    {
-        let value = assert_and_parse_stdout(&transcript.stdout);
-        assert_schema_version(&value, case.name);
-        assert_exit_status(transcript.status, &value, case.name);
-        if value.get("status") == Some(&serde_json::json!("success")) {
-            assert_eq!(
-                value
-                    .get("cards")
-                    .and_then(serde_json::Value::as_array)
-                    .map_or(0, Vec::len),
-                1,
-                "graph_slice_truncated_{} should contain exactly 1 card (max_cards=1)",
-                case.name
-            );
-            assert_eq!(
-                value
-                    .pointer("/spillover/truncated")
-                    .and_then(serde_json::Value::as_bool),
-                Some(true),
-                "graph_slice_truncated_{} spillover should be truncated",
-                case.name
-            );
-        } else {
-            assert_eq!(
-                value.get("status"),
-                Some(&serde_json::json!("refusal")),
-                "graph_slice_truncated_{} should return success or refusal",
-                case.name
-            );
-            assert_eq!(
-                value.pointer("/refusal/reason"),
-                Some(&serde_json::json!("no_symbol_at_position")),
-                "graph_slice_truncated_{} refusal reason should match the snapshot contract",
-                case.name
-            );
+    )?;
+    let snapshot_name = format!("graph_slice_truncated_{}", case.name);
+    let value = assert_graph_slice_envelope(&transcript, &snapshot_name)?;
+    if is_success(&value) {
+        assert_truncated_to_single_card(&value, &snapshot_name);
+    } else {
+        assert_refusal(&value, "no_symbol_at_position", &snapshot_name);
+    }
+
+    daemon.join()?;
+    assert_named_snapshot(&snapshot_name, &render_snapshot(&transcript)?);
+    Ok(())
+}
+
+/// Selects the fixture workspace a refusal case runs against.
+///
+/// The workspace cannot be built inside a `#[case]` attribute because it owns a
+/// `TempDir` that must live only for the duration of the test.
+#[derive(Clone, Copy)]
+enum RefusalWorkspace {
+    /// A plain-text file, which the language router cannot classify.
+    UnsupportedLanguage,
+    /// A Rust fixture drawn from the shared case battery.
+    Fixture(GraphSliceFixtureCase),
+}
+
+impl RefusalWorkspace {
+    /// Materialises the workspace this case runs against.
+    ///
+    /// # Errors
+    /// Returns a description if the temporary directory or the fixture file
+    /// cannot be created.
+    fn build(self) -> Result<WorkspaceUri, String> {
+        match self {
+            Self::UnsupportedLanguage => SnapshotHarness::unsupported_workspace(),
+            Self::Fixture(case) => SnapshotHarness::workspace_for_case(case),
         }
     }
-    daemon.join();
-    assert_named_snapshot(
-        &format!("graph_slice_truncated_{}", case.name),
-        &render_snapshot(&transcript),
-    );
 }
 
-struct RefusalSnapshotCase<'a> {
-    workspace: WorkspaceUri,
+#[derive(Clone, Copy)]
+struct RefusalSnapshotCase {
+    workspace: RefusalWorkspace,
     line: u32,
     column: u32,
-    expected_reason: &'a str,
-    status_assertion_message: &'a str,
-    snapshot_name: &'a str,
+    expected_reason: &'static str,
+    snapshot_name: &'static str,
 }
 
-fn run_refusal_snapshot(harness: SnapshotHarness, case: RefusalSnapshotCase<'_>) {
-    let RefusalSnapshotCase {
-        workspace,
-        line,
-        column,
-        expected_reason,
-        status_assertion_message,
-        snapshot_name,
-    } = case;
-    let daemon = harness.daemon(None);
+/// Runs one refusal case end to end and records its snapshot.
+///
+/// # Errors
+/// Returns a description if the workspace, daemon, CLI invocation, or
+/// transcript rendering fails.
+fn run_refusal_snapshot(harness: SnapshotHarness, case: RefusalSnapshotCase) -> Result<(), String> {
+    let workspace = case.workspace.build()?;
+    let daemon = harness.daemon(None)?;
     let transcript = run_graph_slice(
         &daemon,
-        SnapshotHarness::request(&workspace.uri, line, column, None),
-    );
-    {
-        let value = assert_and_parse_stdout(&transcript.stdout);
-        assert_schema_version(&value, snapshot_name);
-        assert_exit_status(transcript.status, &value, snapshot_name);
-        assert_eq!(
-            value.get("status"),
-            Some(&serde_json::json!("refusal")),
-            "{status_assertion_message}"
-        );
-        assert_eq!(
-            value.pointer("/refusal/reason"),
-            Some(&serde_json::json!(expected_reason)),
-            "refusal reason should be {expected_reason}"
-        );
-    }
-    daemon.join();
-    assert_named_snapshot(snapshot_name, &render_snapshot(&transcript));
+        SnapshotHarness::request(&workspace.uri, case.line, case.column, None),
+    )?;
+
+    let value = assert_graph_slice_envelope(&transcript, case.snapshot_name)?;
+    assert_refusal(&value, case.expected_reason, case.snapshot_name);
+
+    daemon.join()?;
+    assert_named_snapshot(case.snapshot_name, &render_snapshot(&transcript)?);
+    Ok(())
 }
 
 #[rstest]
-fn graph_slice_refusal_snapshots(snapshot_harness: SnapshotHarness) {
-    run_refusal_snapshot(
-        snapshot_harness,
-        RefusalSnapshotCase {
-            workspace: SnapshotHarness::unsupported_workspace(),
-            line: 1,
-            column: 1,
-            expected_reason: "unsupported_language",
-            status_assertion_message: "unsupported language should produce a refusal",
-            snapshot_name: "graph_slice_refusal_unsupported_language",
-        },
-    );
-}
-
-#[rstest]
-fn graph_slice_refusal_no_symbol_at_position(snapshot_harness: SnapshotHarness) {
-    run_refusal_snapshot(
-        snapshot_harness,
-        RefusalSnapshotCase {
-            workspace: SnapshotHarness::workspace_for_case(RUST_CASES[19]),
-            line: 2,
-            column: 1,
-            expected_reason: "no_symbol_at_position",
-            status_assertion_message: "blank-indented position should produce a refusal",
-            snapshot_name: "graph_slice_refusal_no_symbol_at_position",
-        },
-    );
-}
-
-#[rstest]
-fn graph_slice_refusal_position_out_of_range(snapshot_harness: SnapshotHarness) {
-    run_refusal_snapshot(
-        snapshot_harness,
-        RefusalSnapshotCase {
-            workspace: SnapshotHarness::workspace_for_case(RUST_CASES[0]),
-            line: 10_000,
-            column: 1,
-            expected_reason: "position_out_of_range",
-            status_assertion_message: "out-of-range position should produce a refusal",
-            snapshot_name: "graph_slice_refusal_position_out_of_range",
-        },
-    );
+#[case::unsupported_language(RefusalSnapshotCase {
+    workspace: RefusalWorkspace::UnsupportedLanguage,
+    line: 1,
+    column: 1,
+    expected_reason: "unsupported_language",
+    snapshot_name: "graph_slice_refusal_unsupported_language",
+})]
+#[case::no_symbol_at_position(RefusalSnapshotCase {
+    workspace: RefusalWorkspace::Fixture(RUST_CASES[19]),
+    line: 2,
+    column: 1,
+    expected_reason: "no_symbol_at_position",
+    snapshot_name: "graph_slice_refusal_no_symbol_at_position",
+})]
+#[case::position_out_of_range(RefusalSnapshotCase {
+    workspace: RefusalWorkspace::Fixture(RUST_CASES[0]),
+    line: 10_000,
+    column: 1,
+    expected_reason: "position_out_of_range",
+    snapshot_name: "graph_slice_refusal_position_out_of_range",
+})]
+fn graph_slice_refusal_snapshots(
+    #[case] case: RefusalSnapshotCase,
+    snapshot_harness: SnapshotHarness,
+) -> Result<(), String> {
+    run_refusal_snapshot(snapshot_harness, case)
 }

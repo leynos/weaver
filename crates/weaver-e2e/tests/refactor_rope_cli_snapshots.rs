@@ -12,20 +12,21 @@ mod refactor_routing;
 use std::io::Write;
 
 use assert_cmd::Command;
-use daemon_harness::{FakeDaemon, output_to_transcript, weaver_binary_path};
+use daemon_harness::{FakeDaemon, output_to_transcript, resolve_or_build_weaver_binary_path};
 use insta::assert_debug_snapshot;
 use rstest::rstest;
 
-#[expect(
-    clippy::expect_used,
-    reason = "test helper surfaces setup failures with the exact requested call structure"
-)]
-fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
-    let daemon = FakeDaemon::start(1, "renamed_symbol").expect("fake daemon should start");
+fn run_rename_refactor_snapshot(
+    snapshot_name: &str,
+    provider: Option<&str>,
+) -> std::io::Result<()> {
+    let daemon = FakeDaemon::start(1, "renamed_symbol")?;
     let endpoint = daemon.endpoint();
 
-    let effective_provider = provider.unwrap_or("rope");
-    let provider_fragment = format!("--provider {effective_provider} ");
+    // Omitting `--provider` entirely is what exercises automatic routing;
+    // passing a default here would make the automatic case identical to the
+    // explicit one and the test inert.
+    let provider_fragment = provider.map_or_else(String::new, |name| format!("--provider {name} "));
     let command_string = format!(
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
          {provider_fragment}--refactoring rename --file src/main.py --position 1:5 \
@@ -40,8 +41,10 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
         "act".into(),
         "refactor".into(),
     ];
-    args.push("--provider".into());
-    args.push(effective_provider.into());
+    if let Some(name) = provider {
+        args.push("--provider".into());
+        args.push(name.into());
+    }
     args.extend([
         "--refactoring".into(),
         "rename".into(),
@@ -52,16 +55,15 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
         "new_name=renamed_symbol".into(),
     ]);
 
-    let mut command = Command::new(weaver_binary_path());
-    let output = command
-        .args(&args)
-        .output()
-        .expect("command should execute");
+    let mut command = Command::new(resolve_or_build_weaver_binary_path()?);
+    let output = command.args(&args).output()?;
 
     let transcript = output_to_transcript(command_string, &output, daemon.requests());
     daemon.join();
 
     assert_debug_snapshot!(snapshot_name, transcript);
+
+    Ok(())
 }
 
 #[rstest]
@@ -69,7 +71,7 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
 #[case("refactor_automatic_rope_routing", None)]
 #[case("refactor_provider_mismatch_refusal", Some("rust-analyzer"))]
 fn refactor_rope_routing_cli_snapshot(#[case] case_name: &str, #[case] provider: Option<&str>) {
-    run_rename_refactor_snapshot(case_name, provider);
+    run_rename_refactor_snapshot(case_name, provider).expect("rename refactor snapshot should run");
 }
 
 #[test]
@@ -86,7 +88,8 @@ fn refactor_pipeline_with_observe_and_jq_snapshot() {
 
     let daemon = FakeDaemon::start(2, "renamed_symbol").expect("fake daemon should start");
     let endpoint = daemon.endpoint();
-    let weaver_bin = weaver_binary_path();
+    let weaver_bin =
+        resolve_or_build_weaver_binary_path().expect("weaver binary should be locatable");
 
     let shell_script = concat!(
         "\"$WEAVER_BIN\" --daemon-socket \"$WEAVER_ENDPOINT\" --output json ",

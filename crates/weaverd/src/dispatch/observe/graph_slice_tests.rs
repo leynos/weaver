@@ -1,101 +1,22 @@
 //! Unit tests for the `observe graph-slice` dispatch handler.
-use std::path::PathBuf;
-
-use rstest::{fixture, rstest};
+use rstest::rstest;
 use tempfile::TempDir;
-use url::Url;
-use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel};
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_cards::DetailLevel;
 
-use super::{MAX_SAME_FILE_DISCOVERY_POSITIONS, first_non_whitespace_column, handle};
-use crate::{
-    backends::FusionBackends,
-    dispatch::{request::CommandRequest, response::ResponseWriter},
-    semantic_provider::SemanticBackendProvider,
-    tests::support::fs as test_fs,
+use self::support::{
+    SourceRequest,
+    backends_fixture,
+    detail_value,
+    dispatch_payload,
+    dispatch_source,
+    prepare_request,
 };
-#[fixture]
-fn backends_fixture() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
-    let dir = TempDir::new().map_err(|error| format!("create temp dir: {error}"))?;
-    let socket_path = dir
-        .path()
-        .join("socket.sock")
-        .to_string_lossy()
-        .into_owned();
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_path),
-        ..Config::default()
-    };
-    let provider =
-        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-    Ok((FusionBackends::new(config, provider), dir))
-}
-fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> Result<PathBuf, std::io::Error> {
-    let path = temp_dir.path().join(name);
-    test_fs::write(&path, content)?;
-    Ok(path)
-}
-fn make_request(arguments: &[&str]) -> CommandRequest {
-    let args_json: Vec<String> = arguments
-        .iter()
-        .map(|s| format!("\"{}\"", s.replace('"', "\\\"")))
-        .collect();
-    let json = format!(
-        concat!(
-            "{{\"command\":{{\"domain\":\"observe\",",
-            "\"operation\":\"graph-slice\"}},",
-            "\"arguments\":[{}]}}"
-        ),
-        args_json.join(",")
-    );
-    match CommandRequest::parse(json.as_bytes()) {
-        Ok(request) => request,
-        Err(error) => panic!("request: {error}"),
-    }
-}
+use super::{MAX_SAME_FILE_DISCOVERY_POSITIONS, first_non_whitespace_column};
+use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
 
-fn response_payload(output: Vec<u8>) -> Result<serde_json::Value, String> {
-    let response = String::from_utf8(output).map_err(|error| format!("utf8: {error}"))?;
-    let mut stdout_data = None;
-    for line in response.lines() {
-        let envelope: serde_json::Value =
-            serde_json::from_str(line).map_err(|error| format!("envelope: {error}"))?;
-        if envelope.get("stream").and_then(|value| value.as_str()) == Some("stdout") {
-            stdout_data = Some(
-                envelope
-                    .get("data")
-                    .and_then(|value| value.as_str())
-                    .ok_or_else(|| "stdout data".to_string())?
-                    .to_owned(),
-            );
-            break;
-        }
-    }
-    let data = stdout_data.ok_or_else(|| "no stdout envelope".to_string())?;
-    serde_json::from_str(&data).map_err(|error| format!("payload: {error}"))
-}
-fn detail_value(detail: DetailLevel) -> &'static str {
-    match detail {
-        DetailLevel::Minimal => "minimal",
-        DetailLevel::Signature => "signature",
-        DetailLevel::Structure => "structure",
-        DetailLevel::Semantic => "semantic",
-        DetailLevel::Full => "full",
-        _ => "full",
-    }
-}
-fn dispatch_payload(
-    request: &CommandRequest,
-    backends: &mut FusionBackends<SemanticBackendProvider>,
-) -> Result<(i32, serde_json::Value), String> {
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-    let result = match handle(request, &mut writer, backends) {
-        Ok(result) => result,
-        Err(error) => return Err(format!("dispatch fails: {error}")),
-    };
-    response_payload(output).map(|payload| (result.status, payload))
-}
+#[path = "graph_slice_test_support.rs"]
+mod support;
+
 fn assert_success_response(status: i32, payload: &serde_json::Value) {
     assert_eq!(status, 0, "expected success exit status");
     assert_eq!(
@@ -113,6 +34,7 @@ fn assert_default_graph_slice_shape(payload: &serde_json::Value) {
     );
     assert_eq!(payload["edges"], serde_json::json!([]));
 }
+
 fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
     assert_eq!(
         payload["spillover"]["truncated"], true,
@@ -136,29 +58,70 @@ fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
     }
 }
 
-fn assert_refusal(status: i32, payload: &serde_json::Value, reason: &str) {
-    let expected_status = match reason {
-        "unsupported_language" => 10,
-        "no_symbol_at_position" => 11,
-        "position_out_of_range" => 12,
-        "not_yet_implemented" => 13,
-        "backend_unavailable" => 14,
-        other => panic!("unknown refusal reason {other}"),
-    };
-    assert_eq!(status, expected_status);
-    assert_eq!(payload["status"], "refusal");
-    assert_eq!(payload["schema_version"], "graph_slice.v1");
-    assert_eq!(payload["refusal"]["reason"], reason);
+/// Collects an identifier from every entry of a JSON array, reporting the
+/// supplied message when the value is not an array or an entry lacks a
+/// string identifier.
+///
+/// Callers supply the diagnostics so each collection names the payload shape
+/// it expected.
+fn collect_ids_from_array<'a>(
+    values: &'a serde_json::Value,
+    array_error: &'static str,
+    id_error: &'static str,
+    extract_id: impl Fn(&'a serde_json::Value) -> Option<&'a str>,
+) -> Result<Vec<&'a str>, String> {
+    values
+        .as_array()
+        .ok_or_else(|| array_error.to_owned())?
+        .iter()
+        .map(|value| extract_id(value).ok_or_else(|| id_error.to_owned()))
+        .collect()
 }
 
-fn assert_refusal_with_message(
-    status: i32,
-    payload: &serde_json::Value,
-    reason: &str,
-    message: &str,
-) {
-    assert_refusal(status, payload, reason);
-    assert_eq!(payload["refusal"]["message"], message);
+/// Collects `symbol.symbol_id` from every card in a `cards` array.
+fn symbol_ids(cards: &serde_json::Value) -> Result<Vec<&str>, String> {
+    collect_ids_from_array(
+        cards,
+        "cards should be an array",
+        "symbol_id should be a string",
+        |card| card["symbol"]["symbol_id"].as_str(),
+    )
+}
+
+/// Collects `symbol_id` from every entry in a spillover frontier array.
+fn frontier_ids(frontier: &serde_json::Value) -> Result<Vec<&str>, String> {
+    collect_ids_from_array(
+        frontier,
+        "frontier should be an array",
+        "frontier symbol_id should be a string",
+        |entry| entry["symbol_id"].as_str(),
+    )
+}
+
+/// Maps a structured refusal reason onto the exit status the handler reports.
+fn refusal_status(reason: &str) -> Option<i32> {
+    match reason {
+        "unsupported_language" => Some(10),
+        "no_symbol_at_position" => Some(11),
+        "position_out_of_range" => Some(12),
+        "not_yet_implemented" => Some(13),
+        "backend_unavailable" => Some(14),
+        _ => None,
+    }
+}
+
+/// Asserts the refusal envelope shape, keeping failures on the calling line.
+macro_rules! assert_refusal {
+    ($status:expr, $payload:expr, $reason:expr) => {{
+        let reason: &str = $reason;
+        let payload = &$payload;
+        let expected_status =
+            refusal_status(reason).unwrap_or_else(|| panic!("unknown refusal reason {reason}"));
+        assert_eq!($status, expected_status);
+        assert_eq!(payload["status"], "refusal");
+        assert_eq!(payload["schema_version"], "graph_slice.v1");
+        assert_eq!(payload["refusal"]["reason"], reason);
+    }};
 }
 
 #[rstest]
@@ -166,10 +129,10 @@ fn valid_request_returns_success_and_echoed_constraints(
     backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
 ) -> Result<(), String> {
     let (mut backends, temp_dir) = backends_fixture?;
-    let path = write_source(
-        &temp_dir,
-        "slice.rs",
-        concat!(
+    let source = SourceRequest {
+        temp_dir: &temp_dir,
+        filename: "slice.rs",
+        content: concat!(
             "struct Counter(u32);\n\n",
             "impl Counter {\n",
             "    fn increment(&mut self) {\n",
@@ -177,22 +140,17 @@ fn valid_request_returns_success_and_echoed_constraints(
             "    }\n",
             "}\n"
         ),
-    )
-    .map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
-        .to_string();
-    let request = make_request(&[
-        "--uri",
-        &uri,
-        "--position",
-        "4:8",
-        "--entry-detail",
-        detail_value(DetailLevel::Structure),
-        "--node-detail",
-        detail_value(DetailLevel::Semantic),
-    ]);
+        arguments: &[
+            "--position",
+            "4:8",
+            "--entry-detail",
+            detail_value(DetailLevel::Structure),
+            "--node-detail",
+            detail_value(DetailLevel::Semantic),
+        ],
+    };
 
+    let request = prepare_request(&source)?;
     let (status, payload) = dispatch_payload(&request, &mut backends)?;
     let (second_status, second_payload) = dispatch_payload(&request, &mut backends)?;
 
@@ -203,28 +161,10 @@ fn valid_request_returns_success_and_echoed_constraints(
     assert_eq!(payload["constraints"]["node_detail"], "semantic");
     assert_eq!(payload["spillover"]["truncated"], false);
     assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "increment");
-    let symbol_ids: Vec<&str> = payload["cards"]
-        .as_array()
-        .expect("cards array")
-        .iter()
-        .map(|card| {
-            card["symbol"]["symbol_id"]
-                .as_str()
-                .expect("symbol_id should be a string")
-        })
-        .collect();
-    let second_symbol_ids: Vec<&str> = second_payload["cards"]
-        .as_array()
-        .expect("cards array")
-        .iter()
-        .map(|card| {
-            card["symbol"]["symbol_id"]
-                .as_str()
-                .expect("symbol_id should be a string")
-        })
-        .collect();
-    assert!(symbol_ids.len() >= 2);
-    assert_eq!(symbol_ids, second_symbol_ids);
+    let first_symbol_ids = symbol_ids(&payload["cards"])?;
+    let second_symbol_ids = symbol_ids(&second_payload["cards"])?;
+    assert!(first_symbol_ids.len() >= 2);
+    assert_eq!(first_symbol_ids, second_symbol_ids);
     Ok(())
 }
 
@@ -233,10 +173,10 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
     backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
 ) -> Result<(), String> {
     let (mut backends, temp_dir) = backends_fixture?;
-    let path = write_source(
-        &temp_dir,
-        "slice.py",
-        concat!(
+    let source = SourceRequest {
+        temp_dir: &temp_dir,
+        filename: "slice.py",
+        content: concat!(
             "class Factory:\n",
             "    @classmethod\n",
             "    def build(cls) -> \"Factory\":\n",
@@ -245,24 +185,19 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
             "    def version() -> str:\n",
             "        return \"1.0\"\n"
         ),
-    )
-    .map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
-        .to_string();
-    let request = make_request(&[
-        "--uri",
-        &uri,
-        "--position",
-        "3:9",
-        "--max-cards",
-        "1",
-        "--entry-detail",
-        detail_value(DetailLevel::Semantic),
-        "--node-detail",
-        detail_value(DetailLevel::Semantic),
-    ]);
+        arguments: &[
+            "--position",
+            "3:9",
+            "--max-cards",
+            "1",
+            "--entry-detail",
+            detail_value(DetailLevel::Semantic),
+            "--node-detail",
+            detail_value(DetailLevel::Semantic),
+        ],
+    };
 
+    let request = prepare_request(&source)?;
     let (status, payload) = dispatch_payload(&request, &mut backends)?;
     let (second_status, second_payload) = dispatch_payload(&request, &mut backends)?;
 
@@ -277,28 +212,10 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
     let kept_symbol_id = payload["cards"][0]["symbol"]["symbol_id"]
         .as_str()
         .expect("kept symbol_id should be a string");
-    let frontier_ids: Vec<&str> = payload["spillover"]["frontier"]
-        .as_array()
-        .expect("frontier array")
-        .iter()
-        .map(|entry| {
-            entry["symbol_id"]
-                .as_str()
-                .expect("frontier symbol_id should be a string")
-        })
-        .collect();
-    let second_frontier_ids: Vec<&str> = second_payload["spillover"]["frontier"]
-        .as_array()
-        .expect("frontier array")
-        .iter()
-        .map(|entry| {
-            entry["symbol_id"]
-                .as_str()
-                .expect("frontier symbol_id should be a string")
-        })
-        .collect();
-    assert!(!frontier_ids.contains(&kept_symbol_id));
-    assert_eq!(frontier_ids, second_frontier_ids);
+    let first_frontier = frontier_ids(&payload["spillover"]["frontier"])?;
+    let second_frontier = frontier_ids(&second_payload["spillover"]["frontier"])?;
+    assert!(!first_frontier.contains(&kept_symbol_id));
+    assert_eq!(first_frontier, second_frontier);
     assert_spillover_truncated_with_frontier(&payload);
     Ok(())
 }
@@ -307,36 +224,6 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
 mod argument_tests;
 #[path = "coverage_tests.rs"]
 mod coverage_tests;
-struct RefusalCase<'a> {
-    filename: &'a str,
-    content: &'a str,
-    position: &'a str,
-    expected_reason: &'a str,
-    expected_message: Option<&'a str>,
-}
-
-fn assert_structured_refusal(
-    backends: &mut FusionBackends<SemanticBackendProvider>,
-    temp_dir: &TempDir,
-    case: &RefusalCase<'_>,
-) -> Result<(), String> {
-    let path =
-        write_source(temp_dir, case.filename, case.content).map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
-        .to_string();
-    let request = make_request(&["--uri", &uri, "--position", case.position]);
-
-    let (status, payload) = dispatch_payload(&request, backends)?;
-
-    match case.expected_message {
-        Some(message) => {
-            assert_refusal_with_message(status, &payload, case.expected_reason, message);
-        }
-        None => assert_refusal(status, &payload, case.expected_reason),
-    }
-    Ok(())
-}
 
 #[rstest]
 #[case(("notes.txt", "plain text\n", "1:1", "unsupported_language", None))]
@@ -364,17 +251,22 @@ fn structured_refusal_cases(
 ) -> Result<(), String> {
     let (mut backends, temp_dir) = backends_fixture?;
     let (filename, content, position, expected_reason, expected_message) = case;
-    assert_structured_refusal(
+
+    let (status, payload) = dispatch_source(
         &mut backends,
-        &temp_dir,
-        &RefusalCase {
+        &SourceRequest {
+            temp_dir: &temp_dir,
             filename,
             content,
-            position,
-            expected_reason,
-            expected_message,
+            arguments: &["--position", position],
         },
-    )
+    )?;
+
+    assert_refusal!(status, payload, expected_reason);
+    if let Some(message) = expected_message {
+        assert_eq!(payload["refusal"]["message"], message);
+    }
+    Ok(())
 }
 
 #[test]

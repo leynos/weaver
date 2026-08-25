@@ -46,12 +46,26 @@ pub struct FakeDaemon {
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
-/// Returns the path to the compiled `weaver` binary for use in end-to-end
-/// tests.
+// `CARGO_BIN_EXE_weaver` is only set for the crate that owns the binary
+// (`weaver-cli`), so assert_cmd's env-based lookup can never succeed here;
+// the shared resolver falls back to probing and building the workspace binary.
+#[path = "../support/weaver_binary.rs"]
+mod weaver_binary_resolver;
+
+/// Resolves the compiled `weaver` binary for end-to-end tests, building it
+/// when no prebuilt binary is found.
 ///
-/// This wrapper keeps the test support API stable for modules that already
-/// import it.
-pub fn weaver_binary_path() -> std::path::PathBuf { assert_cmd::cargo::cargo_bin("weaver") }
+/// The name mirrors the underlying resolver deliberately: this is not a pure
+/// lookup, and a cold call may shell out to `cargo build` and write artefacts
+/// into the workspace target directory.
+///
+/// # Errors
+/// Returns an `io::Error` if the `weaver` binary cannot be located or built.
+pub fn resolve_or_build_weaver_binary_path() -> io::Result<std::path::PathBuf> {
+    weaver_binary_resolver::resolve_or_build_weaver_binary_path()
+        .map(std::path::Path::to_path_buf)
+        .map_err(io::Error::other)
+}
 
 impl FakeDaemon {
     /// Binds an ephemeral localhost TCP port and spawns a background thread that

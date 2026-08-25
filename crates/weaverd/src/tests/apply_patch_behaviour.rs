@@ -115,101 +115,140 @@ impl ApplyPatchWorld {
     }
 }
 
+/// Fixture payload: workspace creation can fail, so steps unwrap it themselves.
+type ApplyPatchWorldFixture = Result<RefCell<ApplyPatchWorld>, String>;
+
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<ApplyPatchWorld> {
-    let temp_dir = match TempDir::new() {
-        Ok(temp_dir) => temp_dir,
-        Err(error) => panic!("create temporary workspace: {error}"),
-    };
-    RefCell::new(ApplyPatchWorld::new(temp_dir))
+fn world() -> ApplyPatchWorldFixture {
+    TempDir::new()
+        .map(|temp_dir| RefCell::new(ApplyPatchWorld::new(temp_dir)))
+        .map_err(|error| format!("create temporary workspace: {error}"))
+}
+
+/// Borrows the world, surfacing fixture construction failure as a step failure.
+fn apply_patch_world(world: &ApplyPatchWorldFixture) -> Result<&RefCell<ApplyPatchWorld>> {
+    world
+        .as_ref()
+        .map_err(|error| anyhow::anyhow!(error.clone()))
 }
 
 #[given("a workspace with the default source file")]
-fn given_default_source(world: &RefCell<ApplyPatchWorld>) -> Result<()> {
-    world.borrow().create_file("src/main.rs", DEFAULT_SOURCE)
+fn given_default_source(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?
+        .borrow()
+        .create_file("src/main.rs", DEFAULT_SOURCE)
 }
 
 #[given("an empty workspace")]
-#[expect(
-    unused_variables,
-    reason = "BDD step intentionally relies on the default empty workspace"
-)]
-fn given_empty_workspace(world: &RefCell<ApplyPatchWorld>) {}
+fn given_empty_workspace(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?;
+    Ok(())
+}
 
 #[given("a patch that replaces the main message")]
-fn given_patch_replace(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow_mut().set_patch(MODIFY_PATCH);
+fn given_patch_replace(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?
+        .borrow_mut()
+        .set_patch(MODIFY_PATCH);
+    Ok(())
 }
 
 #[given("a patch that creates a new module")]
-fn given_patch_create(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow_mut().set_patch(CREATE_PATCH);
+fn given_patch_create(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?
+        .borrow_mut()
+        .set_patch(CREATE_PATCH);
+    Ok(())
 }
 
 #[given("a patch that deletes a file")]
-fn given_patch_delete(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow_mut().set_patch(DELETE_PATCH);
+fn given_patch_delete(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?
+        .borrow_mut()
+        .set_patch(DELETE_PATCH);
+    Ok(())
 }
 
 #[given("a patch that targets a parent directory")]
-fn given_patch_traversal(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow_mut().set_patch(TRAVERSAL_PATCH);
+fn given_patch_traversal(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?
+        .borrow_mut()
+        .set_patch(TRAVERSAL_PATCH);
+    Ok(())
 }
 
 #[given("a patch with an invalid diff header")]
-fn given_patch_invalid_header(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow_mut().set_patch(INVALID_HEADER_PATCH);
+fn given_patch_invalid_header(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?
+        .borrow_mut()
+        .set_patch(INVALID_HEADER_PATCH);
+    Ok(())
 }
 
 #[given("a patch that omits the create hunk")]
-fn given_patch_missing_hunk(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow_mut().set_patch(MISSING_HUNK_PATCH);
+fn given_patch_missing_hunk(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?
+        .borrow_mut()
+        .set_patch(MISSING_HUNK_PATCH);
+    Ok(())
 }
 
 #[given("a workspace with a deletable file")]
-fn given_deletable_file(world: &RefCell<ApplyPatchWorld>) -> Result<()> {
-    world.borrow().create_file("src/remove.rs", "fn old() {}\n")
+fn given_deletable_file(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?
+        .borrow()
+        .create_file("src/remove.rs", "fn old() {}\n")
 }
 
 #[given("an apply-patch syntactic lock that passes")]
-fn given_syntactic_passes(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow_mut().syntactic_lock = ConfigurableSyntacticLock::passing();
+fn given_syntactic_passes(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?.borrow_mut().syntactic_lock = ConfigurableSyntacticLock::passing();
+    Ok(())
 }
 
 #[given("an apply-patch syntactic lock on {path} that fails with {message}")]
-fn given_syntactic_fails(world: &RefCell<ApplyPatchWorld>, path: String, message: String) {
+fn given_syntactic_fails(
+    world: &ApplyPatchWorldFixture,
+    path: String,
+    message: String,
+) -> Result<()> {
     let path = PathBuf::from(strip_quotes(&path));
     let failure = VerificationFailure::new(path, message.as_str());
-    world.borrow_mut().syntactic_lock = ConfigurableSyntacticLock::failing(vec![failure]);
+    apply_patch_world(world)?.borrow_mut().syntactic_lock =
+        ConfigurableSyntacticLock::failing(vec![failure]);
+    Ok(())
 }
 
 #[given("an apply-patch semantic lock that passes")]
-fn given_semantic_passes(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow_mut().semantic_lock = ConfigurableSemanticLock::passing();
+fn given_semantic_passes(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?.borrow_mut().semantic_lock = ConfigurableSemanticLock::passing();
+    Ok(())
 }
 
 #[given("an apply-patch semantic lock on {path} that fails with {message}")]
-fn given_semantic_fails(world: &RefCell<ApplyPatchWorld>, path: String, message: String) {
+fn given_semantic_fails(
+    world: &ApplyPatchWorldFixture,
+    path: String,
+    message: String,
+) -> Result<()> {
     let path = PathBuf::from(strip_quotes(&path));
     let failure = VerificationFailure::new(path, message.as_str());
-    world.borrow_mut().semantic_lock = ConfigurableSemanticLock::failing(vec![failure]);
+    apply_patch_world(world)?.borrow_mut().semantic_lock =
+        ConfigurableSemanticLock::failing(vec![failure]);
+    Ok(())
 }
 
 #[when("the patch is applied")]
-fn when_patch_applied(world: &RefCell<ApplyPatchWorld>) -> Result<()> {
-    world.borrow_mut().apply_patch()
+fn when_patch_applied(world: &ApplyPatchWorldFixture) -> Result<()> {
+    apply_patch_world(world)?.borrow_mut().apply_patch()
 }
 
 #[then("the apply-patch file {path} contains {snippet}")]
-fn then_file_contains(
-    world: &RefCell<ApplyPatchWorld>,
-    path: String,
-    snippet: String,
-) -> Result<()> {
+fn then_file_contains(world: &ApplyPatchWorldFixture, path: String, snippet: String) -> Result<()> {
     let path = strip_quotes(&path);
     let snippet = strip_quotes(&snippet);
-    let content = world.borrow().read_file(path)?;
+    let content = apply_patch_world(world)?.borrow().read_file(path)?;
     ensure!(
         content.contains(snippet),
         "expected {path} to contain {snippet:?}, got: {content:?}"
@@ -218,28 +257,28 @@ fn then_file_contains(
 }
 
 #[then("the file {path} is missing")]
-fn then_file_missing(world: &RefCell<ApplyPatchWorld>, path: String) -> Result<()> {
+fn then_file_missing(world: &ApplyPatchWorldFixture, path: String) -> Result<()> {
     let path = strip_quotes(&path);
     ensure!(
-        !world.borrow().file_exists(path)?,
+        !apply_patch_world(world)?.borrow().file_exists(path)?,
         "expected {path} to be missing"
     );
     Ok(())
 }
 
 #[then("the apply-patch response succeeds")]
-fn then_patch_succeeds(world: &RefCell<ApplyPatchWorld>) -> Result<()> {
-    let world = world.borrow();
-    let result = world.result.as_ref().context("result set")?;
+fn then_patch_succeeds(world: &ApplyPatchWorldFixture) -> Result<()> {
+    let state = apply_patch_world(world)?.borrow();
+    let result = state.result.as_ref().context("result set")?;
     ensure!(result.is_ok(), "expected success, got: {result:?}");
     Ok(())
 }
 
 #[then("the apply-patch fails with {kind}")]
-fn then_patch_fails(world: &RefCell<ApplyPatchWorld>, kind: String) -> Result<()> {
+fn then_patch_fails(world: &ApplyPatchWorldFixture, kind: String) -> Result<()> {
     let kind = strip_quotes(&kind);
-    let world = world.borrow();
-    let result = world.result.as_ref().context("result set")?;
+    let state = apply_patch_world(world)?.borrow();
+    let result = state.result.as_ref().context("result set")?;
     let error = match result {
         Err(error) => error,
         Ok(()) => anyhow::bail!("expected failure, got success"),
@@ -280,4 +319,4 @@ fn then_patch_fails(world: &RefCell<ApplyPatchWorld>, kind: String) -> Result<()
 fn strip_quotes(value: &str) -> &str { value.trim_matches('"') }
 
 #[scenario(path = "tests/features/apply_patch.feature")]
-fn apply_patch_scenarios(#[from(world)] world: RefCell<ApplyPatchWorld>) { drop(world); }
+fn apply_patch_scenarios(#[from(world)] world: ApplyPatchWorldFixture) { drop(world); }

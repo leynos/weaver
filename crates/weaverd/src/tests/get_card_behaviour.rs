@@ -6,7 +6,7 @@ use std::{
     io::{BufRead, BufReader, Write},
     net::{SocketAddr, TcpStream},
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::Duration,
 };
 
@@ -15,42 +15,27 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
 use url::Url;
-use weaver_cards::DEFAULT_CACHE_CAPACITY;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_config::SocketEndpoint;
 
 use crate::{
-    backends::FusionBackends,
-    dispatch::{BackendManager, DispatchConnectionHandler},
-    semantic_provider::SemanticBackendProvider,
-    tests::support::fs as test_fs,
+    dispatch::DispatchConnectionHandler,
+    tests::support::{self, fs as test_fs},
     transport::{ListenerHandle, SocketListener},
 };
 
 #[fixture]
-fn test_handler() -> Arc<DispatchConnectionHandler> {
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix("/tmp/weaver-bdd-get-card/socket.sock"),
-        ..Config::default()
-    };
-    let provider =
-        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-    let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
-    let backend_manager = BackendManager::new(backends);
-    let workspace_root = match std::env::current_dir() {
-        Ok(path) => path,
-        Err(error) => panic!("find workspace root: {error}"),
-    };
-    let runtime_dir = std::env::temp_dir();
-    let handler = match DispatchConnectionHandler::new(
-        backend_manager,
-        workspace_root,
-        "/tmp/weaver-bdd-get-card/socket.sock",
-        runtime_dir,
-    ) {
-        Ok(handler) => handler,
-        Err(error) => panic!("create dispatch connection handler: {error}"),
-    };
-    Arc::new(handler)
+fn test_handler() -> Result<Arc<DispatchConnectionHandler>, String> {
+    support::dispatch_handler("/tmp/weaver-bdd-get-card/socket.sock")
+}
+
+/// Fixture payload: handler and workspace setup can fail, so steps unwrap it.
+type GetCardWorldFixture = Result<RefCell<GetCardWorld>, String>;
+
+/// Borrows the world, surfacing fixture construction failure as a step failure.
+fn get_card_world(world: &GetCardWorldFixture) -> Result<&RefCell<GetCardWorld>> {
+    world
+        .as_ref()
+        .map_err(|error| anyhow::anyhow!(error.clone()))
 }
 
 struct GetCardWorld {
@@ -209,22 +194,21 @@ impl Drop for GetCardWorld {
 }
 
 #[fixture]
-fn world(test_handler: Arc<DispatchConnectionHandler>) -> RefCell<GetCardWorld> {
-    let world = match GetCardWorld::with_handler(test_handler) {
-        Ok(world) => world,
-        Err(error) => panic!("create get-card test world: {error}"),
-    };
-    RefCell::new(world)
+fn world(test_handler: Result<Arc<DispatchConnectionHandler>, String>) -> GetCardWorldFixture {
+    let handler = test_handler?;
+    GetCardWorld::with_handler(handler)
+        .map(RefCell::new)
+        .map_err(|error| format!("create get-card test world: {error}"))
 }
 
 #[given("a daemon connection is established for get-card")]
-fn given_daemon_connection(world: &RefCell<GetCardWorld>) -> Result<()> {
-    world.borrow_mut().start_listener()
+fn given_daemon_connection(world: &GetCardWorldFixture) -> Result<()> {
+    get_card_world(world)?.borrow_mut().start_listener()
 }
 
 #[given("a supported Rust source fixture")]
-fn given_supported_rust_fixture(world: &RefCell<GetCardWorld>) -> Result<()> {
-    world.borrow_mut().write_fixture(
+fn given_supported_rust_fixture(world: &GetCardWorldFixture) -> Result<()> {
+    get_card_world(world)?.borrow_mut().write_fixture(
         "rust",
         "card.rs",
         "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    \
@@ -233,118 +217,148 @@ fn given_supported_rust_fixture(world: &RefCell<GetCardWorld>) -> Result<()> {
 }
 
 #[given("an unsupported text fixture")]
-fn given_unsupported_fixture(world: &RefCell<GetCardWorld>) -> Result<()> {
-    world
+fn given_unsupported_fixture(world: &GetCardWorldFixture) -> Result<()> {
+    get_card_world(world)?
         .borrow_mut()
         .write_fixture("text", "notes.txt", "plain text only\n")
 }
 
 #[given("an empty Python fixture")]
-fn given_empty_python_fixture(world: &RefCell<GetCardWorld>) -> Result<()> {
-    world.borrow_mut().write_fixture("empty", "empty.py", "")
+fn given_empty_python_fixture(world: &GetCardWorldFixture) -> Result<()> {
+    get_card_world(world)?
+        .borrow_mut()
+        .write_fixture("empty", "empty.py", "")
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[when("an observe get-card request is sent for the Rust fixture")]
-fn when_request_rust_fixture(world: &RefCell<GetCardWorld>) -> Result<()> {
-    world.borrow_mut().send_get_card(GetCardRequest {
-        key: "rust",
-        line: 2,
-        column: 4,
-        detail: "structure",
-    })
+fn when_request_rust_fixture(world: &GetCardWorldFixture) -> Result<()> {
+    get_card_world(world)?
+        .borrow_mut()
+        .send_get_card(GetCardRequest {
+            key: "rust",
+            line: 2,
+            column: 4,
+            detail: "structure",
+        })
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[when("an observe get-card semantic request is sent for the Rust fixture")]
-fn when_request_rust_fixture_semantic(world: &RefCell<GetCardWorld>) -> Result<()> {
-    world.borrow_mut().send_get_card(GetCardRequest {
-        key: "rust",
-        line: 2,
-        column: 4,
-        detail: "semantic",
-    })
+fn when_request_rust_fixture_semantic(world: &GetCardWorldFixture) -> Result<()> {
+    get_card_world(world)?
+        .borrow_mut()
+        .send_get_card(GetCardRequest {
+            key: "rust",
+            line: 2,
+            column: 4,
+            detail: "semantic",
+        })
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[when("an observe get-card request is sent for the unsupported fixture")]
-fn when_request_unsupported_fixture(world: &RefCell<GetCardWorld>) -> Result<()> {
-    world.borrow_mut().send_get_card(GetCardRequest {
-        key: "text",
-        line: 1,
-        column: 1,
-        detail: "structure",
-    })
+fn when_request_unsupported_fixture(world: &GetCardWorldFixture) -> Result<()> {
+    get_card_world(world)?
+        .borrow_mut()
+        .send_get_card(GetCardRequest {
+            key: "text",
+            line: 1,
+            column: 1,
+            detail: "structure",
+        })
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[when("an observe get-card request is sent for the empty Python fixture")]
-fn when_request_empty_fixture(world: &RefCell<GetCardWorld>) -> Result<()> {
-    world.borrow_mut().send_get_card(GetCardRequest {
-        key: "empty",
-        line: 1,
-        column: 1,
-        detail: "structure",
-    })
+fn when_request_empty_fixture(world: &GetCardWorldFixture) -> Result<()> {
+    get_card_world(world)?
+        .borrow_mut()
+        .send_get_card(GetCardRequest {
+            key: "empty",
+            line: 1,
+            column: 1,
+            detail: "structure",
+        })
 }
 
 #[when("the same observe get-card request is sent twice for the Rust fixture")]
-fn when_request_rust_fixture_twice(world: &RefCell<GetCardWorld>) -> Result<()> {
+fn when_request_rust_fixture_twice(world: &GetCardWorldFixture) -> Result<()> {
     when_request_rust_fixture(world)?;
     when_request_rust_fixture(world)
 }
 
 #[when("the Rust fixture is rewritten to return {name}")]
-fn when_rewrite_rust_fixture(world: &RefCell<GetCardWorld>, name: String) -> Result<()> {
+fn when_rewrite_rust_fixture(world: &GetCardWorldFixture, name: String) -> Result<()> {
     let function_name = name.trim_matches('"');
     let source = format!("fn {function_name}() -> usize {{\n    1\n}}\n");
-    world.borrow_mut().rewrite_fixture("rust", &source)
+    get_card_world(world)?
+        .borrow_mut()
+        .rewrite_fixture("rust", &source)
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[then(r#"the stdout response contains "{fragment}""#)]
-fn then_stdout_contains(world: &RefCell<GetCardWorld>, fragment: String) {
+fn then_stdout_contains(world: &GetCardWorldFixture, fragment: String) -> Result<()> {
+    let state = get_card_world(world)?;
     let fragment = fragment.trim_matches('"');
     assert!(
-        world.borrow().stdout_contains(fragment),
+        state.borrow().stdout_contains(fragment),
         "expected stdout to contain {fragment:?}, got {:?}",
-        world.borrow().response_lines
+        state.borrow().response_lines
     );
+    Ok(())
 }
 
 #[then("the get-card response exits with status {status}")]
-fn then_exit_status(world: &RefCell<GetCardWorld>, status: i32) {
+fn then_exit_status(world: &GetCardWorldFixture, status: i32) -> Result<()> {
+    let state = get_card_world(world)?;
     assert!(
-        world.borrow().has_exit_status(status),
+        state.borrow().has_exit_status(status),
         "expected exit status {status}, got {:?}",
-        world.borrow().response_lines
+        state.borrow().response_lines
     );
+    Ok(())
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[then("both responses are identical")]
-fn then_both_responses_identical(world: &RefCell<GetCardWorld>) {
+fn then_both_responses_identical(world: &GetCardWorldFixture) -> Result<()> {
+    let state = get_card_world(world)?;
     assert!(
-        world.borrow().responses_are_identical(),
+        state.borrow().responses_are_identical(),
         "expected identical responses, got previous {:?} and latest {:?}",
-        world.borrow().previous_response_lines,
-        world.borrow().response_lines
+        state.borrow().previous_response_lines,
+        state.borrow().response_lines
     );
+    Ok(())
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[then(r#"the latest stdout response contains "{fragment}""#)]
-fn then_latest_stdout_contains(world: &RefCell<GetCardWorld>, fragment: String) {
+fn then_latest_stdout_contains(world: &GetCardWorldFixture, fragment: String) -> Result<()> {
+    let state = get_card_world(world)?;
     let fragment = fragment.trim_matches('"');
     assert!(
-        world.borrow().latest_stdout_contains(fragment),
+        state.borrow().latest_stdout_contains(fragment),
         "expected latest stdout to contain {fragment:?}, got {:?}",
-        world.borrow().response_lines
+        state.borrow().response_lines
     );
+    Ok(())
 }
 
+// @codescene(disable:"Code Duplication") Distinct rstest-bdd step registration (2026-08-20)
 #[then("the latest stdout response differs from the first response")]
-fn then_latest_response_differs(world: &RefCell<GetCardWorld>) {
+fn then_latest_response_differs(world: &GetCardWorldFixture) -> Result<()> {
+    let state = get_card_world(world)?;
     assert!(
-        world.borrow().latest_response_differs(),
+        state.borrow().latest_response_differs(),
         "expected responses to differ, got previous {:?} and latest {:?}",
-        world.borrow().previous_response_lines,
-        world.borrow().response_lines
+        state.borrow().previous_response_lines,
+        state.borrow().response_lines
     );
+    Ok(())
 }
 
 #[scenario(path = "tests/features/get_card.feature")]
-fn get_card_behaviour(#[from(world)] world: RefCell<GetCardWorld>) { drop(world); }
+fn get_card_behaviour(#[from(world)] world: GetCardWorldFixture) { drop(world); }

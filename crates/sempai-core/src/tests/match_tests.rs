@@ -2,16 +2,22 @@
 
 use std::collections::BTreeMap;
 
+use anyhow::{Result, ensure};
+use rstest::{fixture, rstest};
+use weaver_test_macros::allow_fixture_expansion_lints;
+
 use crate::{CaptureValue, CapturedNode, LineCol, Match, Span};
 
+#[allow_fixture_expansion_lints]
+#[fixture]
 fn sample_span() -> Span { Span::new(12, 42, LineCol::new(2, 0), LineCol::new(4, 0)) }
 
-#[test]
-fn match_construction_with_empty_captures() {
+#[rstest]
+fn match_construction_with_empty_captures(sample_span: Span) {
     let m = Match::new(
         String::from("my-rule"),
         String::from("file:///app.py"),
-        sample_span(),
+        sample_span,
         None,
         BTreeMap::new(),
     );
@@ -22,8 +28,8 @@ fn match_construction_with_empty_captures() {
     assert!(m.captures().is_empty());
 }
 
-#[test]
-fn match_construction_with_focus_and_captures() {
+#[rstest]
+fn match_construction_with_focus_and_captures(sample_span: Span) {
     let focus = Span::new(18, 26, LineCol::new(3, 6), LineCol::new(3, 14));
     let node = CapturedNode::new(
         focus.clone(),
@@ -36,7 +42,7 @@ fn match_construction_with_focus_and_captures() {
     let m = Match::new(
         String::from("rule-2"),
         String::from("file:///lib.rs"),
-        sample_span(),
+        sample_span,
         Some(focus),
         captures,
     );
@@ -45,12 +51,12 @@ fn match_construction_with_focus_and_captures() {
     assert!(m.captures().contains_key("$C"));
 }
 
-#[test]
-fn match_serde_round_trip() {
+#[rstest]
+fn match_serde_round_trip(sample_span: Span) {
     let m = Match::new(
         String::from("test-rule"),
         String::from("file:///test.py"),
-        sample_span(),
+        sample_span,
         None,
         BTreeMap::new(),
     );
@@ -63,8 +69,7 @@ fn match_serde_round_trip() {
 /// Builds a [`Match`] with both `Node` and `Nodes` captures, serializes it
 /// to JSON, and deserializes it back.  Returns the deserialized instance for
 /// per-field assertions in individual tests.
-fn round_trip_match_with_captures() -> Match {
-    let span = sample_span();
+fn round_trip_match_with_captures(span: Span) -> Result<Match> {
     let node = CapturedNode::new(
         span.clone(),
         String::from("identifier"),
@@ -95,19 +100,15 @@ fn round_trip_match_with_captures() -> Match {
         captures,
     );
 
-    let serialized_match = match serde_json::to_string(&m) {
-        Ok(serialized_match) => serialized_match,
-        Err(error) => panic!("match with captures should serialize: {error}"),
-    };
-    match serde_json::from_str(&serialized_match) {
-        Ok(deserialized_match) => deserialized_match,
-        Err(error) => panic!("match with captures should deserialize: {error}"),
-    }
+    let serialized_match = serde_json::to_string(&m)?;
+    let deserialized_match = serde_json::from_str(&serialized_match)?;
+    Ok(deserialized_match)
 }
 
-#[test]
-fn match_serde_round_trip_preserves_node_capture() {
-    let deserialized = round_trip_match_with_captures();
+#[rstest]
+fn match_serde_round_trip_preserves_node_capture(sample_span: Span) {
+    let deserialized = round_trip_match_with_captures(sample_span)
+        .expect("match with captures should round-trip through JSON");
 
     assert_eq!(deserialized.rule_id(), "test-rule");
     assert_eq!(deserialized.uri(), "file:///test.py");
@@ -122,9 +123,10 @@ fn match_serde_round_trip_preserves_node_capture() {
     }
 }
 
-#[test]
-fn match_serde_round_trip_preserves_nodes_capture() {
-    let deserialized = round_trip_match_with_captures();
+#[rstest]
+fn match_serde_round_trip_preserves_nodes_capture(sample_span: Span) {
+    let deserialized = round_trip_match_with_captures(sample_span)
+        .expect("match with captures should round-trip through JSON");
 
     match deserialized.captures().get("$nodes") {
         Some(CaptureValue::Nodes(ns)) => {
@@ -140,14 +142,13 @@ fn match_serde_round_trip_preserves_nodes_capture() {
     }
 }
 
-#[test]
-fn match_captures_preserve_btreemap_ordering() {
-    let span = sample_span();
+#[rstest]
+fn match_captures_preserve_btreemap_ordering(sample_span: Span) -> Result<()> {
     let mut captures = BTreeMap::new();
     captures.insert(
         String::from("$Z"),
         CaptureValue::Node(CapturedNode::new(
-            span.clone(),
+            sample_span.clone(),
             String::from("identifier"),
             None,
         )),
@@ -155,7 +156,7 @@ fn match_captures_preserve_btreemap_ordering() {
     captures.insert(
         String::from("$A"),
         CaptureValue::Node(CapturedNode::new(
-            span.clone(),
+            sample_span.clone(),
             String::from("identifier"),
             None,
         )),
@@ -164,14 +165,19 @@ fn match_captures_preserve_btreemap_ordering() {
     let m = Match::new(
         String::from("order-test"),
         String::from("file:///test.rs"),
-        span,
+        sample_span,
         None,
         captures,
     );
-    let json = serde_json::to_string(&m).expect("serialize");
+    let json = serde_json::to_string(&m)?;
 
     // $A should appear before $Z in JSON due to BTreeMap ordering
-    let pos_a = json.find("$A").expect("$A present");
-    let pos_z = json.find("$Z").expect("$Z present");
-    assert!(pos_a < pos_z, "$A should appear before $Z in JSON");
+    let pos_a = json
+        .find("$A")
+        .ok_or_else(|| anyhow::anyhow!("$A present"))?;
+    let pos_z = json
+        .find("$Z")
+        .ok_or_else(|| anyhow::anyhow!("$Z present"))?;
+    ensure!(pos_a < pos_z, "$A should appear before $Z in JSON");
+    Ok(())
 }

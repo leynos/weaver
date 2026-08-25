@@ -133,29 +133,65 @@ struct ExpectedDiagnosticCase {
     notes: Vec<String>,
 }
 
-fn assert_single_diagnostic_report(report: &DiagnosticReport, expected: &ExpectedDiagnostic<'_>) {
-    assert_eq!(report.len(), 1);
-    let Some(first) = report.diagnostics().first() else {
-        panic!("at least one diagnostic should be present");
-    };
-    assert_eq!(first.code(), expected.code);
-    assert_eq!(first.primary_span(), expected.primary_span.as_ref());
-    assert_eq!(first.message(), expected.message);
-    assert_eq!(first.notes(), expected.notes);
+/// Extracts the sole diagnostic from a report, or an error describing why
+/// there wasn't exactly one. A fallible extractor shared by every assertion
+/// below that expects a single-diagnostic report.
+fn only_diagnostic(report: &DiagnosticReport) -> anyhow::Result<&Diagnostic> {
+    anyhow::ensure!(
+        report.len() == 1,
+        "expected exactly one diagnostic, got {}",
+        report.len()
+    );
+    report
+        .diagnostics()
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("at least one diagnostic should be present"))
+}
+
+fn assert_single_diagnostic_report(
+    report: &DiagnosticReport,
+    expected: &ExpectedDiagnostic<'_>,
+) -> anyhow::Result<()> {
+    let first = only_diagnostic(report)?;
+    anyhow::ensure!(
+        first.code() == expected.code,
+        "code should be {:?}, got {:?}",
+        expected.code,
+        first.code()
+    );
+    anyhow::ensure!(
+        first.primary_span() == expected.primary_span.as_ref(),
+        "primary span should be {:?}, got {:?}",
+        expected.primary_span,
+        first.primary_span()
+    );
+    anyhow::ensure!(
+        first.message() == expected.message,
+        "message should be {:?}, got {:?}",
+        expected.message,
+        first.message()
+    );
+    anyhow::ensure!(
+        first.notes() == expected.notes,
+        "notes should be {:?}, got {:?}",
+        expected.notes,
+        first.notes()
+    );
+    Ok(())
 }
 
 fn assert_report_constructor_builds_single_diagnostic(
     constructor: fn(DiagnosticCode, String, Option<SourceSpan>, Vec<String>) -> DiagnosticReport,
     span: Option<SourceSpan>,
     expected: &ExpectedDiagnostic<'_>,
-) {
+) -> anyhow::Result<()> {
     let report = constructor(
         expected.code,
         expected.message.to_owned(),
         span,
         expected.notes.to_vec(),
     );
-    assert_single_diagnostic_report(&report, expected);
+    assert_single_diagnostic_report(&report, expected)
 }
 
 #[test]
@@ -260,7 +296,8 @@ fn diagnostic_report_constructors_build_single_diagnostic(
         message: expected.message,
         notes: &expected.notes,
     };
-    assert_report_constructor_builds_single_diagnostic(constructor, span, &borrowed_expected);
+    assert_report_constructor_builds_single_diagnostic(constructor, span, &borrowed_expected)
+        .expect("constructor should build a single matching diagnostic");
 }
 
 #[test]

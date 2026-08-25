@@ -7,7 +7,7 @@ mod get_card_behaviour;
 mod lib_api;
 mod process_behaviour;
 mod safety_harness_behaviour;
-mod safety_harness_types;
+pub(crate) mod safety_harness_types;
 mod socket_behaviour;
 pub(crate) mod support;
 mod unit;

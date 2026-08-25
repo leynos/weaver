@@ -106,14 +106,7 @@ mod tests {
     use rstest::rstest;
 
     use super::{LineCol, line_col_to_byte_offset, parse_line_col};
-    use crate::dispatch::errors::DispatchError;
-
-    fn invalid_arguments_message(error: DispatchError) -> String {
-        match error {
-            DispatchError::InvalidArguments { message } => message,
-            other => panic!("expected invalid arguments error, got: {other:?}"),
-        }
-    }
+    use crate::dispatch::act::refactor::refactor_helpers::errors::invalid_arguments_message;
 
     #[rstest]
     #[case::start("1:1", LineCol { line: 1, column: 1 })]
@@ -130,7 +123,8 @@ mod tests {
     #[case::zero_column("1:0", "column number must be >= 1")]
     fn parse_line_col_rejects_invalid_values(#[case] value: &str, #[case] expected_message: &str) {
         let message =
-            invalid_arguments_message(parse_line_col(value).expect_err("position should fail"));
+            invalid_arguments_message(parse_line_col(value).expect_err("position should fail"))
+                .expect("position parsing should fail with invalid arguments");
 
         assert!(message.contains(expected_message), "{message}");
     }
@@ -169,7 +163,8 @@ mod tests {
     ) {
         let message = invalid_arguments_message(
             line_col_to_byte_offset(content, line, column, None).expect_err("position should fail"),
-        );
+        )
+        .expect("offset conversion should fail with invalid arguments");
 
         assert!(message.contains("out of range"), "{message}");
     }

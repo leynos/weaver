@@ -1,10 +1,9 @@
 //! Behavioural tests for the Double-Lock safety harness.
 
-use std::{cell::RefCell, collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, path::PathBuf};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
-use tempfile::TempDir;
 use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::safety_harness_types::{DiagnosticMessage, FileContent, FileName, TextPattern};
@@ -12,188 +11,45 @@ use crate::{
     safety_harness::{
         ConfigurableSemanticLock,
         ConfigurableSyntacticLock,
-        EditTransaction,
-        FileEdit,
-        Position,
         SafetyHarnessError,
-        SyntacticLock,
-        SyntacticLockResult,
-        TextEdit,
         TransactionOutcome,
         TreeSitterSyntacticLockAdapter,
-        VerificationContext,
         VerificationFailure,
     },
-    tests::support::fs as test_fs,
+    tests::support::{
+        fs as test_fs,
+        safety_harness_world::{SafetyHarnessWorld, SyntacticLockVariant},
+    },
 };
 
-/// Syntactic lock variant for BDD test scenarios.
-///
-/// Allows tests to use either a configurable lock (for controlled outcomes)
-/// or the real Tree-sitter adapter (for integration testing).
-enum SyntacticLockVariant {
-    Configurable(ConfigurableSyntacticLock),
-    TreeSitter(TreeSitterSyntacticLockAdapter),
-}
-
-impl SyntacticLock for SyntacticLockVariant {
-    fn validate(&self, context: &VerificationContext) -> SyntacticLockResult {
-        match self {
-            Self::Configurable(lock) => lock.validate(context),
-            Self::TreeSitter(lock) => lock.validate(context),
-        }
-    }
-}
-
-/// Test world for safety harness BDD scenarios.
-pub struct SafetyHarnessWorld {
-    temp_dir: TempDir,
-    files: HashMap<String, PathBuf>,
-    /// Original content of files when created, for unchanged assertions.
-    original_content: HashMap<String, String>,
-    /// The most recently created source file (used as default for edits).
-    current_file: Option<String>,
-    syntactic_lock: SyntacticLockVariant,
-    semantic_lock: ConfigurableSemanticLock,
-    pending_edits: Vec<FileEdit>,
-    outcome: Option<Result<TransactionOutcome, SafetyHarnessError>>,
-}
-
-impl SafetyHarnessWorld {
-    /// Creates a new test world.
-    fn new() -> Self {
-        let temp_dir = match TempDir::new() {
-            Ok(temp_dir) => temp_dir,
-            Err(error) => panic!("create temporary directory: {error}"),
-        };
-        Self {
-            temp_dir,
-            files: HashMap::new(),
-            original_content: HashMap::new(),
-            current_file: None,
-            syntactic_lock: SyntacticLockVariant::Configurable(ConfigurableSyntacticLock::passing()),
-            semantic_lock: ConfigurableSemanticLock::passing(),
-            pending_edits: Vec::new(),
-            outcome: None,
-        }
-    }
-
-    /// Creates a file with the given content.
-    fn create_file(&mut self, name: &FileName, content: &FileContent) -> Result<(), String> {
-        let path = name.to_path(self.temp_dir.path());
-        test_fs::write(&path, content.as_bytes())
-            .map_err(|error| format!("write content: {error}"))?;
-        let name_str = name.as_str().to_string();
-        self.files.insert(name_str.clone(), path);
-        self.original_content
-            .insert(name_str.clone(), content.as_str().to_string());
-        self.current_file = Some(name_str);
-        Ok(())
-    }
-
-    /// Returns the current (most recently created) file name for edits.
-    fn current_file_name(&self) -> FileName {
-        self.current_file.as_deref().unwrap_or("test.txt").into()
-    }
-
-    /// Returns the original content for a named file.
-    fn original_content(&self, name: &FileName) -> Option<&str> {
-        self.original_content.get(name.as_str()).map(String::as_str)
-    }
-
-    /// Returns the path for a named file.
-    fn file_path(&self, name: &FileName) -> PathBuf {
-        self.files
-            .get(name.as_str())
-            .cloned()
-            .unwrap_or_else(|| name.to_path(self.temp_dir.path()))
-    }
-
-    /// Reads the current content of a file.
-    fn read_file(&self, name: &FileName) -> Result<String, String> {
-        let path = self.file_path(name);
-        test_fs::read_to_string(&path).map_err(|error| format!("read file: {error}"))
-    }
-
-    /// Adds an edit that replaces text.
-    fn add_replacement_edit(
-        &mut self,
-        name: &FileName,
-        old: &TextPattern,
-        new: &TextPattern,
-    ) -> Result<(), String> {
-        let path = self.file_path(name);
-        let content =
-            if test_fs::exists(&path).map_err(|error| format!("check file existence: {error}"))? {
-                test_fs::read_to_string(&path).map_err(|error| format!("read file: {error}"))?
-            } else {
-                String::new()
-            };
-
-        // Find the position of the old text
-        if let Some(pos) = content.find(old.as_str()) {
-            let line = content[..pos].matches('\n').count() as u32;
-            let line_start = content[..pos].rfind('\n').map_or(0, |i| i + 1);
-            let column = (pos - line_start) as u32;
-            let old_end_col = column + old.len() as u32;
-
-            let edit = TextEdit::from_positions(
-                Position::new(line, column),
-                Position::new(line, old_end_col),
-                new.as_str().to_string(),
-            );
-            let file_edit = FileEdit::with_edits(path, vec![edit]);
-            self.pending_edits.push(file_edit);
-        }
-        Ok(())
-    }
-
-    /// Adds an edit that creates a new file with content.
-    fn add_creation_edit(&mut self, name: &FileName, content: &FileContent) {
-        let path = self.file_path(name);
-        let edit = TextEdit::insert_at(Position::new(0, 0), content.as_str());
-        let file_edit = FileEdit::with_edits(path.clone(), vec![edit]);
-        self.pending_edits.push(file_edit);
-        self.files.insert(name.as_str().to_string(), path);
-    }
-
-    /// Executes the transaction with pending edits.
-    fn execute_transaction(&mut self) -> Result<(), String> {
-        let mut transaction = EditTransaction::new(&self.syntactic_lock, &self.semantic_lock);
-        for edit in self.pending_edits.drain(..) {
-            transaction.add_edit(edit);
-        }
-        let workspace_dir =
-            cap_std::fs::Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
-                .map_err(|error| format!("open workspace dir: {error}"))?;
-        self.outcome = Some(transaction.execute(&workspace_dir, self.temp_dir.path()));
-        Ok(())
-    }
-
-    /// Returns the transaction outcome.
-    fn outcome(&self) -> Option<&Result<TransactionOutcome, SafetyHarnessError>> {
-        self.outcome.as_ref()
-    }
-}
+/// Fixture payload: workspace creation can fail, so steps unwrap it themselves.
+type SafetyHarnessWorldFixture = Result<RefCell<SafetyHarnessWorld>, String>;
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<SafetyHarnessWorld> { RefCell::new(SafetyHarnessWorld::new()) }
+fn world() -> SafetyHarnessWorldFixture { SafetyHarnessWorld::new().map(RefCell::new) }
+
+/// Borrows the world, surfacing fixture construction failure as a step failure.
+fn safety_world(world: &SafetyHarnessWorldFixture) -> Result<&RefCell<SafetyHarnessWorld>, String> {
+    world.as_ref().map_err(Clone::clone)
+}
 
 // ---- Given steps ----
 
 #[given("a source file {name} with content {content}")]
 fn given_source_file(
-    world: &RefCell<SafetyHarnessWorld>,
+    world: &SafetyHarnessWorldFixture,
     name: FileName,
     content: FileContent,
 ) -> Result<(), String> {
-    world.borrow_mut().create_file(&name, &content)
+    safety_world(world)?
+        .borrow_mut()
+        .create_file(&name, &content)
 }
 
 #[given("no existing file {name}")]
-fn given_no_file(world: &RefCell<SafetyHarnessWorld>, name: FileName) -> Result<(), String> {
-    let path = world.borrow().file_path(&name);
+fn given_no_file(world: &SafetyHarnessWorldFixture, name: FileName) -> Result<(), String> {
+    let path = safety_world(world)?.borrow().file_path(&name);
     assert!(
         !test_fs::exists(&path).map_err(|error| format!("check file existence: {error}"))?,
         "file should not exist: {path:?}"
@@ -202,90 +58,112 @@ fn given_no_file(world: &RefCell<SafetyHarnessWorld>, name: FileName) -> Result<
 }
 
 #[given("a syntactic lock that passes")]
-fn given_syntactic_passes(world: &RefCell<SafetyHarnessWorld>) {
-    world.borrow_mut().syntactic_lock =
+fn given_syntactic_passes(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
+    safety_world(world)?.borrow_mut().syntactic_lock =
         SyntacticLockVariant::Configurable(ConfigurableSyntacticLock::passing());
+    Ok(())
 }
 
 #[given("a syntactic lock that fails with {message}")]
-fn given_syntactic_fails(world: &RefCell<SafetyHarnessWorld>, message: DiagnosticMessage) {
+fn given_syntactic_fails(
+    world: &SafetyHarnessWorldFixture,
+    message: DiagnosticMessage,
+) -> Result<(), String> {
     let failure = VerificationFailure::new(PathBuf::from("test"), message.as_str());
-    world.borrow_mut().syntactic_lock =
+    safety_world(world)?.borrow_mut().syntactic_lock =
         SyntacticLockVariant::Configurable(ConfigurableSyntacticLock::failing(vec![failure]));
+    Ok(())
 }
 
 #[given("a Tree-sitter syntactic lock")]
-fn given_tree_sitter_syntactic_lock(world: &RefCell<SafetyHarnessWorld>) {
-    world.borrow_mut().syntactic_lock =
+fn given_tree_sitter_syntactic_lock(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
+    safety_world(world)?.borrow_mut().syntactic_lock =
         SyntacticLockVariant::TreeSitter(TreeSitterSyntacticLockAdapter::new());
+    Ok(())
 }
 
 #[given("a semantic lock that passes")]
-fn given_semantic_passes(world: &RefCell<SafetyHarnessWorld>) {
-    world.borrow_mut().semantic_lock = ConfigurableSemanticLock::passing();
+fn given_semantic_passes(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
+    safety_world(world)?.borrow_mut().semantic_lock = ConfigurableSemanticLock::passing();
+    Ok(())
 }
 
 #[given("a semantic lock that fails with {message}")]
-fn given_semantic_fails(world: &RefCell<SafetyHarnessWorld>, message: DiagnosticMessage) {
+fn given_semantic_fails(
+    world: &SafetyHarnessWorldFixture,
+    message: DiagnosticMessage,
+) -> Result<(), String> {
     let failure = VerificationFailure::new(PathBuf::from("test"), message.as_str());
-    world.borrow_mut().semantic_lock = ConfigurableSemanticLock::failing(vec![failure]);
+    safety_world(world)?.borrow_mut().semantic_lock =
+        ConfigurableSemanticLock::failing(vec![failure]);
+    Ok(())
 }
 
 #[given("a semantic lock that is unavailable with {message}")]
-fn given_semantic_unavailable(world: &RefCell<SafetyHarnessWorld>, message: DiagnosticMessage) {
-    world.borrow_mut().semantic_lock = ConfigurableSemanticLock::unavailable(message.as_str());
+fn given_semantic_unavailable(
+    world: &SafetyHarnessWorldFixture,
+    message: DiagnosticMessage,
+) -> Result<(), String> {
+    safety_world(world)?.borrow_mut().semantic_lock =
+        ConfigurableSemanticLock::unavailable(message.as_str());
+    Ok(())
 }
 
 // ---- When steps ----
 
 #[when("an edit replaces {old} with {new}")]
 fn when_edit_replaces(
-    world: &RefCell<SafetyHarnessWorld>,
+    world: &SafetyHarnessWorldFixture,
     old: TextPattern,
     new: TextPattern,
 ) -> Result<(), String> {
     // Use current file from scenario, falling back to "test.txt"
-    let file_name = world.borrow().current_file_name();
-    world
+    let state = safety_world(world)?;
+    let file_name = state.borrow().current_file_name();
+    state
         .borrow_mut()
         .add_replacement_edit(&file_name, &old, &new)?;
-    world.borrow_mut().execute_transaction()
+    state.borrow_mut().execute_transaction()
 }
 
 #[when("an edit replaces {old} with {new} in {name}")]
 fn when_edit_replaces_in_file(
-    world: &RefCell<SafetyHarnessWorld>,
+    world: &SafetyHarnessWorldFixture,
     old: TextPattern,
     new: TextPattern,
     name: FileName,
 ) -> Result<(), String> {
-    world.borrow_mut().add_replacement_edit(&name, &old, &new)
+    safety_world(world)?
+        .borrow_mut()
+        .add_replacement_edit(&name, &old, &new)
 }
 
 #[when("no edits are submitted")]
 #[expect(unused_variables, reason = "No edits to add for this step.")]
-fn when_no_edits(world: &RefCell<SafetyHarnessWorld>) {}
+fn when_no_edits(world: &SafetyHarnessWorldFixture) {}
 
 #[when("an edit creates {name} with content {content}")]
 fn when_edit_creates(
-    world: &RefCell<SafetyHarnessWorld>,
+    world: &SafetyHarnessWorldFixture,
     name: FileName,
     content: FileContent,
 ) -> Result<(), String> {
-    world.borrow_mut().add_creation_edit(&name, &content);
-    world.borrow_mut().execute_transaction()
+    let state = safety_world(world)?;
+    state.borrow_mut().add_creation_edit(&name, &content);
+    state.borrow_mut().execute_transaction()
 }
 
 /// Executes the transaction, if needed, before asserting its outcome.
-fn assert_outcome<F>(world: &RefCell<SafetyHarnessWorld>, assertion: F) -> Result<(), String>
+fn assert_outcome<F>(world: &SafetyHarnessWorldFixture, assertion: F) -> Result<(), String>
 where
     F: FnOnce(&Result<TransactionOutcome, SafetyHarnessError>),
 {
-    if world.borrow().outcome().is_none() {
-        world.borrow_mut().execute_transaction()?;
+    let cell = safety_world(world)?;
+    if cell.borrow().outcome().is_none() {
+        cell.borrow_mut().execute_transaction()?;
     }
-    let world = world.borrow();
-    let Some(outcome) = world.outcome() else {
+    let state = cell.borrow();
+    let Some(outcome) = state.outcome() else {
         return Err("outcome should exist".to_string());
     };
     assertion(outcome);
@@ -293,7 +171,7 @@ where
 }
 
 #[then("the transaction commits successfully")]
-fn then_commits(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
+fn then_commits(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| {
         assert!(
             outcome.as_ref().is_ok_and(|o| o.committed()),
@@ -304,7 +182,7 @@ fn then_commits(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
 }
 
 #[then("the transaction fails with a syntactic lock error")]
-fn then_syntactic_fails(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
+fn then_syntactic_fails(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
         Ok(TransactionOutcome::SyntacticLockFailed { .. }) => {}
         other => panic!("expected syntactic lock failure, got {other:?}"),
@@ -313,7 +191,7 @@ fn then_syntactic_fails(world: &RefCell<SafetyHarnessWorld>) -> Result<(), Strin
 }
 
 #[then("the transaction fails with a semantic lock error")]
-fn then_semantic_fails(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
+fn then_semantic_fails(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
         Ok(TransactionOutcome::SemanticLockFailed { .. }) => {}
         other => panic!("expected semantic lock failure, got {other:?}"),
@@ -322,7 +200,7 @@ fn then_semantic_fails(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String
 }
 
 #[then("the transaction fails with a backend error")]
-fn then_backend_error(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
+fn then_backend_error(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
         Err(SafetyHarnessError::SemanticBackendUnavailable { .. }) => {}
         other => panic!("expected backend error, got {other:?}"),
@@ -331,7 +209,7 @@ fn then_backend_error(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String>
 }
 
 #[then("the transaction reports no changes")]
-fn then_no_changes(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
+fn then_no_changes(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
         Ok(TransactionOutcome::NoChanges) => {}
         other => panic!("expected no changes, got {other:?}"),
@@ -341,11 +219,12 @@ fn then_no_changes(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
 
 #[then("the file contains {expected}")]
 fn then_file_contains(
-    world: &RefCell<SafetyHarnessWorld>,
+    world: &SafetyHarnessWorldFixture,
     expected: TextPattern,
 ) -> Result<(), String> {
-    let file_name = world.borrow().current_file_name();
-    let content = world.borrow().read_file(&file_name)?;
+    let state = safety_world(world)?;
+    let file_name = state.borrow().current_file_name();
+    let content = state.borrow().read_file(&file_name)?;
     assert!(
         content.contains(expected.as_str()),
         "expected file to contain '{}', got '{content}'",
@@ -356,11 +235,11 @@ fn then_file_contains(
 
 #[then("the file {name} contains {expected}")]
 fn then_named_file_contains(
-    world: &RefCell<SafetyHarnessWorld>,
+    world: &SafetyHarnessWorldFixture,
     name: FileName,
     expected: TextPattern,
 ) -> Result<(), String> {
-    let content = world.borrow().read_file(&name)?;
+    let content = safety_world(world)?.borrow().read_file(&name)?;
     assert!(
         content.contains(expected.as_str()),
         "expected {} to contain '{}', got '{content}'",
@@ -371,11 +250,11 @@ fn then_named_file_contains(
 }
 
 #[then("the file is unchanged")]
-fn then_file_unchanged(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
-    let file_name = world.borrow().current_file_name();
-    let world = world.borrow();
-    let content = world.read_file(&file_name)?;
-    let expected = world
+fn then_file_unchanged(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
+    let state = safety_world(world)?.borrow();
+    let file_name = state.current_file_name();
+    let content = state.read_file(&file_name)?;
+    let expected = state
         .original_content(&file_name)
         .ok_or_else(|| format!("no original content recorded for {}", file_name.as_str()))?;
     assert_eq!(content, expected, "file should be unchanged");
@@ -384,12 +263,12 @@ fn then_file_unchanged(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String
 
 #[then("the file {name} is unchanged")]
 fn then_named_file_unchanged(
-    world: &RefCell<SafetyHarnessWorld>,
+    world: &SafetyHarnessWorldFixture,
     name: FileName,
 ) -> Result<(), String> {
-    let world = world.borrow();
-    let content = world.read_file(&name)?;
-    let expected = world
+    let state = safety_world(world)?.borrow();
+    let content = state.read_file(&name)?;
+    let expected = state
         .original_content(&name)
         .ok_or_else(|| format!("no original content recorded for {}", name.as_str()))?;
     assert_eq!(content, expected, "{} should be unchanged", name.as_str());
@@ -397,4 +276,4 @@ fn then_named_file_unchanged(
 }
 
 #[scenario(path = "tests/features/safety_harness.feature")]
-fn safety_harness(#[from(world)] _: RefCell<SafetyHarnessWorld>) {}
+fn safety_harness(#[from(world)] _: SafetyHarnessWorldFixture) {}

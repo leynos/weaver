@@ -1,4 +1,16 @@
 //! Shared harness utilities for end-to-end integration tests.
+//!
+//! This module carries the pieces every snapshot suite needs: the in-process
+//! daemon, transcript capture, and snapshot assertion. Command-specific request
+//! builders live in sibling files (`get_card.rs`, `graph_slice.rs`) so that each
+//! test binary compiles only the helpers it actually uses.
+//!
+//! Every fallible operation here reports failure as `Result<_, String>` and is
+//! propagated to the test boundary. `String` is the error type because nothing
+//! in the harness ever matches on a failure — the only consumer is a test that
+//! renders the description and stops — so an enum would add variants with no
+//! reader. It also composes directly with the resolver's existing
+//! `Result<PathBuf, String>` cache contract.
 
 use std::{
     io,
@@ -10,7 +22,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use assert_cmd::Command;
 use insta::assert_snapshot;
 use serde::Serialize;
 use tempfile::TempDir;
@@ -27,7 +38,7 @@ use weaverd::{
     SemanticBackendProvider,
 };
 
-use crate::{fixture_io::write_fixture_path, weaver_binary::weaver_binary_path};
+use crate::{fixture_io::write_fixture_path, weaver_binary::resolve_or_build_weaver_binary_path};
 
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
@@ -41,180 +52,150 @@ pub(crate) struct Transcript {
     stderr: String,
 }
 
-/// Paired transcripts from a two-request caching sequence.
-#[derive(Debug, Serialize)]
-pub(crate) struct CacheTranscript {
-    pub first: Transcript,
-    pub second: Transcript,
-    pub cache_hits: u64,
-    pub cache_misses: u64,
-}
-
-/// Input parameters for a single `observe get-card` CLI invocation in tests.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct GetCardRequest<'a> {
-    pub uri: &'a str,
-    pub line: u32,
-    pub column: u32,
-    pub detail: &'a str,
-}
-
-/// Input parameters for a single `observe graph-slice` CLI invocation in tests.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct GraphSliceRequest<'a> {
-    pub uri: &'a str,
-    pub line: u32,
-    pub column: u32,
-    pub entry_detail: &'a str,
-    pub node_detail: &'a str,
-    pub max_cards: Option<u32>,
-}
-
 /// In-process test daemon accepting a bounded number of requests over a loopback socket.
 pub(crate) struct TestDaemon {
     address: SocketAddr,
     backend_manager: BackendManager,
-    join_handle: Option<thread::JoinHandle<()>>,
+    join_handle: Option<thread::JoinHandle<Result<(), String>>>,
 }
 
 impl TestDaemon {
     /// Starts the daemon, binding to an ephemeral loopback port and awaiting `expected_requests`
     /// connections.
-    pub(crate) fn start(expected_requests: usize) -> Self {
-        let _ = weaver_binary_path();
-        let listener = required_result(TcpListener::bind(("127.0.0.1", 0)), "bind test listener");
-        let address = required_result(listener.local_addr(), "listener address");
-        let config = Config {
-            daemon_socket: SocketEndpoint::tcp("127.0.0.1", 0),
-            ..Config::default()
-        };
-        let provider =
-            SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-        let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
-        let backend_manager = BackendManager::new(Arc::clone(&backends));
-        let workspace_root = required_result(std::env::current_dir(), "workspace root");
-        let endpoint = format!("tcp://{address}");
-        let handler = Arc::new(required_result(
-            DispatchConnectionHandler::new(
-                backend_manager.clone(),
-                workspace_root,
-                endpoint,
-                std::env::temp_dir(),
-            ),
-            "absolute workspace root",
-        ));
+    ///
+    /// # Errors
+    /// Returns a description if the CLI binary cannot be located, the loopback
+    /// listener cannot be bound, the working directory is unavailable, or the
+    /// dispatch handler rejects the workspace root.
+    pub(crate) fn start(expected_requests: usize) -> Result<Self, String> {
+        // Resolve (and if necessary build) the CLI before the daemon starts
+        // serving, so a missing binary fails with a clear message up front.
+        resolve_or_build_weaver_binary_path()
+            .map_err(|error| format!("locate weaver binary: {error}"))?;
+        let listener = TcpListener::bind(("127.0.0.1", 0))
+            .map_err(|error| format!("bind test listener: {error}"))?;
+        let address = listener
+            .local_addr()
+            .map_err(|error| format!("listener address: {error}"))?;
+        let backend_manager = BackendManager::new(new_backends());
+        let handler = Arc::new(new_handler(&backend_manager, address)?);
 
-        let join_handle = thread::spawn(move || {
-            serve_requests(&listener, expected_requests, &handler);
-        });
+        let join_handle =
+            thread::spawn(move || serve_requests(&listener, expected_requests, &handler));
 
-        Self {
+        Ok(Self {
             address,
             backend_manager,
             join_handle: Some(join_handle),
-        }
+        })
     }
 
-    fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
+    /// Returns the `tcp://<addr>` string the CLI passes to `--daemon-socket`.
+    pub(crate) fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
     /// Returns the daemon's current card-cache statistics.
-    pub(crate) fn cache_stats(&self) -> weaver_cards::CacheStats {
-        let stats = self
-            .backend_manager
+    ///
+    /// # Errors
+    /// Returns a description if the backend registry cannot be locked.
+    pub(crate) fn cache_stats(&self) -> Result<weaver_cards::CacheStats, String> {
+        self.backend_manager
             .with_backends(|backends| backends.provider().card_extractor().cache_stats())
-            .map_err(|error| error.to_string());
-        required_result(stats, "cache stats should be available")
+            .map_err(|error| format!("cache stats should be available: {error}"))
     }
 
-    /// Waits for the daemon thread to finish and asserts all expected requests were served.
-    pub(crate) fn join(mut self) {
-        let join_handle = required_result(
-            self.join_handle.take().ok_or("daemon join handle missing"),
-            "daemon join handle",
-        );
-        if let Err(panic_payload) = join_handle.join() {
-            std::panic::resume_unwind(panic_payload);
+    /// Waits for the daemon thread to finish and confirms all expected requests
+    /// were served.
+    ///
+    /// # Errors
+    /// Returns a description if the handle has already been taken, if the
+    /// serving loop failed, or if the cache statistics are unreachable
+    /// afterwards. A panic on the daemon thread is re-raised on this thread so
+    /// its original location survives.
+    pub(crate) fn join(mut self) -> Result<(), String> {
+        let join_handle = self
+            .join_handle
+            .take()
+            .ok_or_else(|| String::from("daemon join handle missing"))?;
+        match join_handle.join() {
+            Ok(served) => served?,
+            Err(panic_payload) => std::panic::resume_unwind(panic_payload),
         }
-        let _ = self.cache_stats();
+        self.cache_stats()?;
+        Ok(())
     }
+}
+
+/// Builds the shared fusion backend registry the test daemon serves from.
+fn new_backends() -> Arc<Mutex<FusionBackends<SemanticBackendProvider>>> {
+    let config = Config {
+        daemon_socket: SocketEndpoint::tcp("127.0.0.1", 0),
+        ..Config::default()
+    };
+    let provider =
+        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
+    Arc::new(Mutex::new(FusionBackends::new(config, provider)))
+}
+
+/// Builds the dispatch handler serving requests for `address`.
+///
+/// # Errors
+/// Returns a description if the current working directory is unavailable or
+/// the handler rejects it as a workspace root.
+fn new_handler(
+    backend_manager: &BackendManager,
+    address: SocketAddr,
+) -> Result<DispatchConnectionHandler, String> {
+    let workspace_root =
+        std::env::current_dir().map_err(|error| format!("workspace root: {error}"))?;
+    DispatchConnectionHandler::new(
+        backend_manager.clone(),
+        workspace_root,
+        format!("tcp://{address}"),
+        std::env::temp_dir(),
+    )
+    .map_err(|error| format!("absolute workspace root: {error}"))
 }
 
 /// Writes a card fixture file into `temp_dir` and returns its `file://` URI string.
-pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
-    let path = required_result(
-        write_fixture_path(temp_dir, case.file_name, case.source),
-        "write fixture path",
-    );
-    let uri = Url::from_file_path(&path).map_err(|()| "fixture path to URI".to_owned());
-    required_result(uri, "fixture path to URI").to_string()
+///
+/// # Errors
+/// Returns a description if the fixture cannot be written or if its path has no
+/// `file://` URI representation.
+pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> Result<String, String> {
+    let path = write_fixture_path(temp_dir, case.file_name, case.source)
+        .map_err(|error| format!("write fixture path: {error}"))?;
+    path_uri(&path)
 }
 
-/// Executes `weaver observe get-card` via the test daemon and returns a `Transcript`.
-pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> Transcript {
-    let command = format!(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri \
-         <uri> --position {}:{} --detail {}",
-        request.line, request.column, request.detail
-    );
-    let command_output = Command::new(weaver_binary_path())
-        .args([
-            "--daemon-socket",
-            &daemon.endpoint(),
-            "--output",
-            "json",
-            "observe",
-            "get-card",
-            "--uri",
-            request.uri,
-            "--position",
-            &format!("{}:{}", request.line, request.column),
-            "--detail",
-            request.detail,
-        ])
-        .output();
-    let output = required_result(command_output, "CLI should execute");
-    output_to_transcript(command, &output)
+/// Converts a filesystem path into its `file://` URI string.
+///
+/// # Errors
+/// Returns a description if the path cannot be expressed as a `file://` URI,
+/// which `url` reports for relative paths.
+pub(crate) fn path_uri(path: &Path) -> Result<String, String> {
+    Url::from_file_path(path)
+        .map(|uri| uri.to_string())
+        .map_err(|()| format!("fixture path to URI: {}", path.display()))
 }
 
-/// Executes `weaver observe graph-slice` via the test daemon and returns a `Transcript`.
-pub(crate) fn run_graph_slice(daemon: &TestDaemon, request: GraphSliceRequest<'_>) -> Transcript {
-    let mut command = format!(
-        concat!(
-            "weaver --daemon-socket tcp://<daemon-endpoint> --output json ",
-            "observe graph-slice --uri <uri> --position {}:{} ",
-            "--entry-detail {} --node-detail {}"
-        ),
-        request.line, request.column, request.entry_detail, request.node_detail
-    );
-    let mut cli_args = vec![
-        String::from("--daemon-socket"),
-        daemon.endpoint(),
-        String::from("--output"),
-        String::from("json"),
-        String::from("observe"),
-        String::from("graph-slice"),
-        String::from("--uri"),
-        String::from(request.uri),
-        String::from("--position"),
-        format!("{}:{}", request.line, request.column),
-        String::from("--entry-detail"),
-        String::from(request.entry_detail),
-        String::from("--node-detail"),
-        String::from(request.node_detail),
-    ];
-    if let Some(max_cards) = request.max_cards {
-        command.push_str(" --max-cards ");
-        command.push_str(&max_cards.to_string());
-        cli_args.push(String::from("--max-cards"));
-        cli_args.push(max_cards.to_string());
-    }
-
-    let output = required_result(
-        Command::new(weaver_binary_path()).args(&cli_args).output(),
-        "CLI should execute",
-    );
-    output_to_transcript(command, &output)
+/// Runs the `weaver` CLI with `cli_args` and captures the result as a `Transcript`.
+///
+/// `command` is the sanitised display form recorded in the snapshot, with the
+/// ephemeral endpoint and temporary paths already replaced by placeholders.
+///
+/// # Errors
+/// Returns a description if the CLI binary cannot be located or if the process
+/// cannot be spawned and run to completion.
+pub(crate) fn run_cli(command: String, cli_args: &[String]) -> Result<Transcript, String> {
+    let binary = resolve_or_build_weaver_binary_path()
+        .map_err(|error| format!("locate weaver binary: {error}"))?;
+    let output = assert_cmd::Command::new(binary)
+        .args(cli_args)
+        .output()
+        .map_err(|error| format!("CLI should execute: {error}"))?;
+    Ok(output_to_transcript(command, &output))
 }
+
 /// Asserts an insta snapshot stored under `tests/snapshots/<name>.snap`.
 pub(crate) fn assert_named_snapshot(name: &str, content: &str) {
     let mut settings = insta::Settings::clone_current();
@@ -229,50 +210,95 @@ pub(crate) fn assert_named_snapshot(name: &str, content: &str) {
     });
 }
 
+/// Serves exactly `expected_requests` connections, then returns.
+///
+/// Runs on the daemon thread, so its outcome is surfaced by
+/// [`TestDaemon::join`] rather than being raised here.
+///
+/// # Errors
+/// Returns a description if the listener rejects non-blocking mode or if any
+/// connection fails to arrive before the accept deadline.
 fn serve_requests(
     listener: &TcpListener,
     expected_requests: usize,
     handler: &Arc<DispatchConnectionHandler>,
-) {
-    required_result(
-        listener.set_nonblocking(true),
-        "non-blocking mode should be supported",
-    );
+) -> Result<(), String> {
+    listener
+        .set_nonblocking(true)
+        .map_err(|error| format!("non-blocking mode should be supported: {error}"))?;
     for _ in 0..expected_requests {
-        let stream = accept_before_deadline(listener);
+        let stream = accept_before_deadline(listener)?;
         handler.handle(ConnectionStream::Tcp(stream));
     }
+    Ok(())
 }
 
-fn accept_before_deadline(listener: &TcpListener) -> TcpStream {
+/// Polls `listener` until one connection arrives or [`ACCEPT_TIMEOUT`] elapses.
+///
+/// # Errors
+/// Returns a description if the deadline passes with no connection, if the
+/// listener itself fails, or if the accepted stream cannot be returned to
+/// blocking mode.
+fn accept_before_deadline(listener: &TcpListener) -> Result<TcpStream, String> {
     let deadline = Instant::now() + ACCEPT_TIMEOUT;
     loop {
         match listener.accept() {
-            Ok((stream, _)) => {
-                required_result(
-                    stream.set_nonblocking(false),
-                    "blocking mode should be supported",
-                );
-                return stream;
-            }
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                assert!(
-                    Instant::now() < deadline,
-                    "test daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
-                );
-                thread::sleep(ACCEPT_POLL_INTERVAL);
-            }
-            Err(error) => {
-                let listener_address = listener
-                    .local_addr()
-                    .map_or_else(|_| String::from("<unknown>"), |address| address.to_string());
-                panic!(
-                    "test daemon listener {listener_address} failed before {ACCEPT_TIMEOUT:?}: \
-                     {error}"
-                );
-            }
+            Ok((stream, _)) => return restore_blocking_stream(stream),
+            Err(error) => handle_accept_error(&error, deadline, listener)?,
         }
     }
+}
+
+/// Returns an accepted `stream` to blocking mode before handing it on.
+///
+/// The listener polls non-blocking, so an accepted stream inherits that mode
+/// and must be reset before the handler reads from it.
+///
+/// # Errors
+/// Returns a description if the stream rejects blocking mode.
+fn restore_blocking_stream(stream: TcpStream) -> Result<TcpStream, String> {
+    stream
+        .set_nonblocking(false)
+        .map_err(|error| format!("blocking mode should be supported: {error}"))?;
+    Ok(stream)
+}
+
+/// Decides whether an accept failure should be retried or reported.
+///
+/// Returns `Ok(())` once it has slept for [`ACCEPT_POLL_INTERVAL`], meaning the
+/// caller should poll again.
+///
+/// # Errors
+/// Returns the timeout diagnostic when `error` is `WouldBlock` at or after
+/// `deadline`, and the listener diagnostic for any other failure.
+fn handle_accept_error(
+    error: &io::Error,
+    deadline: Instant,
+    listener: &TcpListener,
+) -> Result<(), String> {
+    if error.kind() != io::ErrorKind::WouldBlock {
+        return Err(format!(
+            "test daemon listener {} failed before {ACCEPT_TIMEOUT:?}: {error}",
+            listener_address(listener)
+        ));
+    }
+
+    if Instant::now() >= deadline {
+        return Err(format!(
+            "test daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
+        ));
+    }
+
+    thread::sleep(ACCEPT_POLL_INTERVAL);
+    Ok(())
+}
+
+/// Renders the listener's local address for a diagnostic, falling back to a
+/// placeholder when even that lookup fails.
+fn listener_address(listener: &TcpListener) -> String {
+    listener
+        .local_addr()
+        .map_or_else(|_| String::from("<unknown>"), |address| address.to_string())
 }
 
 fn output_to_transcript(command: String, output: &Output) -> Transcript {
@@ -338,63 +364,5 @@ fn normalize_message_value(value: &mut serde_json::Value) {
         if let Some((prefix, _)) = message.split_once("/tmp/") {
             *message = format!("{prefix}<path>");
         }
-    }
-}
-
-fn required_result<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
-    match result {
-        Ok(resolved) => resolved,
-        Err(error) => panic!("{context}: {error}"),
-    }
-}
-
-#[cfg(test)]
-mod test_support_type_usage {
-    //! Ensures support helpers are referenced in compilation for strict lint profiles.
-    use super::*;
-
-    #[test]
-    fn test_build_reference_support_items() {
-        let cache_transcript = CacheTranscript {
-            first: Transcript {
-                command: String::from("<command>"),
-                status: 0,
-                stdout: String::new(),
-                stderr: String::new(),
-            },
-            second: Transcript {
-                command: String::from("<command>"),
-                status: 0,
-                stdout: String::new(),
-                stderr: String::new(),
-            },
-            cache_hits: 0,
-            cache_misses: 0,
-        };
-        let get_card_request = GetCardRequest {
-            uri: "file:///tmp/example",
-            line: 0,
-            column: 0,
-            detail: "semantic",
-        };
-        let graph_slice_request = GraphSliceRequest {
-            uri: "file:///tmp/example",
-            line: 0,
-            column: 0,
-            entry_detail: "semantic",
-            node_detail: "semantic",
-            max_cards: None,
-        };
-        let run_get_card_fn: for<'a> fn(&'a TestDaemon, GetCardRequest<'a>) -> Transcript =
-            run_get_card;
-        let run_graph_slice_fn: for<'a> fn(&'a TestDaemon, GraphSliceRequest<'a>) -> Transcript =
-            run_graph_slice;
-        let _ = (
-            cache_transcript,
-            get_card_request,
-            graph_slice_request,
-            run_get_card_fn,
-            run_graph_slice_fn,
-        );
     }
 }

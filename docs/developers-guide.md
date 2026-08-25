@@ -80,6 +80,40 @@ If a workflow's behaviour genuinely depends on a feature only present from a
 particular commit onwards, express that as a comment or a changelog note, not
 as a test assertion on the SHA string.
 
+## Whitaker CI setup
+
+CI pins Whitaker, Weaver's external lint engine, to a fixed revision through
+the `WHITAKER_REV` environment variable in `.github/workflows/ci.yml`. The
+`Install Whitaker` step then does three things, in order:
+
+1. Installs the installer binary with:
+
+   ```sh
+   cargo install --locked \
+     --git https://github.com/leynos/whitaker \
+     --rev "${WHITAKER_REV}" \
+     whitaker-installer
+   ```
+
+2. Clones the Whitaker source into
+   `${XDG_DATA_HOME:-${HOME}/.local/share}/whitaker` and checks out
+   `${WHITAKER_REV}` detached.
+3. Runs `whitaker-installer --build-only --no-update --cranelift` to prebuild
+   the Cranelift-accelerated lint libraries.
+
+The clone is a separate step from `cargo install` because the installer
+expects the Whitaker source tree to already exist at that well-known path
+when it builds the lint libraries; `cargo install` only produces the
+installer binary, not the source checkout it operates on. `--no-update` stops
+the installer from fetching a different revision than the one just checked
+out, and `--build-only` skips any installer behaviour beyond compiling the
+libraries. Together, pinning the clone and the installer to the same
+`WHITAKER_REV` and disabling the installer's own update step is what keeps
+the CI lint environment reproducible across runs.
+
+See the [Whitaker user's guide](whitaker-users-guide.md) for day-to-day usage
+of the installed lints.
+
 ## Adding or renaming public commands
 
 ADR 007 makes the 0.1.0 public command surface resource-first and generated
@@ -704,8 +738,42 @@ values so that slice responses are reproducible regardless of extraction order.
 ## E2E test support for graph-slice
 
 The end-to-end graph-slice test harness lives in
-`crates/weaver-e2e/tests/graph_slice_snapshots.rs` and is backed by helpers in
-`crates/weaver-e2e/tests/test_support/mod.rs`.
+`crates/weaver-e2e/tests/graph_slice_snapshots.rs`. Shared daemon and
+transcript plumbing lives in `crates/weaver-e2e/tests/test_support/mod.rs`;
+command-specific request builders live in sibling files (`graph_slice.rs`,
+`get_card.rs`) so that each test binary compiles only the helpers it actually
+uses. `GraphSliceRequest<'a>` and `run_graph_slice` live in
+`crates/weaver-e2e/tests/test_support/graph_slice.rs`.
+
+### `run_cli`
+
+`run_cli(command, cli_args)` (`test_support/mod.rs`) is the shared primitive
+that both `run_graph_slice` and `run_get_card` build on. It resolves the
+`weaver` binary, executes it with `cli_args`, and captures the result as a
+`Transcript`. `command` is the sanitized display form recorded in the snapshot:
+callers render it themselves, with the ephemeral daemon endpoint and any
+temporary fixture path already replaced by stable placeholders.
+
+### Resolving the `weaver` binary
+
+`run_cli` locates the CLI binary via `resolve_or_build_weaver_binary_path()` in
+`crates/weaver-e2e/tests/support/weaver_binary.rs`. This resolver exists because
+`assert_cmd`'s usual `CARGO_BIN_EXE_weaver` environment lookup only works from
+the crate that owns the binary (`weaver-cli`); it is never set when tests run
+from `weaver-e2e`. The resolver first checks the target directory and the
+`CARGO_BIN_EXE_weaver` environment variable, then, on a cold cache, shells out
+to `cargo build -p weaver-cli --bin weaver` and writes the resulting artefacts
+into the workspace target directory.
+
+The outcome — success or failure — is memoized in a process-wide `OnceLock`, so
+the build runs at most once per test process and concurrent test threads cannot
+race to spawn competing builds. This cache is per process, not per test run: a
+failed build poisons every remaining test in that binary, and the next
+`cargo test` invocation starts afresh.
+`crates/weaver-e2e/tests/test_support/daemon_harness.rs` re-exports a thin
+wrapper of the same name, `resolve_or_build_weaver_binary_path`, adapting the
+`Result<&'static Path, &'static str>` return type to `io::Result<PathBuf>` for
+callers in that module.
 
 ### `GraphSliceRequest`
 
@@ -717,7 +785,12 @@ The end-to-end graph-slice test harness lives in
 
 `run_graph_slice(daemon, request)` invokes the CLI via the test daemon socket
 and returns a `Transcript` containing `stdout` (the JSONL response envelope) and
-`stderr`.
+`stderr`. It builds the real `cli_args` list first, then derives the recorded
+`command` string from that same list with a private `display_command` helper,
+which swaps the ephemeral daemon endpoint and fixture URI for stable
+placeholders. Deriving the display form from the real arguments keeps the
+snapshot's command string and the arguments actually passed to the CLI from
+drifting apart.
 
 ### `fixture_uri`
 
@@ -799,21 +872,28 @@ the thread finishes.
 `thread::JoinHandle<()>`) to allow the join to consume the handle via
 `Option::take`.
 
-### `test_support` visibility promotions
+### `test_support` command-specific modules
 
-The following fields were promoted from `pub(crate)` to `pub` to allow access
-from the new `graph_slice_snapshots.rs` test binary:
+Get-card and graph-slice each have their own request builders, kept apart from
+the shared `test_support/mod.rs` plumbing:
 
-| Struct               | Fields promoted                                 |
-| -------------------- | ----------------------------------------------- |
-| `CacheTranscript`    | `first`, `second`, `cache_hits`, `cache_misses` |
-| `GetCardRequest<'a>` | `uri`, `line`, `column`, `detail`               |
+| Module                        | Types                                                   |
+| ----------------------------- | ------------------------------------------------------- |
+| `test_support/get_card.rs`    | `CacheTranscript`, `GetCardRequest<'a>`, `run_get_card` |
+| `test_support/graph_slice.rs` | `GraphSliceRequest<'a>`, `run_graph_slice`              |
 
-*Table: Visibility promotions in `test_support`*
+*Table: Command-specific request builders in `test_support`*
 
-`GraphSliceRequest<'a>` was added as a new `pub(crate)` struct with fields
-`uri`, `line`, `column`, `entry_detail`, `node_detail`, and
-`max_cards: Option<u32>`.
+`CacheTranscript` bundles the `first` and `second` transcripts, plus
+`cache_hits` and `cache_misses` counters, from a two-request caching sequence.
+`GetCardRequest<'a>` carries `uri`, `line`, `column`, and `detail` for a single
+`weaver observe get-card` invocation.
+
+Both struct types are themselves `pub(crate)`, so they are only reachable from
+within the `weaver-e2e` integration-test crate; only their *fields* are `pub`.
+That inner `pub` lets sibling modules within the crate construct and read them
+with plain struct literals, without needing accessor methods — it does not
+widen visibility beyond the crate boundary set by the struct itself.
 
 ## CLI help and preflight internals
 
@@ -951,33 +1031,51 @@ access:
   the canonical fixture collections consumed by plugin contract tests.
 - `rename_symbol_request_fixture_named(name)` /
   `rename_symbol_response_fixture_named(name)` — look up a single named request
-  or response fixture by key and panic when the requested fixture name is
-  unknown.
+  or response fixture by key and return `Result<_, FixtureError>` instead of
+  panicking; a miss yields `FixtureError::Missing { kind, name }`, where `kind`
+  is `"request"` or `"response"`.
 - `validate_rename_symbol_request_fixture(fixture)` /
   `validate_rename_symbol_response_fixture(fixture)` — run contract validation
   without panicking and return `Result<(), PluginError>` so callers can inspect
   the exact contract failure.
 - `assert_rename_symbol_request_fixture_contract` /
   `assert_rename_symbol_response_fixture_contract` — assertion helpers that
-  validate a fixture against the `RenameSymbolContract` and panic with a
-  descriptive message on failure.
+  validate a fixture against the `RenameSymbolContract` and return
+  `Result<(), FixtureError>`, so callers assert (and panic, if desired) at the
+  test boundary rather than inside the shared helper.
+
+`FixtureError` (re-exported as `weaver_plugins::FixtureError`) is the shared
+error type for these fallible helpers. It carries three variants:
+`Missing { kind, name }` for an unknown fixture name,
+`UnexpectedSuccess { kind, name }` for a fixture that was expected to fail
+contract validation but did not, and `ContractMismatch { message }` for a
+validation failure. It derives `thiserror::Error`, so it converts cleanly into
+`anyhow::Error` at a `?`-propagating test boundary.
 
 ```toml
 [dev-dependencies]
 weaver-plugins = { path = "../weaver-plugins", features = ["test-support"] }
 ```
 
-Typical lookup and validation usage:
+Typical lookup and validation usage, propagating lookup failures with `?` at a
+`Result`-returning test boundary:
 
 ```rust
+use anyhow::Result;
 use weaver_plugins::{
     rename_symbol_request_fixture_named, validate_rename_symbol_request_fixture,
 };
 
-let fixture = rename_symbol_request_fixture_named("valid_request");
-let result = validate_rename_symbol_request_fixture(&fixture);
-assert!(result.is_ok(), "fixture should satisfy the shared contract");
+fn fixture_satisfies_contract() -> Result<()> {
+    let fixture = rename_symbol_request_fixture_named("valid_request")?;
+    let result = validate_rename_symbol_request_fixture(&fixture);
+    assert!(result.is_ok(), "fixture should satisfy the shared contract");
+    Ok(())
+}
 ```
+
+Prefer `.expect("valid_request fixture should exist")` in place of `?` when the
+surrounding test function does not return a `Result`.
 
 ### `FakeDaemon` (`weaver-e2e/tests/test_support/daemon_harness.rs`)
 
@@ -1169,6 +1267,34 @@ readable after automated wrapping:
   values, and a next-command example derived from the first supported
   provider/refactoring or the `<plugin>` / `<operation>` placeholders. Called
   by the argument-builder when one or more required flags are absent.
+
+## `weaver-lsp-host` BDD world rebuild guarantee
+
+`crates/weaver-lsp-host/src/tests/support/world.rs` defines `TestWorld`, the
+BDD fixture that owns the `LspHost` under test plus its registered stub
+language servers. Steps mutate a `TestWorld` through methods such as
+`request_definition`, `notify_did_open`, and `rebuild_host`, then assert on
+the recorded `last_error`, `last_definition`, `last_references`,
+`last_diagnostics`, or `last_capabilities` fields.
+
+`TestWorld::rebuild_host(overrides)` replaces the host and its stub-server
+registrations using the configs previously set with
+`TestWorld::set_configs`. Registration can fail partway through — for
+example when a config's `initialization_error` causes
+`RecordingLanguageServer::failing_initialize` to report a registration
+failure for one of several stub servers. `rebuild_host` builds the
+replacement `LspHost` and handle map in local variables and only assigns
+them to `self.host` and `self.handles` after every registration in the loop
+has succeeded. A mid-loop failure therefore returns `Err` without mutating
+`self.host`, `self.handles`, or `self.active_overrides`, leaving the
+previously built world exactly as it was before the failed call. Tests that
+want to exercise this path call `set_configs` with a config that is known to
+fail, call `rebuild_host` again, and assert that the pre-existing host and
+handles are unchanged.
+
+This guarantee is specific to `TestWorld::rebuild_host`; other crates
+(`weaverd`, `weaver-sandbox`, `weaver-cli`) have their own internal
+`TestWorld`-style harnesses that are not covered by this section.
 
 ## Act-refactor position parsing and byte-offset conversion
 

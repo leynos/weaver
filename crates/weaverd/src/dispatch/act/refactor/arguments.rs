@@ -188,20 +188,21 @@ mod tests {
     use rstest::rstest;
 
     use super::{LineCol, parse_refactor_args};
-    use crate::dispatch::{act::refactor::metrics::NullPositionMetrics, errors::DispatchError};
-    fn invalid_arguments_message(error: DispatchError) -> String {
-        match error {
-            DispatchError::InvalidArguments { message } => message,
-            other => panic!("expected invalid arguments error, got: {other:?}"),
-        }
-    }
+    use crate::dispatch::act::refactor::{
+        metrics::NullPositionMetrics,
+        refactor_helpers::errors::invalid_arguments_message,
+    };
     fn args(tokens: &[&str]) -> Vec<String> { tokens.iter().copied().map(String::from).collect() }
-    #[track_caller]
-    fn assert_invalid_args_contains(args: Vec<String>, expected_substrings: &[&str]) {
+    /// Parses `args`, expecting rejection, and returns the operator message.
+    fn rejection_message(args: &[String]) -> Result<String, String> {
         let metrics = NullPositionMetrics;
-        let message = invalid_arguments_message(
-            parse_refactor_args(&args, &metrics).expect_err("parse should fail"),
-        );
+        let error = parse_refactor_args(args, &metrics)
+            .err()
+            .ok_or_else(|| String::from("parse should fail"))?;
+        invalid_arguments_message(error)
+    }
+    #[track_caller]
+    fn assert_message_contains(message: &str, expected_substrings: &[&str]) {
         for expected in expected_substrings {
             assert!(
                 message.contains(expected),
@@ -341,7 +342,9 @@ mod tests {
         #[case] args: Vec<String>,
         #[case] expected_substrings: Vec<&str>,
     ) {
-        assert_invalid_args_contains(args, &expected_substrings);
+        let message = rejection_message(&args).expect("parse should reject these arguments");
+
+        assert_message_contains(&message, &expected_substrings);
     }
     #[test]
     fn parses_complete_argument_set() {
@@ -377,22 +380,17 @@ mod tests {
         "src/main.py",
     ]))]
     fn missing_required_flags_report_full_contract(#[case] args: Vec<String>) {
-        let metrics = NullPositionMetrics;
-        let message = invalid_arguments_message(
-            parse_refactor_args(&args, &metrics).expect_err("parse should fail"),
-        );
+        let message = rejection_message(&args).expect("parse should reject incomplete arguments");
 
-        for required in [
-            "--provider <plugin>",
-            "--refactoring <operation>",
-            "--file <path>",
-            "--position <line:col>",
-        ] {
-            assert!(
-                message.contains(required),
-                "missing '{required}' from: {message}"
-            );
-        }
+        assert_message_contains(
+            &message,
+            &[
+                "--provider <plugin>",
+                "--refactoring <operation>",
+                "--file <path>",
+                "--position <line:col>",
+            ],
+        );
         assert!(message.contains("Providers: rope, rust-analyzer"));
         assert!(message.contains("Refactorings: rename"));
         assert!(message.contains("Next command:"));

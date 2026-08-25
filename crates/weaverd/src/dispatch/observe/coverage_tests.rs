@@ -2,7 +2,6 @@
 
 use rstest::rstest;
 use tempfile::TempDir;
-use url::Url;
 use weaver_cards::DetailLevel;
 use weaver_lsp_host::{Language, ServerCapabilitySet};
 
@@ -10,11 +9,14 @@ use super::{
     FusionBackends,
     SemanticBackendProvider,
     assert_success_response,
-    backends_fixture,
-    detail_value,
-    dispatch_payload,
-    make_request,
-    write_source,
+    support::{
+        SourceRequest,
+        backends_fixture,
+        detail_value,
+        dispatch_payload,
+        dispatch_source,
+        prepare_request,
+    },
 };
 use crate::dispatch::observe::test_support::{
     StubLanguageServer,
@@ -29,10 +31,10 @@ fn enrichment_applies_lsp_provenance_when_detail_is_semantic() -> Result<(), Str
         markdown_hover("```rust\nfn increment(&mut self)\n```"),
     );
     let (mut backends, temp_dir) = semantic_backends_with_server(Language::Rust, server)?;
-    let path = write_source(
-        &temp_dir,
-        "enrich.rs",
-        concat!(
+    let source = SourceRequest {
+        temp_dir: &temp_dir,
+        filename: "enrich.rs",
+        content: concat!(
             "struct Counter(u32);\n\n",
             "impl Counter {\n",
             "    fn increment(&mut self) {\n",
@@ -40,23 +42,17 @@ fn enrichment_applies_lsp_provenance_when_detail_is_semantic() -> Result<(), Str
             "    }\n",
             "}\n"
         ),
-    )
-    .map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
-        .to_string();
-    let request = make_request(&[
-        "--uri",
-        &uri,
-        "--position",
-        "4:8",
-        "--entry-detail",
-        detail_value(DetailLevel::Semantic),
-        "--node-detail",
-        detail_value(DetailLevel::Semantic),
-    ]);
+        arguments: &[
+            "--position",
+            "4:8",
+            "--entry-detail",
+            detail_value(DetailLevel::Semantic),
+            "--node-detail",
+            detail_value(DetailLevel::Semantic),
+        ],
+    };
 
-    let (status, payload) = dispatch_payload(&request, &mut backends)?;
+    let (status, payload) = dispatch_source(&mut backends, &source)?;
 
     assert_success_response(status, &payload);
 
@@ -95,10 +91,10 @@ fn stable_card_order_produces_deterministic_results(
     backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
 ) -> Result<(), String> {
     let (mut backends, temp_dir) = backends_fixture?;
-    let path = write_source(
-        &temp_dir,
-        "order.rs",
-        concat!(
+    let request = prepare_request(&SourceRequest {
+        temp_dir: &temp_dir,
+        filename: "order.rs",
+        content: concat!(
             "struct Alpha(u32);\n\n",
             "impl Alpha {\n",
             "    fn first(&self) -> u32 { self.0 }\n",
@@ -106,15 +102,11 @@ fn stable_card_order_produces_deterministic_results(
             "    fn third(&self) -> u32 { self.0 + 2 }\n",
             "}\n"
         ),
-    )
-    .map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
-        .to_string();
-    let request = make_request(&["--uri", &uri, "--position", "4:8"]);
+        arguments: &["--position", "4:8"],
+    })?;
 
     let (status_a, payload_a) = dispatch_payload(&request, &mut backends)?;
-    let (mut fresh_backends, _fresh_backend_dir) = super::backends_fixture()?;
+    let (mut fresh_backends, _fresh_backend_dir) = super::support::backends_fixture()?;
     let (status_b, payload_b) = dispatch_payload(&request, &mut fresh_backends)?;
 
     assert_success_response(status_a, &payload_a);
@@ -153,14 +145,14 @@ fn single_symbol_file_returns_one_card_with_empty_frontier(
     backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
 ) -> Result<(), String> {
     let (mut backends, temp_dir) = backends_fixture?;
-    let path =
-        write_source(&temp_dir, "solo.rs", "fn solo() {}\n").map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
-        .to_string();
-    let request = make_request(&["--uri", &uri, "--position", "1:4"]);
+    let source = SourceRequest {
+        temp_dir: &temp_dir,
+        filename: "solo.rs",
+        content: "fn solo() {}\n",
+        arguments: &["--position", "1:4"],
+    };
 
-    let (status, payload) = dispatch_payload(&request, &mut backends)?;
+    let (status, payload) = dispatch_source(&mut backends, &source)?;
 
     assert_success_response(status, &payload);
 
@@ -197,24 +189,24 @@ fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
     let source = (0..=MAX_SAME_FILE_DISCOVERY_POSITIONS)
         .map(|index| format!("fn item_{index}() {{}}\n"))
         .collect::<String>();
-    let path = write_source(&temp_dir, "large.rs", &source).map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
-        .to_string();
-    let request = make_request(&[
-        "--uri",
-        &uri,
-        "--position",
-        "1:4",
-        "--max-cards",
-        "300",
-        "--entry-detail",
-        detail_value(DetailLevel::Structure),
-        "--node-detail",
-        detail_value(DetailLevel::Structure),
-    ]);
-
-    let (status, payload) = dispatch_payload(&request, &mut backends)?;
+    let (status, payload) = dispatch_source(
+        &mut backends,
+        &SourceRequest {
+            temp_dir: &temp_dir,
+            filename: "large.rs",
+            content: &source,
+            arguments: &[
+                "--position",
+                "1:4",
+                "--max-cards",
+                "300",
+                "--entry-detail",
+                detail_value(DetailLevel::Structure),
+                "--node-detail",
+                detail_value(DetailLevel::Structure),
+            ],
+        },
+    )?;
 
     assert_success_response(status, &payload);
     assert_eq!(payload["spillover"]["truncated"], true);

@@ -9,6 +9,17 @@
 //! with a [`ContractVersion`]. The [`CapabilityContract`] trait provides
 //! the validation interface that concrete contracts implement.
 
+/// Shared contract expectations for the `rename-symbol` fixtures.
+///
+/// This module is available only when the `test-support` feature is enabled.
+#[cfg(feature = "test-support")]
+pub mod fixture_contract;
+/// Error type shared by the `rename-symbol` fixture contract and fixture
+/// support modules.
+///
+/// This module is available only when the `test-support` feature is enabled.
+#[cfg(feature = "test-support")]
+pub mod fixture_error;
 pub mod reason_code;
 pub mod rename_symbol;
 /// Shared test fixtures and validation helpers for capability contract tests.

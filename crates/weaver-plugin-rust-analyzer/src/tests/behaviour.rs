@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
+use anyhow::{Context as _, Result, ensure};
 use mockall::mock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -133,72 +134,97 @@ fn given_failing_adapter(world: &mut World) { world.adapter_mode = AdapterMode::
 fn given_no_change_adapter(world: &mut World) { world.adapter_mode = AdapterMode::NoChange; }
 
 #[when("the plugin executes the request")]
-fn when_execute(world: &mut World) {
-    let Some(request) = world.request.as_ref() else {
-        panic!("request should be present");
-    };
+fn when_execute(world: &mut World) -> Result<()> {
+    let request = world
+        .request
+        .as_ref()
+        .context("request should be present")?;
     let mut adapter = MockBehaviourAdapter::new();
     if should_invoke_rename(request) {
         configure_adapter_for_mode(&mut adapter, world.adapter_mode);
     }
     world.execute_result = Some(execute_request(&adapter, request));
+    Ok(())
 }
 
 /// Resolves the world's execute result to a `PluginResponse`, converting
 /// `Err` outcomes to failure responses for assertion consistency.
-fn resolved_response(world: &World) -> PluginResponse {
-    let Some(execute_result) = world.execute_result.as_ref() else {
-        panic!("execute result should be present");
-    };
-    match execute_result {
+fn resolved_response(world: &World) -> Result<PluginResponse> {
+    let execute_result = world
+        .execute_result
+        .as_ref()
+        .context("execute result should be present")?;
+
+    Ok(match execute_result {
         Ok(resp) => resp.clone(),
         Err(failure) => failure_response(failure.clone()),
-    }
+    })
 }
 
 #[then("the plugin returns successful diff output")]
-fn then_successful_diff(world: &mut World) {
-    let response = resolved_response(world);
-    assert!(response.is_success());
-    assert!(matches!(response.output(), PluginOutput::Diff { .. }));
+fn then_successful_diff(world: &mut World) -> Result<()> {
+    let response = resolved_response(world)?;
+    ensure!(
+        response.is_success(),
+        "expected a successful plugin response"
+    );
+    ensure!(
+        matches!(response.output(), PluginOutput::Diff { .. }),
+        "expected diff output, got {:?}",
+        response.output()
+    );
+    Ok(())
 }
 
 #[then("the plugin returns failure diagnostics")]
-fn then_failure_diagnostics(world: &mut World) {
-    let response = resolved_response(world);
-    assert!(!response.is_success());
-    assert_eq!(response.output(), &PluginOutput::Empty);
-    assert!(
+fn then_failure_diagnostics(world: &mut World) -> Result<()> {
+    let response = resolved_response(world)?;
+    ensure!(!response.is_success(), "expected a failure response");
+    ensure!(
+        response.output() == &PluginOutput::Empty,
+        "expected empty output for a failure response"
+    );
+    ensure!(
         response
             .diagnostics()
             .iter()
-            .any(|diag| diag.severity() == DiagnosticSeverity::Error)
+            .any(|diag| diag.severity() == DiagnosticSeverity::Error),
+        "expected an error diagnostic"
     );
+    Ok(())
 }
 
 #[then("the failure message contains {text}")]
-fn then_failure_contains(world: &mut World, text: String) {
+fn then_failure_contains(world: &mut World, text: String) -> Result<()> {
     let needle = text.trim_matches('"');
-    let response = resolved_response(world);
+    let response = resolved_response(world)?;
     let diagnostics = response.diagnostics();
-    assert!(
+    ensure!(
         diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message().contains(needle)),
         "expected diagnostics to contain '{needle}', got: {diagnostics:?}",
     );
+    Ok(())
+}
+
+/// Maps a feature-file reason-code token onto its enum value.
+fn parse_reason_code(token: &str) -> Option<ReasonCode> {
+    match token {
+        "incomplete_payload" => Some(ReasonCode::IncompletePayload),
+        "operation_not_supported" => Some(ReasonCode::OperationNotSupported),
+        "symbol_not_found" => Some(ReasonCode::SymbolNotFound),
+        _ => None,
+    }
 }
 
 #[then("the failure reason code is {text}")]
-fn then_failure_reason_code(world: &mut World, text: String) {
-    let expected = match text.trim_matches('"') {
-        "incomplete_payload" => ReasonCode::IncompletePayload,
-        "operation_not_supported" => ReasonCode::OperationNotSupported,
-        "symbol_not_found" => ReasonCode::SymbolNotFound,
-        other => panic!("unsupported reason code in feature: {other}"),
-    };
-    let response = resolved_response(world);
-    assert!(
+fn then_failure_reason_code(world: &mut World, text: String) -> Result<()> {
+    let token = text.trim_matches('"');
+    let expected = parse_reason_code(token)
+        .with_context(|| format!("unsupported reason code in feature: {token}"))?;
+    let response = resolved_response(world)?;
+    ensure!(
         response
             .diagnostics()
             .iter()
@@ -206,6 +232,7 @@ fn then_failure_reason_code(world: &mut World, text: String) {
         "expected reason code {expected:?}, got: {:?}",
         response.diagnostics(),
     );
+    Ok(())
 }
 
 #[scenario(path = "tests/features/rust_analyzer_plugin.feature")]

@@ -4,6 +4,7 @@
 //! loading fixtures so step definitions and unit tests remain focused on their
 //! assertions.
 
+mod cli_harness;
 mod fake_daemon;
 mod lifecycle;
 
@@ -17,6 +18,7 @@ use std::{
 
 use anyhow::{Context, Result, ensure};
 use cap_std::fs::Dir;
+pub(crate) use cli_harness::{EXPECTED_SHARED_CONFIG_HELP_FLAGS, run_with_panicking_loader};
 #[cfg(unix)]
 pub(super) use fake_daemon::accept_unix_connection;
 pub(super) use fake_daemon::{FakeDaemon, accept_tcp_connection, respond_to_request};

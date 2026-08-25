@@ -192,7 +192,7 @@ fn test_read_daemon_messages(input: Vec<u8>) -> (Result<i32, AppError>, Vec<u8>,
 fn read_daemon_messages_errors_without_exit() {
     let input = b"{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"hi\"}\n".to_vec();
     let (error, stdout, _stderr) = test_read_daemon_messages(input);
-    let error = error.unwrap_err();
+    let error = error.expect_err("expected missing-exit error");
     assert!(matches!(error, AppError::MissingExit));
     let stdout_text = decode_utf8(stdout, "stdout").expect("decode stdout");
     assert_eq!(stdout_text, "hi");
@@ -205,7 +205,7 @@ fn read_daemon_messages_warns_after_empty_lines() {
         payload.extend_from_slice(b"\n");
     }
     let (error, _stdout, stderr) = test_read_daemon_messages(payload);
-    let error = error.unwrap_err();
+    let error = error.expect_err("expected missing-exit error");
     assert!(matches!(error, AppError::MissingExit));
     let warning = decode_utf8(stderr, "stderr").expect("decode stderr");
     assert!(warning.contains("Warning: received"));
@@ -214,7 +214,7 @@ fn read_daemon_messages_warns_after_empty_lines() {
 #[test]
 fn read_daemon_messages_fails_on_malformed_json() {
     let (error, _stdout, _stderr) = test_read_daemon_messages(Vec::from("this is not json\n"));
-    let error = error.unwrap_err();
+    let error = error.expect_err("expected parse-message error");
     assert!(matches!(error, AppError::ParseMessage(_)));
 }
 
@@ -386,7 +386,7 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
     assert!(!is_daemon_not_running(&AppError::MissingExit));
     assert!(!is_daemon_not_running(&AppError::BareInvocation));
     assert!(!is_daemon_not_running(&AppError::PreflightGuidance));
-    let ser_err = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err());
+    let ser_err = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").expect_err("bad"));
     assert!(!is_daemon_not_running(&ser_err));
 }
 mod actionable_guidance;

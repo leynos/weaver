@@ -9,7 +9,10 @@
 //! argument parsing are covered by the sibling `tests`, `resolution_tests`,
 //! `rollback_tests`, and other refactor test modules.
 
-use std::{path::PathBuf, sync::Mutex};
+use std::{
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
@@ -107,9 +110,13 @@ struct RenameDispatch<'a> {
     socket_dir: &'a TempDir,
 }
 
-struct RenameExpectation<'a> {
-    position: Option<&'a str>,
-    new_name: Option<&'a str>,
+/// The rename-specific slice of a captured plugin request.
+struct RenameArguments {
+    operation: String,
+    uri: Option<String>,
+    position: Option<String>,
+    new_name: Option<String>,
+    has_offset: bool,
 }
 
 struct RenameContractCase {
@@ -176,32 +183,28 @@ fn dispatch_inspecting_rename(
     Ok((captured, file_path, response_stream))
 }
 
-fn assert_rename_request(
-    config: RenameDispatch<'_>,
-    expectation: RenameExpectation<'_>,
-) -> Result<(PluginRequest, PathBuf), String> {
-    let (plugin_request, file_path, _response_stream) = dispatch_inspecting_rename(config)?;
-    let expected_uri = Url::from_file_path(&file_path)
-        .map_err(|()| format!("failed to build URI for '{}'", file_path.display()))?
-        .to_string();
+/// Projects the captured request onto the fields the rename contract pins down.
+fn rename_arguments(request: &PluginRequest) -> RenameArguments {
+    let args = request.arguments();
+    let string_argument = |key: &str| {
+        args.get(key)
+            .and_then(|value| value.as_str())
+            .map(str::to_owned)
+    };
+    RenameArguments {
+        operation: request.operation().to_owned(),
+        uri: string_argument("uri"),
+        position: string_argument("position"),
+        new_name: string_argument("new_name"),
+        has_offset: args.contains_key("offset"),
+    }
+}
 
-    assert_eq!(plugin_request.operation(), "rename-symbol");
-    let args = plugin_request.arguments();
-    assert_eq!(
-        args.get("uri").and_then(|value| value.as_str()),
-        Some(expected_uri.as_str()),
-    );
-    assert_eq!(
-        args.get("position").and_then(|value| value.as_str()),
-        expectation.position
-    );
-    assert!(!args.contains_key("offset"));
-    assert_eq!(
-        args.get("new_name").and_then(|value| value.as_str()),
-        expectation.new_name
-    );
-
-    Ok((plugin_request, file_path))
+/// Builds the `file://` URI the handler is expected to send for `path`.
+fn file_uri(path: &Path) -> Result<String, String> {
+    Url::from_file_path(path)
+        .map_err(|()| format!("failed to build URI for '{}'", path.display()))
+        .map(|uri| uri.to_string())
 }
 
 #[rstest]
@@ -240,20 +243,23 @@ fn handler_rename_contract_parametrised(
     #[case] case: RenameContractCase,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let _ = assert_rename_request(
-        RenameDispatch {
+    let (plugin_request, file_path, _response_stream) =
+        dispatch_inspecting_rename(RenameDispatch {
             file: case.file,
             provider: case.provider,
             language: case.language,
             position: case.position_argument,
             extra_args: case.extra_args,
             socket_dir: &socket_dir,
-        },
-        RenameExpectation {
-            position: case.position,
-            new_name: case.new_name,
-        },
-    )?;
+        })?;
+    let expected_uri = file_uri(&file_path)?;
+    let arguments = rename_arguments(&plugin_request);
+
+    assert_eq!(arguments.operation, "rename-symbol");
+    assert_eq!(arguments.uri.as_deref(), Some(expected_uri.as_str()));
+    assert_eq!(arguments.position.as_deref(), case.position);
+    assert!(!arguments.has_offset);
+    assert_eq!(arguments.new_name.as_deref(), case.new_name);
     Ok(())
 }
 

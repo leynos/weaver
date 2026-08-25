@@ -29,18 +29,12 @@ fn make_sensor(name: &str, lang: &str) -> PluginManifest {
 }
 
 #[fixture]
-fn populated_registry() -> PluginRegistry {
-    let mut r = PluginRegistry::new();
-    if let Err(error) = r.register(make_actuator("rope", "python")) {
-        panic!("register rope: {error}");
-    }
-    if let Err(error) = r.register(make_sensor("jedi", "python")) {
-        panic!("register jedi: {error}");
-    }
-    if let Err(error) = r.register(make_actuator("srgn", "rust")) {
-        panic!("register srgn: {error}");
-    }
-    r
+fn populated_registry() -> Result<PluginRegistry, PluginError> {
+    let mut registry = PluginRegistry::new();
+    registry.register(make_actuator("rope", "python"))?;
+    registry.register(make_sensor("jedi", "python"))?;
+    registry.register(make_actuator("srgn", "rust"))?;
+    Ok(registry)
 }
 
 // ---------------------------------------------------------------------------
@@ -94,13 +88,15 @@ fn register_rejects_invalid_manifest() {
 // ---------------------------------------------------------------------------
 
 #[rstest]
-fn get_returns_none_for_missing(populated_registry: PluginRegistry) {
-    assert!(populated_registry.get("nonexistent").is_none());
+fn get_returns_none_for_missing(populated_registry: Result<PluginRegistry, PluginError>) {
+    let registry = populated_registry.expect("populated registry should build");
+    assert!(registry.get("nonexistent").is_none());
 }
 
 #[rstest]
-fn find_by_kind_actuators(populated_registry: PluginRegistry) {
-    let actuators = populated_registry.find_by_kind(PluginKind::Actuator);
+fn find_by_kind_actuators(populated_registry: Result<PluginRegistry, PluginError>) {
+    let registry = populated_registry.expect("populated registry should build");
+    let actuators = registry.find_by_kind(PluginKind::Actuator);
     assert_eq!(actuators.len(), 2);
     let names: Vec<&str> = actuators.iter().map(|m| m.name()).collect();
     assert!(names.contains(&"rope"));
@@ -108,8 +104,9 @@ fn find_by_kind_actuators(populated_registry: PluginRegistry) {
 }
 
 #[rstest]
-fn find_by_kind_sensors(populated_registry: PluginRegistry) {
-    let sensors = populated_registry.find_by_kind(PluginKind::Sensor);
+fn find_by_kind_sensors(populated_registry: Result<PluginRegistry, PluginError>) {
+    let registry = populated_registry.expect("populated registry should build");
+    let sensors = registry.find_by_kind(PluginKind::Sensor);
     assert_eq!(sensors.len(), 1);
     assert_eq!(sensors.first().expect("one sensor").name(), "jedi");
 }
@@ -117,28 +114,37 @@ fn find_by_kind_sensors(populated_registry: PluginRegistry) {
 #[rstest]
 #[case::lowercase("python")]
 #[case::capitalised("Python")]
-fn find_for_language_is_case_insensitive(populated_registry: PluginRegistry, #[case] query: &str) {
-    let results = populated_registry.find_for_language(query);
+fn find_for_language_is_case_insensitive(
+    populated_registry: Result<PluginRegistry, PluginError>,
+    #[case] query: &str,
+) {
+    let registry = populated_registry.expect("populated registry should build");
+    let results = registry.find_for_language(query);
     assert_eq!(results.len(), 2, "expected 2 plugins for '{query}'");
 }
 
 #[rstest]
-fn find_actuator_for_language(populated_registry: PluginRegistry) {
-    let actuators = populated_registry.find_actuator_for_language("python");
+fn find_actuator_for_language(populated_registry: Result<PluginRegistry, PluginError>) {
+    let registry = populated_registry.expect("populated registry should build");
+    let actuators = registry.find_actuator_for_language("python");
     assert_eq!(actuators.len(), 1);
     assert_eq!(actuators.first().expect("one actuator").name(), "rope");
 }
 
 #[rstest]
-fn find_for_language_returns_empty_for_unknown(populated_registry: PluginRegistry) {
-    let results = populated_registry.find_for_language("haskell");
+fn find_for_language_returns_empty_for_unknown(
+    populated_registry: Result<PluginRegistry, PluginError>,
+) {
+    let registry = populated_registry.expect("populated registry should build");
+    let results = registry.find_for_language("haskell");
     assert!(results.is_empty());
 }
 
 #[rstest]
-fn len_reflects_registration_count(populated_registry: PluginRegistry) {
-    assert_eq!(populated_registry.len(), 3);
-    assert!(!populated_registry.is_empty());
+fn len_reflects_registration_count(populated_registry: Result<PluginRegistry, PluginError>) {
+    let registry = populated_registry.expect("populated registry should build");
+    assert_eq!(registry.len(), 3);
+    assert!(!registry.is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -160,31 +166,26 @@ fn make_actuator_with_capabilities(
 }
 
 #[fixture]
-fn capability_registry() -> PluginRegistry {
-    let mut r = PluginRegistry::new();
-    if let Err(error) = r.register(make_actuator_with_capabilities(
+fn capability_registry() -> Result<PluginRegistry, PluginError> {
+    let mut registry = PluginRegistry::new();
+    registry.register(make_actuator_with_capabilities(
         "rope",
         "python",
         vec![CapabilityId::RenameSymbol],
-    )) {
-        panic!("register rope: {error}");
-    }
-    if let Err(error) = r.register(make_actuator_with_capabilities(
+    ))?;
+    registry.register(make_actuator_with_capabilities(
         "ra",
         "rust",
         vec![CapabilityId::RenameSymbol, CapabilityId::ExtricateSymbol],
-    )) {
-        panic!("register ra: {error}");
-    }
-    if let Err(error) = r.register(make_sensor("jedi", "python")) {
-        panic!("register jedi: {error}");
-    }
-    r
+    ))?;
+    registry.register(make_sensor("jedi", "python"))?;
+    Ok(registry)
 }
 
 #[rstest]
-fn find_for_capability_returns_matching(capability_registry: PluginRegistry) {
-    let results = capability_registry.find_for_capability(CapabilityId::RenameSymbol);
+fn find_for_capability_returns_matching(capability_registry: Result<PluginRegistry, PluginError>) {
+    let registry = capability_registry.expect("capability registry should build");
+    let results = registry.find_for_capability(CapabilityId::RenameSymbol);
     assert_eq!(results.len(), 2);
     let names: Vec<&str> = results.iter().map(|m| m.name()).collect();
     assert!(names.contains(&"rope"));
@@ -192,37 +193,50 @@ fn find_for_capability_returns_matching(capability_registry: PluginRegistry) {
 }
 
 #[rstest]
-fn find_for_capability_excludes_non_matching(capability_registry: PluginRegistry) {
-    let results = capability_registry.find_for_capability(CapabilityId::ExtricateSymbol);
+fn find_for_capability_excludes_non_matching(
+    capability_registry: Result<PluginRegistry, PluginError>,
+) {
+    let registry = capability_registry.expect("capability registry should build");
+    let results = registry.find_for_capability(CapabilityId::ExtricateSymbol);
     assert_eq!(results.len(), 1);
     assert_eq!(results.first().expect("one plugin").name(), "ra");
 }
 
 #[rstest]
-fn find_for_capability_returns_empty_for_unused(capability_registry: PluginRegistry) {
-    let results = capability_registry.find_for_capability(CapabilityId::ExtractMethod);
+fn find_for_capability_returns_empty_for_unused(
+    capability_registry: Result<PluginRegistry, PluginError>,
+) {
+    let registry = capability_registry.expect("capability registry should build");
+    let results = registry.find_for_capability(CapabilityId::ExtractMethod);
     assert!(results.is_empty());
 }
 
 #[rstest]
-fn find_for_language_and_capability_intersects(capability_registry: PluginRegistry) {
-    let results =
-        capability_registry.find_for_language_and_capability("python", CapabilityId::RenameSymbol);
+fn find_for_language_and_capability_intersects(
+    capability_registry: Result<PluginRegistry, PluginError>,
+) {
+    let registry = capability_registry.expect("capability registry should build");
+    let results = registry.find_for_language_and_capability("python", CapabilityId::RenameSymbol);
     assert_eq!(results.len(), 1);
     assert_eq!(results.first().expect("one plugin").name(), "rope");
 }
 
 #[rstest]
-fn find_for_language_and_capability_returns_empty_on_mismatch(capability_registry: PluginRegistry) {
-    let results = capability_registry
-        .find_for_language_and_capability("python", CapabilityId::ExtricateSymbol);
+fn find_for_language_and_capability_returns_empty_on_mismatch(
+    capability_registry: Result<PluginRegistry, PluginError>,
+) {
+    let registry = capability_registry.expect("capability registry should build");
+    let results =
+        registry.find_for_language_and_capability("python", CapabilityId::ExtricateSymbol);
     assert!(results.is_empty());
 }
 
 #[rstest]
-fn find_for_language_and_capability_is_case_insensitive(capability_registry: PluginRegistry) {
-    let results =
-        capability_registry.find_for_language_and_capability("Rust", CapabilityId::RenameSymbol);
+fn find_for_language_and_capability_is_case_insensitive(
+    capability_registry: Result<PluginRegistry, PluginError>,
+) {
+    let registry = capability_registry.expect("capability registry should build");
+    let results = registry.find_for_language_and_capability("Rust", CapabilityId::RenameSymbol);
     assert_eq!(results.len(), 1);
     assert_eq!(results.first().expect("one plugin").name(), "ra");
 }

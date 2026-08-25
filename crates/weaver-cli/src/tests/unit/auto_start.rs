@@ -177,28 +177,23 @@ fn spawn_delayed_unix_listener(
     })
 }
 
+/// Pure predicate: does the auto-start attempt match the expected success
+/// shape (exit 17, waiting message, no failure text, daemon stdout relayed)?
+#[cfg(unix)]
+fn auto_start_success_matches(exit: ExitCode, stderr_text: &str, stdout_text: &str) -> bool {
+    exit == ExitCode::from(17)
+        && stderr_text.contains("Waiting for daemon start...")
+        && !stderr_text.contains("failed to spawn")
+        && !stderr_text.contains("exited before")
+        && stdout_text.contains("daemon says hello")
+}
+
 #[cfg(unix)]
 fn assert_auto_start_success(exit: ExitCode, stderr_text: &str, stdout_text: &str) {
-    assert_eq!(
-        exit,
-        ExitCode::from(17),
-        "expected exit code 17, got {exit:?}; stderr: {stderr_text:?}"
-    );
     assert!(
-        stderr_text.contains("Waiting for daemon start..."),
-        "auto-start should write waiting message: {stderr_text:?}"
-    );
-    assert!(
-        !stderr_text.contains("failed to spawn"),
-        "should not contain spawn failure: {stderr_text:?}"
-    );
-    assert!(
-        !stderr_text.contains("exited before"),
-        "should not contain startup failure: {stderr_text:?}"
-    );
-    assert!(
-        stdout_text.contains("daemon says hello"),
-        "should receive daemon stdout: {stdout_text:?}"
+        auto_start_success_matches(exit, stderr_text, stdout_text),
+        "auto-start did not match expected success shape; exit: {exit:?}, stderr: \
+         {stderr_text:?}, stdout: {stdout_text:?}"
     );
 }
 

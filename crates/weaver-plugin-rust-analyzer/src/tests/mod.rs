@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use cap_std::{ambient_authority, fs::Dir};
 use rstest::rstest;
 use support::{
+    MockAdapter,
     adapter_returning,
     adapter_returning_with_path,
     adapter_unused,
@@ -49,98 +50,141 @@ fn unsupported_operation_returns_error() {
     assert_eq!(err.reason_code(), Some(ReasonCode::OperationNotSupported));
 }
 
-enum FailureScenario {
-    NoChange,
-    AdapterError,
-    UriMismatch,
-    RelativeUri,
-    InvalidUri,
+/// URI override applied before dispatching a rename request.
+#[derive(Clone, Copy)]
+enum UriOverride {
+    /// Keep the URI that matches the file payload.
+    None,
+    /// Point at a different file to trigger the mismatch guard.
+    Mismatch,
+    /// Use an equivalent but non-normalised path.
+    Relative,
+    /// Use a value that is not a `file://` URI at all.
+    Invalid,
+}
+
+impl UriOverride {
+    const fn value(self) -> Option<&'static str> {
+        match self {
+            Self::None => None,
+            Self::Mismatch => Some("file:///src/other.rs"),
+            Self::Relative => Some("file:///./src/main.rs"),
+            Self::Invalid => Some("src/main.rs"),
+        }
+    }
+}
+
+/// Adapter behaviour selected by a scenario.
+#[derive(Clone, Copy)]
+enum AdapterSetup {
+    /// The adapter is never expected to be called.
+    Unused,
+    /// The adapter renames successfully and asserts the forwarded path.
+    RenamesPath(&'static str),
+    /// The adapter returns content identical to the input.
+    ReturnsUnchanged,
+    /// The adapter reports an engine failure.
+    Fails,
+}
+
+const RENAMED_SOURCE: &str = "fn new_name() -> i32 {\n    1\n}\n";
+
+fn adapter_for(setup: AdapterSetup) -> MockAdapter {
+    match setup {
+        AdapterSetup::Unused => adapter_unused(),
+        AdapterSetup::RenamesPath(path) => {
+            adapter_returning_with_path(Ok(String::from(RENAMED_SOURCE)), Some(path))
+        }
+        AdapterSetup::ReturnsUnchanged => {
+            adapter_returning(Ok(String::from("fn old_name() -> i32 {\n    1\n}\n")))
+        }
+        AdapterSetup::Fails => adapter_returning(Err(RustAnalyzerAdapterError::EngineFailed {
+            message: String::from("rust-analyzer adapter failed"),
+        })),
+    }
+}
+
+/// The expected outcome of a rename dispatch, encoded per case so the test
+/// body never re-matches on the scenario.
+#[derive(Clone, Copy)]
+enum ExpectedOutcome {
+    /// The request should succeed.
+    Success,
+    /// The request should fail with the given message fragment and reason.
+    Failure {
+        message_fragment: &'static str,
+        reason_code: Option<ReasonCode>,
+    },
 }
 
 #[rstest]
-#[case::no_change(FailureScenario::NoChange)]
-#[case::adapter_error(FailureScenario::AdapterError)]
-#[case::uri_mismatch(FailureScenario::UriMismatch)]
-#[case::relative_uri(FailureScenario::RelativeUri)]
-#[case::invalid_uri(FailureScenario::InvalidUri)]
-fn rename_non_mutating_or_error_returns_failure(#[case] scenario: FailureScenario) {
+#[case::no_change(
+    UriOverride::None,
+    AdapterSetup::ReturnsUnchanged,
+    ExpectedOutcome::Failure {
+        message_fragment: "no content changes",
+        reason_code: Some(ReasonCode::SymbolNotFound),
+    }
+)]
+#[case::adapter_error(
+    UriOverride::None,
+    AdapterSetup::Fails,
+    ExpectedOutcome::Failure {
+        message_fragment: "rust-analyzer adapter failed",
+        reason_code: None,
+    }
+)]
+#[case::uri_mismatch(
+    UriOverride::Mismatch,
+    AdapterSetup::Unused,
+    ExpectedOutcome::Failure {
+        message_fragment: "does not match file payload",
+        reason_code: Some(ReasonCode::IncompletePayload),
+    }
+)]
+#[case::relative_uri(
+    UriOverride::Relative,
+    AdapterSetup::RenamesPath("src/main.rs"),
+    ExpectedOutcome::Success
+)]
+#[case::invalid_uri(
+    UriOverride::Invalid,
+    AdapterSetup::Unused,
+    ExpectedOutcome::Failure {
+        message_fragment: "uri argument must be a valid file:// URI",
+        reason_code: Some(ReasonCode::IncompletePayload),
+    }
+)]
+fn rename_non_mutating_or_error_returns_failure(
+    #[case] uri_override: UriOverride,
+    #[case] adapter_setup: AdapterSetup,
+    #[case] expected: ExpectedOutcome,
+) {
     let mut arguments = rename_arguments();
-    if matches!(scenario, FailureScenario::UriMismatch) {
+    if let Some(uri) = uri_override.value() {
         arguments.insert(
             String::from("uri"),
-            serde_json::Value::String(String::from("file:///src/other.rs")),
+            serde_json::Value::String(String::from(uri)),
         );
     }
-    if matches!(scenario, FailureScenario::RelativeUri) {
-        arguments.insert(
-            String::from("uri"),
-            serde_json::Value::String(String::from("file:///./src/main.rs")),
-        );
-    }
-    if matches!(scenario, FailureScenario::InvalidUri) {
-        arguments.insert(
-            String::from("uri"),
-            serde_json::Value::String(String::from("src/main.rs")),
-        );
-    }
-    let adapter = match &scenario {
-        FailureScenario::AdapterError => {
-            adapter_returning(Err(RustAnalyzerAdapterError::EngineFailed {
-                message: String::from("rust-analyzer adapter failed"),
-            }))
-        }
-        FailureScenario::UriMismatch | FailureScenario::InvalidUri => adapter_unused(),
-        FailureScenario::RelativeUri => adapter_returning_with_path(
-            Ok(String::from("fn new_name() -> i32 {\n    1\n}\n")),
-            Some("src/main.rs"),
-        ),
-        FailureScenario::NoChange => {
-            adapter_returning(Ok(String::from("fn old_name() -> i32 {\n    1\n}\n")))
-        }
-    };
+    let adapter = adapter_for(adapter_setup);
+    let outcome = execute_request(&adapter, &request_with_args(arguments));
 
-    match scenario {
-        FailureScenario::RelativeUri => {
-            let response = execute_request(&adapter, &request_with_args(arguments))
-                .expect("equivalent relative file URI should succeed");
+    match expected {
+        ExpectedOutcome::Success => {
+            let response = outcome.expect("scenario should succeed");
             assert!(response.is_success());
         }
-        FailureScenario::NoChange => {
-            let err = execute_request(&adapter, &request_with_args(arguments))
-                .expect_err("failure scenario should return Err");
+        ExpectedOutcome::Failure {
+            message_fragment,
+            reason_code,
+        } => {
+            let err = outcome.expect_err("failure scenario should return Err");
             assert!(
-                err.message().contains("no content changes"),
-                "expected no-change diagnostic, got: {err}"
+                err.message().contains(message_fragment),
+                "expected message mentioning '{message_fragment}', got: {err}"
             );
-            assert_eq!(err.reason_code(), Some(ReasonCode::SymbolNotFound));
-        }
-        FailureScenario::AdapterError => {
-            let err = execute_request(&adapter, &request_with_args(arguments))
-                .expect_err("failure scenario should return Err");
-            assert!(
-                err.message().contains("rust-analyzer adapter failed"),
-                "expected adapter error message, got: {err}"
-            );
-            assert_eq!(err.reason_code(), None);
-        }
-        FailureScenario::UriMismatch => {
-            let err = execute_request(&adapter, &request_with_args(arguments))
-                .expect_err("failure scenario should return Err");
-            assert!(
-                err.message().contains("does not match file payload"),
-                "expected uri mismatch diagnostic, got: {err}"
-            );
-            assert_eq!(err.reason_code(), Some(ReasonCode::IncompletePayload));
-        }
-        FailureScenario::InvalidUri => {
-            let err = execute_request(&adapter, &request_with_args(arguments))
-                .expect_err("failure scenario should return Err");
-            assert!(
-                err.message()
-                    .contains("uri argument must be a valid file:// URI"),
-                "expected invalid-URI diagnostic, got: {err}"
-            );
-            assert_eq!(err.reason_code(), Some(ReasonCode::IncompletePayload));
+            assert_eq!(err.reason_code(), reason_code);
         }
     }
 }
@@ -150,7 +194,8 @@ fn rename_non_mutating_or_error_returns_failure(#[case] scenario: FailureScenari
 #[case::curdir(".")]
 fn rename_rejects_empty_or_curdir_path(#[case] path: &str) {
     let adapter = adapter_unused();
-    let error = execute_request(&adapter, &request_with_path(path))
+    let request = request_with_path(path).expect("request should build");
+    let error = execute_request(&adapter, &request)
         .expect_err("invalid path should fail before adapter invocation");
     assert!(
         error
