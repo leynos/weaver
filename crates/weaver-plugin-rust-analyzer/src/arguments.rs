@@ -7,8 +7,13 @@ use std::collections::HashMap;
 
 /// Validated rename-symbol arguments extracted from a plugin request.
 pub(crate) struct RenameSymbolArgs {
+    /// Document URI exactly as supplied by the caller; never rewritten or
+    /// canonicalized here.
     uri: String,
+    /// Zero-based byte offset of the symbol within the document, decoded from
+    /// the request's `position` field.
     offset: usize,
+    /// Replacement identifier requested by the caller, guaranteed non-blank.
     new_name: String,
 }
 
@@ -42,6 +47,7 @@ pub(crate) fn parse_rename_symbol_arguments(
     })
 }
 
+/// Extracts the `uri` argument, rejecting a missing, non-string, or blank value.
 fn parse_uri(arguments: &HashMap<String, serde_json::Value>) -> Result<String, String> {
     let uri_value = arguments
         .get("uri")
@@ -55,6 +61,10 @@ fn parse_uri(arguments: &HashMap<String, serde_json::Value>) -> Result<String, S
     Ok(String::from(uri))
 }
 
+/// Extracts the `position` argument as a byte offset.
+///
+/// Accepts either a JSON string or a JSON number so that callers that render
+/// offsets as text are not penalized.
 fn parse_position(arguments: &HashMap<String, serde_json::Value>) -> Result<usize, String> {
     let position_value = arguments
         .get("position")
@@ -66,6 +76,8 @@ fn parse_position(arguments: &HashMap<String, serde_json::Value>) -> Result<usiz
         .map_err(|error| format!("position must be a non-negative integer: {error}"))
 }
 
+/// Extracts the `new_name` argument, rejecting a missing, non-string, or
+/// blank value.
 fn parse_new_name(arguments: &HashMap<String, serde_json::Value>) -> Result<String, String> {
     let new_name_value = arguments
         .get("new_name")
@@ -79,6 +91,10 @@ fn parse_new_name(arguments: &HashMap<String, serde_json::Value>) -> Result<Stri
     Ok(String::from(new_name))
 }
 
+/// Renders a JSON scalar as a string for numeric parsing.
+///
+/// Returns [`None`] for any value that is neither a string nor a number, so
+/// callers can report a type error rather than guessing.
 fn json_value_to_string(value: &serde_json::Value) -> Option<String> {
     match value {
         serde_json::Value::String(text) => Some(text.to_owned()),

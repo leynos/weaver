@@ -2,7 +2,11 @@
 
 use sempai_yaml::{LegacyFormula, LegacyValue, MatchFormula, SearchQueryPrincipal};
 
+/// Supplies stable, low-cardinality labels for tracing spans emitted during
+/// normalization.
 pub(crate) trait SearchQueryPrincipalTraceExt {
+    /// Returns a fixed label naming the principal's syntax family, suitable as
+    /// a trace field value because the set of labels is closed.
     fn discriminant_like(&self) -> &'static str;
 }
 
@@ -16,6 +20,9 @@ impl SearchQueryPrincipalTraceExt for SearchQueryPrincipal {
     }
 }
 
+/// Measures the pattern text a legacy formula carries, for trace fields that
+/// gauge rule size. Returns `None` for the composite operators, whose size is
+/// better described by [`legacy_branch_count`].
 pub(crate) fn legacy_pattern_len(formula: &LegacyFormula) -> Option<usize> {
     match formula {
         LegacyFormula::Pattern(text)
@@ -29,6 +36,8 @@ pub(crate) fn legacy_pattern_len(formula: &LegacyFormula) -> Option<usize> {
     }
 }
 
+/// Measures a unary operator's operand, recursing when the operand is itself
+/// a nested formula.
 fn legacy_value_pattern_len(value: &LegacyValue) -> Option<usize> {
     match value {
         LegacyValue::String(text) => Some(text.len()),
@@ -36,6 +45,8 @@ fn legacy_value_pattern_len(value: &LegacyValue) -> Option<usize> {
     }
 }
 
+/// Counts the immediate operands of a composite legacy formula, or `None` for
+/// leaf operators that have no branches to count.
 pub(crate) const fn legacy_branch_count(formula: &LegacyFormula) -> Option<usize> {
     match formula {
         LegacyFormula::Patterns(clauses) => Some(clauses.len()),
@@ -44,6 +55,8 @@ pub(crate) const fn legacy_branch_count(formula: &LegacyFormula) -> Option<usize
     }
 }
 
+/// Measures the pattern text of a v2 `match` formula, looking through the
+/// unary and decorated wrappers to reach the underlying leaf.
 pub(crate) fn match_pattern_len(formula: &MatchFormula) -> Option<usize> {
     match formula {
         MatchFormula::Pattern(text)
@@ -60,6 +73,8 @@ pub(crate) fn match_pattern_len(formula: &MatchFormula) -> Option<usize> {
     }
 }
 
+/// Counts the immediate operands of an `all` or `any` formula, looking
+/// through decorations; returns `None` for formulas without branches.
 pub(crate) fn match_branch_count(formula: &MatchFormula) -> Option<usize> {
     match formula {
         MatchFormula::All(branches) | MatchFormula::Any(branches) => Some(branches.len()),

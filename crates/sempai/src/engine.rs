@@ -26,13 +26,20 @@ use crate::{
 /// A compiled query plan for one rule and target language.
 #[derive(Debug)]
 pub struct QueryPlan {
+    /// Identifier of the rule this plan was compiled from, carried through so
+    /// matches can be attributed back to their rule.
     rule_id: String,
+    /// Language the plan was compiled for; a plan is only valid against
+    /// snapshots of this language.
     language: Language,
-    /// The normalized canonical formula.
+    /// The normalized canonical formula, shared behind an [`Arc`] so a plan
+    /// can be cloned cheaply and reused across source files.
     formula: Arc<Decorated<Formula>>,
 }
 
 impl QueryPlan {
+    /// Assembles a plan from parts already validated by the compiler; callers
+    /// outside the crate obtain plans through [`Engine::compile_yaml`].
     pub(crate) const fn new(
         rule_id: String,
         language: Language,
@@ -85,6 +92,8 @@ impl QueryPlan {
 /// ```
 #[derive(Debug)]
 pub struct Engine {
+    /// Limits and language settings applied to every compilation and
+    /// execution performed by this engine.
     config: EngineConfig,
 }
 

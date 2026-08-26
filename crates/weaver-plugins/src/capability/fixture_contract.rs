@@ -46,6 +46,9 @@ pub fn error_mentions_fragment(error: &PluginError, fragment: &str) -> bool {
     error.to_string().contains(fragment)
 }
 
+/// Runs one fixture through `result` and checks the outcome against the
+/// fixture's declared expectation: success when no error fragment is set,
+/// or an error mentioning the fragment when one is.
 fn check_fixture_contract<T>(
     fixture: &RenameSymbolFixture<T>,
     result: Result<(), PluginError>,
@@ -103,6 +106,8 @@ pub fn assert_rename_symbol_response_fixture_contract(
     )
 }
 
+/// Applies `check_fixture` to every fixture in `fixtures`, failing fast on
+/// an empty suite so a broken wiring path cannot pass by vacuous truth.
 fn check_suite_matches_contract<T>(
     suite_name: &str,
     fixtures: &[T],

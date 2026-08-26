@@ -293,7 +293,7 @@ Current files that matter for this milestone:
 - [crates/sempai-yaml/src/parser/mod.rs](../../crates/sempai-yaml/src/parser/mod.rs)
 - [crates/sempai-yaml/src/parser/builders.rs](../../crates/sempai-yaml/src/parser/builders.rs)
 - [crates/sempai-yaml/src/model.rs](../../crates/sempai-yaml/src/model.rs)
-- [crates/sempai-yaml/src/raw.rs](../../crates/sempai-yaml/src/raw.rs)
+- [crates/sempai-yaml/src/raw/mod.rs](../../crates/sempai-yaml/src/raw/mod.rs)
 - [crates/sempai-yaml/src/tests/behaviour.rs](../../crates/sempai-yaml/src/tests/behaviour.rs)
 - [crates/sempai-yaml/tests/features/sempai_yaml.feature](../../crates/sempai-yaml/tests/features/sempai_yaml.feature)
 - [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs)
@@ -356,7 +356,7 @@ Go/no-go:
 
 Bridge the current data gap between parsed rules and engine-side validation.
 
-- Extend `crates/sempai-yaml/src/raw.rs` to deserialize
+- Extend `crates/sempai-yaml/src/raw/mod.rs` to deserialize
   `r2c-internal-project-depends-on` in a forward-compatible way. It can remain
   opaque data if no typed semantics are needed yet.
 - Update `crates/sempai-yaml/src/model.rs` so parsed search rules can report

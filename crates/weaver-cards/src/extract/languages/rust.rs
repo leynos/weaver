@@ -61,6 +61,10 @@ pub(super) fn collect(root: Node<'_>, source: &str) -> Vec<EntityCandidate> {
     entities
 }
 
+/// Collects `function_item` methods nested inside a `trait_item` or
+/// `impl_item` body, tagging each with `container` as its owning type or
+/// trait name. Returns an empty vector when `node` has no body (e.g. a trait
+/// declaration without a default-method block).
 fn impl_like_methods(
     node: Node<'_>,
     source: &str,

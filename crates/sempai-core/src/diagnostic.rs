@@ -224,6 +224,8 @@ fn diagnostic_summary(diagnostics: &[Diagnostic]) -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, thiserror::Error)]
 #[error("{}", diagnostic_summary(&self.diagnostics))]
 pub struct DiagnosticReport {
+    /// The individual diagnostics that make up this report, in emission
+    /// order.
     diagnostics: Vec<Diagnostic>,
 }
 

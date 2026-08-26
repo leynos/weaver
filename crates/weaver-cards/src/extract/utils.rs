@@ -7,6 +7,11 @@ use weaver_syntax::SupportedLanguage;
 
 use crate::{CardExtractionError, CardLanguage, DetailLevel};
 
+/// Lists the extraction sources that contributed to a card at `detail`.
+///
+/// Tree-sitter extraction always contributes; the higher detail levels are
+/// reported as "degraded" because this extractor never runs LSP-backed
+/// semantic or full analysis, it only fills those levels from syntax alone.
 pub(super) fn provenance_sources(detail: DetailLevel) -> Vec<String> {
     static TREE_SITTER_ONLY: OnceLock<Vec<String>> = OnceLock::new();
     let base = TREE_SITTER_ONLY.get_or_init(|| vec![String::from("tree_sitter")]);
@@ -20,6 +25,8 @@ pub(super) fn provenance_sources(detail: DetailLevel) -> Vec<String> {
     sources
 }
 
+/// Maps the internal Tree-sitter language enum onto the public card schema's
+/// language enum, keeping the two vocabularies independently evolvable.
 pub(super) const fn to_card_language(language: SupportedLanguage) -> CardLanguage {
     match language {
         SupportedLanguage::Rust => CardLanguage::Rust,
@@ -28,6 +35,13 @@ pub(super) const fn to_card_language(language: SupportedLanguage) -> CardLanguag
     }
 }
 
+/// Builds the `file://` URI used to identify a symbol's source location.
+///
+/// # Errors
+///
+/// Returns [`CardExtractionError::InvalidPath`] when `path` is not absolute
+/// or cannot otherwise be converted to a file URI (for example, malformed
+/// path components on the host platform).
 pub(super) fn file_uri(path: &Path) -> Result<String, CardExtractionError> {
     if !path.is_absolute() {
         return Err(CardExtractionError::InvalidPath {

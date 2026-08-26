@@ -1,12 +1,20 @@
-//! Raw serde-deserializable types mirroring the YAML schema.
+//! Conversion of the raw YAML shapes in [`super`] into the validated `model`
+//! types.
 //!
-//! These types mirror the serde input and convert into the typed `model` layer
-//! via `TryFrom`, returning `DiagnosticReport` when semantic constraints fail.
+//! Serde deserialization validates the raw document shape, including rejecting
+//! unknown fields on strict mappings. Every conversion is fallible: this layer
+//! enforces additional semantic constraints — such as a formula object naming
+//! exactly one operator — and reports violations as `DiagnosticReport`s.
 use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
-use serde::Deserialize;
-use serde_json::Value;
 use serde_saphyr::Spanned;
 
+use super::{
+    RawLegacyClause,
+    RawLegacyFormulaObject,
+    RawLegacyValue,
+    RawMatchFormula,
+    RawMatchFormulaObject,
+};
 use crate::model::{
     LegacyClause,
     LegacyFormula,
@@ -15,105 +23,9 @@ use crate::model::{
     RuleMode,
     RuleSeverity,
 };
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RawRuleFile {
-    pub(crate) rules: Vec<RawRule>,
-}
-// Allow unknown fields for forward compatibility with future Semgrep rule extensions.
-#[derive(Debug, Deserialize)]
-pub(crate) struct RawRule {
-    pub(crate) id: Option<Spanned<String>>,
-    pub(crate) message: Option<Spanned<String>>,
-    pub(crate) languages: Option<Spanned<Vec<String>>>,
-    pub(crate) severity: Option<Spanned<String>>,
-    pub(crate) mode: Option<Spanned<String>>,
-    #[serde(rename = "min-version")]
-    pub(crate) min_version: Option<Spanned<String>>,
-    #[serde(rename = "max-version")]
-    pub(crate) max_version: Option<Spanned<String>>,
-    pub(crate) pattern: Option<Spanned<String>>,
-    #[serde(rename = "pattern-regex")]
-    pub(crate) pattern_regex: Option<Spanned<String>>,
-    pub(crate) patterns: Option<Spanned<Vec<RawLegacyClause>>>,
-    #[serde(rename = "pattern-either")]
-    pub(crate) pattern_either: Option<Spanned<Vec<RawLegacyFormulaObject>>>,
-    #[serde(rename = "match")]
-    pub(crate) match_formula: Option<Spanned<RawMatchFormula>>,
-    #[serde(rename = "r2c-internal-project-depends-on")]
-    pub(crate) project_depends_on: Option<Spanned<Value>>,
-    #[serde(rename = "dest-language")]
-    pub(crate) dest_language: Option<Spanned<String>>,
-    pub(crate) extract: Option<Spanned<String>>,
-    pub(crate) join: Option<Spanned<Value>>,
-    pub(crate) taint: Option<Spanned<Value>>,
-    #[serde(rename = "pattern-sources")]
-    pub(crate) pattern_sources: Option<Spanned<Value>>,
-    #[serde(rename = "pattern-sanitizers")]
-    pub(crate) pattern_sanitizers: Option<Spanned<Value>>,
-    #[serde(rename = "pattern-sinks")]
-    pub(crate) pattern_sinks: Option<Spanned<Value>>,
-}
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-pub(crate) enum RawLegacyClause {
-    Formula(RawLegacyFormulaObject),
-    Constraint(Value),
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-pub(crate) enum RawLegacyValue {
-    String(String),
-    Formula(Box<RawLegacyFormulaObject>),
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RawLegacyFormulaObject {
-    pub(crate) pattern: Option<String>,
-    #[serde(rename = "pattern-regex")]
-    pub(crate) pattern_regex: Option<String>,
-    pub(crate) patterns: Option<Vec<RawLegacyClause>>,
-    #[serde(rename = "pattern-either")]
-    pub(crate) pattern_either: Option<Vec<Self>>,
-    #[serde(rename = "pattern-not")]
-    pub(crate) pattern_not: Option<RawLegacyValue>,
-    #[serde(rename = "pattern-inside")]
-    pub(crate) pattern_inside: Option<RawLegacyValue>,
-    #[serde(rename = "pattern-not-inside")]
-    pub(crate) pattern_not_inside: Option<RawLegacyValue>,
-    #[serde(rename = "pattern-not-regex")]
-    pub(crate) pattern_not_regex: Option<String>,
-    #[serde(rename = "semgrep-internal-pattern-anywhere")]
-    pub(crate) anywhere: Option<RawLegacyValue>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-pub(crate) enum RawMatchFormula {
-    String(String),
-    Object(Box<RawMatchFormulaObject>),
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RawMatchFormulaObject {
-    pub(crate) pattern: Option<String>,
-    pub(crate) regex: Option<String>,
-    pub(crate) all: Option<Vec<RawMatchFormula>>,
-    pub(crate) any: Option<Vec<RawMatchFormula>>,
-    pub(crate) not: Option<Box<RawMatchFormula>>,
-    pub(crate) inside: Option<Box<RawMatchFormula>>,
-    pub(crate) anywhere: Option<Box<RawMatchFormula>>,
-    #[serde(rename = "where")]
-    pub(crate) where_clauses: Option<Vec<Value>>,
-    #[serde(rename = "as")]
-    pub(crate) as_name: Option<String>,
-    pub(crate) fix: Option<String>,
-}
-
+/// Builds a schema validation diagnostic with a fixed code and a single
+/// remediation note, so all schema failures read consistently.
 pub(crate) fn schema_error(
     message: String,
     span: Option<SourceSpan>,
@@ -127,7 +39,14 @@ pub(crate) fn schema_error(
     )
 }
 
-/// Returns the sole parsed legacy formula or the diagnostic from `make_error`.
+/// Reduces a set of collected legacy operands to the single formula a legacy
+/// object is allowed to define.
+///
+/// # Errors
+///
+/// Returns the diagnostic produced by `make_error` when the object defined no
+/// operator or more than one; the operand count is passed through so the caller
+/// can word the two cases differently.
 pub(crate) fn singleton_formula(
     mut formulas: Vec<LegacyFormula>,
     make_error: impl FnOnce(usize) -> DiagnosticReport,
@@ -165,7 +84,15 @@ impl TryFrom<RawLegacyFormulaObject> for LegacyFormula {
     }
 }
 
-/// Converts a `RawLegacyFormulaObject` to a `LegacyFormula`.
+/// Converts a legacy formula mapping into the single [`LegacyFormula`] it
+/// denotes, recursing through nested clauses. `span` locates the mapping for
+/// diagnostics and may be `None` when no source position is known.
+///
+/// # Errors
+///
+/// Returns a schema diagnostic when the mapping names no supported operator or
+/// names more than one, and propagates any failure from converting a nested
+/// clause.
 pub(crate) fn convert_legacy_formula_object(
     value: RawLegacyFormulaObject,
     span: Option<SourceSpan>,
@@ -230,7 +157,13 @@ pub(crate) fn push_optional_legacy_formula(
     }
 }
 
-/// Appends an optional sequence-backed legacy operator to `formulas`.
+/// Appends an optional sequence-backed legacy operator to `formulas`, converting
+/// each element on the way; absent operands leave `formulas` untouched.
+///
+/// # Errors
+///
+/// Propagates the first element conversion failure, in which case nothing is
+/// appended.
 pub(crate) fn push_optional_legacy_sequence_formula<T, U>(
     formulas: &mut Vec<LegacyFormula>,
     value: Option<Vec<T>>,
@@ -250,6 +183,8 @@ where
     Ok(())
 }
 
+/// Converts an optional unary operand and appends the resulting formula,
+/// leaving `formulas` untouched when the operand is absent.
 fn push_optional_legacy_value_formula(
     formulas: &mut Vec<LegacyFormula>,
     value: Option<RawLegacyValue>,
@@ -337,7 +272,15 @@ impl TryFrom<RawMatchFormulaObject> for MatchFormula {
     }
 }
 
-/// Converts a raw `match` formula object into a validated `MatchFormula`.
+/// Converts a raw `match` mapping into a validated [`MatchFormula`], wrapping
+/// the core operator in a decoration layer when `where`, `as` or `fix` is also
+/// present.
+///
+/// # Errors
+///
+/// Returns a schema diagnostic, blaming `span`, when the mapping names no core
+/// operator or names more than one, and propagates failures from converting
+/// nested operands.
 pub(crate) fn convert_match_formula_object(
     value: RawMatchFormulaObject,
     span: Option<SourceSpan>,
@@ -378,7 +321,13 @@ pub(crate) fn convert_match_formula_object(
     Ok(MatchFormula::decorated(core, where_, as_name, fix))
 }
 
-// Helper functions for parsing that don't belong in the model
+/// Decodes a `severity:` token into the typed severity.
+///
+/// # Errors
+///
+/// Returns a schema diagnostic listing every accepted token when the value is
+/// not one of them, blaming `fallback_span` because the spanned value's own
+/// location is not always available.
 pub(crate) fn parse_severity(
     value: &Spanned<String>,
     fallback_span: Option<&SourceSpan>,

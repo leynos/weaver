@@ -7,10 +7,18 @@ use crate::{BranchInfo, LocalInfo};
 
 /// Tracks traversal state while collecting locals and branches from a body.
 pub(super) struct StructureCollector<'a> {
+    /// Original file text, used to slice out bound names.
     source: &'a str,
+    /// Tree-sitter node id of the body being traversed, so `visit` can tell
+    /// the entry point apart from a nested entity that happens to share its
+    /// kind.
     body_root_id: usize,
+    /// Node kind of the callable or container that owns the body; needed to
+    /// special-case Rust trait items when deciding what counts as nested.
     root_kind: &'a str,
+    /// Local variable bindings discovered so far, in traversal order.
     locals: Vec<LocalInfo>,
+    /// Branch markers discovered so far, in traversal order.
     branches: Vec<BranchInfo>,
 }
 
@@ -135,16 +143,24 @@ pub(super) fn branch_info(node: Node<'_>) -> Option<BranchInfo> {
     })
 }
 
+/// Extracts bound names from a `let_declaration`'s `pattern` field, covering
+/// simple bindings and destructuring patterns alike.
 fn binding_names(node: Node<'_>, source: &str) -> Vec<String> {
     node.child_by_field_name("pattern")
         .map_or_else(Vec::new, |pattern| bound_names(pattern, source))
 }
 
+/// Extracts bound names from an `assignment`'s `left` field, so plain and
+/// destructuring assignment targets both surface as locals.
 fn assignment_names(node: Node<'_>, source: &str) -> Vec<String> {
     node.child_by_field_name("left")
         .map_or_else(Vec::new, |target| bound_names(target, source))
 }
 
+/// Extracts bound names from a `lexical_declaration` (`let`/`const` in
+/// TypeScript), preferring each `variable_declarator`'s `name` field and
+/// falling back to a broader scan of the declaration's children when no
+/// declarator is found, so unusual grammar shapes still yield names.
 fn lexical_names(node: Node<'_>, source: &str) -> Vec<String> {
     let mut cursor = node.walk();
     let names: Vec<String> = node
@@ -168,12 +184,18 @@ fn lexical_names(node: Node<'_>, source: &str) -> Vec<String> {
     }
 }
 
+/// Recursively resolves `node` to the identifier names it binds, wrapping
+/// [`collect_bound_names`] with a fresh accumulator for callers that only
+/// need the resulting list.
 fn bound_names(node: Node<'_>, source: &str) -> Vec<String> {
     let mut names = Vec::new();
     collect_bound_names(node, source, &mut names);
     names
 }
 
+/// Appends `node`'s text as a bound name, after whitespace normalization,
+/// skipping it if the slice is empty (e.g. because the byte range could not
+/// be read from `source`).
 fn push_identifier_name(node: Node<'_>, source: &str, names: &mut Vec<String>) {
     let name = normalise_whitespace(source.get(node.byte_range()).unwrap_or_default());
     if !name.is_empty() {
@@ -181,10 +203,20 @@ fn push_identifier_name(node: Node<'_>, source: &str, names: &mut Vec<String>) {
     }
 }
 
+/// Returns the first child of `node` found under any of `fields`, checked in
+/// order, so callers can prefer one field name over another without writing
+/// out repeated `or_else` chains.
 fn find_named_field_child<'a>(node: Node<'a>, fields: &[&str]) -> Option<Node<'a>> {
     fields.iter().find_map(|f| node.child_by_field_name(f))
 }
 
+/// Walks `node` to find every identifier it binds, appending each to `names`.
+///
+/// Plain identifier-like nodes are recorded directly; member/field/subscript
+/// expressions are skipped entirely since they target existing bindings
+/// rather than declaring new ones; and other nodes are recursed into via a
+/// preferred pattern field (`name`, `pattern`, `left`, `value`) when present,
+/// or through all named children otherwise.
 fn collect_bound_names(node: Node<'_>, source: &str, names: &mut Vec<String>) {
     match node.kind() {
         "identifier"

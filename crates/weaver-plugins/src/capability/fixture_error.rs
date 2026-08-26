@@ -38,5 +38,7 @@ pub enum FixtureError {
 }
 
 impl FixtureError {
+    /// Builds a [`FixtureError::ContractMismatch`] from an already-formatted
+    /// message, saving call sites from naming the variant directly.
     pub(crate) const fn mismatch(message: String) -> Self { Self::ContractMismatch { message } }
 }

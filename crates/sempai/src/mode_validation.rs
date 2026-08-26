@@ -14,6 +14,10 @@ pub(crate) fn validate_supported_modes(file: &RuleFile) -> Result<(), Diagnostic
         .map_or(Ok(()), Err)
 }
 
+/// Produces the rejection diagnostic for a single rule, or `None` when the
+/// rule's mode is executable. Only search mode is implemented; the remaining
+/// modes parse successfully but are refused here rather than silently
+/// producing no matches.
 fn unsupported_mode_diagnostic(rule: &Rule) -> Option<DiagnosticReport> {
     match rule.mode() {
         RuleMode::Search => None,
@@ -33,12 +37,16 @@ fn unsupported_mode_diagnostic(rule: &Rule) -> Option<DiagnosticReport> {
     }
 }
 
+/// Picks the tightest location to blame for an unsupported mode: the `mode:`
+/// value if the source map located it, otherwise the whole rule.
 fn unsupported_mode_span(rule: &Rule) -> Option<SourceSpan> {
     rule.mode_span()
         .cloned()
         .or_else(|| rule.rule_span().cloned())
 }
 
+/// Renders a mode as the spelling a rule author would have written, so the
+/// diagnostic echoes their YAML rather than a Rust variant name.
 #[expect(
     clippy::missing_const_for_fn,
     reason = "keep this helper runtime-only to avoid const-eval coupling in diagnostics"

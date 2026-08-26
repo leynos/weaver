@@ -29,6 +29,7 @@ pub use project_depends_on::ProjectDependsOnPayload;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleFile {
+    /// Rules in the order they appear under the document's `rules:` key.
     pub(crate) rules: Vec<Rule>,
 }
 
@@ -49,15 +50,33 @@ impl RuleFile {
 /// A parsed Semgrep-compatible rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rule {
+    /// Stable identifier from the rule's `id:` key, used to key findings and
+    /// suppressions; required, so it is unwrapped during validation.
     pub(crate) id: String,
+    /// Analysis family selected by `mode:`, defaulting to search when the key
+    /// is absent.
     pub(crate) mode: RuleMode,
+    /// Coarse span of the whole rule mapping, absent when the source map could
+    /// not locate the rule.
     pub(crate) span: Option<SourceSpan>,
+    /// Span of the `mode:` value alone, so mode-specific diagnostics can point
+    /// at the offending key rather than the whole rule.
     pub(crate) mode_span: Option<SourceSpan>,
+    /// Finding text from `message:`; optional because the schema tolerates
+    /// rules that only need to match.
     pub(crate) message: Option<String>,
+    /// Languages from `languages:`, empty when the key is omitted.
     pub(crate) languages: Vec<String>,
+    /// Decoded `severity:` token; `None` leaves the choice to the caller's
+    /// default policy.
     pub(crate) severity: Option<RuleSeverity>,
+    /// Oldest Semgrep release the rule declares support for, from
+    /// `min-version:`.
     pub(crate) min_version: Option<String>,
+    /// Newest Semgrep release the rule declares support for, from
+    /// `max-version:`.
     pub(crate) max_version: Option<String>,
+    /// The rule body, whose variant is fixed by [`Rule::mode`].
     pub(crate) principal: RulePrincipal,
 }
 
@@ -213,8 +232,12 @@ pub enum SearchQueryPrincipal {
 /// Extract rule principal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtractQueryPrincipal {
+    /// Language the extracted text is re-analysed as, from `dest-language:`.
     pub(crate) dest_language: String,
+    /// Metavariable naming the capture whose text is extracted, from
+    /// `extract:`.
     pub(crate) extract: String,
+    /// Legacy formula that locates the code to extract from.
     pub(crate) query: LegacyFormula,
 }
 
@@ -322,6 +345,8 @@ pub enum MatchFormula {
 }
 
 impl MatchFormula {
+    /// Reports whether any decoration key is present, and so whether a
+    /// [`MatchFormula::Decorated`] wrapper is needed at all.
     #[inline]
     const fn has_decoration(
         where_clauses: &[Value],

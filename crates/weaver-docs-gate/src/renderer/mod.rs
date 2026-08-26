@@ -10,29 +10,49 @@ use std::collections::BTreeMap;
 
 use crate::{BoundaryManifest, BoundaryState, BoundaryTask};
 
+/// Placeholder cell text for fields the manifest leaves unset.
 const NA: &str = "n/a";
 
 /// One fully formatted Markdown table row before padding is applied.
 struct MatrixRow {
+    /// Roadmap task ID rendered as a link to its anchor.
     roadmap_task: String,
+    /// Escaped one-line summary of the task.
     gist: String,
+    /// Human-readable label for the task's `BoundaryState`.
     state: String,
+    /// Comma-separated upstream `OrthoConfig` task references, or `n/a`.
     upstream: String,
+    /// Commit hash the divergence or wrapper shipped in, or `n/a`.
     shipped_in: String,
+    /// Removal gate text, or an ADR 007 divergence link, or `n/a`.
     gate_or_divergence: String,
+    /// Next scheduled review date, or `n/a` if none is set.
     next_review_by: String,
+    /// Date the task was last reviewed.
     last_reviewed: String,
 }
 
 /// Widths for each generated Markdown table column.
+///
+/// Field names mirror `MatrixRow` so the same column can be looked up in
+/// both structs while rendering.
 struct ColumnWidths {
+    /// Width of the roadmap task column.
     roadmap_task: usize,
+    /// Width of the gist column.
     gist: usize,
+    /// Width of the state column.
     state: usize,
+    /// Width of the upstream references column.
     upstream: usize,
+    /// Width of the shipped-in commit column.
     shipped_in: usize,
+    /// Width of the removal gate or divergence column.
     gate_or_divergence: usize,
+    /// Width of the next-review-by column.
     next_review_by: usize,
+    /// Width of the last-reviewed column.
     last_reviewed: usize,
 }
 

@@ -136,6 +136,10 @@ impl TreeSitterSyntacticLock {
         self.validate_file(&path, &content)
     }
 
+    /// Validates a batch of `(path, content)` pairs, generic over how each is
+    /// borrowed, so both owned and borrowed multi-file call sites can share
+    /// one implementation. Stops at the first error but accumulates all
+    /// non-error failures across every file.
     fn validate_pairs<I, P, C>(&self, files: I) -> Result<Vec<ValidationFailure>, SyntaxError>
     where
         I: IntoIterator<Item = (P, C)>,

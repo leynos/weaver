@@ -28,10 +28,15 @@ use crate::{
 /// capture during matching.
 #[derive(Debug)]
 pub struct Pattern {
+    /// The pattern as written by the caller, before normalization.
     source: String,
+    /// The grammar the pattern was compiled and will be matched against.
     language: SupportedLanguage,
+    /// Metavariables found in `source`, in the order they appear.
     metavariables: Vec<MetaVariable>,
+    /// The parsed tree, possibly wrapped so a bare fragment could parse.
     parsed: ParseResult,
+    /// Whether wrapping was needed; the matcher unwraps to the real root.
     wrapped_in_function: bool,
 }
 
@@ -117,6 +122,9 @@ impl Pattern {
     #[must_use]
     pub const fn language(&self) -> SupportedLanguage { self.language }
 
+    /// Returns whether this pattern was wrapped in a synthetic function to
+    /// parse successfully, so the matcher knows to unwrap it before comparing
+    /// against candidate nodes.
     pub(crate) const fn wrapped_in_function(&self) -> bool { self.wrapped_in_function }
 
     /// Returns the metavariables defined in this pattern.
@@ -132,7 +140,7 @@ impl Pattern {
     pub const fn has_metavariables(&self) -> bool { !self.metavariables.is_empty() }
 }
 
-/// Un-normalised pattern source, before metavariable substitution.
+/// Un-normalized pattern source, before metavariable substitution.
 #[derive(Clone, Copy)]
 struct RawSource<'a>(&'a str);
 
@@ -141,9 +149,13 @@ struct RawSource<'a>(&'a str);
 struct NormalizedSource(String);
 
 impl NormalizedSource {
+    /// Borrows the normalized pattern text.
     fn as_str(&self) -> &str { &self.0 }
 }
 
+/// Wraps a normalized pattern in a synthetic function so a bare expression
+/// or statement fragment (not a complete top-level item) can still be parsed
+/// by a grammar that only accepts complete items at the top level.
 fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &NormalizedSource) -> String {
     let s = pattern.as_str();
     match language {
@@ -160,6 +172,9 @@ fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &NormalizedSourc
     }
 }
 
+/// Appends a trailing semicolon to a Rust pattern fragment, unless it
+/// already ends in `;` or `}`, so it parses as a valid statement inside the
+/// synthetic wrapper function.
 fn rust_pattern_wrapper_statement(pattern: &NormalizedSource) -> String {
     let trimmed = pattern.as_str().trim_end();
     match trimmed.chars().last() {
@@ -168,6 +183,10 @@ fn rust_pattern_wrapper_statement(pattern: &NormalizedSource) -> String {
     }
 }
 
+/// Indents a Python pattern fragment as the body of a synthetic
+/// `def __weaver_pattern_wrapper__():` so it parses under Python's
+/// indentation-sensitive grammar. An empty fragment becomes a `pass` body,
+/// since Python does not allow an empty function body.
 fn python_pattern_wrapper(pattern: &NormalizedSource) -> String {
     let s = pattern.as_str();
     let mut out = String::from("def __weaver_pattern_wrapper__():\n");
@@ -183,6 +202,9 @@ fn python_pattern_wrapper(pattern: &NormalizedSource) -> String {
     out
 }
 
+/// Rewrites `source`, replacing each metavariable reference with a
+/// placeholder identifier that the target grammar can parse as an ordinary
+/// name, so the pattern can round-trip through Tree-sitter.
 fn normalize_metavariables(source: RawSource<'_>) -> Result<NormalizedSource, SyntaxError> {
     let mut out = String::with_capacity(source.0.len());
 
@@ -194,19 +216,33 @@ fn normalize_metavariables(source: RawSource<'_>) -> Result<NormalizedSource, Sy
     Ok(NormalizedSource(out))
 }
 
+/// A `$`-prefixed reference found while scanning raw pattern source, before
+/// its dollar count has been classified into a [`MetaVarKind`].
 #[derive(Debug)]
 struct MetavarReference {
+    /// Number of consecutive `$` characters preceding the name (1 for
+    /// `$VAR`, 3 for `$$$VAR`); any other count is rejected by the caller.
     dollars: usize,
+    /// The metavariable name, without its `$` prefix.
     name: String,
+    /// Byte offset of the leading `$` in the raw pattern source.
     offset: usize,
 }
 
+/// An event emitted while scanning raw pattern source: either an ordinary
+/// character to copy through, or a metavariable reference to substitute.
 #[derive(Debug)]
 enum MetavarEvent {
+    /// A character outside any metavariable reference.
     Literal(char),
+    /// A `$VAR` or `$$$VAR` reference.
     Metavar(MetavarReference),
 }
 
+/// Scans `source` character by character, invoking `handler` with a
+/// [`MetavarEvent`] for each literal character and each metavariable
+/// reference found. Shared by both metavariable extraction and pattern
+/// normalisation so the two stay in lockstep.
 fn visit_metavariables<F>(source: RawSource<'_>, mut handler: F) -> Result<(), SyntaxError>
 where
     F: FnMut(MetavarEvent),

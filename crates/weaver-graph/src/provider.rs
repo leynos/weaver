@@ -140,6 +140,8 @@ pub trait CallHierarchyClient {
 /// Uses `textDocument/callHierarchy` requests to build call graphs from
 /// language server data.
 pub struct LspCallGraphProvider<C> {
+    /// The LSP call hierarchy client used to issue prepare/incoming/outgoing
+    /// requests; generic so tests can substitute a mock implementation.
     client: C,
 }
 
@@ -238,6 +240,9 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
         Ok(graph)
     }
 
+    /// Resolves the call hierarchy items anchored at `position`, translating
+    /// the filesystem path to a URI and defaulting to an empty vec when the
+    /// server reports no candidates rather than propagating `None`.
     fn prepare_at_position(
         &mut self,
         position: &SourcePosition,
@@ -256,6 +261,9 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
             .map(Option::unwrap_or_default)
     }
 
+    /// Walks incoming calls to `item`, adding caller nodes and edges to
+    /// `graph` and recursing until `remaining_depth` is exhausted. Depth is
+    /// tracked with `saturating_sub` so callers cannot underflow it.
     fn explore_callers(
         &mut self,
         graph: &mut CallGraph,
@@ -304,6 +312,9 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
         Ok(())
     }
 
+    /// Mirror of [`Self::explore_callers`] for outgoing calls: walks callees
+    /// of `item`, adding nodes and edges to `graph` and recursing until
+    /// `remaining_depth` is exhausted.
     fn explore_callees(
         &mut self,
         graph: &mut CallGraph,

@@ -7,9 +7,15 @@ use serde_saphyr::Location;
 /// Retains coarse source locations from the raw YAML document.
 #[derive(Debug, Clone, Default)]
 pub struct SourceMap {
+    /// URI attached to every span produced, so diagnostics name their file;
+    /// `None` when the YAML came from an anonymous buffer.
     source_uri: Option<String>,
+    /// Span of the whole document, used as the fallback blame location.
     root_span: Option<SourceSpan>,
+    /// Span of the `rules` sequence, blamed when the sequence itself is
+    /// missing or malformed.
     rules_span: Option<SourceSpan>,
+    /// Span of each rule, indexed by its position in the `rules` sequence.
     rule_spans: Vec<SourceSpan>,
 }
 
@@ -83,6 +89,10 @@ impl SourceMap {
     }
 }
 
+/// Converts a YAML node's character-indexed marks into a byte-indexed span.
+///
+/// Returns `None` when the offsets do not fit in the span representation. The
+/// end is forced past the start so zero-width nodes still highlight something.
 fn source_span_for_node(
     yaml: &str,
     node: &MarkedYamlOwned,
@@ -99,6 +109,9 @@ fn source_span_for_node(
     ))
 }
 
+/// Maps a character index into a byte offset, saturating at the end of
+/// `source` so a stale or out-of-range index degrades to the document end
+/// rather than losing the span entirely.
 fn char_index_to_byte(source: &str, index: usize) -> Option<usize> {
     if index == 0 {
         return Some(0);

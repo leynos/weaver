@@ -35,8 +35,12 @@ pub const RENAME_SYMBOL_CONTRACT_VERSION: ContractVersion = ContractVersion::new
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenameSymbolRequest {
+    /// File URI identifying the document containing the symbol to rename.
     uri: String,
+    /// Location of the symbol within the document, as "line:col" or a byte
+    /// offset; the exact form is plugin-defined.
     position: String,
+    /// Replacement identifier to substitute for the symbol at `position`.
     new_name: String,
 }
 

@@ -145,6 +145,7 @@ pub(super) fn apply_workspace_edit(
     Ok(updated)
 }
 
+/// Gathers edits for `file_uri` from both the legacy `changes` map and `document_changes`.
 fn collect_text_edits(
     workspace_edit: WorkspaceEdit,
     file_uri: &Uri,
@@ -164,6 +165,7 @@ fn collect_text_edits(
     Ok(edits)
 }
 
+/// Flattens either arm of `documentChanges` into a plain edit list for the target file.
 fn collect_document_changes(
     target: &mut Vec<TextEdit>,
     document_changes: DocumentChanges,
@@ -190,6 +192,7 @@ fn collect_document_changes(
     }
 }
 
+/// Accepts an edit operation and rejects file create, rename, and delete operations.
 fn collect_operation(
     target: &mut Vec<TextEdit>,
     operation: DocumentChangeOperation,
@@ -219,6 +222,7 @@ fn collect_operation(
     }
 }
 
+/// Appends edits to `target`, discarding those for other files and unwrapping annotations.
 fn append_document_edits(
     target: &mut Vec<TextEdit>,
     uri: &Uri,
@@ -237,6 +241,7 @@ fn append_document_edits(
     }
 }
 
+/// Converts a line/character position into a byte offset under the negotiated `encoding`.
 fn lsp_position_to_byte_offset(
     content: &str,
     position: Position,
@@ -259,6 +264,7 @@ fn lsp_position_to_byte_offset(
     }
 }
 
+/// Resolves a UTF-8 position, rejecting offsets past the line end or inside a code point.
 fn utf8_position_to_byte_offset(
     content: &str,
     position: Position,
@@ -287,6 +293,7 @@ fn utf8_position_to_byte_offset(
     Ok(byte_offset)
 }
 
+/// Resolves a UTF-16 position by walking the line and accumulating code-unit widths.
 fn utf16_position_to_byte_offset(
     line_content: &str,
     position: Position,
@@ -317,6 +324,7 @@ fn utf16_position_to_byte_offset(
     })
 }
 
+/// Returns the byte offset of `target_line`'s first character, counting `\n` terminators.
 fn find_line_start_offset(
     content: &str,
     target_line: u32,
@@ -364,6 +372,7 @@ pub(super) fn path_to_file_uri(path: &Path) -> Result<Uri, RustAnalyzerAdapterEr
         })
 }
 
+/// Slices `content`, reporting `slice_name` and the range when the bounds are not valid.
 fn slice_checked<'a, R>(
     content: &'a str,
     range: R,

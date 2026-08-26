@@ -158,6 +158,11 @@ fn require<T: Clone>(
     })
 }
 
+/// Converts one deserialized rule into its validated form.
+///
+/// `index` selects this rule's span from `source_map`, falling back to the
+/// `rules` sequence and then the document root so a diagnostic always has some
+/// location to blame.
 fn build_rule(
     raw: RawRule,
     index: usize,
@@ -217,6 +222,9 @@ fn build_rule(
     })
 }
 
+/// Converts a `serde_saphyr` failure into a report, resolving the error's
+/// location through `source_map` and classifying it as a schema violation or a
+/// YAML syntax fault so the two get distinct diagnostic codes.
 fn diagnostic_from_serde(error: &serde_saphyr::Error, source_map: &SourceMap) -> DiagnosticReport {
     let span = source_map
         .span_from_location(error.location())
@@ -230,6 +238,8 @@ fn diagnostic_from_serde(error: &serde_saphyr::Error, source_map: &SourceMap) ->
     DiagnosticReport::parser_error(code, error.to_string(), span, vec![])
 }
 
+/// Reports whether the failure is the document contradicting the rule schema
+/// rather than the YAML being unparsable, which selects the diagnostic code.
 const fn is_schema_error(error: &serde_saphyr::Error) -> bool {
     matches!(
         error,

@@ -10,7 +10,10 @@ use weaver_plugins::{
 #[derive(Debug, Error, Clone)]
 #[error("{message}")]
 pub(crate) struct PluginFailure {
+    /// Operator-facing description surfaced as the diagnostic message.
     message: String,
+    /// Stable machine-readable classification, absent when the failure has no
+    /// agreed code for callers to branch on.
     reason_code: Option<ReasonCode>,
 }
 

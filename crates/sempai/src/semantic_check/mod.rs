@@ -29,10 +29,16 @@
 use sempai_core::{
     DiagnosticCode,
     DiagnosticReport,
-    SourceSpan,
     formula::{Constraint, Decorated, Formula},
 };
 
+mod analysis;
+
+use self::analysis::{AnalysisScope, analyse_formula_with_depth};
+
+/// Ceiling on formula nesting, enforced to keep the recursive analysis off the
+/// stack limit on adversarial or generated rules. Chosen far above any
+/// handwritten rule's depth.
 pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
 
 #[cfg(test)]
@@ -40,11 +46,15 @@ thread_local! {
     static VALIDATE_CONSTRAINTS_CALL_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
+/// Clears the per-thread call counter so a test can assert on the number of
+/// constraint validations its own call performed.
 #[cfg(test)]
 pub(crate) fn reset_validate_constraints_call_count() {
     VALIDATE_CONSTRAINTS_CALL_COUNT.with(|count| count.set(0));
 }
 
+/// Reads the per-thread constraint validation counter, used by tests that
+/// check constraints are visited once rather than repeatedly.
 #[cfg(test)]
 pub(crate) fn validate_constraints_call_count() -> usize {
     VALIDATE_CONSTRAINTS_CALL_COUNT.with(std::cell::Cell::get)
@@ -128,6 +138,9 @@ pub(crate) fn count_constraint_validation_visits(
     Ok((node_count, where_clause_count))
 }
 
+/// Classifies the check a constraint *will* receive once the surrounding
+/// validation stage has the context it needs. Nothing is rejected today; the
+/// enum records the intended checks so the gap stays visible and testable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PendingConstraintValidation {
     /// TODO: Validate regex syntax once diagnostics can point at the normalized
@@ -141,6 +154,8 @@ enum PendingConstraintValidation {
     UnsupportedConstraint,
 }
 
+/// Maps a constraint to the check it is awaiting, so tests can assert the
+/// classification without depending on when the checks land.
 const fn pending_constraint_validation(constraint: &Constraint) -> PendingConstraintValidation {
     match constraint {
         Constraint::MetavariableRegex { .. } => PendingConstraintValidation::RegexSyntax,
@@ -149,6 +164,9 @@ const fn pending_constraint_validation(constraint: &Constraint) -> PendingConstr
     }
 }
 
+/// Visits every node of a formula tree in pre-order, stopping at the first
+/// visitor error. Exists so traversal order lives in one place rather than
+/// being re-implemented by each analysis pass.
 fn walk_formula_tree<F>(formula: &Decorated<Formula>, mut visit: F) -> Result<(), DiagnosticReport>
 where
     F: FnMut(&Decorated<Formula>) -> Result<(), DiagnosticReport>,
@@ -156,6 +174,8 @@ where
     walk_formula_tree_inner(formula, &mut visit)
 }
 
+/// Recursive worker behind [`walk_formula_tree`], taking the visitor by
+/// mutable reference so it is not moved on each recursion.
 fn walk_formula_tree_inner<F>(
     formula: &Decorated<Formula>,
     visit: &mut F,
@@ -178,6 +198,9 @@ where
     }
 }
 
+/// Runs the structural analysis and converts the first recorded violation
+/// into a diagnostic. Not-in-or is reported ahead of the missing-positive-term
+/// failure because it is the more specific defect.
 fn validate_formula_inner(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
     let analysis = analyse_formula_with_depth(
         formula,
@@ -205,177 +228,4 @@ fn validate_formula_inner(formula: &Decorated<Formula>) -> Result<(), Diagnostic
         ));
     }
     Ok(())
-}
-
-#[derive(Debug, Default)]
-struct FormulaAnalysis {
-    has_positive_term: bool,
-    contains_not: bool,
-    first_negation_span: Option<SourceSpan>,
-    invalid_not_in_or: Option<DiagnosticSite>,
-    missing_positive_term: Option<DiagnosticSite>,
-}
-
-#[derive(Debug)]
-struct DiagnosticSite {
-    primary_span: Option<SourceSpan>,
-}
-
-#[derive(Clone, Copy)]
-struct AnalysisScope<'a> {
-    depth: usize,
-    fallback_span: Option<&'a SourceSpan>,
-}
-
-impl<'a> AnalysisScope<'a> {
-    const fn child_with_fallback(self, fallback_span: Option<&'a SourceSpan>) -> Self {
-        Self {
-            depth: self.depth + 1,
-            fallback_span,
-        }
-    }
-}
-
-/// Analyses a `Not` node, marking negation and recording the first negation span.
-fn analyse_not_arm(
-    inner: &Decorated<Formula>,
-    scope: AnalysisScope<'_>,
-    formula_span: Option<&SourceSpan>,
-) -> Result<FormulaAnalysis, DiagnosticReport> {
-    let mut analysis = analyse_formula_with_depth(
-        inner,
-        scope.child_with_fallback(formula_span.or(scope.fallback_span)),
-    )?;
-    analysis.contains_not = true;
-    analysis.has_positive_term = false;
-    analysis.first_negation_span = formula_span.cloned().or(analysis.first_negation_span);
-    Ok(analysis)
-}
-
-/// Analyses an `Inside` or `Anywhere` node (no negation tracking).
-fn analyse_inside_anywhere_arm(
-    inner: &Decorated<Formula>,
-    scope: AnalysisScope<'_>,
-    formula_span: Option<&SourceSpan>,
-) -> Result<FormulaAnalysis, DiagnosticReport> {
-    let mut analysis = analyse_formula_with_depth(
-        inner,
-        scope.child_with_fallback(formula_span.or(scope.fallback_span)),
-    )?;
-    analysis.has_positive_term = false;
-    Ok(analysis)
-}
-
-/// Analyses a conjunction (`And`) node and attaches a
-/// `MissingPositiveTermInAnd` site when no positive descendant is found.
-fn analyse_and_arm(
-    formula: &Decorated<Formula>,
-    branches: &[Decorated<Formula>],
-    scope: AnalysisScope<'_>,
-) -> Result<FormulaAnalysis, DiagnosticReport> {
-    let mut analysis = analyse_branches(
-        branches,
-        scope.child_with_fallback(formula.span.as_ref().or(scope.fallback_span)),
-    )?;
-    if !analysis.has_positive_term {
-        analysis.missing_positive_term = Some(DiagnosticSite {
-            primary_span: formula
-                .span
-                .clone()
-                .or_else(|| branches.iter().find_map(|branch| branch.span.clone()))
-                .or_else(|| scope.fallback_span.cloned()),
-        });
-    }
-    Ok(analysis)
-}
-
-/// Analyses a disjunction (`Or`) node and attaches an `InvalidNotInOr` site
-/// the first time a branch containing a `Not` is encountered.
-fn analyse_or_arm(
-    formula: &Decorated<Formula>,
-    branches: &[Decorated<Formula>],
-    scope: AnalysisScope<'_>,
-) -> Result<FormulaAnalysis, DiagnosticReport> {
-    let mut analysis = FormulaAnalysis::default();
-    let child_fallback = formula.span.as_ref().or(scope.fallback_span);
-    let child_scope = scope.child_with_fallback(child_fallback);
-    for branch in branches {
-        let branch_analysis = analyse_formula_with_depth(branch, child_scope)?;
-        if branch_analysis.contains_not && analysis.invalid_not_in_or.is_none() {
-            analysis.invalid_not_in_or = Some(DiagnosticSite {
-                primary_span: branch_analysis
-                    .first_negation_span
-                    .clone()
-                    .or_else(|| branch.span.clone())
-                    .or_else(|| child_fallback.cloned()),
-            });
-        } else {
-            analysis.invalid_not_in_or = analysis
-                .invalid_not_in_or
-                .or(branch_analysis.invalid_not_in_or);
-        }
-        analysis.has_positive_term |= branch_analysis.has_positive_term;
-        analysis.contains_not |= branch_analysis.contains_not;
-        analysis.first_negation_span = analysis
-            .first_negation_span
-            .or(branch_analysis.first_negation_span);
-        analysis.missing_positive_term = analysis
-            .missing_positive_term
-            .or(branch_analysis.missing_positive_term);
-    }
-    Ok(analysis)
-}
-
-fn analyse_formula_with_depth(
-    formula: &Decorated<Formula>,
-    scope: AnalysisScope<'_>,
-) -> Result<FormulaAnalysis, DiagnosticReport> {
-    if scope.depth > MAX_FORMULA_DEPTH {
-        return Err(DiagnosticReport::validation_error(
-            DiagnosticCode::ESempaiSchemaInvalid,
-            format!(
-                "formula nesting depth exceeds limit of {MAX_FORMULA_DEPTH}: {}",
-                scope.depth
-            ),
-            formula
-                .span
-                .clone()
-                .or_else(|| scope.fallback_span.cloned()),
-            vec![],
-        ));
-    }
-    match &formula.node {
-        Formula::Atom(_) => Ok(FormulaAnalysis {
-            has_positive_term: true,
-            ..FormulaAnalysis::default()
-        }),
-        Formula::Not(inner) => analyse_not_arm(inner, scope, formula.span.as_ref()),
-        Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            analyse_inside_anywhere_arm(inner, scope, formula.span.as_ref())
-        }
-        Formula::And(branches) => analyse_and_arm(formula, branches, scope),
-        Formula::Or(branches) => analyse_or_arm(formula, branches, scope),
-    }
-}
-
-fn analyse_branches(
-    branches: &[Decorated<Formula>],
-    scope: AnalysisScope<'_>,
-) -> Result<FormulaAnalysis, DiagnosticReport> {
-    let mut analysis = FormulaAnalysis::default();
-    for branch in branches {
-        let branch_analysis = analyse_formula_with_depth(branch, scope)?;
-        analysis.has_positive_term |= branch_analysis.has_positive_term;
-        analysis.contains_not |= branch_analysis.contains_not;
-        analysis.first_negation_span = analysis
-            .first_negation_span
-            .or(branch_analysis.first_negation_span);
-        analysis.invalid_not_in_or = analysis
-            .invalid_not_in_or
-            .or(branch_analysis.invalid_not_in_or);
-        analysis.missing_positive_term = analysis
-            .missing_positive_term
-            .or(branch_analysis.missing_positive_term);
-    }
-    Ok(analysis)
 }

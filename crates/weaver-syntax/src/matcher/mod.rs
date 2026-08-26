@@ -17,8 +17,11 @@ use crate::{parser::ParseResult, pattern::Pattern, position::point_to_one_based}
 /// Result of a successful pattern match.
 #[derive(Debug)]
 pub struct MatchResult<'a> {
+    /// The AST node the pattern matched.
     node: tree_sitter::Node<'a>,
+    /// The full candidate source text `node` was matched against.
     source: &'a str,
+    /// Metavariable bindings captured while matching, keyed by name.
     captures: HashMap<String, CapturedValue<'a>>,
 }
 
@@ -58,6 +61,7 @@ impl<'a> MatchResult<'a> {
 
 /// Pattern matcher that finds occurrences in parsed code.
 pub struct Matcher<'p> {
+    /// The compiled pattern this matcher searches for.
     pattern: &'p Pattern,
 }
 

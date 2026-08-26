@@ -17,11 +17,14 @@ use crate::DetailLevel;
 /// without accepting a separate `flag` parameter.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct RawValue<'a> {
+    /// Flag the value was supplied for, used to label error messages.
     pub(super) flag: Flag,
+    /// Unparsed string taken from the argument list.
     pub(super) value: &'a str,
 }
 
 impl<'a> RawValue<'a> {
+    /// Pairs a flag with its raw string value.
     pub(super) const fn new(flag: Flag, value: &'a str) -> Self { Self { flag, value } }
 }
 

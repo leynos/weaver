@@ -37,12 +37,19 @@ pub(super) fn symbol_id(
     format!("sym_{}", hex_prefix(digest.iter().take(8).copied()))
 }
 
+/// Feeds one length-prefixed field into `hasher`.
+///
+/// The length prefix disambiguates adjacent fields (`"ab" + "c"` versus
+/// `"a" + "bc"`) so the digest cannot collide across differently-split inputs
+/// that would otherwise concatenate to the same bytes.
 fn update_field(hasher: &mut Sha256, field: &str) {
     hasher.update(field.len().to_string().as_bytes());
     hasher.update(b":");
     hasher.update(field.as_bytes());
 }
 
+/// Renders `bytes` as a lowercase hex string, used to keep the `sym_` prefix
+/// short while remaining a stable, printable digest fragment.
 fn hex_prefix(bytes: impl IntoIterator<Item = u8>) -> String {
     let mut output = String::with_capacity(16);
     for byte in bytes {
@@ -52,6 +59,11 @@ fn hex_prefix(bytes: impl IntoIterator<Item = u8>) -> String {
     output
 }
 
+/// Converts a single 4-bit nibble (0-15) to its lowercase hex digit.
+///
+/// Callers only ever pass values derived from `byte >> 4` or `byte & 0x0f`,
+/// so the `_ => '0'` arm is unreachable in practice; it exists only so the
+/// match is exhaustive without panicking.
 const fn nibble_to_hex(nibble: u8) -> char {
     match nibble {
         0..=9 => (b'0' + nibble) as char,

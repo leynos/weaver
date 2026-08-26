@@ -4,6 +4,9 @@ use std::time::SystemTime;
 
 use time::{OffsetDateTime, format_description::well_known::Iso8601};
 
+/// Placeholder returned when formatting the current time fails, so
+/// provenance still contains a well-formed (if inaccurate) timestamp rather
+/// than an error.
 const FALLBACK_TIMESTAMP: &str = "1970-01-01T00:00:00Z";
 
 /// Formats the current UTC timestamp as ISO 8601 / RFC 3339.
