@@ -1511,9 +1511,16 @@ designed.
 The target daemon replaces one request-wide backend owner with a
 `WorkspaceManager`. The manager maps daemon-resolved canonical roots to
 reference-counted `WorkspaceState` values. Its lock covers lookup,
-single-flight creation, retirement marking, and removal only. Routing,
-filesystem input/output, plugin execution, server startup, and queue waits all
-occur after that lock has been released.
+reservation/publication, retirement marking, and removal only. For each
+workspace key, an `Arc<InFlightWorkspaceCreation>` reservation provides
+single-flight creation: the creator performs registry input/output and state
+initialization outside the manager lock, then publishes only a fully
+initialized `Arc<WorkspaceState>` under the registry lock. Concurrent first
+requests wait for and share the one creation result. If creation fails, the
+reservation is cleared and all waiters receive the same error; no partial state
+is published.
+Routing, filesystem input/output, plugin execution, server startup, and queue
+waits all occur after that lock has been released.
 
 For screen readers: the following diagram shows daemon-global admission and
 immutable registries feeding a short-lived workspace lookup, after which work

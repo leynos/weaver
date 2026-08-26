@@ -211,7 +211,12 @@ struct WorkspaceKey {
 }
 
 struct WorkspaceManager {
-    workspaces: RwLock<HashMap<WorkspaceKey, Arc<WorkspaceState>>>,
+    registry: RwLock<WorkspaceRegistry>,
+}
+
+struct WorkspaceRegistry {
+    workspaces: HashMap<WorkspaceKey, Arc<WorkspaceState>>,
+    in_flight: HashMap<WorkspaceKey, Arc<InFlightWorkspaceCreation>>,
 }
 
 struct WorkspaceState {
@@ -223,10 +228,15 @@ struct WorkspaceState {
 }
 ```
 
-The manager lock protects only lookup, insertion, retirement marking, and
-removal. An `Arc<WorkspaceState>` remains valid after the manager releases its
-lock. Workspace creation must be single-flight, so simultaneous first requests
-do not create duplicate pools.
+The manager lock protects only lookup, reservation/publication, retirement
+marking, and removal. An `Arc<WorkspaceState>` remains valid after the manager
+releases its lock. For each workspace key, an `Arc<InFlightWorkspaceCreation>`
+reservation provides single-flight creation: the creator performs registry
+input/output and state initialization outside the manager lock, then publishes
+only a fully initialized `Arc<WorkspaceState>` under the registry lock.
+Concurrent first requests wait for and share the one creation result. If
+creation fails, the reservation is cleared and all waiters receive the same
+error; no partial state is published.
 
 Workspace-owned caches include any state whose correctness depends on paths,
 file contents, configuration, language-server documents, or workspace revision.
@@ -329,7 +339,7 @@ inside it.
 The daemon replaces the request-wide global backend mutex with two levels of
 coordination:
 
-1. a short-lived registry lookup or creation lock; and
+1. a short-lived registry lookup or creation lock.
 2. workspace- and server-local coordination for the selected operation.
 
 Read-only operations in different workspaces run concurrently. Read-only
