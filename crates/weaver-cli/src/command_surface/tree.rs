@@ -7,6 +7,8 @@ pub(crate) struct CommandArgument {
     pub(crate) long: &'static str,
     /// Placeholder displayed for a value-taking flag.
     pub(crate) value_name: Option<&'static str>,
+    /// Whether the runtime parser requires this flag.
+    pub(crate) required: bool,
     /// Fluent identifier describing the argument.
     pub(crate) help_id: &'static str,
     /// English fallback describing the argument.
@@ -61,12 +63,14 @@ const DEFINITIONS_GET_ARGUMENTS: &[CommandArgument] = &[
     CommandArgument {
         long: "uri",
         value_name: Some("URI"),
+        required: true,
         help_id: "weaver-command-definitions-get-uri",
         help: "The document URI containing the reference position",
     },
     CommandArgument {
         long: "position",
         value_name: Some("LINE:COLUMN"),
+        required: true,
         help_id: "weaver-command-definitions-get-position",
         help: "The 1-indexed line:column position to resolve",
     },
