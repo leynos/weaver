@@ -81,7 +81,7 @@ fn field_metadata(argument: &CommandArgument) -> FieldMetadata {
         long_help_id: None,
         value: argument.value_name.map(|_| ValueType::String),
         default: None,
-        required: false,
+        required: argument.required,
         deprecated: None,
         cli: Some(CliMetadata {
             long: Some(argument.long.to_owned()),

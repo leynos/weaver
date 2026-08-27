@@ -49,6 +49,22 @@ fn projection_preserves_the_structured_command_hierarchy() {
 }
 
 #[test]
+fn projection_preserves_required_definition_arguments() {
+    let metadata =
+        project(command_tree::root()).expect("the built-in command tree should be bounded");
+    let definitions_get = &metadata.subcommands[0].subcommands[0];
+
+    assert_eq!(
+        definitions_get
+            .fields
+            .iter()
+            .map(|field| (field.name.as_str(), field.required))
+            .collect::<Vec<_>>(),
+        [("uri", true), ("position", true)],
+    );
+}
+
+#[test]
 fn projection_roundtrips_through_the_upstream_ir_format() {
     let metadata =
         project(command_tree::root()).expect("the built-in command tree should be bounded");
@@ -85,6 +101,7 @@ fn derived_field(long: &'static str, value_name: Option<&'static str>) -> Option
     let mut field = field_metadata(&CommandArgument {
         long,
         value_name,
+        required: true,
         help_id: if long == "uri" {
             "weaver.fields.uri.help"
         } else {
