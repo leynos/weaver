@@ -960,3 +960,8 @@ manual-page build input, and added generated captions to the boundary matrix.
 On 2026-08-22, a final renderer review added a multiphase regression test for
 caption numbering and rendered order. The test protects the generated boundary
 matrix when it contains more than one roadmap phase.
+
+On 2026-08-28, review found that the projection marked required structured
+arguments as optional. `CommandArgument` now carries parser requiredness, and
+the projection test asserts that `definitions get --uri` and `--position` stay
+required in recursive metadata.
