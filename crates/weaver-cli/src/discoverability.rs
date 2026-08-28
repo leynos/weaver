@@ -8,7 +8,10 @@ use std::io::{self, Write};
 
 use ortho_config::{LocalizationArgs, Localizer};
 
-use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
+use crate::{
+    actionable_guidance::{ActionableGuidance, write_actionable_guidance},
+    command_tree,
+};
 
 /// A validated, known CLI domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,66 +31,33 @@ impl KnownDomain {
     }
 
     /// Resolves a raw string to a known domain, case-insensitively.
-    /// Uses DOMAIN_OPERATIONS as the single source of truth.
+    /// Uses the canonical command tree as the single source of truth.
     pub(crate) fn try_parse(s: &str) -> Option<Self> {
         let normalized = s.trim().to_ascii_lowercase();
-        DOMAIN_OPERATIONS
+        command_tree::domain_operations()
             .iter()
-            .find(|(domain, ..)| *domain == normalized.as_str())
-            .map(|(domain, ..)| match *domain {
+            .find(|entry| entry.domain == normalized)
+            .map(|entry| match entry.domain {
                 "observe" => Self::Observe,
                 "act" => Self::Act,
                 "verify" => Self::Verify,
-                _ => panic!("DOMAIN_OPERATIONS contains unknown domain: {domain}"),
+                _ => panic!("command tree contains unknown domain: {}", entry.domain),
             })
     }
 
     fn operations(self) -> Option<&'static [&'static str]> {
-        DOMAIN_OPERATIONS
+        command_tree::domain_operations()
             .iter()
-            .find(|(name, ..)| *name == self.as_str())
-            .map(|(_, _, ops)| *ops)
+            .find(|entry| entry.domain == self.as_str())
+            .map(|entry| entry.operations)
     }
 
     fn catalogue_order() -> impl Iterator<Item = Self> {
-        DOMAIN_OPERATIONS
+        command_tree::domain_operations()
             .iter()
-            .map(|(domain, ..)| known_domain_from_catalogue_entry(domain))
+            .map(|entry| known_domain_from_catalogue_entry(entry.domain))
     }
 }
-
-/// Canonical domain-to-operation mapping for CLI discoverability features.
-pub const DOMAIN_OPERATIONS: &[(&str, &str, &[&str])] = &[
-    (
-        "observe",
-        "Query code structure and relationships",
-        &[
-            "get-definition",
-            "find-references",
-            "grep",
-            "diagnostics",
-            "call-hierarchy",
-            "get-card",
-            "graph-slice",
-        ],
-    ),
-    (
-        "act",
-        "Perform code modifications",
-        &[
-            "rename-symbol",
-            "apply-edits",
-            "apply-patch",
-            "apply-rewrite",
-            "refactor",
-        ],
-    ),
-    (
-        "verify",
-        "Validate code correctness",
-        &["diagnostics", "syntax"],
-    ),
-];
 
 /// Returns the canonical operation list for a known domain.
 pub(crate) fn operations_for_domain(domain: KnownDomain) -> Option<&'static [&'static str]> {
@@ -281,6 +251,3 @@ pub(crate) fn should_emit_domain_guidance(cli: &crate::Cli) -> bool {
             .as_deref()
             .is_some_and(|domain| !domain.trim().is_empty())
 }
-
-#[cfg(test)]
-pub(crate) mod fluent_entries;

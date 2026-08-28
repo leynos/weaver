@@ -133,7 +133,7 @@ adapter must name the OrthoConfig task that replaces it, keep its scope limited
 to Weaver-owned semantic metadata, and have tests that prove the temporary
 shape is stable enough to migrate.
 
-The first local adapter is `crates/weaver-cli/src/command_surface.rs`. Its
+The first local adapter is `crates/weaver-cli/src/command_surface/mod.rs`. Its
 removal policy is:
 
 | Local helper             | Replacement dependency          | Removal gate                                                                                                                                                                                                                                                                                   |
@@ -145,6 +145,16 @@ removal policy is:
 Any local helper that survives after those OrthoConfig tasks are available must
 record a permanent divergence in this ADR before it can remain in the
 implementation.
+
+### Recursive documentation projection
+
+Weaver consumes the recursive `ortho_config::docs::DocMetadata` contract at the
+pinned Git revision. Its clap enums cannot derive the corresponding subcommand
+metadata because OrthoConfig rejects named-field and unit variants. The
+framework-independent command tree is therefore projected by hand, with all
+upstream IR literals isolated in `command_ir`. The local tree remains a wrapper
+because capability and provider-policy metadata still have no upstream home.
+Help and the generated manual page consume the same projected command.
 
 ## Boundary classification
 

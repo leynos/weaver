@@ -799,12 +799,34 @@ flags dynamically from `ortho_config` metadata. Each visible field becomes a
 surface. The help-only parser deliberately does not attach config value
 validators because runtime config parsing owns case handling and validation.
 
+The structured command descriptions live once in
+`crates/weaver-cli/src/command_surface/tree.rs`. `command_ir` projects that
+tree into recursive `DocMetadata`, and `help_metadata` applies the projection
+to the parser-shaped help command. Add a command or its long flags to the tree
+first, add its Fluent identifiers, then update runtime parsing only where the
+wire contract actually changes. Do not recreate the operation catalogue in clap
+attributes, Fluent entries, or the manual-page build script.
+
 The augmented command is used in both places that need truthful help text:
 
 - runtime `--help` rendering, where the CLI prints help without invoking the
   configuration loader or starting the daemon;
 - `clap_mangen` man page generation in `crates/weaver-cli/build.rs`, so the
   generated roff output stays aligned with the runtime help surface.
+
+The build script directly includes `cli.rs`, `command_surface/tree.rs`,
+`command_ir/mod.rs`, and `help.rs` because it cannot link its own library. Its
+`cargo:rerun-if-changed` inputs additionally include `command_surface/mod.rs`,
+alongside those directly included files. When changing any of these metadata
+inputs, keep the corresponding rerun entry in `crates/weaver-cli/build.rs` so
+packaging regenerates the manual page from the same projection.
+
+The daemon routing catalogue remains private in production. The
+`weaverd::test_support::routing_catalogue()` accessor, its internal re-export,
+and its router definition are all compiled only with the `test-support` feature.
+`crates/weaver-e2e` enables that feature in its development dependency to
+compare the CLI's discoverability catalogue with daemon routing; production
+dependencies must not enable it.
 
 ### 2.2 Augmented command pattern
 
@@ -818,13 +840,10 @@ This split preserves the current runtime contract that configuration flags take
 effect only when they appear before the command domain. It also avoids teaching
 clap to accept post-domain configuration flags that the loader would ignore.
 
-The augmented builder promotes clap argument IDs, long flag names, value names,
-and any future possible-value metadata to `&'static str` values. Clap requires
-`'static` lifetimes for dynamically constructed arguments, so the builder
-intentionally leaks those bounded allocations with `Box::leak`. The leaked
-strings live for the process lifetime and are intentionally never freed; the
-augmented command is cached once per process, so repeated help rendering does
-not allocate another set of argument metadata.
+The augmented builder passes owned strings directly to Clap. Clap 4 accepts
+owned argument IDs, long names, and value names, so help construction does not
+leak process-lifetime allocations. The augmented command remains cached once
+per process.
 
 ### 2.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
 
