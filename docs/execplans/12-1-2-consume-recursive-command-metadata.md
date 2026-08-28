@@ -798,6 +798,8 @@ Stages B through D — the focused loop, repeated per obligation:
 set -euo pipefail
 
 cargo test -p weaver-cli command_ir 2>&1 | tee "$LOG_BASE-unit.out"
+cargo test -p weaver-cli metadata_application_localizes_recursive_help_and_manpage \
+  2>&1 | tee "$LOG_BASE-metadata.out"
 cargo test -p weaver-e2e --test catalogue_agreement 2>&1 | tee "$LOG_BASE-e2e.out"
 ```
 
@@ -1062,3 +1064,11 @@ On 2026-08-28, that rerun passed the complete deterministic suite, the explicit
 CLI build-script build, the warning-denied daemon release build, the catalogue
 agreement test, the `command_ir` suite, and the metadata-application oracle.
 The ExecPlan is complete pending the final CodeRabbit response.
+
+On 2026-08-28, the final review found that INV-5a's metadata oracle was not
+listed in the executable focused loop. The loop now runs it with the same
+failure-propagating logging pattern as the existing focused commands. Completion
+awaits the documentation-gate rerun.
+
+On 2026-08-28, `markdownlint` and `nixie` passed after the focused-loop
+correction. The ExecPlan is complete pending the final CodeRabbit response.
