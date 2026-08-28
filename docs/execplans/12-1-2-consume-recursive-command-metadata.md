@@ -56,7 +56,7 @@ These are hard invariants. Violating one requires escalation, not a workaround.
 1. Do not add a new runtime dependency, a new build-time dependency, or a new
    CI tool. In particular do not add `clap_complete` and do not add
    `cargo-orthohelp`. Both are scoped to roadmap 13.3.3. Exception: the
-   `thiserror` workspace dependency is also declared for the build script,
+   `thiserror` workspace dependency is also declared for the build script
    because `build.rs` includes `command_ir/mod.rs`, whose projection error
    derives `thiserror::Error`. This keeps the build-script projection on the
    same typed error path as runtime help without introducing a new package or
@@ -337,23 +337,21 @@ Recorded during planning; keep appending during implementation.
   Date/Author: 2026-08-22, implementation agent.
 
 - Decision: permit `thiserror` as the sole build-dependency exception.
-  Rationale:
-  `crates/weaver-cli/build.rs` directly includes `command_ir/mod.rs` so the
-  manual page uses the same projection as runtime help. That module derives
-  `thiserror::Error` for `ProjectionError`; the build script therefore needs
-  the already-used workspace dependency when compiling its included module. No
-  new package or dependency source is introduced. Date/Author: 2026-08-28,
-  review follow-up.
+  Rationale: `crates/weaver-cli/build.rs` directly includes `command_ir/mod.rs`
+  so the manual page uses the same projection as runtime help. That module
+  derives `thiserror::Error` for `ProjectionError`; the build script therefore
+  needs the already-used workspace dependency when compiling its included
+  module. No new package or dependency source is introduced. Date/Author:
+  2026-08-28, review follow-up.
 
 - Decision: retain Cargo's feature-disabled release build and the
-  feature-enabled
-  e2e catalogue test as INV-8's equivalent Rust compile-time coverage, rather
-  than add a duplicate `trybuild` fixture. Rationale: the release build catches
-  the exact `unused_imports` and `dead_code` failure under `-D warnings`; the
-  e2e target compiles the only public test-support consumer. Both also compile
-  the actual build-script module-inclusion path, so a synthetic fixture would
-  prove less than the production commands. Date/Author: 2026-08-28, review
-  follow-up.
+  feature-enabled e2e catalogue test as INV-8's equivalent Rust compile-time
+  coverage, rather than add a duplicate `trybuild` fixture. Rationale: the
+  release build catches the exact `unused_imports` and `dead_code` failure under
+  `-D warnings`; the e2e target compiles the only public test-support
+  consumer. Both also compile the actual build-script module-inclusion path, so
+  a synthetic fixture would prove less than the production commands.
+  Date/Author: 2026-08-28, review follow-up.
 
 - Decision: use the recursive documentation contract at the actual pinned
   OrthoConfig Git revision, without changing the dependency. Rationale:
@@ -632,13 +630,14 @@ mock.
   check and call the feature-gated catalogue accessor; the CLI build script
   must compile its included projection modules and their derives. Method:
   `RUSTFLAGS="-D warnings" cargo build --manifest-path crates/weaverd/Cargo.toml
-  --release --target x86_64-unknown-linux-gnu`,
-  and `cargo test -p weaver-e2e --test catalogue_agreement`. The first command
-  is the feature-disabled compile-time negative case; the second enables and
-  type-checks the feature-gated public accessor. Both Cargo commands compile
-  the relevant build scripts, including `weaver-cli/build.rs` and its included
-  `thiserror` derive. A separate `trybuild` fixture would duplicate these
-  package-feature builds without exercising the release warning policy.
+  --release --target x86_64-unknown-linux-gnu`;
+  `cargo test -p weaver-e2e --test catalogue_agreement`; and
+  `cargo build -p weaver-cli`. The first command is the feature-disabled
+  compile-time negative case; the second enables and type checks the
+  feature-gated public accessor; the third compiles `weaver-cli/build.rs`,
+  including its projection modules and `thiserror` derive. A separate
+  `trybuild` fixture would duplicate these package-feature builds without
+  exercising the release warning policy.
 
 - Obligation INV-6: **cross-crate catalogue agreement**. The CLI's operation
   catalogue and the daemon's `DomainRoutingContext` describe the same set.
@@ -795,7 +794,9 @@ Expected, respectively: the pinned Git revision;
 
 Stages B through D — the focused loop, repeated per obligation:
 
-```sh
+```bash
+set -euo pipefail
+
 cargo test -p weaver-cli command_ir 2>&1 | tee "$LOG_BASE-unit.out"
 cargo test -p weaver-e2e --test catalogue_agreement 2>&1 | tee "$LOG_BASE-e2e.out"
 ```
@@ -809,7 +810,9 @@ cargo insta show -p weaver-cli
 
 Stage E — regenerate the boundary matrix after editing the TOML:
 
-```sh
+```bash
+set -euo pipefail
+
 cargo run -p weaver-docs-gate --example render_boundary_matrix -- \
   docs/orthoconfig-consumer-boundary.toml docs/orthoconfig-consumer-boundary.md
 cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture \
@@ -819,7 +822,9 @@ cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture \
 Full gate sequence, run sequentially — never in parallel because the build
 cache is shared:
 
-```sh
+```bash
+set -euo pipefail
+
 make fmt         2>&1 | tee "$LOG_BASE-fmt.out"
 make check-fmt   2>&1 | tee "$LOG_BASE-checkfmt.out"
 make lint        2>&1 | tee "$LOG_BASE-lint.out"
@@ -1046,3 +1051,14 @@ repair: `check-fmt`, `lint`, `typecheck`, `test`, `markdownlint`, and `nixie`.
 The warning-denied `weaverd` release build, feature-enabled catalogue agreement
 test, `command_ir` suite, and metadata-application oracle also passed. The
 ExecPlan is complete again pending external CodeRabbit review only.
+
+On 2026-08-28, CodeRabbit found that the documented logged gate commands did
+not set `pipefail`, and that INV-8 conflated the daemon release build with the
+independent CLI build script. The recorded sequences now use Bash with
+`set -euo pipefail`, and INV-8 adds the explicit `cargo build -p weaver-cli`
+command. Completion awaits the corresponding deterministic rerun.
+
+On 2026-08-28, that rerun passed the complete deterministic suite, the explicit
+CLI build-script build, the warning-denied daemon release build, the catalogue
+agreement test, the `command_ir` suite, and the metadata-application oracle.
+The ExecPlan is complete pending the final CodeRabbit response.
