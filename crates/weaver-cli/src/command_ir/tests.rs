@@ -24,7 +24,7 @@ use crate::{
 };
 
 #[test]
-fn projection_preserves_the_structured_command_hierarchy() {
+fn projection_preserves_the_structured_command_hierarchy_without_passthrough() {
     let metadata =
         project(command_tree::root()).expect("the built-in command tree should be bounded");
 
@@ -36,7 +36,7 @@ fn projection_preserves_the_structured_command_hierarchy() {
             .iter()
             .map(|node| node.app_name.as_str())
             .collect::<Vec<_>>(),
-        ["definitions", "daemon", "domain-operation"],
+        ["definitions", "daemon"],
     );
     assert_eq!(
         metadata.subcommands[0]
