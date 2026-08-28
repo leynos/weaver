@@ -67,6 +67,7 @@ fn project_children(node: &CommandNode, depth: usize) -> Result<Vec<DocMetadata>
         CommandSemantics::Structured => node
             .children
             .iter()
+            .filter(|child| matches!(child.semantics, CommandSemantics::Structured))
             .map(|child| project_node(child, depth + 1))
             .collect(),
         CommandSemantics::DaemonPassthrough { .. } => Ok(Vec::new()),
