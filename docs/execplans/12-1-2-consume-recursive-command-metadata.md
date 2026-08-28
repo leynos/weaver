@@ -55,7 +55,12 @@ These are hard invariants. Violating one requires escalation, not a workaround.
 
 1. Do not add a new runtime dependency, a new build-time dependency, or a new
    CI tool. In particular do not add `clap_complete` and do not add
-   `cargo-orthohelp`. Both are scoped to roadmap 13.3.3.
+   `cargo-orthohelp`. Both are scoped to roadmap 13.3.3. Exception: the
+   `thiserror` workspace dependency is also declared for the build script,
+   because `build.rs` includes `command_ir/mod.rs`, whose projection error
+   derives `thiserror::Error`. This keeps the build-script projection on the
+   same typed error path as runtime help without introducing a new package or
+   dependency source.
 2. Do not add a new crate to the workspace. Use module directories inside
    `crates/weaver-cli` to respect the file-length cap.
 3. Do not add a `context` subcommand to `crates/weaver-cli/src/cli.rs`. The
@@ -331,6 +336,25 @@ Recorded during planning; keep appending during implementation.
   unchanged, so the cross-crate agreement test still consumes the catalogue.
   Date/Author: 2026-08-22, implementation agent.
 
+- Decision: permit `thiserror` as the sole build-dependency exception.
+  Rationale:
+  `crates/weaver-cli/build.rs` directly includes `command_ir/mod.rs` so the
+  manual page uses the same projection as runtime help. That module derives
+  `thiserror::Error` for `ProjectionError`; the build script therefore needs
+  the already-used workspace dependency when compiling its included module. No
+  new package or dependency source is introduced. Date/Author: 2026-08-28,
+  review follow-up.
+
+- Decision: retain Cargo's feature-disabled release build and the
+  feature-enabled
+  e2e catalogue test as INV-8's equivalent Rust compile-time coverage, rather
+  than add a duplicate `trybuild` fixture. Rationale: the release build catches
+  the exact `unused_imports` and `dead_code` failure under `-D warnings`; the
+  e2e target compiles the only public test-support consumer. Both also compile
+  the actual build-script module-inclusion path, so a synthetic fixture would
+  prove less than the production commands. Date/Author: 2026-08-28, review
+  follow-up.
+
 - Decision: use the recursive documentation contract at the actual pinned
   OrthoConfig Git revision, without changing the dependency. Rationale:
   although the plan originally described the resolved dependency as 0.9.0,
@@ -587,6 +611,35 @@ mock.
   and `--uri-value` for `--uri`, so substring collisions cannot satisfy the
   assertion.
 
+- Obligation INV-5a: **metadata application observability**. Recursive
+  metadata application must visibly replace Clap's derive fallback for a nested
+  command summary and each argument description, in both rendered help and the
+  manual page. Method: a test-local `Localizer` returns deliberately distinct
+  text for `definitions get`, `--uri`, and `--position`; the test renders
+  `definitions get --help` and `clap_mangen` output, then asserts each value.
+  It also proves that the daemon passthrough is excluded from recursive
+  `DocMetadata` while its localized catalogue remains in the root after-help
+  section. Artefact: `crates/weaver-cli/src/help_metadata.rs`, test
+  `metadata_application_localizes_recursive_help_and_manpage`. Evidence:
+  `cargo test -p weaver-cli metadata_application_localizes_recursive_help_and_manpage`.
+  Non-vacuity: before the child-semantics filter, the test failed because the
+  projected root had three children rather than the two structured Clap
+  subcommands; before after-help argument descriptions were added, its
+  manual-page assertion failed.
+
+- Obligation INV-8: **compile-time boundary coverage**. The production daemon
+  must compile without `test-support`, while the e2e agreement test must type
+  check and call the feature-gated catalogue accessor; the CLI build script
+  must compile its included projection modules and their derives. Method:
+  `RUSTFLAGS="-D warnings" cargo build --manifest-path crates/weaverd/Cargo.toml
+  --release --target x86_64-unknown-linux-gnu`,
+  and `cargo test -p weaver-e2e --test catalogue_agreement`. The first command
+  is the feature-disabled compile-time negative case; the second enables and
+  type-checks the feature-gated public accessor. Both Cargo commands compile
+  the relevant build scripts, including `weaver-cli/build.rs` and its included
+  `thiserror` derive. A separate `trybuild` fixture would duplicate these
+  package-feature builds without exercising the release warning policy.
+
 - Obligation INV-6: **cross-crate catalogue agreement**. The CLI's operation
   catalogue and the daemon's `DomainRoutingContext` describe the same set.
   Method: parameterized test comparing the two, placed where both are visible.
@@ -822,8 +875,11 @@ after applying a fix.
 
 ## Interfaces and dependencies
 
-No new dependencies. The types below are the intended end state; keep every
-upstream struct literal confined to `command_ir`.
+The only dependency exception is the existing workspace `thiserror` package,
+which is declared for the build script because it directly includes
+`command_ir/mod.rs` and must compile that module's `ProjectionError` derive. No
+new package or dependency source is introduced. The types below are the
+intended end state; keep every upstream struct literal confined to `command_ir`.
 
 In `crates/weaver-cli/src/command_surface/mod.rs`, the Weaver-owned tree, free
 of `clap` and `ortho_config`:
@@ -965,3 +1021,28 @@ On 2026-08-28, review found that the projection marked required structured
 arguments as optional. `CommandArgument` now carries parser requiredness, and
 the projection test asserts that `definitions get --uri` and `--position` stay
 required in recursive metadata.
+
+On 2026-08-28, review found that the dependency constraint did not record the
+`thiserror` build-dependency exception, and that the developer guide described
+`command_surface/mod.rs` as a build-script include. Verification of
+`crates/weaver-cli/build.rs` confirmed that the script directly includes
+`cli.rs`, `command_ir/mod.rs`, `command_surface/tree.rs`, and `help.rs`; its
+`cargo:rerun-if-changed` inputs additionally include `command_surface/mod.rs`.
+The exception and this distinction are now recorded in the plan and developer
+guide.
+
+On 2026-08-28, a follow-up review found that existing snapshots and structural
+checks could not distinguish metadata application from Clap's matching English
+fallbacks. The new distinct-localizer oracle first exposed a passthrough node
+leaking into projected recursive metadata, then showed the manual page lacked
+argument descriptions. The projection now filters passthrough children, and the
+shared rendered command reference includes each structured argument's localized
+description. INV-8 records the existing release and feature-enabled Cargo
+commands as the relevant compile-time evidence; completion awaits their rerun
+with all deterministic gates.
+
+On 2026-08-28, all deterministic gates passed after the behavioural-oracle
+repair: `check-fmt`, `lint`, `typecheck`, `test`, `markdownlint`, and `nixie`.
+The warning-denied `weaverd` release build, feature-enabled catalogue agreement
+test, `command_ir` suite, and metadata-application oracle also passed. The
+ExecPlan is complete again pending external CodeRabbit review only.

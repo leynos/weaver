@@ -118,8 +118,26 @@ fn append_structured_commands(
                 "  {} \u{2014} {summary}\n",
                 command_signature(&child_path, child),
             ));
+            append_argument_help(output, child, localizer);
             append_structured_commands(output, child, &child_path, localizer);
         }
+    }
+}
+
+/// Appends localised argument descriptions for a structured command.
+fn append_argument_help(output: &mut String, node: &CommandNode, localizer: &dyn Localizer) {
+    for argument in node.arguments {
+        let help = localizer.message(argument.help_id, None, argument.help);
+        output.push_str("    --");
+        output.push_str(argument.long);
+        if let Some(value_name) = argument.value_name {
+            output.push_str(" <");
+            output.push_str(value_name);
+            output.push('>');
+        }
+        output.push_str(" \u{2014} ");
+        output.push_str(&help);
+        output.push('\n');
     }
 }
 
@@ -159,5 +177,85 @@ fn format_operation_row(operations: &[&str]) -> String {
 fn pad_to(row: &mut String, width: usize) {
     if row.len() < width {
         row.extend(std::iter::repeat_n(' ', width - row.len()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Behavioural tests for recursive metadata application to rendered help.
+
+    use clap::CommandFactory;
+    use ortho_config::{LocalizationArgs, Localizer};
+
+    use super::{apply_node, apply_passthrough_help};
+    use crate::{cli::Cli, command_ir, command_tree};
+
+    struct DistinctLocalizer;
+
+    impl Localizer for DistinctLocalizer {
+        fn lookup(&self, id: &str, _args: Option<&LocalizationArgs<'_>>) -> Option<String> {
+            match id {
+                "weaver-command-definitions-get" => {
+                    Some("Translated definition lookup summary".to_owned())
+                }
+                "weaver-command-definitions-get-uri" => {
+                    Some("Translated document URI argument".to_owned())
+                }
+                "weaver-command-definitions-get-position" => {
+                    Some("Translated source position argument".to_owned())
+                }
+                "weaver-command-domain-observe" => {
+                    Some("Translated code-structure domain".to_owned())
+                }
+                _ => None,
+            }
+        }
+    }
+
+    #[test]
+    fn metadata_application_localizes_recursive_help_and_manpage() -> anyhow::Result<()> {
+        let root = command_tree::root();
+        let metadata = command_ir::project(root)?;
+        let localizer = DistinctLocalizer;
+        let mut command = apply_node(Cli::command(), &metadata, root, &localizer);
+        command = apply_passthrough_help(command, root, &localizer);
+
+        assert_eq!(metadata.subcommands.len(), 2);
+        assert!(
+            command.get_after_help().is_some_and(|help| help
+                .to_string()
+                .contains("Translated code-structure domain")),
+            "passthrough domains must be rendered from the tree, not projected as Clap subcommands"
+        );
+
+        let definitions = command
+            .find_subcommand_mut("definitions")
+            .expect("definitions command should exist");
+        let rendered_help = definitions
+            .find_subcommand_mut("get")
+            .expect("definitions get command should exist")
+            .render_long_help()
+            .to_string();
+        assert!(rendered_help.contains("Translated definition lookup summary"));
+        assert!(rendered_help.contains("Translated document URI argument"));
+        assert!(rendered_help.contains("Translated source position argument"));
+
+        let mut manpage = Vec::new();
+        clap_mangen::Man::new(command).render(&mut manpage)?;
+        let rendered_manpage = String::from_utf8(manpage)?;
+        assert!(
+            rendered_manpage.contains("Translated definition lookup summary"),
+            "manpage must consume recursively applied command metadata"
+        );
+        assert!(
+            rendered_manpage.contains("Translated document URI argument"),
+            "manpage must consume recursively applied argument metadata"
+        );
+        assert!(
+            rendered_manpage.contains("Translated source position argument"),
+            "manpage must consume recursively applied argument metadata"
+        );
+
+        Ok(())
     }
 }

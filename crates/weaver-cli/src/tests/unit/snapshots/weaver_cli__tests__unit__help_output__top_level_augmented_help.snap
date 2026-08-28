@@ -75,6 +75,8 @@ Commands:
 
   definitions — Query symbol definitions
   definitions get --uri <URI> --position <LINE:COLUMN> — Returns the definition location for a source position
+    --uri <URI> — The document URI containing the reference position
+    --position <LINE:COLUMN> — The 1-indexed line:column position to resolve
   daemon — Runs daemon lifecycle commands
   daemon start — Starts the daemon and waits for readiness
   daemon stop — Stops the daemon gracefully

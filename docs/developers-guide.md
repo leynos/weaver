@@ -814,10 +814,11 @@ The augmented command is used in both places that need truthful help text:
 - `clap_mangen` man page generation in `crates/weaver-cli/build.rs`, so the
   generated roff output stays aligned with the runtime help surface.
 
-The build script includes `cli.rs`, `command_surface/mod.rs`,
-`command_surface/tree.rs`, `command_ir/mod.rs`, and `help.rs` because it cannot
-link its own library. When changing any of those metadata inputs, keep the
-corresponding `cargo:rerun-if-changed` entry in `crates/weaver-cli/build.rs` so
+The build script directly includes `cli.rs`, `command_surface/tree.rs`,
+`command_ir/mod.rs`, and `help.rs` because it cannot link its own library. Its
+`cargo:rerun-if-changed` inputs additionally include `command_surface/mod.rs`,
+alongside those directly included files. When changing any of these metadata
+inputs, keep the corresponding rerun entry in `crates/weaver-cli/build.rs` so
 packaging regenerates the manual page from the same projection.
 
 The daemon routing catalogue remains private in production. The
