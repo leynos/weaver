@@ -45,6 +45,9 @@ pub struct ProcessTestWorld {
 }
 
 impl ProcessTestWorld {
+    /// Creates a process-supervision BDD test world.
+    ///
+    /// Returns the prepared world, or an error when test runtime setup fails.
     pub fn new() -> Result<Self, String> {
         let loader = TestConfigLoader::new()?;
         let world = Self {
@@ -217,6 +220,10 @@ impl ProcessTestWorld {
                 .any(|status| status == expected)
     }
 
+    /// Checks whether the runtime lock file exists.
+    ///
+    /// Returns whether the file exists, or an error when the filesystem
+    /// existence check fails.
     pub fn lock_exists(&self) -> Result<bool, String> {
         fs::exists(self.lock_path()).map_err(|error| format!("check lock file: {error}"))
     }
@@ -324,6 +331,10 @@ impl ShutdownSignal for TestShutdownSignal {
     }
 }
 
+/// Extracts the string `status` field from a JSON health snapshot.
+///
+/// Returns the field's string value, or `"<missing status>"` when the field
+/// is absent or is not a string.
 pub fn snapshot_status(snapshot: &Value) -> &str {
     snapshot
         .get("status")
