@@ -99,7 +99,7 @@ fn then_daemonisation_requested(world: &ProcessWorld) -> Result<(), String> {
     world
         .borrow()
         .wait_for_condition(
-            |state| state.daemonizer_calls() > 0,
+            |state| Ok(state.daemonizer_calls() > 0),
             "daemonisation to be invoked",
         )
         .map_err(|error| format!("expected daemonisation to be invoked at least once: {error}"))
@@ -111,7 +111,10 @@ fn then_lock_file_exists(world: &ProcessWorld) -> Result<(), String> {
     world
         .borrow()
         .wait_for_condition(
-            |state| test_fs::exists(state.lock_path()).is_ok_and(|exists| exists),
+            |state| {
+                test_fs::exists(state.lock_path())
+                    .map_err(|error| format!("check lock file existence: {error}"))
+            },
             "lock file to be written",
         )
         .map_err(|error| format!("lock file should exist whilst daemon is running: {error}"))
@@ -124,7 +127,10 @@ fn then_pid_file_exists(world: &ProcessWorld) -> Result<(), String> {
         let world_ref = world.borrow();
         world_ref
             .wait_for_condition(
-                |state| test_fs::exists(state.pid_path()).is_ok_and(|exists| exists),
+                |state| {
+                    test_fs::exists(state.pid_path())
+                        .map_err(|error| format!("check pid file existence: {error}"))
+                },
                 "pid file to be written",
             )
             .map_err(|error| format!("pid file should be written: {error}"))?;
@@ -168,7 +174,7 @@ fn then_health_starting(world: &ProcessWorld) -> Result<(), String> {
     world
         .borrow()
         .wait_for_condition(
-            |state| state.saw_status("starting"),
+            |state| Ok(state.saw_status("starting")),
             "starting health snapshot",
         )
         .map_err(|error| format!("starting health snapshot should have been observed: {error}"))
@@ -180,7 +186,7 @@ fn then_health_stopping(world: &ProcessWorld) -> Result<(), String> {
     world
         .borrow()
         .wait_for_condition(
-            |state| state.saw_status("stopping"),
+            |state| Ok(state.saw_status("stopping")),
             "stopping health snapshot",
         )
         .map_err(|error| format!("daemon should publish stopping health snapshot: {error}"))
