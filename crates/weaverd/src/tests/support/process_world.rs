@@ -247,11 +247,11 @@ impl ProcessTestWorld {
 
     pub fn wait_for_condition<F>(&self, predicate: F, description: &str) -> StepResult
     where
-        F: Fn(&Self) -> bool,
+        F: Fn(&Self) -> Result<bool, String>,
     {
         let deadline = Instant::now() + WAIT_TIMEOUT;
         while Instant::now() < deadline {
-            if predicate(self) {
+            if predicate(self)? {
                 return Ok(());
             }
             thread::sleep(POLL_INTERVAL);
@@ -340,4 +340,41 @@ pub fn snapshot_status(snapshot: &Value) -> &str {
         .get("status")
         .and_then(Value::as_str)
         .map_or("<missing status>", |status| status)
+}
+
+#[cfg(test)]
+mod tests {
+    //! Focused tests for process-supervision test-world helpers.
+
+    use std::cell::Cell;
+
+    use super::*;
+
+    #[test]
+    fn wait_for_condition_returns_exists_failure_without_timeout() {
+        let world = ProcessTestWorld::new().expect("create process test world");
+        fs::write(world.lock_path(), "lock").expect("create lock-file fixture");
+        let attempts = Cell::new(0);
+
+        let error = world
+            .wait_for_condition(
+                |state| {
+                    attempts.set(attempts.get() + 1);
+                    fs::exists(state.lock_path().join("child"))
+                        .map_err(|error| format!("check lock file existence: {error}"))
+                },
+                "child of lock file",
+            )
+            .expect_err("exists error should stop polling");
+
+        assert_eq!(attempts.get(), 1, "predicate should be called once");
+        assert!(
+            error.starts_with("check lock file existence:"),
+            "expected exists error, got: {error}"
+        );
+        assert!(
+            !error.contains("timeout waiting"),
+            "predicate failure should not become a timeout: {error}"
+        );
+    }
 }
