@@ -223,6 +223,10 @@ impl ProcessTestWorld {
                 .any(|status| status == expected)
     }
 
+    /// Checks whether the runtime lock file exists.
+    ///
+    /// Returns whether the file exists, or an error when the filesystem
+    /// existence check fails.
     pub fn lock_exists(&self) -> Result<bool, String> {
         fs::exists(self.lock_path()).map_err(|error| format!("check lock file: {error}"))
     }
