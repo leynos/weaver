@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex};
 
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_config::{CapabilityMatrix, Config, RuntimePaths, SocketEndpoint};
 
 use crate::{
     backends::FusionBackends,
@@ -27,6 +27,8 @@ pub fn dispatch_handler(socket_path: &str) -> Result<Arc<DispatchConnectionHandl
     };
     let provider =
         SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
+    let runtime_paths = RuntimePaths::from_config_readonly(&config)
+        .map_err(|error| format!("derive runtime paths: {error}"))?;
     let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
     let workspace_root =
         std::env::current_dir().map_err(|error| format!("find workspace root: {error}"))?;
@@ -34,7 +36,7 @@ pub fn dispatch_handler(socket_path: &str) -> Result<Arc<DispatchConnectionHandl
         BackendManager::new(backends),
         workspace_root,
         socket_path,
-        std::env::temp_dir(),
+        runtime_paths,
     )
     .map_err(|error| format!("create dispatch connection handler: {error}"))?;
     Ok(Arc::new(handler))

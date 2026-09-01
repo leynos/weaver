@@ -35,6 +35,7 @@ pub type StepResult = Result<(), String>;
 
 pub struct ProcessTestWorld {
     loader: TestConfigLoader,
+    runtime_paths: RuntimePaths,
     reporter: Arc<RecordingHealthReporter>,
     daemonizer: TestDaemonizer,
     shutdown: TestShutdownSignal,
@@ -50,8 +51,10 @@ impl ProcessTestWorld {
     /// Returns the prepared world, or an error when test runtime setup fails.
     pub fn new() -> Result<Self, String> {
         let loader = TestConfigLoader::new()?;
+        let runtime_paths = loader.runtime_paths()?;
         let world = Self {
             loader,
+            runtime_paths,
             reporter: Arc::new(RecordingHealthReporter::default()),
             daemonizer: TestDaemonizer::default(),
             shutdown: TestShutdownSignal::new(),
@@ -167,11 +170,11 @@ impl ProcessTestWorld {
 
     pub fn take_wait_error(&mut self) -> Option<String> { self.wait_error.take() }
 
-    pub fn lock_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.lock") }
+    pub fn lock_path(&self) -> PathBuf { self.runtime_paths.lock_path().to_path_buf() }
 
-    pub fn pid_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.pid") }
+    pub fn pid_path(&self) -> PathBuf { self.runtime_paths.pid_path().to_path_buf() }
 
-    pub fn health_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.health") }
+    pub fn health_path(&self) -> PathBuf { self.runtime_paths.health_path().to_path_buf() }
 
     pub fn read_health(&self) -> Result<Value, String> {
         let content = fs::read_to_string(self.health_path()).map_err(|error| error.to_string())?;

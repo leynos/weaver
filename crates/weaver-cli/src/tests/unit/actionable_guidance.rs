@@ -184,6 +184,7 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     LifecycleError::StartupFailed {
         exit_status: Some(17),
         runtime_dir: "/tmp/test/runtime".into(),
+        health_path: "/tmp/test/runtime/weaverd.health".into(),
     },
     StartupGuidanceExpectation {
         problem: "daemon exited before reporting ready (status: Some(17))",
