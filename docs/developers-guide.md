@@ -1432,9 +1432,9 @@ while lifecycle monitoring owns the runtime files that explain daemon readiness.
 - `endpoint: impl Into<String>` records the socket or TCP endpoint handling
   the request. Structured dispatch events include this value for operator
   correlation.
-- `runtime_paths: RuntimePaths` supplies the selected runtime directory and
-  endpoint-scoped health-snapshot path, so logs and CLI guidance point at the
-  same runtime artefacts.
+- `runtime_dir: PathBuf` records the daemon runtime directory. Structured
+  dispatch events derive the `weaverd.health` health-snapshot path from it, so
+  logs and CLI guidance point at the same runtime artefacts.
 
 The connection flow is:
 
@@ -1479,12 +1479,12 @@ metadata, and five optional sensitive request fields:
 - `full_payload`
 
 `serialize_structured_event` always includes `event`, `endpoint`,
-`runtime_dir`, and the endpoint-scoped health path supplied by `RuntimePaths`,
-then extends the payload with metadata. If any sensitive field is present, the
-serializer writes the field with the `"<redacted>"` marker rather than the
-original content. That keeps structured logs useful for diagnosing dispatch
-failures without exposing patch contents, request bodies, source text,
-environment values, or complete payloads.
+`runtime_dir`, and the derived `weaverd.health` path, then extends the payload
+with metadata. If any sensitive field is present, the serializer writes the
+field with the `"<redacted>"` marker rather than the original content. That
+keeps structured logs useful for diagnosing dispatch failures without exposing
+patch contents, request bodies, source text, environment values, or complete
+payloads.
 
 `emit_structured_event` formats the event as JSON and logs it to
 `DISPATCH_TARGET`. It uses `tracing::error!` when `is_error` is true and
@@ -1515,9 +1515,9 @@ non-empty content to the caller-provided parse closure.
 
 The concrete readers have these return semantics:
 
-- `read_health` returns `Ok(Some(HealthSnapshot))` when the configured health
-  snapshot is present and valid JSON, `Ok(None)` when the file is missing or
-  empty, `Err(LifecycleError::ReadHealth { .. })` when reading fails, and
+- `read_health` returns `Ok(Some(HealthSnapshot))` when `weaverd.health` is
+  present and valid JSON, `Ok(None)` when the file is missing or empty,
+  `Err(LifecycleError::ReadHealth { .. })` when reading fails, and
   `Err(LifecycleError::ParseHealth { .. })` when JSON parsing fails.
 - `read_pid` returns `Ok(Some(u32))` when the PID file is present and contains
   a valid integer, `Ok(None)` when it is missing or empty,
@@ -1527,12 +1527,13 @@ The concrete readers have these return semantics:
 ### `runtime_dir` in lifecycle errors
 
 `LifecycleError::LaunchDaemon` and `LifecycleError::StartupFailed` both carry
-`runtime_dir: PathBuf`. `StartupFailed` also carries the endpoint-scoped
-`health_path: PathBuf` supplied by `RuntimePaths`. The CLI keeps these paths
-with the errors because startup guidance is produced after the lower-level
-lifecycle operation has already failed.
+`runtime_dir: PathBuf`. The CLI keeps this path with the error because startup
+guidance is produced after the lower-level lifecycle operation has already
+failed. Carrying the runtime directory in the error lets actionable guidance
+derive the same `weaverd.health` path that monitoring uses and surface runtime
+artefact inspection as a next diagnostic step.
 
 For launch failures, guidance can tell the operator where to inspect runtime
 artefacts even when the daemon process never starts. For startup failures,
-guidance uses the endpoint-scoped health path and points directly at the health
-snapshot that should explain why readiness was not reached.
+guidance derives `runtime_dir.join("weaverd.health")` and points directly at
+the health snapshot that should explain why readiness was not reached.
