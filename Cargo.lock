@@ -3518,6 +3518,7 @@ dependencies = [
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",
+ "rustix 1.1.4",
  "serde",
  "serde_json",
  "serial_test",

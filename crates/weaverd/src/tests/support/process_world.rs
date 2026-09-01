@@ -193,8 +193,8 @@ impl ProcessTestWorld {
         Ok(())
     }
 
-    pub fn write_lock_without_pid(&self) -> StepResult {
-        fs::write(self.lock_path(), b"").map_err(|error| error.to_string())
+    pub fn terminate_before_pid_write(&self) -> StepResult {
+        test_support::terminate_before_pid_write(&self.runtime_paths)
     }
 
     pub fn read_pid(&self) -> Result<Option<u32>, String> {

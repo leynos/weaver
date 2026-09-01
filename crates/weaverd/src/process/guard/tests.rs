@@ -84,7 +84,9 @@ fn setup_guard_with_health(
 #[test]
 fn missing_pid_file_refuses_reacquire() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
-    write_runtime_file(&paths, paths.lock_file_name(), b"")?;
+    let runtime_dir = open_runtime_dir(&paths)?;
+    let _first_guard = ProcessGuard::acquire(runtime_dir, paths.clone())
+        .map_err(|error| format!("initial lock should be acquired: {error}"))?;
     let runtime_dir = open_runtime_dir(&paths)?;
     match ProcessGuard::acquire(runtime_dir, paths.clone()) {
         Err(LaunchError::StartupInProgress { .. }) => {
@@ -96,6 +98,28 @@ fn missing_pid_file_refuses_reacquire() -> Result<(), String> {
         }
         other => Err(format!("expected startup-in-progress error, got {other:?}")),
     }
+}
+
+#[test]
+fn terminated_launch_before_pid_write_reclaims_lock() -> Result<(), String> {
+    let (_dir, paths) = build_paths()?;
+    let runtime_dir = open_runtime_dir(&paths)?;
+    let guard = ProcessGuard::acquire(runtime_dir, paths.clone())
+        .map_err(|error| format!("initial lock should be acquired: {error}"))?;
+    guard.terminate_before_pid_write();
+    assert!(
+        runtime_file_exists(&paths, paths.lock_file_name())?,
+        "terminated launch should retain the persistent lock path",
+    );
+
+    let runtime_dir = open_runtime_dir(&paths)?;
+    let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
+        .map_err(|error| format!("abandoned lock should be reclaimed: {error}"))?;
+    guard
+        .write_pid(42)
+        .map_err(|error| format!("pid write should succeed after recovery: {error}"))?;
+
+    Ok(())
 }
 
 #[rstest]
