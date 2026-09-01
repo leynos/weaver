@@ -7,9 +7,13 @@ use super::{
 use crate::backends::{BackendKind, BackendStartupError};
 
 #[test]
-fn read_error_event_maps_all_dispatch_errors() {
+fn read_error_event_maps_all_dispatch_errors() -> Result<(), String> {
     let temp_dir = std::env::temp_dir();
-    let endpoint = temp_dir.join("weaverd.sock").to_string_lossy().into_owned();
+    let endpoint_path = temp_dir.join("weaverd.sock");
+    let runtime_paths = runtime_paths(SocketEndpoint::unix(
+        endpoint_path.to_string_lossy().into_owned(),
+    ))?;
+    let endpoint = endpoint_path.to_string_lossy().into_owned();
     let cases = vec![
         (DispatchError::malformed("bad json"), "request_rejected"),
         (
@@ -61,8 +65,9 @@ fn read_error_event_maps_all_dispatch_errors() {
     ];
 
     for (error, expected_event) in cases {
-        let event = read_error_event(&error, &endpoint, &temp_dir);
+        let event = read_error_event(&error, &endpoint, &runtime_paths);
         let value = serialize_structured_event(&event);
         assert_eq!(value["event"], serde_json::json!(expected_event));
     }
+    Ok(())
 }
