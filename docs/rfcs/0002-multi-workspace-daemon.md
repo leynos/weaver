@@ -500,10 +500,13 @@ and configuration vocabulary before implementation.
 
 ### 8.2. Stage two: carry workspace identity
 
-Add the workspace locator to CLI-daemon requests and reject missing locators or
-schema/version mismatches. The daemon returns an explicit schema error for any
-validation failure. No workspace operation executes before validation, and the
-daemon does not infer the locator from its captured startup root.
+Add the workspace locator to CLI-daemon requests. Missing or incompatible
+request fields, including schema/version mismatches, fail transport validation
+with stable schema/version reason codes. A present workspace locator that fails
+accessibility, containment, canonicalization, or topology checks fails with a
+structured locator-validation error and a stable daemon-side reason code. Both
+failure classes occur before request routing, and the daemon does not infer the
+locator from its captured startup root.
 
 ### 8.3. Stage three: introduce workspace ownership
 

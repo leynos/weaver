@@ -946,10 +946,13 @@ while allowing distributors to ship additional locales as optional artefacts.
 The default `weaverd` endpoint is one local, per-user service boundary, not one
 repository boundary. Every routable CLI request must therefore carry a
 workspace locator derived from the invocation context or an explicit public
-override. The daemon validates and canonicalizes that locator before domain
-routing, then selects workspace-owned state using the resulting key. A client
-path is untrusted input; it does not become filesystem authority merely because
-the client calls it canonical.
+override. Missing or incompatible request fields fail transport schema/version
+validation with stable reason codes. A present locator that fails accessibility,
+containment, canonicalization, or topology checks fails domain-shaped locator
+validation with a stable daemon-side reason code. Both checks happen before
+domain routing, after which the daemon selects workspace-owned state using the
+resulting key. A client path is untrusted input; it does not become filesystem
+authority merely because the client calls it canonical.
 
 The current implementation still captures one startup directory and retains it
 as the request handler's workspace root. Until the workspace request contract
@@ -1439,17 +1442,22 @@ daemon owns only its bootstrap directory. The default endpoint retains the
 `weaverd.lock`, `weaverd.pid`, and `weaverd.health` artefact names; non-default
 endpoints derive all three names from a deterministic, filesystem-safe endpoint
 identifier. A dedicated `ProcessGuard` claims the resulting lock file under the
-runtime directory before any work begins. If the lock already exists the guard
-first checks whether a PID file is present: its absence is treated as "launch
-already in progress" so a second invocation refuses to start rather than racing
-the first instance. When a PID is recorded the guard probes the process using
-`kill(pid, 0)`. Live peers cause the launch to abort, while stale artefacts are
-removed before retrying. Successful launches then background the daemon via
-`daemonize-me`, write the current PID, and publish a JSON health snapshot. Both
-artefacts are written atomically via a temporary file and rename so readers
-never observe a truncated payload. The snapshot records the lifecycle state
-(`starting`, `ready`, `stopping`), the PID, and a UNIX timestamp so external
-probes can consume the same readiness signal as the CLI.
+runtime directory before any work begins. The guard holds an advisory
+exclusive ownership lock on that persistent file, so a live owner cannot race a
+second daemon. If a pre-existing lock is actively owned, acquisition returns
+`LaunchError::StartupInProgress`; if it is not locked, the guard reclaims stale
+PID and health state and reuses the same lock inode. Clean shutdown retains the
+lock file and removes only the PID and health files, avoiding unlink-and-recreate
+races. This recovery covers termination after lock acquisition but before
+`write_pid`, and integration tests must prove that a subsequent launch recovers
+without permitting two live daemons. When a PID is recorded the guard probes the
+process using `kill(pid, 0)`. Live peers cause the launch to abort. Successful
+launches then background the daemon via `daemonize-me`, write the current PID,
+and publish a JSON health snapshot. Both artefacts are written atomically via a
+temporary file and rename, so readers never observe a truncated payload. The
+snapshot records the lifecycle state (`starting`, `ready`, `stopping`), the PID,
+and a UNIX timestamp, so external probes can consume the same readiness signal
+as the CLI.
 
 The daemon now binds a socket listener as part of startup. The listener binds
 to the configured `SocketEndpoint`, switches into a non-blocking accept loop,
