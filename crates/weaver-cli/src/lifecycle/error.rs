@@ -78,6 +78,7 @@ pub enum LifecycleError {
         exit_status: Option<i32>,
         /// The runtime directory the daemon was given.
         runtime_dir: PathBuf,
+        health_path: PathBuf,
     },
     /// The daemon reported `stopping` before it ever became ready.
     #[error("daemon reported 'stopping' before reaching ready; check health snapshot at {path:?}")]

@@ -1,5 +1,7 @@
 //! Unit tests for process guard health checking.
 
+use std::path::Path;
+
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_config::{Config, SocketEndpoint};
@@ -30,33 +32,33 @@ fn open_runtime_dir(paths: &RuntimePaths) -> Result<cap_std::fs::Dir, String> {
 
 fn write_runtime_file(
     paths: &RuntimePaths,
-    filename: &str,
+    filename: &Path,
     content: impl AsRef<[u8]>,
 ) -> Result<(), String> {
     open_runtime_dir(paths)?
         .write(filename, content)
-        .map_err(|error| format!("failed to write {filename}: {error}"))
+        .map_err(|error| format!("failed to write {}: {error}", filename.display()))
 }
 
-fn read_runtime_file(paths: &RuntimePaths, filename: &str) -> Result<String, String> {
+fn read_runtime_file(paths: &RuntimePaths, filename: &Path) -> Result<String, String> {
     open_runtime_dir(paths)?
         .read_to_string(filename)
-        .map_err(|error| format!("failed to read {filename}: {error}"))
+        .map_err(|error| format!("failed to read {}: {error}", filename.display()))
 }
 
-fn runtime_file_exists(paths: &RuntimePaths, filename: &str) -> Result<bool, String> {
+fn runtime_file_exists(paths: &RuntimePaths, filename: &Path) -> Result<bool, String> {
     match open_runtime_dir(paths)?.metadata(filename) {
         Ok(_) => Ok(true),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(format!("failed to inspect {filename}: {error}")),
+        Err(error) => Err(format!("failed to inspect {}: {error}", filename.display())),
     }
 }
 
 #[fixture]
 fn seeded_runtime_paths(#[default("0\n")] pid: &str) -> Result<(TempDir, RuntimePaths), String> {
     let (dir, paths) = build_paths()?;
-    write_runtime_file(&paths, "weaverd.lock", b"")?;
-    write_runtime_file(&paths, "weaverd.pid", pid)?;
+    write_runtime_file(&paths, paths.lock_file_name(), b"")?;
+    write_runtime_file(&paths, paths.pid_file_name(), pid)?;
     Ok((dir, paths))
 }
 
@@ -82,15 +84,14 @@ fn setup_guard_with_health(
 #[test]
 fn missing_pid_file_refuses_reacquire() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
-    write_runtime_file(&paths, "weaverd.lock", b"")?;
+    write_runtime_file(&paths, paths.lock_file_name(), b"")?;
     let runtime_dir = open_runtime_dir(&paths)?;
     match ProcessGuard::acquire(runtime_dir, paths.clone()) {
         Err(LaunchError::StartupInProgress { .. }) => {
-            if !runtime_file_exists(&paths, "weaverd.lock")? {
-                return Err(String::from(
-                    "lock should remain whilst startup is in progress",
-                ));
-            }
+            assert!(
+                runtime_file_exists(&paths, paths.lock_file_name())?,
+                "lock should remain whilst startup is in progress",
+            );
             Ok(())
         }
         other => Err(format!("expected startup-in-progress error, got {other:?}")),
@@ -106,23 +107,24 @@ fn stale_pid_is_reclaimed(
     #[with(pid)] seeded_runtime_paths: Result<(TempDir, RuntimePaths), String>,
 ) -> Result<(), String> {
     let (_dir, paths) = seeded_runtime_paths?;
-    let seeded_pid = read_runtime_file(&paths, "weaverd.pid")?;
+    let seeded_pid = read_runtime_file(&paths, paths.pid_file_name())?;
     if seeded_pid != pid {
         return Err(format!(
             "unexpected seeded pid content: expected {pid:?}, got {seeded_pid:?}"
         ));
     }
     if write_health {
-        write_runtime_file(&paths, "weaverd.health", b"stale")?;
+        write_runtime_file(&paths, paths.health_file_name(), b"stale")?;
     }
 
     let runtime_dir = open_runtime_dir(&paths)?;
     let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
         .map_err(|error| format!("stale runtime should be reclaimed: {error}"))?;
-    if write_health && runtime_file_exists(&paths, "weaverd.health")? {
-        return Err(String::from(
+    if write_health {
+        assert!(
+            !runtime_file_exists(&paths, paths.health_file_name())?,
             "stale health file should be removed before reacquiring",
-        ));
+        );
     }
     guard
         .write_pid(42)
@@ -133,9 +135,9 @@ fn stale_pid_is_reclaimed(
 #[test]
 fn existing_pid_rejects_launch() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
-    write_runtime_file(&paths, "weaverd.lock", b"")?;
+    write_runtime_file(&paths, paths.lock_file_name(), b"")?;
     let pid = std::process::id();
-    write_runtime_file(&paths, "weaverd.pid", format!("{pid}\n"))?;
+    write_runtime_file(&paths, paths.pid_file_name(), format!("{pid}\n"))?;
     let runtime_dir = open_runtime_dir(&paths)?;
     match ProcessGuard::acquire(runtime_dir, paths) {
         Err(LaunchError::AlreadyRunning { pid: recorded }) => {
@@ -154,7 +156,7 @@ fn existing_pid_rejects_launch() -> Result<(), String> {
 fn health_snapshot_is_written_with_newline() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
     let _guard = setup_guard_with_health(&paths, HealthState::Ready)?;
-    let content = read_runtime_file(&paths, "weaverd.health")?;
+    let content = read_runtime_file(&paths, paths.health_file_name())?;
     if !content.ends_with('\n') {
         return Err(String::from("health snapshot should end with newline"));
     }
@@ -173,3 +175,5 @@ fn health_snapshot_records_event() -> Result<(), String> {
     }
     Ok(())
 }
+// weave: run 'weave explain crates/weaverd/src/process/guard/tests.rs' for per-hunk detail, 'weave
+// check' to verify your resolution

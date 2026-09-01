@@ -29,7 +29,7 @@ use tracing_subscriber::{
     registry::{LookupSpan, Registry},
 };
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_config::{CapabilityMatrix, Config, RuntimePaths, SocketEndpoint};
 
 use super::*;
 use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
@@ -250,12 +250,17 @@ pub(crate) fn ensure(condition: bool, message: impl Into<String>) -> Result<(), 
 pub(crate) fn harness(
     backend_manager: Result<BackendManagerFixture, String>,
 ) -> Result<HandlerTestHarness, String> {
-    let manager = backend_manager?.manager();
+    let backend_manager = backend_manager?.manager();
     let temp_dir = TempDir::new().map_err(|error| format!("temporary directory: {error}"))?;
     let (listener, addr) = create_listener()?;
     let workspace_root = temp_dir.path().join("weaverd-test-workspace");
     let endpoint = temp_dir.path().join("weaverd-test/socket.sock");
-    let runtime_dir = temp_dir.path().to_path_buf();
+    let config = Config {
+        daemon_socket: SocketEndpoint::unix(endpoint.to_string_lossy().into_owned()),
+        ..Config::default()
+    };
+    let runtime_paths = RuntimePaths::from_config_readonly(&config)
+        .map_err(|error| format!("derive runtime paths: {error}"))?;
     let dispatch = dispatcher::get_default(Dispatch::clone);
 
     let server_handle = thread::spawn(move || {
@@ -264,10 +269,10 @@ pub(crate) fn harness(
             .accept()
             .map_err(|error| format!("accept: {error}"))?;
         DispatchConnectionHandler::new(
-            manager,
+            backend_manager,
             workspace_root,
             endpoint.to_string_lossy().into_owned(),
-            runtime_dir,
+            runtime_paths,
         )
         .map_err(|error| format!("absolute workspace root: {error}"))?
         .handle(ConnectionStream::Tcp(stream));
@@ -323,3 +328,5 @@ fn second_dispatcher_keeps_a_callsite_registered_under_capture() {
         "expected the emission through the recording dispatcher to be captured"
     );
 }
+// weave: run 'weave explain crates/weaverd/src/dispatch/handler/tests_helpers.rs' for per-hunk
+// detail, 'weave check' to verify your resolution

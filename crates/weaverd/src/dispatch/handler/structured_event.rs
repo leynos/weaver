@@ -4,17 +4,14 @@
 //! request failures and other notable states. Sensitive request data is
 //! redacted before serialization so the emitted logs remain safe to forward.
 
-use std::path::Path;
-
 use serde_json::{Map, Value, json};
 use tracing::{error, info};
+use weaver_config::RuntimePaths;
 
 use crate::dispatch::{errors::DispatchError, router::DISPATCH_TARGET};
 
 /// Placeholder written in place of every sensitive field value.
 const REDACTION_MARKER: &str = "<redacted>";
-/// File name of the health snapshot recorded next to the runtime directory.
-const HEALTH_SNAPSHOT_NAME: &str = "weaverd.health";
 
 /// Metadata fields attached to a structured dispatch event.
 #[derive(Debug)]
@@ -88,6 +85,7 @@ pub(super) struct StructuredDispatchEvent {
     endpoint: String,
     /// Runtime directory whose health snapshot accompanies the event.
     runtime_dir: std::path::PathBuf,
+    health_path: std::path::PathBuf,
     /// Optional request metadata attached to the event.
     metadata: StructuredEventMetadata,
     /// Request patch text, retained only to mark it redacted.
@@ -107,13 +105,14 @@ impl StructuredDispatchEvent {
     pub(super) fn new(
         event: &'static str,
         endpoint: impl Into<String>,
-        runtime_dir: &Path,
+        runtime_paths: &RuntimePaths,
         metadata: StructuredEventMetadata,
     ) -> Self {
         Self {
             event,
             endpoint: endpoint.into(),
-            runtime_dir: runtime_dir.to_path_buf(),
+            runtime_dir: runtime_paths.runtime_dir().to_path_buf(),
+            health_path: runtime_paths.health_path().to_path_buf(),
             metadata,
             patch: None,
             body: None,
@@ -128,13 +127,13 @@ impl StructuredDispatchEvent {
 pub(super) fn read_error_event(
     error: &DispatchError,
     endpoint: &str,
-    runtime_dir: &Path,
+    runtime_paths: &RuntimePaths,
 ) -> StructuredDispatchEvent {
     match error {
         DispatchError::RequestTooLarge { size, max_size } => StructuredDispatchEvent::new(
             "request_too_large",
             endpoint,
-            runtime_dir,
+            runtime_paths,
             StructuredEventMetadata::none()
                 .with_size(*size)
                 .with_max_size(*max_size),
@@ -142,7 +141,7 @@ pub(super) fn read_error_event(
         _ => StructuredDispatchEvent::new(
             "request_rejected",
             endpoint,
-            runtime_dir,
+            runtime_paths,
             StructuredEventMetadata::none(),
         ),
     }
@@ -171,13 +170,7 @@ pub(super) fn serialize_structured_event(event: &StructuredDispatchEvent) -> Val
     );
     payload.insert(
         "weaverd.health".into(),
-        json!(
-            event
-                .runtime_dir
-                .join(HEALTH_SNAPSHOT_NAME)
-                .to_string_lossy()
-                .to_string()
-        ),
+        json!(event.health_path.to_string_lossy().to_string()),
     );
 
     event.metadata.extend_payload(&mut payload);
@@ -230,3 +223,5 @@ pub(super) fn emit_structured_event(
         );
     }
 }
+// weave: run 'weave explain crates/weaverd/src/dispatch/handler/structured_event.rs' for per-hunk
+// detail, 'weave check' to verify your resolution

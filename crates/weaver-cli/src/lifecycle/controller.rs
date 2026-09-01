@@ -106,7 +106,7 @@ impl SystemLifecycle {
         let paths = prepare_runtime(context)?;
         let dir = open_runtime_dir(&paths)?;
 
-        match read_pid(&dir, PID_FILENAME, paths.pid_path())? {
+        match read_pid(&dir, paths.pid_file_name(), paths.pid_path())? {
             Some(pid) => stop_daemon(pid, &paths, context, output),
             None => report_missing_pid(&paths, context, output),
         }
@@ -204,7 +204,7 @@ impl SystemLifecycle {
         }
 
         let dir = open_runtime_dir(&paths)?;
-        let health = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
+        let health = read_health(&dir, paths.health_file_name(), paths.health_path())?;
         let runtime = RuntimeStatusContext {
             paths: &paths,
             endpoint: context.config.daemon_socket(),
@@ -215,7 +215,7 @@ impl SystemLifecycle {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
+        let pid = read_pid(&dir, paths.pid_file_name(), paths.pid_path())?;
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
         Self::report_degraded_status(RuntimeProbe { reachable, pid }, runtime, output)?;
         Ok(ExitCode::SUCCESS)

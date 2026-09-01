@@ -201,15 +201,14 @@ fn launch_daemon_guidance(binary: &OsStr, runtime_dir: &Path) -> ActionableGuida
 }
 
 /// Builds guidance for a daemon that exited before reporting readiness.
-fn startup_failed_guidance(exit_status: Option<i32>, runtime_dir: &Path) -> ActionableGuidance {
+fn startup_failed_guidance(exit_status: Option<i32>, health_path: &Path) -> ActionableGuidance {
     let problem = format!("daemon exited before reporting ready (status: {exit_status:?})");
-    let health_path = runtime_dir.join("weaverd.health");
     let alternatives = vec![
         "The daemon started but failed to become ready.".to_owned(),
         String::new(),
         "Valid alternatives:".to_owned(),
         "  - Check the daemon logs for errors".to_owned(),
-        startup_socket_hint(Some(health_path.as_path())),
+        startup_socket_hint(Some(health_path)),
         startup_output_hint().to_owned(),
     ];
     ActionableGuidance::new(problem, alternatives, startup_retry_command())
@@ -315,9 +314,9 @@ pub(crate) fn write_startup_guidance<W: Write>(
         } => launch_daemon_guidance(binary, runtime_dir),
         LifecycleError::StartupFailed {
             exit_status,
-            runtime_dir,
+            health_path,
             ..
-        } => startup_failed_guidance(*exit_status, runtime_dir),
+        } => startup_failed_guidance(*exit_status, health_path),
         LifecycleError::StartupTimeout { health_path, .. } => startup_timeout_guidance(health_path),
         LifecycleError::StartupAborted { path } => startup_aborted_guidance(path),
         other => {
@@ -332,3 +331,5 @@ pub(crate) fn write_startup_guidance<W: Write>(
 
     write_actionable_guidance(writer, &guidance)
 }
+// weave: run 'weave explain crates/weaver-cli/src/actionable_guidance.rs' for per-hunk detail,
+// 'weave check' to verify your resolution
