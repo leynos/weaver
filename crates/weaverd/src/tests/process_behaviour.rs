@@ -90,10 +90,10 @@ fn given_stale_runtime_invalid(world: &ProcessWorld) -> Result<(), String> {
     Ok(())
 }
 
-#[given("a lock without a pid file exists")]
-fn given_lock_without_pid(world: &ProcessWorld) -> Result<(), String> {
-    let scenario = process_world(world)?;
-    scenario.borrow().write_lock_without_pid()?;
+#[given("a prior launch terminated after acquiring the lock")]
+fn given_terminated_launch_before_pid_write(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
+    world.borrow().terminate_before_pid_write()?;
     Ok(())
 }
 
@@ -196,22 +196,20 @@ fn then_health_stopping(world: &ProcessWorld) -> Result<(), String> {
         .map_err(|error| format!("daemon should publish stopping health snapshot: {error}"))
 }
 
-#[then("the runtime artefacts are removed")]
-fn then_runtime_removed(world: &ProcessWorld) -> Result<(), String> {
-    let scenario = process_world(world)?;
-    let borrowed = scenario.borrow();
+#[then("the runtime state is cleaned up")]
+fn then_runtime_state_cleaned_up(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
+    let world = world.borrow();
     assert!(
-        !test_fs::exists(borrowed.lock_path())
-            .map_err(|error| format!("check lock file: {error}"))?,
-        "lock file should be removed after shutdown",
+        world.lock_exists()?,
+        "lock file should remain available for the next launch",
     );
     assert!(
-        !test_fs::exists(borrowed.pid_path())
-            .map_err(|error| format!("check pid file: {error}"))?,
+        !test_fs::exists(world.pid_path()).map_err(|error| format!("check pid file: {error}"))?,
         "pid file should be removed after shutdown",
     );
     assert!(
-        !test_fs::exists(borrowed.health_path())
+        !test_fs::exists(world.health_path())
             .map_err(|error| format!("check health file: {error}"))?,
         "health file should be removed after shutdown",
     );
@@ -230,16 +228,6 @@ fn then_stale_pid_replaced(world: &ProcessWorld) -> Result<(), String> {
         pid,
         std::process::id(),
         "pid file should record the current process id",
-    );
-    Ok(())
-}
-
-#[then("the lock file remains in place")]
-fn then_lock_remains(world: &ProcessWorld) -> Result<(), String> {
-    let scenario = process_world(world)?;
-    assert!(
-        scenario.borrow().lock_exists()?,
-        "lock file should remain when launch is still in progress",
     );
     Ok(())
 }
@@ -275,11 +263,6 @@ fn then_daemon_succeeds(world: &ProcessWorld) -> Result<(), String> {
         .ok_or_else(|| String::from("expected a recorded daemon result"))?;
     assert!(result.is_ok(), "daemon run should succeed: {result:?}");
     Ok(())
-}
-
-#[then("the daemon run fails with launch already in progress")]
-fn then_daemon_fails_launch_in_progress(world: &ProcessWorld) -> Result<(), String> {
-    assert_daemon_error_contains(process_world(world)?, "launch already in progress")
 }
 
 #[then("the daemon run fails with invalid configuration")]
@@ -329,5 +312,3 @@ fn assert_daemon_error_contains(
 
 #[scenario(path = "tests/features/daemon_process.feature")]
 fn daemon_process(#[from(world)] _: ProcessWorld) {}
-// weave: run 'weave explain crates/weaverd/src/tests/process_behaviour.rs' for per-hunk detail,
-// 'weave check' to verify your resolution

@@ -9,11 +9,15 @@ use std::{
 use cap_std::fs::OpenOptionsExt;
 use cap_std::fs::{Dir, File, OpenOptions};
 use nix::{errno::Errno, sys::signal::kill, unistd::Pid};
+#[cfg(all(unix, not(target_os = "solaris")))]
+use rustix::fs::{FlockOperation, flock};
 use serde::Serialize;
 use tracing::{info, warn};
 use weaver_config::RuntimePaths;
 
 use super::{PROCESS_TARGET, errors::LaunchError, files::atomic_write};
+
+type LockFile = File;
 
 #[cfg(test)]
 mod health_events;
@@ -31,7 +35,7 @@ pub(super) struct ProcessGuard {
     /// Capability handle to the runtime directory holding the artefacts.
     runtime_dir: Dir,
     /// Held lock file marking an active launch; released when dropped.
-    _lock: File,
+    _lock: LockFile,
     /// PID recorded by `write_pid`, required before health updates.
     pid: Option<u32>,
 }
@@ -123,13 +127,12 @@ impl ProcessGuard {
     /// Borrows the runtime paths resolved for this daemon instance.
     pub(super) const fn paths(&self) -> &RuntimePaths { &self.paths }
 
+    #[cfg(test)]
+    fn terminate_before_pid_write(self) { drop(self); }
+
     /// Removes the lock, PID, and health artefacts, ignoring absent files.
     fn cleanup(&self) {
-        for path in [
-            self.paths.lock_path(),
-            self.paths.pid_path(),
-            self.paths.health_path(),
-        ] {
+        for path in [self.paths.pid_path(), self.paths.health_path()] {
             remove_runtime_file(&self.runtime_dir, path);
         }
     }
@@ -220,7 +223,7 @@ impl HealthSnapshot<'_> {
 ///
 /// Returns [`LaunchError`] if the lock file cannot be created or an existing
 /// lock cannot be resolved.
-fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
+fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<LockFile, LaunchError> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -230,12 +233,13 @@ fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
     let filename = runtime_filename(paths.lock_path())?;
     match dir.open_with(filename, &options) {
         Ok(file) => {
+            let lock = lock_new_file(file, paths)?;
             info!(
                 target: PROCESS_TARGET,
                 file = %paths.lock_path().display(),
                 "acquired daemon lock"
             );
-            Ok(file)
+            Ok(lock)
         }
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
             handle_existing_lock(dir, paths)
@@ -254,53 +258,107 @@ fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
 /// Returns [`LaunchError::StartupInProgress`] when a launch holds the lock
 /// without a PID file, [`LaunchError::AlreadyRunning`] when the recorded
 /// process is alive, and propagates probe and cleanup failures.
-fn handle_existing_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
-    if !runtime_file_exists(dir, paths.pid_path())? {
-        info!(
-            target: PROCESS_TARGET,
-            lock = %paths.lock_path().display(),
-            "refusing to start: launch already in progress",
-        );
-        return Err(LaunchError::StartupInProgress {
-            lock: paths.lock_path().to_path_buf(),
-            pid: paths.pid_path().to_path_buf(),
-        });
-    }
-
-    match read_pid(dir, paths.pid_path()) {
-        Some(0) => {
-            warn!(
-                target: PROCESS_TARGET,
-                "existing daemon recorded zero pid; cleaning stale files",
-            );
-        }
-        Some(pid) => {
-            if check_process(pid)? {
-                info!(
+fn handle_existing_lock(dir: &Dir, paths: &RuntimePaths) -> Result<LockFile, LaunchError> {
+    if runtime_file_exists(dir, paths.pid_path())? {
+        match read_pid(dir, paths.pid_path()) {
+            Some(0) => {
+                warn!(
                     target: PROCESS_TARGET,
-                    pid,
-                    "refusing to start: existing daemon alive",
+                    "existing daemon recorded zero pid; cleaning stale files",
                 );
-                return Err(LaunchError::AlreadyRunning { pid });
             }
-            warn!(
-                target: PROCESS_TARGET,
-                pid,
-                "existing daemon not detected; cleaning stale files",
-            );
-        }
-        None => {
-            warn!(
-                target: PROCESS_TARGET,
-                "pid file unreadable; cleaning stale files",
-            );
+            Some(pid) => match check_process(pid)? {
+                true => {
+                    info!(
+                        target: PROCESS_TARGET,
+                        pid,
+                        "refusing to start: existing daemon alive",
+                    );
+                    return Err(LaunchError::AlreadyRunning { pid });
+                }
+                false => {
+                    warn!(
+                        target: PROCESS_TARGET,
+                        pid,
+                        "existing daemon not detected; cleaning stale files",
+                    );
+                }
+            },
+            None => {
+                warn!(
+                    target: PROCESS_TARGET,
+                    "pid file unreadable; cleaning stale files",
+                );
+            }
         }
     }
 
-    remove_file(dir, paths.lock_path())?;
+    let lock = lock_existing_file(dir, paths)?;
     remove_file(dir, paths.pid_path())?;
     remove_file(dir, paths.health_path())?;
+    Ok(lock)
+}
+
+#[cfg(all(unix, not(target_os = "solaris")))]
+fn lock_new_file(file: File, paths: &RuntimePaths) -> Result<LockFile, LaunchError> {
+    lock_file(file, paths)
+}
+
+#[cfg(any(not(unix), target_os = "solaris"))]
+fn lock_new_file(file: File, _paths: &RuntimePaths) -> Result<LockFile, LaunchError> { Ok(file) }
+
+#[cfg(all(unix, not(target_os = "solaris")))]
+fn lock_existing_file(dir: &Dir, paths: &RuntimePaths) -> Result<LockFile, LaunchError> {
+    let mut options = OpenOptions::new();
+    options.write(true);
+    let filename = runtime_filename(paths.lock_path())?;
+    let file = dir
+        .open_with(filename, &options)
+        .map_err(|source| LaunchError::LockCreate {
+            path: paths.lock_path().to_path_buf(),
+            source,
+        })?;
+    match lock_file(file, paths) {
+        Ok(lock) => {
+            warn!(
+                target: PROCESS_TARGET,
+                lock = %paths.lock_path().display(),
+                "reclaiming stale daemon lock"
+            );
+            Ok(lock)
+        }
+        Err(LaunchError::LockCreate { source, .. })
+            if source.kind() == io::ErrorKind::WouldBlock =>
+        {
+            info!(
+                target: PROCESS_TARGET,
+                lock = %paths.lock_path().display(),
+                "refusing to start: launch already in progress",
+            );
+            Err(LaunchError::StartupInProgress {
+                lock: paths.lock_path().to_path_buf(),
+                pid: paths.pid_path().to_path_buf(),
+            })
+        }
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(any(not(unix), target_os = "solaris"))]
+fn lock_existing_file(dir: &Dir, paths: &RuntimePaths) -> Result<LockFile, LaunchError> {
+    remove_file(dir, paths.lock_path())?;
     acquire_lock(dir, paths)
+}
+
+#[cfg(all(unix, not(target_os = "solaris")))]
+fn lock_file(file: File, paths: &RuntimePaths) -> Result<LockFile, LaunchError> {
+    flock(&file, FlockOperation::NonBlockingLockExclusive).map_err(|source| {
+        LaunchError::LockCreate {
+            path: paths.lock_path().to_path_buf(),
+            source: source.into(),
+        }
+    })?;
+    Ok(file)
 }
 
 /// Reads and parses the PID file, returning `None` when it is absent or
@@ -394,3 +452,4 @@ pub(super) mod test_support;
 
 #[cfg(test)]
 mod tests;
+// check' to verify your resolution

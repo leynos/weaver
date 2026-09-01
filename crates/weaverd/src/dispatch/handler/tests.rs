@@ -297,5 +297,3 @@ fn read_request_line_returns_request_too_large_for_large_payload() {
 
     sender.join().expect("join sender");
 }
-// weave: run 'weave explain crates/weaverd/src/dispatch/handler/tests.rs' for per-hunk detail,
-// 'weave check' to verify your resolution

@@ -307,5 +307,4 @@ struct RouteContext<'a> {
 impl ConnectionHandler for DispatchConnectionHandler {
     fn handle(&self, stream: ConnectionStream) { self.dispatch(stream); }
 }
-// weave: run 'weave explain crates/weaverd/src/dispatch/handler/mod.rs' for per-hunk detail, 'weave
 // check' to verify your resolution

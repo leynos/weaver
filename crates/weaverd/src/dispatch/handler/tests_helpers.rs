@@ -328,5 +328,4 @@ fn second_dispatcher_keeps_a_callsite_registered_under_capture() {
         "expected the emission through the recording dispatcher to be captured"
     );
 }
-// weave: run 'weave explain crates/weaverd/src/dispatch/handler/tests_helpers.rs' for per-hunk
 // detail, 'weave check' to verify your resolution

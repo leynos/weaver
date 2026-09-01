@@ -331,5 +331,3 @@ pub(crate) fn write_startup_guidance<W: Write>(
 
     write_actionable_guidance(writer, &guidance)
 }
-// weave: run 'weave explain crates/weaver-cli/src/actionable_guidance.rs' for per-hunk detail,
-// 'weave check' to verify your resolution

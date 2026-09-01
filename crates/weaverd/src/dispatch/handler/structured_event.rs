@@ -223,5 +223,4 @@ pub(super) fn emit_structured_event(
         );
     }
 }
-// weave: run 'weave explain crates/weaverd/src/dispatch/handler/structured_event.rs' for per-hunk
 // detail, 'weave check' to verify your resolution
