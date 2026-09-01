@@ -141,7 +141,7 @@ where
             backend_manager,
             workspace_root,
             config.daemon_socket().to_string(),
-            guard.paths().runtime_dir().to_path_buf(),
+            guard.paths().clone(),
         )
         .map_err(|error| LaunchError::WorkspaceRoot {
             source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),
