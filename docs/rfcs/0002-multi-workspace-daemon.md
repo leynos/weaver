@@ -180,6 +180,13 @@ treating the canonical string as filesystem authority.
 The per-user socket remains the default. Separate socket configuration remains
 an operational escape hatch, not the primary tenancy mechanism.
 
+Process supervision is scoped to the complete configured `SocketEndpoint`, not
+only its runtime directory. The default endpoint retains the `weaverd.lock`,
+`weaverd.pid`, and `weaverd.health` artefact names; non-default endpoints
+derive all three names from a deterministic, filesystem-safe endpoint
+identifier. Separate configured sockets can therefore run concurrently,
+including Unix sockets that share a parent directory.
+
 ### 6.2. Workspace registry and ownership
 
 For screen readers: the following diagram shows a per-user daemon registry

@@ -1431,22 +1431,25 @@ through a `StructuredHealthReporter` that records `bootstrap_starting`,
 events are logged as structured traces, matching the roadmap's requirement for
 supervised backends.
 
-Process supervision now enforces one daemon per user and configured runtime
-endpoint. This singleton process is intended to host several isolated
-workspaces; it is not evidence that the daemon owns only its bootstrap
-directory. A dedicated `ProcessGuard` claims a lock file (`weaverd.lock`) under
-the runtime directory before any work begins. If the lock already exists the
-guard first checks whether a PID file is present: the absence of `weaverd.pid`
-is treated as "launch already in progress" so a second invocation refuses to
-start rather than racing the first instance. When a PID is recorded the guard
-probes the process using `kill(pid, 0)`. Live peers cause the launch to abort,
-while stale artefacts are removed before retrying. Successful launches then
-background the daemon via `daemonize-me`, write the current PID, and publish a
-JSON health snapshot to `weaverd.health`. Both artefacts are written atomically
-via a temporary file and rename so readers never observe a truncated payload.
-The snapshot records the lifecycle state (`starting`, `ready`, `stopping`), the
-PID, and a UNIX timestamp so external probes can consume the same readiness
-signal as the CLI.
+Process supervision now enforces one daemon per user and complete configured
+`SocketEndpoint`. Separate configured sockets can therefore run concurrently,
+including Unix sockets that share a parent directory. This singleton process is
+intended to host several isolated workspaces; it is not evidence that the
+daemon owns only its bootstrap directory. The default endpoint retains the
+`weaverd.lock`, `weaverd.pid`, and `weaverd.health` artefact names; non-default
+endpoints derive all three names from a deterministic, filesystem-safe endpoint
+identifier. A dedicated `ProcessGuard` claims the resulting lock file under the
+runtime directory before any work begins. If the lock already exists the guard
+first checks whether a PID file is present: its absence is treated as "launch
+already in progress" so a second invocation refuses to start rather than racing
+the first instance. When a PID is recorded the guard probes the process using
+`kill(pid, 0)`. Live peers cause the launch to abort, while stale artefacts are
+removed before retrying. Successful launches then background the daemon via
+`daemonize-me`, write the current PID, and publish a JSON health snapshot. Both
+artefacts are written atomically via a temporary file and rename so readers
+never observe a truncated payload. The snapshot records the lifecycle state
+(`starting`, `ready`, `stopping`), the PID, and a UNIX timestamp so external
+probes can consume the same readiness signal as the CLI.
 
 The daemon now binds a socket listener as part of startup. The listener binds
 to the configured `SocketEndpoint`, switches into a non-blocking accept loop,
