@@ -61,6 +61,7 @@ pub enum LifecycleError {
     StartupFailed {
         exit_status: Option<i32>,
         runtime_dir: PathBuf,
+        health_path: PathBuf,
     },
     #[error("daemon reported 'stopping' before reaching ready; check health snapshot at {path:?}")]
     StartupAborted { path: PathBuf },

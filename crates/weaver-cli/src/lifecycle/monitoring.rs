@@ -18,10 +18,6 @@ mod monitoring_readers;
 pub(crate) use self::monitoring_readers::{read_health, read_pid};
 use super::{error::LifecycleError, utils::open_runtime_dir};
 
-/// Filename for the daemon's PID file within the runtime directory.
-pub(super) const PID_FILENAME: &str = "weaverd.pid";
-/// Filename for the daemon's health snapshot within the runtime directory.
-pub(super) const HEALTH_FILENAME: &str = "weaverd.health";
 /// Interval between health snapshot checks during daemon startup polling.
 /// A 200ms interval balances responsiveness against CPU and filesystem pressure.
 /// [`wait_for_ready`] uses it to poll the daemon's health file.
@@ -51,10 +47,10 @@ impl std::fmt::Display for DaemonStatus {
     }
 }
 
-/// Health snapshot data read from the daemon's health file.
-/// The daemon writes this JSON structure to `weaverd.health` to communicate its
-/// current state. The CLI reads this file to determine readiness during startup
-/// and to report status.
+/// Health snapshot data read from the daemon's configured health file.
+/// The daemon writes this JSON structure to communicate its current state. The
+/// CLI reads the endpoint-scoped health file to determine readiness during
+/// startup and to report status.
 ///
 /// # Fields
 ///
@@ -127,7 +123,7 @@ pub(super) fn wait_for_ready(
     // PID check and rely solely on the timestamp to identify fresh snapshots.
     let mut daemonized = false;
     while deadline.is_none_or(|d| Instant::now() < d) {
-        poll_spawned_child(child, paths.runtime_dir(), &mut daemonized)?;
+        poll_spawned_child(child, paths, &mut daemonized)?;
         let monitor = ProcessMonitorContext {
             started_at,
             expected_pid,
@@ -148,7 +144,7 @@ pub(super) fn wait_for_ready(
 
 fn poll_spawned_child(
     child: &mut Child,
-    runtime_dir: &std::path::Path,
+    paths: &RuntimePaths,
     daemonized: &mut bool,
 ) -> Result<(), LifecycleError> {
     if *daemonized {
@@ -165,7 +161,8 @@ fn poll_spawned_child(
     if !status.success() {
         return Err(LifecycleError::StartupFailed {
             exit_status: status.code(),
-            runtime_dir: runtime_dir.to_path_buf(),
+            runtime_dir: paths.runtime_dir().to_path_buf(),
+            health_path: paths.health_path().to_path_buf(),
         });
     }
     *daemonized = true;
@@ -237,7 +234,7 @@ pub(crate) fn check_health_snapshot(
     paths: &RuntimePaths,
     monitor: ProcessMonitorContext,
 ) -> Result<HealthCheckOutcome, LifecycleError> {
-    let Some(snapshot) = read_health(dir, HEALTH_FILENAME, paths.health_path())? else {
+    let Some(snapshot) = read_health(dir, paths.health_file_name(), paths.health_path())? else {
         return Ok(HealthCheckOutcome::Continue);
     };
     let pid_ok = monitor.daemonized || snapshot_matches_process(&snapshot, monitor.expected_pid);

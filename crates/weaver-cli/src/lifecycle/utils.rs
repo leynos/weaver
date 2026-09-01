@@ -175,7 +175,6 @@ mod tests {
         temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
     ) {
         let (dir, _paths) = temp_paths.expect("create temp runtime paths");
-        let health_path = dir.path().join("weaverd.health");
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
                 dir.path()
@@ -185,6 +184,10 @@ mod tests {
             ),
             ..weaver_config::Config::default()
         };
+        let health_path = RuntimePaths::from_config_readonly(&config)
+            .expect("derive runtime paths")
+            .health_path()
+            .to_path_buf();
 
         // Pre-write health snapshot with ready status and recent timestamp.
         // The PID check is skipped when daemonized=true (child exits with 0).
