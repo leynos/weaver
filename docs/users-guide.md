@@ -49,9 +49,15 @@ Representative target commands look like this:
 ```sh
 weaver definitions get --uri file:///src/main.rs --position 10:5
 weaver references list --uri file:///src/main.rs --position 10:5 --json
-weaver symbols list --query 'fn $name(...)' --json \
-  | jq 'select(.name | startswith("old_"))' \
-  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+weaver symbols list --query 'fn $NAME(...)' --json \
+  | jq -c '
+      if .schema == "weaver.selector.v1" then
+        select(.captures.NAME.text | startswith("old_"))
+      else
+        .
+      end
+    ' \
+  | weaver symbols rename --selectors - --replace-prefix old_ --with-prefix new_
 weaver symbols rename --query 'fn process_request(...)' --new-name run_request
 weaver patches apply --file changes.patch --dry-run
 weaver context --json

@@ -100,9 +100,15 @@ Observe-style resource commands emit selector records that act-style mutation
 commands can consume directly or after ordinary UNIX filtering:
 
 ```sh
-weaver symbols list --query 'fn $name(...)' --json \
-  | jq 'select(.name | startswith("old_"))' \
-  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+weaver symbols list --query 'fn $NAME(...)' --json \
+  | jq -c '
+      if .schema == "weaver.selector.v1" then
+        select(.captures.NAME.text | startswith("old_"))
+      else
+        .
+      end
+    ' \
+  | weaver symbols rename --selectors - --replace-prefix old_ --with-prefix new_
 ```
 
 Sempai one-liner queries are a first-class selector form, peer to position
@@ -449,12 +455,18 @@ act-style commands can consume either directly or after ordinary UNIX
 filtering. For example:
 
 ```sh
-weaver symbols list --query 'fn $name(...)' --json \
-  | weaver symbols rename --from-stdin --suffix _renamed
+weaver symbols list --query 'fn $NAME(...)' --json \
+  | weaver symbols rename --selectors - --suffix _renamed
 
-weaver symbols list --query 'fn $name(...)' --json \
-  | jq 'select(.name | startswith("old_"))' \
-  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+weaver symbols list --query 'fn $NAME(...)' --json \
+  | jq -c '
+      if .schema == "weaver.selector.v1" then
+        select(.captures.NAME.text | startswith("old_"))
+      else
+        .
+      end
+    ' \
+  | weaver symbols rename --selectors - --replace-prefix old_ --with-prefix new_
 
 weaver symbols rename --query 'fn process_request(...)' --new-name run_request
 
