@@ -16,7 +16,7 @@ macro_rules! define_reader {
         $(#[$attr:meta])*
         $vis:vis fn $name:ident(
             dir: &Dir,
-            filename: &str,
+            filename: &Path,
             full_path: &Path,
         ) -> Result<Option<$ret_ty:ty>, LifecycleError> {
             read_error: $read_variant:ident,
@@ -27,7 +27,7 @@ macro_rules! define_reader {
         $(#[$attr])*
         $vis fn $name(
             dir: &Dir,
-            filename: &str,
+            filename: &Path,
             full_path: &Path,
         ) -> Result<Option<$ret_ty>, LifecycleError> {
             read_and_parse(
@@ -59,7 +59,7 @@ macro_rules! define_reader {
 /// This encapsulates the common pattern where a missing file is a valid state
 /// (for example, during daemon startup before health or PID files are written),
 /// rather than an error. Other I/O errors are propagated.
-fn read_optional_file(dir: &Dir, filename: &str) -> Result<Option<String>, io::Error> {
+fn read_optional_file(dir: &Dir, filename: &Path) -> Result<Option<String>, io::Error> {
     match dir.read_to_string(filename) {
         Ok(content) => Ok(Some(content)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
@@ -75,7 +75,7 @@ fn read_optional_file(dir: &Dir, filename: &str) -> Result<Option<String>, io::E
 /// 3. Parse content using the provided `parse` function
 fn read_and_parse<T, R, P>(
     dir: &Dir,
-    filename: &str,
+    filename: &Path,
     read_error: R,
     parse: P,
 ) -> Result<Option<T>, LifecycleError>
@@ -99,7 +99,7 @@ define_reader! {
     /// * `Err(ParseHealth)` if JSON is invalid.
     pub(crate) fn read_health(
         dir: &Dir,
-        filename: &str,
+        filename: &Path,
         full_path: &Path,
     ) -> Result<Option<HealthSnapshot>, LifecycleError> {
         read_error: ReadHealth,
@@ -118,7 +118,7 @@ define_reader! {
     /// * `Err(ParsePid)` if the value is not a valid integer.
     pub(crate) fn read_pid(
         dir: &Dir,
-        filename: &str,
+        filename: &Path,
         full_path: &Path,
     ) -> Result<Option<u32>, LifecycleError> {
         read_error: ReadPid,

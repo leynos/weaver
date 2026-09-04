@@ -39,7 +39,7 @@ fn read_pid_handles_missing_file(temp_paths: anyhow::Result<(TempDir, RuntimePat
     let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     let dir = open_test_dir(&paths).expect("open test dir");
     assert_eq!(
-        read_pid(&dir, "weaverd.pid", paths.pid_path()).expect("read pid"),
+        read_pid(&dir, paths.pid_file_name(), paths.pid_path()).expect("read pid"),
         None
     );
 }
@@ -50,7 +50,7 @@ fn read_pid_parses_integer(temp_paths: anyhow::Result<(TempDir, RuntimePaths)>) 
     write_test_file(paths.pid_path(), b"42\n").expect("write pid");
     let dir = open_test_dir(&paths).expect("open test dir");
     assert_eq!(
-        read_pid(&dir, "weaverd.pid", paths.pid_path()).expect("read pid"),
+        read_pid(&dir, paths.pid_file_name(), paths.pid_path()).expect("read pid"),
         Some(42)
     );
 }
@@ -68,8 +68,8 @@ fn read_health_returns_none_when_absent_or_empty(
     }
     let dir = open_test_dir(&paths).expect("open test dir");
     assert_eq!(
-        read_health(&dir, "weaverd.health", paths.health_path())
-            .expect("failed to read weaverd.health in test"),
+        read_health(&dir, paths.health_file_name(), paths.health_path())
+            .expect("failed to read health snapshot in test"),
         None
     );
 }
@@ -83,7 +83,7 @@ fn read_health_parses_valid_json(temp_paths: anyhow::Result<(TempDir, RuntimePat
     )
     .expect("write health snapshot");
     let dir = open_test_dir(&paths).expect("open test dir");
-    let snapshot = read_health(&dir, "weaverd.health", paths.health_path())
+    let snapshot = read_health(&dir, paths.health_file_name(), paths.health_path())
         .expect("read health")
         .expect("snapshot present");
     assert_eq!(snapshot.status, DaemonStatus::Ready);
@@ -98,8 +98,8 @@ fn read_health_returns_parse_error_for_invalid_json(
     let (_dir, paths) = temp_paths.expect("create temp runtime paths");
     write_test_file(paths.health_path(), b"not-json\n").expect("write bad health");
     let dir = open_test_dir(&paths).expect("open test dir");
-    let err =
-        read_health(&dir, "weaverd.health", paths.health_path()).expect_err("expected parse error");
+    let err = read_health(&dir, paths.health_file_name(), paths.health_path())
+        .expect_err("expected parse error");
     assert!(
         matches!(err, LifecycleError::ParseHealth { .. }),
         "expected ParseHealth, got: {err:?}"

@@ -35,6 +35,7 @@ pub type StepResult = Result<(), String>;
 
 pub struct ProcessTestWorld {
     loader: TestConfigLoader,
+    runtime_paths: RuntimePaths,
     reporter: Arc<RecordingHealthReporter>,
     daemonizer: TestDaemonizer,
     shutdown: TestShutdownSignal,
@@ -45,10 +46,15 @@ pub struct ProcessTestWorld {
 }
 
 impl ProcessTestWorld {
+    /// Creates a process-supervision BDD test world.
+    ///
+    /// Returns the prepared world, or an error when test runtime setup fails.
     pub fn new() -> Result<Self, String> {
         let loader = TestConfigLoader::new()?;
+        let runtime_paths = loader.runtime_paths()?;
         let world = Self {
             loader,
+            runtime_paths,
             reporter: Arc::new(RecordingHealthReporter::default()),
             daemonizer: TestDaemonizer::default(),
             shutdown: TestShutdownSignal::new(),
@@ -164,11 +170,11 @@ impl ProcessTestWorld {
 
     pub fn take_wait_error(&mut self) -> Option<String> { self.wait_error.take() }
 
-    pub fn lock_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.lock") }
+    pub fn lock_path(&self) -> PathBuf { self.runtime_paths.lock_path().to_path_buf() }
 
-    pub fn pid_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.pid") }
+    pub fn pid_path(&self) -> PathBuf { self.runtime_paths.pid_path().to_path_buf() }
 
-    pub fn health_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.health") }
+    pub fn health_path(&self) -> PathBuf { self.runtime_paths.health_path().to_path_buf() }
 
     pub fn read_health(&self) -> Result<Value, String> {
         let content = fs::read_to_string(self.health_path()).map_err(|error| error.to_string())?;
@@ -187,8 +193,8 @@ impl ProcessTestWorld {
         Ok(())
     }
 
-    pub fn write_lock_without_pid(&self) -> StepResult {
-        fs::write(self.lock_path(), b"").map_err(|error| error.to_string())
+    pub fn terminate_before_pid_write(&self) -> StepResult {
+        test_support::terminate_before_pid_write(&self.runtime_paths)
     }
 
     pub fn read_pid(&self) -> Result<Option<u32>, String> {
@@ -217,6 +223,10 @@ impl ProcessTestWorld {
                 .any(|status| status == expected)
     }
 
+    /// Checks whether the runtime lock file exists.
+    ///
+    /// Returns whether the file exists, or an error when the filesystem
+    /// existence check fails.
     pub fn lock_exists(&self) -> Result<bool, String> {
         fs::exists(self.lock_path()).map_err(|error| format!("check lock file: {error}"))
     }
@@ -240,11 +250,11 @@ impl ProcessTestWorld {
 
     pub fn wait_for_condition<F>(&self, predicate: F, description: &str) -> StepResult
     where
-        F: Fn(&Self) -> bool,
+        F: Fn(&Self) -> Result<bool, String>,
     {
         let deadline = Instant::now() + WAIT_TIMEOUT;
         while Instant::now() < deadline {
-            if predicate(self) {
+            if predicate(self)? {
                 return Ok(());
             }
             thread::sleep(POLL_INTERVAL);
@@ -324,9 +334,50 @@ impl ShutdownSignal for TestShutdownSignal {
     }
 }
 
+/// Extracts the string `status` field from a JSON health snapshot.
+///
+/// Returns the field's string value, or `"<missing status>"` when the field
+/// is absent or is not a string.
 pub fn snapshot_status(snapshot: &Value) -> &str {
     snapshot
         .get("status")
         .and_then(Value::as_str)
         .map_or("<missing status>", |status| status)
+}
+
+#[cfg(test)]
+mod tests {
+    //! Focused tests for process-supervision test-world helpers.
+
+    use std::cell::Cell;
+
+    use super::*;
+
+    #[test]
+    fn wait_for_condition_returns_exists_failure_without_timeout() {
+        let world = ProcessTestWorld::new().expect("create process test world");
+        fs::write(world.lock_path(), "lock").expect("create lock-file fixture");
+        let attempts = Cell::new(0);
+
+        let error = world
+            .wait_for_condition(
+                |state| {
+                    attempts.set(attempts.get() + 1);
+                    fs::exists(state.lock_path().join("child"))
+                        .map_err(|error| format!("check lock file existence: {error}"))
+                },
+                "child of lock file",
+            )
+            .expect_err("exists error should stop polling");
+
+        assert_eq!(attempts.get(), 1, "predicate should be called once");
+        assert!(
+            error.starts_with("check lock file existence:"),
+            "expected exists error, got: {error}"
+        );
+        assert!(
+            !error.contains("timeout waiting"),
+            "predicate failure should not become a timeout: {error}"
+        );
+    }
 }
