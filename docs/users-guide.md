@@ -49,7 +49,7 @@ Representative target commands look like this:
 ```sh
 weaver definitions get --uri file:///src/main.rs --position 10:5
 weaver references list --uri file:///src/main.rs --position 10:5 --json
-weaver symbols list --query 'fn $name(...)' --json \
+weaver symbols list --query 'fn $NAME(...)' --json \
   | jq -c '
       if .schema == "weaver.selector.v1" then
         select(.captures.NAME.text | startswith("old_"))
