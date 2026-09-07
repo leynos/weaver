@@ -197,14 +197,14 @@ The following invariants are normative:
 
 ### 6.1. Query input model
 
-The facade gains distinct compilation entry points for the two public input
-kinds:
+The facade gains one interactive compilation entry point for the two public
+input kinds, plus a separate YAML rule-file compilation entry point:
 
 ```rust,no_run
+#[non_exhaustive]
 pub enum QuerySource<'a> {
     Pattern(&'a str),
     Expression(&'a str),
-    RuleYaml(&'a str),
 }
 
 impl Engine {
@@ -214,8 +214,17 @@ impl Engine {
         language: Language,
         source: QuerySource<'_>,
     ) -> Result<QueryPlan, DiagnosticReport>;
+
+    pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport>;
 }
 ```
+
+`Engine::compile` accepts exactly one interactive pattern or expression and
+returns exactly one plan for the caller-supplied `rule_id` and `language`.
+`Engine::compile_yaml` accepts a complete YAML rule file and returns one plan
+for each rule-language pair it defines. YAML rule identifiers and target
+languages come from the YAML rule file; callers do not supply `rule_id` or
+`language` for that path.
 
 A narrower `compile_pattern` convenience method may accompany `compile` if it
 improves the stable facade. The important boundary is that a bare pattern is
@@ -428,7 +437,7 @@ A completion-preserving filter looks like:
 ```sh
 jq -c '
   if .schema == "weaver.selector.v1" then
-    select(.captures.NAME.text | startswith("old_"))
+    select((.captures.NAME.text? // "") | startswith("old_"))
   else
     .
   end
@@ -450,7 +459,7 @@ A selector-aware command accepts an explicit typed source:
 weaver symbols list --lang rust --query 'fn $NAME($...ARGS)' --json \
   | jq -c '
       if .schema == "weaver.selector.v1" then
-        select(.captures.NAME.text | startswith("old_"))
+        select((.captures.NAME.text? // "") | startswith("old_"))
       else
         .
       end

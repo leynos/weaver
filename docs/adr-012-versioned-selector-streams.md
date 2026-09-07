@@ -69,14 +69,14 @@ Emit compact identifiers which consumers resolve through retained daemon state.
 
 Stream JSONL, but let each command infer what standard input contains.
 
-| Topic | Completed JSONL | Unframed JSONL | JSON array | Opaque handles |
-| ----- | --------------- | --------------- | ---------- | -------------- |
-| Streaming | Yes | Yes | No | Yes |
-| Truncation detection | Yes | No | Yes | Session-bound |
-| `jq -c` composition | Natural with pass-through | Natural | Extra iteration | No |
-| Replay after restart | Yes | Yes | Yes | No |
-| Stale-source evidence | Embedded | Embedded | Embedded | Hidden |
-| Input schema discoverability | Explicit | Explicit | Explicit | Handle protocol |
+| Topic | Completed JSONL | Unframed JSONL | JSON array | Opaque handles | Untyped `--from-stdin` |
+| ----- | --------------- | --------------- | ---------- | -------------- | ---------------------- |
+| Streaming | Yes | Yes | No | Yes | Yes |
+| Truncation detection | Yes | No | Yes | Session-bound | No |
+| `jq -c` composition | Natural with pass-through | Natural | Extra iteration | No | Natural, but untyped |
+| Replay after restart | Yes | Yes | Yes | No | Command-dependent |
+| Stale-source evidence | Embedded | Embedded | Embedded | Hidden | Command-dependent |
+| Input schema discoverability | Explicit | Explicit | Explicit | Handle protocol | Implicit |
 
 _Table 1: Selector stream alternatives._
 
@@ -118,7 +118,7 @@ A representative pipeline is:
 weaver symbols list --lang rust --query 'fn $NAME($...ARGS)' --json \
   | jq -c '
       if .schema == "weaver.selector.v1" then
-        select(.captures.NAME.text | startswith("old_"))
+        select((.captures.NAME.text? // "") | startswith("old_"))
       else
         .
       end
