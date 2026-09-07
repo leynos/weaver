@@ -9,14 +9,10 @@ use crate::{
     AppError,
     ConfigLoader,
     IoStreams,
+    command_tree::{self, CommandNode, CommandSemantics},
     help,
     run_with_loader,
     tests::support::{self, EXPECTED_SHARED_CONFIG_HELP_FLAGS},
-    command_tree::{self, CommandNode, CommandSemantics},
-};
-
-
-//! Tests for clap help output augmented with shared configuration flags.
 };
 
 fn run_with_args(args: &[&str]) -> anyhow::Result<(ExitCode, String, String)> {
@@ -48,13 +44,16 @@ fn help_lists_shared_config_flags_without_loading_config(#[case] argv: &[&str]) 
 
 #[test]
 fn top_level_help_snapshot_matches_augmented_command() {
-    let rendered = help::command().render_long_help().to_string();
+    let rendered = help::try_command()
+        .expect("built-in help command should construct")
+        .render_long_help()
+        .to_string();
     insta::assert_snapshot!("top_level_augmented_help", rendered);
 }
 
 #[test]
 fn daemon_start_help_snapshot_matches_augmented_command() {
-    let mut command = help::command();
+    let mut command = help::try_command().expect("built-in help command should construct");
     let daemon = command
         .find_subcommand_mut("daemon")
         .expect("daemon subcommand must exist");
@@ -79,7 +78,7 @@ fn augmented_command_has_expected_arg_structure() {
         ("locale", Some("LOCALE"), ArgAction::Set),
     ];
 
-    let cmd = help::command();
+    let cmd = help::try_command().expect("built-in help command should construct");
     for (long, expected_value_name, expected_action) in expected {
         let Some(arg) = cmd.get_arguments().find(|a| a.get_long() == Some(*long)) else {
             panic!("augmented command missing --{long}");
@@ -102,13 +101,19 @@ fn augmented_command_has_expected_arg_structure() {
 
 #[test]
 fn projected_structured_surface_appears_in_the_shared_help_and_manpage_command() {
-    assert_command_surface(&help::command(), command_tree::root());
+    assert_command_surface(
+        &help::try_command().expect("built-in help command should construct"),
+        command_tree::root(),
+    );
 }
 
 #[test]
 fn command_ir_structured_surface_coverage_appears_in_rendered_help_and_manpage()
 -> anyhow::Result<()> {
-    let rendered_help = help::command().render_long_help().to_string();
+    let rendered_help = help::try_command()
+        .expect("built-in help command should construct")
+        .render_long_help()
+        .to_string();
     let rendered_manpage = normalise_manpage(&generated_manpage()?);
 
     let rendered_surfaces = RenderedSurfaces {
@@ -130,7 +135,8 @@ fn generated_manpage() -> anyhow::Result<String> {
     use anyhow::Context;
 
     let mut manpage = Vec::new();
-    clap_mangen::Man::new(help::command())
+    let command = help::try_command().context("construct the augmented help command")?;
+    clap_mangen::Man::new(command)
         .render(&mut manpage)
         .context("render manual page from the augmented help command")?;
     String::from_utf8(manpage).context("decode rendered manual page as UTF-8")
@@ -283,10 +289,11 @@ fn write_help_for_args_surfaces_io_error_on_broken_writer() {
     let args: Vec<OsString> = vec![OsString::from("weaver"), OsString::from("--help")];
     let result = crate::help::write_help_for_args(&args, &mut BrokenWriter);
     assert!(result.is_err());
-    assert_eq!(
-        result.expect_err("broken writer should fail").kind(),
-        std::io::ErrorKind::BrokenPipe
-    );
+    assert!(matches!(
+        result,
+        Err(crate::help::HelpWriteError::Write(error))
+            if error.kind() == std::io::ErrorKind::BrokenPipe
+    ));
 }
 
 /// The rendered documentation surfaces that must expose command metadata.

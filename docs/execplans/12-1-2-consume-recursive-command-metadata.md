@@ -183,6 +183,11 @@ Stop and escalate rather than improvising when any of these is reached.
       ADR, design, developer guide, user guide, and roadmap now describe the
       recursive projection and its remaining wrapper boundary. Final full-gate
       evidence is captured in the milestone closeout.
+- [x] Review follow-up: strengthen the projection oracle, make help
+      construction fallible, and prove the binary and build-script boundaries.
+      Completed 2026-09-07 after rebasing onto the PR target. The focused
+      command-IR, help, main-entry, and catalogue-agreement suites; the full
+      deterministic sequence; and the warning-denied release build all pass.
 
 ## Surprises & discoveries
 
@@ -544,10 +549,13 @@ mock.
   domain; examples cannot cover arbitrary shapes, and ordering bugs are exactly
   what silently reorders generated documentation. Domain: generated trees of
   depth 0–4 and branching 0–5, plus the real tree. Artefact:
-  `crates/weaver-cli/src/command_ir/tests/projection_props.rs`. Evidence:
-  `cargo test -p weaver-cli command_ir` fails before the projection exists;
-  passes after. Non-vacuity: the generator must produce at least one tree of
-  depth ≥ 2 and one leaf-only tree; assert generator classification with
+  `crates/weaver-cli/src/command_ir/tests.rs`, tests
+  `projection_preserves_generated_tree_shape`,
+  `projection_handles_a_leaf_only_tree_without_filtering_cases`, and
+  `projection_handles_a_tree_with_at_least_two_levels_without_filtering_cases`.
+  Evidence: `cargo test -p weaver-cli command_ir` fails before the projection
+  exists; passes after. Non-vacuity: the generator must produce at least one
+  tree of depth ≥ 2 and one leaf-only tree; assert generator classification with
   `proptest::prop_assume` avoided in favour of construction, so no case is
   filtered away. Negative control: a deliberately order-shuffling mutant of the
   projection must fail the sibling-order assertion.
@@ -559,26 +567,31 @@ mock.
   IR to upstream's own notion of the shape. It is a live tripwire, not a
   comment. Domain: one representative arguments struct carrying
   `Serialize + Deserialize + Default`. Artefact:
-  `crates/weaver-cli/src/command_ir/tests/derive_differential.rs`. Evidence:
-  `cargo test -p weaver-cli derive_differential`. Fails if either producer
-  drifts. Non-vacuity: the fixture struct must have at least one flag with a
-  value and one boolean switch, so the comparison exercises both `CliMetadata`
-  shapes. Negative control: changing one `help_id` in the hand-assembled node
-  must fail the test.
+  `crates/weaver-cli/src/command_ir/tests.rs`, test
+  `hand_assembled_argument_metadata_matches_the_upstream_derive`. Evidence:
+  `cargo test -p weaver-cli hand_assembled_argument_metadata_matches_the_upstream_derive`.
+  Fails if either producer drifts. Non-vacuity: the fixture struct must have
+  at least one flag with a value and one boolean switch, so the comparison
+  exercises both `CliMetadata` shapes. Negative control: changing one `help_id`
+  in the hand-assembled node must fail the test.
 
 - Obligation INV-3: **schema-version pinning**. Weaver must not silently claim
   conformance to an IR version it has not implemented. Method: parameterized
   test asserting `ortho_config::docs::ORTHO_DOCS_IR_VERSION == "1.1"`, plus a
-  round-trip assertion that each projected node survives `serde_json`
-  serialization and deserialization unchanged. Rationale: Weaver reads the
-  version as a constant and would otherwise propagate any future value
-  automatically. This is the single highest-value guard in the task and costs
-  about ten lines. Domain: the constant, and every node of the real tree.
-  Artefact: `crates/weaver-cli/src/command_ir/tests/schema_version.rs`.
-  Evidence: `cargo test -p weaver-cli schema_version`. Deliberately fails on an
-  upstream bump, forcing a conscious review. Non-vacuity: the round-trip must
-  be shown to fail if a field is dropped during construction — seed that
-  mutation once and observe the failure.
+  narrow wire-format round-trip assertion for the projected root. Rationale:
+  Weaver reads the version as a constant and would otherwise propagate any
+  future value automatically. This is the single highest-value guard in the
+  task and costs about ten lines. Domain: the constant and root wire payload.
+  Artefact: `crates/weaver-cli/src/command_ir/tests.rs`, tests
+  `projection_requires_the_reviewed_upstream_schema_version` and
+  `projection_serde_roundtrip_preserves_wire_format`. Evidence:
+  `cargo test -p weaver-cli command_ir`. Deliberately fails on an upstream
+  bump, forcing a conscious review. The wire-format check is not the projection
+  oracle; `crates/weaver-cli/src/command_ir/tests/canonical_projection.rs`
+  test `canonical_projection_matches_the_independent_command_contract`
+  independently checks every projected node and field. The suite entry remains
+  `crates/weaver-cli/src/command_ir/tests.rs`; the separate nested module keeps
+  both test modules below the repository's 400-line module limit.
 
 - Obligation INV-4: **identifier resolution**. Every Fluent identifier the
   projection mints resolves to real text without falling back. Method:
@@ -588,10 +601,12 @@ mock.
   renders plausible-but-wrong help rather than failing. At five config fields
   that is noticeable; across a whole tree it is not. Domain: every `about_id`,
   `help_id`, `long_help_id` and heading identifier in the real tree. Artefact:
-  `crates/weaver-cli/src/command_ir/tests/identifiers.rs`. Evidence:
-  `cargo test -p weaver-cli identifiers`. Non-vacuity: add one identifier with
-  no catalogue entry, observe the failure, then remove it. A test that passes
-  when the catalogue is empty is vacuous.
+  `crates/weaver-cli/src/command_ir/tests.rs`, test
+  `every_projected_identifier_resolves_from_the_embedded_catalogue`. Evidence:
+  `cargo test -p weaver-cli every_projected_identifier_resolves_from_the_embedded_catalogue`.
+  Non-vacuity: add one identifier with no catalogue entry, observe the
+  failure, then remove it. A test that passes when the catalogue is empty is
+  vacuous.
 
 - Obligation INV-5: **cross-surface coverage (surjectivity)**. Every command
   node and every argument long flag in the tree appears in rendered help and in
@@ -599,8 +614,9 @@ mock.
   output, deliberately *not* a snapshot. Rationale: this is the guard that a
   large accepted snapshot diff cannot bypass, and it is the direct mitigation
   for the highest-severity risk. Domain: the real tree against
-  `help::command().render_long_help()` and the troff produced by `clap_mangen`.
-  Artefact: `crates/weaver-cli/src/tests/unit/help_output.rs`, test
+  `help::try_command()?.render_long_help()` and the troff produced by
+  `clap_mangen`. Artefact: `crates/weaver-cli/src/tests/unit/help_output.rs`,
+  test
   `command_ir_structured_surface_coverage_appears_in_rendered_help_and_manpage`.
   Evidence: `cargo test -p weaver-cli command_ir` passes, including the
   cross-surface assertion. Non-vacuity: removing `append_structured_commands`
@@ -624,6 +640,33 @@ mock.
   projected root had three children rather than the two structured Clap
   subcommands; before after-help argument descriptions were added, its
   manual-page assertion failed.
+
+- Obligation INV-5b: **complete help construction**. Runtime help and the
+  build-script manpage generator must fail rather than return a plausible but
+  metadata-incomplete `clap::Command` when projection or Fluent catalogue
+  construction fails. Method: `HelpConstructionError` preserves either source
+  error with operation context; `try_command` is shared by runtime help and
+  `build.rs`; direct tests force a depth overflow and malformed Fluent source.
+  Artefact: `crates/weaver-cli/src/help.rs`,
+  `crates/weaver-cli/src/help_tests.rs`, and
+  `crates/weaver-cli/src/help_metadata.rs`, tests
+  `projection_failure_returns_construction_error_without_a_command` and
+  `malformed_fluent_catalogue_returns_construction_error_without_a_command`.
+  Evidence: `cargo test -p weaver-cli help`. Non-vacuity: each test asserts the
+  typed `Err` variant, so neither path can return an unaugmented command.
+
+- Obligation INV-5c: **external renderer boundary**. The built binary and the
+  production build-script manpage must expose recursively applied, localized
+  metadata rather than only in-process Clap output. Method:
+  `definitions_get_help_exposes_localised_metadata_at_the_binary_boundary`
+  executes `weaver definitions get --help`; the production-manpage test reads
+  the build-script output. Both assert the exact command summary and whole
+  `--uri <URI>` and `--position <LINE:COLUMN>` token sequences. Artefact:
+  `crates/weaver-cli/tests/main_entry.rs`, tests
+  `definitions_get_help_exposes_localised_metadata_at_the_binary_boundary` and
+  `generated_man_page_contains_all_shared_config_flags`. Evidence:
+  `cargo test -p weaver-cli --test main_entry`. The token-sequence helper
+  rejects substring-only matches.
 
 - Obligation INV-8: **compile-time boundary coverage**. The production daemon
   must compile without `test-support`, while the e2e agreement test must type
@@ -658,8 +701,10 @@ mock.
   `attach_ordering_caveat` both recurse. A stack overflow inside `build.rs`
   surfaces as `signal: 11` with no diagnostic. Domain: depths 0,
   `MAX_COMMAND_DEPTH`, and `MAX_COMMAND_DEPTH + 1`. Artefact:
-  `crates/weaver-cli/src/command_ir/tests/depth.rs`. Evidence:
-  `cargo test -p weaver-cli depth`. Non-vacuity: the over-bound case must
+  `crates/weaver-cli/src/command_ir/tests.rs`, tests
+  `projection_accepts_trees_at_the_supported_depth_bound` and
+  `projection_rejects_a_tree_beyond_the_supported_depth_bound`. Evidence:
+  `cargo test -p weaver-cli command_ir`. Non-vacuity: the over-bound case must
   return the specific error variant, not merely "an error".
 
 No `kani` or `verus` obligation is proposed. There is no unbounded arithmetic,
@@ -798,8 +843,8 @@ Stages B through D — the focused loop, repeated per obligation:
 set -euo pipefail
 
 cargo test -p weaver-cli command_ir 2>&1 | tee "$LOG_BASE-unit.out"
-cargo test -p weaver-cli metadata_application_localizes_recursive_help_and_manpage \
-  2>&1 | tee "$LOG_BASE-metadata.out"
+cargo test -p weaver-cli help 2>&1 | tee "$LOG_BASE-help.out"
+cargo test -p weaver-cli --test main_entry 2>&1 | tee "$LOG_BASE-main-entry.out"
 cargo test -p weaver-e2e --test catalogue_agreement 2>&1 | tee "$LOG_BASE-e2e.out"
 ```
 
@@ -1033,10 +1078,10 @@ On 2026-08-28, review found that the dependency constraint did not record the
 `thiserror` build-dependency exception, and that the developer guide described
 `command_surface/mod.rs` as a build-script include. Verification of
 `crates/weaver-cli/build.rs` confirmed that the script directly includes
-`cli.rs`, `command_ir/mod.rs`, `command_surface/tree.rs`, and `help.rs`; its
-`cargo:rerun-if-changed` inputs additionally include `command_surface/mod.rs`.
-The exception and this distinction are now recorded in the plan and developer
-guide.
+`cli.rs`, `command_ir/mod.rs`, `command_surface/tree.rs`, and `help.rs`;
+`help.rs` includes `help_metadata.rs` by path. Its `cargo:rerun-if-changed`
+inputs additionally include `command_surface/mod.rs`. The exception and this
+distinction are now recorded in the plan and developer guide.
 
 On 2026-08-28, a follow-up review found that existing snapshots and structural
 checks could not distinguish metadata application from Clap's matching English
@@ -1067,8 +1112,29 @@ The ExecPlan is complete pending the final CodeRabbit response.
 
 On 2026-08-28, the final review found that INV-5a's metadata oracle was not
 listed in the executable focused loop. The loop now runs it with the same
-failure-propagating logging pattern as the existing focused commands. Completion
-awaits the documentation-gate rerun.
+failure-propagating logging pattern as the existing focused commands.
+Completion awaits the documentation-gate rerun.
 
 On 2026-08-28, `markdownlint` and `nixie` passed after the focused-loop
 correction. The ExecPlan is complete pending the final CodeRabbit response.
+
+On 2026-09-07, rebase onto the PR target exposed malformed auto-merged imports
+in `help_output.rs` and `main_entry.rs`; formatting caught both before a commit
+and the repaired imports passed focused tests. Review follow-up replaces the
+self-derived recursive serde oracle with
+`canonical_projection_matches_the_independent_command_contract`, which names
+each divergent node or field. `try_command` now makes projection and embedded
+Fluent catalogue loading fallible for both runtime help and build-script manual
+page generation; it retains source errors in `HelpConstructionError` instead of
+returning incomplete metadata. The binary-help and production-manpage tests now
+check the localized `definitions get` summary and its whole `--uri <URI>` and
+`--position <LINE:COLUMN>` sequences. The focused command-IR, help, and
+main-entry suites passed. The build-script inclusion exposed the physical
+400-line limit for `help.rs`, so its focused tests now live in `help_tests.rs`.
+The same limit split the canonical oracle into the nested
+`command_ir/tests/canonical_projection.rs` module while retaining `tests.rs` as
+the suite entry. The consumer-boundary equality gate found stale generated
+Markdown after the rebase; `docs/orthoconfig-consumer-boundary.md` was
+regenerated from its TOML source. Final evidence: focused command-IR, help,
+main-entry, and catalogue-agreement tests; all six deterministic gates; and
+the warning-denied `weaverd` release build passed. The plan is complete.

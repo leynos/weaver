@@ -28,6 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=src/command_surface/tree.rs");
     println!("cargo:rerun-if-changed=src/command_ir/mod.rs");
     println!("cargo:rerun-if-changed=src/help.rs");
+    println!("cargo:rerun-if-changed=src/help_metadata.rs");
+    println!("cargo:rerun-if-changed=src/locales/en-US/messages.ftl");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_NAME");
     println!("cargo:rerun-if-env-changed=CARGO_BIN_NAME");
@@ -38,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=PROFILE");
 
     // The top-level page documents the entire command interface.
-    let cmd = help::command();
+    let cmd = help::try_command()?;
     let default_name = cmd
         .get_bin_name()
         .unwrap_or_else(|| cmd.get_name())

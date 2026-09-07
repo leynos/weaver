@@ -64,8 +64,10 @@ fn projection_preserves_required_definition_arguments() {
     );
 }
 
+#[path = "tests/canonical_projection.rs"]
+mod canonical_projection;
 #[test]
-fn projection_roundtrips_through_the_upstream_ir_format() {
+fn projection_serde_roundtrip_preserves_wire_format() {
     let metadata =
         project(command_tree::root()).expect("the built-in command tree should be bounded");
     let json = serde_json::to_string(&metadata).expect("metadata should serialize");
@@ -130,22 +132,6 @@ fn derived_field(long: &'static str, value_name: Option<&'static str>) -> Option
 #[test]
 fn projection_requires_the_reviewed_upstream_schema_version() {
     assert_eq!(ORTHO_DOCS_IR_VERSION, "1.1");
-}
-
-#[test]
-fn every_projected_node_roundtrips_through_the_upstream_ir_format() -> serde_json::Result<()> {
-    let metadata = project(command_tree::root()).expect("built-in command tree should be bounded");
-    assert_roundtrips(&metadata)
-}
-
-fn assert_roundtrips(metadata: &DocMetadata) -> serde_json::Result<()> {
-    let json = serde_json::to_string(metadata)?;
-    let roundtrip: DocMetadata = serde_json::from_str(&json)?;
-    assert_eq!(&roundtrip, metadata);
-    for child in &metadata.subcommands {
-        assert_roundtrips(child)?;
-    }
-    Ok(())
 }
 
 #[test]
