@@ -1136,5 +1136,14 @@ The same limit split the canonical oracle into the nested
 the suite entry. The consumer-boundary equality gate found stale generated
 Markdown after the rebase; `docs/orthoconfig-consumer-boundary.md` was
 regenerated from its TOML source. Final evidence: focused command-IR, help,
-main-entry, and catalogue-agreement tests; all six deterministic gates; and
-the warning-denied `weaverd` release build passed. The plan is complete.
+main-entry, and catalogue-agreement tests; all six deterministic gates; and the
+warning-denied `weaverd` release build passed. The plan is complete.
+
+On 2026-09-07, rebase onto `origin/sempai-query-pipeline-rfc` commit `95090d4`
+retained its null-safe selector-stream capture filtering in both design
+examples and this plan's 12.1.2 command-tree decision. The selector
+clarification changes neither the recursive command metadata contract nor its
+deferred completion and `weaver context --json` scope, so no implementation
+change is required. The plan remains complete: `make check-fmt`, `make test`,
+`make typecheck`, `make lint`, `make markdownlint`, and `make nixie` passed
+after the rebase.
