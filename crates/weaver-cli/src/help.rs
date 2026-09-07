@@ -5,13 +5,20 @@
 //! help-only clap command with those flags so help and generated manpages stay
 //! truthful without weakening runtime parsing semantics.
 
-use std::{ffi::OsString, io::Write, sync::OnceLock};
+use std::{ffi::OsString, io, io::Write};
 
 use clap::{Arg, ArgAction, Command, CommandFactory};
-use ortho_config::docs::{FieldMetadata, OrthoConfigDocs};
+use ortho_config::{
+    FluentLocalizerError,
+    docs::{FieldMetadata, OrthoConfigDocs},
+};
+use thiserror::Error;
 use weaver_config::{Config, config_field_help};
 
-use crate::cli::Cli;
+use crate::{cli::Cli, command_ir, command_tree};
+
+#[path = "help_metadata.rs"]
+mod metadata;
 
 const CONFIG_PATH_ARG_ID: &str = "config-path";
 const CONFIG_HELP_HEADING: &str = "Options";
@@ -20,26 +27,72 @@ const ORDERING_CAVEAT: &str = "Config flags must appear before the command domai
                                --log-filter debug` is ignored because `--log-filter` appears \
                                after `start`.";
 
-static AUGMENTED_COMMAND: OnceLock<Command> = OnceLock::new();
-
 struct ConfigFieldArgMetadata {
-    name: &'static str,
-    long: &'static str,
+    name: String,
+    long: String,
     short: Option<char>,
     help: &'static str,
     takes_value: bool,
     multiple: bool,
-    value_name: Option<&'static str>,
+    value_name: Option<String>,
 }
 
-/// Returns an augmented `clap::Command` that adds shared configuration flags
-/// for help rendering and manpage generation without affecting the runtime
-/// parser.
-pub(crate) fn command() -> Command { AUGMENTED_COMMAND.get_or_init(build_command).clone() }
+/// Error raised while constructing the shared runtime and manpage help command.
+#[derive(Debug, Error)]
+pub(crate) enum HelpConstructionError {
+    /// The canonical command tree could not be represented in the docs IR.
+    #[error("failed to project the command tree into documentation metadata: {source}")]
+    ProjectCommandMetadata {
+        /// Projection failure that prevents complete help metadata.
+        #[source]
+        source: command_ir::ProjectionError,
+    },
+    /// The embedded Fluent catalogue could not localise help metadata.
+    #[error("failed to load the embedded help localisation catalogue: {source}")]
+    LoadLocalisationCatalogue {
+        /// Fluent resource failure that prevents localised help output.
+        #[source]
+        source: FluentLocalizerError,
+    },
+}
+
+impl HelpConstructionError {
+    /// Adds the help-construction context to a command metadata projection failure.
+    fn project_command_metadata(source: command_ir::ProjectionError) -> Self {
+        Self::ProjectCommandMetadata { source }
+    }
+
+    /// Adds the help-construction context to a Fluent catalogue loading failure.
+    pub(super) fn load_localisation_catalogue(source: FluentLocalizerError) -> Self {
+        Self::LoadLocalisationCatalogue { source }
+    }
+}
+
+/// Error raised while rendering an otherwise complete help command.
+#[derive(Debug, Error)]
+pub(crate) enum HelpWriteError {
+    /// Complete help metadata could not be constructed.
+    #[error(transparent)]
+    Construction(#[from] HelpConstructionError),
+    /// The requested output stream rejected rendered help.
+    #[error("failed to write rendered help: {0}")]
+    Write(#[from] io::Error),
+}
+
+/// Returns an augmented `clap::Command` for runtime help and manpage generation.
+///
+/// The command is returned only when the full recursive metadata projection and
+/// the embedded localisation catalogue both succeed.
+pub(crate) fn try_command() -> Result<Command, HelpConstructionError> {
+    build_command(command_tree::root(), [metadata::EN_US_MESSAGES])
+}
 
 /// Writes help for the provided arguments using the augmented help command.
-pub fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::io::Result<()> {
-    let mut cmd = command();
+pub fn write_help_for_args<W: Write>(
+    args: &[OsString],
+    writer: &mut W,
+) -> Result<(), HelpWriteError> {
+    let mut cmd = try_command()?;
     match cmd.try_get_matches_from_mut(args.iter().cloned()) {
         Err(error)
             if matches!(
@@ -47,21 +100,29 @@ pub fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::
                 clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
             ) =>
         {
-            write!(writer, "{error}")
+            write!(writer, "{error}").map_err(HelpWriteError::Write)
         }
-        Err(error) => write!(writer, "{error}"),
+        Err(error) => write!(writer, "{error}").map_err(HelpWriteError::Write),
         Ok(_) => {
-            cmd.write_long_help(writer).inspect_err(|e| {
-                tracing::warn!(error = %e, "failed to write long help to writer");
-            })?;
-            writeln!(writer)
+            cmd.write_long_help(writer)
+                .inspect_err(|e| {
+                    tracing::warn!(error = %e, "failed to write long help to writer");
+                })
+                .map_err(HelpWriteError::Write)?;
+            writeln!(writer).map_err(HelpWriteError::Write)
         }
     }
 }
 
-fn build_command() -> Command {
+fn build_command(
+    root: &command_tree::CommandNode,
+    localisation_resources: impl IntoIterator<Item = &'static str>,
+) -> Result<Command, HelpConstructionError> {
     tracing::debug!("building augmented help command");
     let mut command = Cli::command();
+    let projected =
+        command_ir::project(root).map_err(HelpConstructionError::project_command_metadata)?;
+    command = metadata::apply(command, &projected, root, localisation_resources)?;
     command = command.arg(config_path_arg());
 
     for field in Config::get_doc_metadata().fields {
@@ -71,7 +132,7 @@ fn build_command() -> Command {
         }
     }
 
-    attach_ordering_caveat(command)
+    Ok(attach_ordering_caveat(command))
 }
 
 /// Returns the `--config-path` clap argument.
@@ -95,41 +156,56 @@ fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
     }
 
     let metadata = ConfigFieldArgMetadata {
-        name: promote_static(field.name.clone()),
-        long: promote_static(long.to_string()),
+        name: field.name.clone(),
+        long: long.to_owned(),
         short: cli.short,
         help: config_field_help(&field.help_id),
         takes_value: cli.takes_value,
         multiple: cli.multiple,
-        value_name: cli.value_name.clone().map(promote_static),
+        value_name: cli.value_name.clone(),
     };
 
-    Some(config_arg_from_metadata(&metadata))
-}
-
-fn promote_static(value: String) -> &'static str {
-    // SAFETY: This intentionally promotes the given `String` to a `'static`
-    // `str` because clap requires process-lifetime metadata for dynamically
-    // built arguments. The leak is effectively process-lifetime and bounded by
-    // the `OnceLock` command cache, which performs this promotion once per
-    // field. This tradeoff satisfies clap's `'static` argument metadata
-    // requirement while avoiding unbounded leaks.
-    Box::leak(value.into_boxed_str())
+    Some(config_arg_from_metadata(metadata))
 }
 
 /// Maps shared configuration metadata to a `clap::Arg`.
-fn config_arg_from_metadata(field: &ConfigFieldArgMetadata) -> Arg {
-    let mut arg = Arg::new(field.name)
-        .long(field.long)
-        .help(field.help)
+fn config_arg_from_metadata(field: ConfigFieldArgMetadata) -> Arg {
+    let ConfigFieldArgMetadata {
+        name,
+        long,
+        short,
+        help,
+        takes_value,
+        multiple,
+        value_name,
+    } = field;
+    let mut arg = Arg::new(name)
+        .long(long)
+        .help(help)
         .help_heading(CONFIG_HELP_HEADING)
         .global(true);
 
-    arg = apply_arg_shape(arg, field);
+    if let Some(short) = short {
+        arg = arg.short(short);
+    }
+
+    if takes_value {
+        arg = arg.action(if multiple {
+            ArgAction::Append
+        } else {
+            ArgAction::Set
+        });
+        if let Some(value_name) = value_name {
+            arg = arg.value_name(value_name);
+        }
+    } else {
+        arg = arg.action(ArgAction::SetTrue);
+    }
 
     arg
 }
 
+/// Recursively appends the configuration-ordering caveat to help output.
 fn attach_ordering_caveat(command: Command) -> Command {
     let command = command.mut_subcommands(attach_ordering_caveat);
     let after_help = command.get_after_help().map_or_else(
@@ -139,203 +215,9 @@ fn attach_ordering_caveat(command: Command) -> Command {
     command.after_help(after_help)
 }
 
-/// Configures value or flag behaviour, optional short alias, `value_name`, and
-/// intentionally defers allowed-value validation to runtime config parsing.
-fn apply_arg_shape(arg: Arg, field: &ConfigFieldArgMetadata) -> Arg {
-    let mut shaped = arg;
-
-    if let Some(short) = field.short {
-        shaped = shaped.short(short);
-    }
-
-    if field.takes_value {
-        shaped = shaped.action(if field.multiple {
-            ArgAction::Append
-        } else {
-            ArgAction::Set
-        });
-        if let Some(value_name) = field.value_name {
-            shaped = shaped.value_name(value_name);
-        }
-    } else {
-        shaped = shaped.action(ArgAction::SetTrue);
-    }
-
-    shaped
-}
-
 #[cfg(test)]
-mod tests {
-    //! Tests for augmented help command construction and argument shaping.
-
-    use clap::error::ErrorKind;
-    use ortho_config::docs::CliMetadata;
-
-    use super::*;
-
-    fn field_metadata(cli: Option<CliMetadata>) -> FieldMetadata {
-        FieldMetadata {
-            name: "example_field".to_string(),
-            help_id: "example-help".to_string(),
-            long_help_id: None,
-            value: None,
-            default: None,
-            required: false,
-            deprecated: None,
-            cli,
-            env: None,
-            file: None,
-            examples: Vec::new(),
-            links: Vec::new(),
-            notes: Vec::new(),
-        }
-    }
-
-    fn cli_metadata(takes_value: bool) -> CliMetadata {
-        CliMetadata {
-            long: Some("example-field".to_string()),
-            short: Some('e'),
-            value_name: Some("VALUE".to_string()),
-            multiple: false,
-            takes_value,
-            possible_values: Vec::new(),
-            hide_in_help: false,
-        }
-    }
-
-    #[test]
-    fn command_returns_reusable_augmented_command() {
-        let first = command().render_long_help().to_string();
-        let second = command().render_long_help().to_string();
-
-        assert_eq!(first, second);
-        assert!(first.contains("--config-path <PATH>"));
-        assert!(first.contains("--locale <LOCALE>"));
-        assert!(first.contains(ORDERING_CAVEAT));
-    }
-
-    #[test]
-    fn command_attaches_ordering_caveat_to_nested_help() {
-        let mut command = command();
-        let daemon = command
-            .find_subcommand_mut("daemon")
-            .expect("daemon subcommand should exist");
-        let start = daemon
-            .find_subcommand_mut("start")
-            .expect("daemon start subcommand should exist");
-
-        assert!(
-            start
-                .render_long_help()
-                .to_string()
-                .contains(ORDERING_CAVEAT)
-        );
-    }
-
-    #[test]
-    fn config_path_arg_accepts_path_value() {
-        let matches = Command::new("test")
-            .arg(config_path_arg())
-            .try_get_matches_from(["test", "--config-path", "weaver.toml"])
-            .expect("config path should parse");
-
-        assert_eq!(
-            matches
-                .get_one::<String>(CONFIG_PATH_ARG_ID)
-                .map(String::as_str),
-            Some("weaver.toml")
-        );
-    }
-
-    #[test]
-    fn config_field_arg_omits_hidden_or_unflagged_fields() {
-        let mut hidden = cli_metadata(true);
-        hidden.hide_in_help = true;
-        let mut unflagged = cli_metadata(true);
-        unflagged.long = None;
-
-        assert!(config_field_arg(&field_metadata(Some(hidden))).is_none());
-        assert!(config_field_arg(&field_metadata(Some(unflagged))).is_none());
-        assert!(config_field_arg(&field_metadata(None)).is_none());
-    }
-
-    #[test]
-    fn config_field_arg_uses_value_shape_without_enum_validation() {
-        let mut cli = cli_metadata(true);
-        cli.possible_values = vec!["json".to_string(), "compact".to_string()];
-        let arg = config_field_arg(&field_metadata(Some(cli))).expect("arg should be visible");
-        let matches = Command::new("test")
-            .arg(arg)
-            .try_get_matches_from(["test", "--example-field", "JSON"])
-            .expect("help parser should not validate config values");
-
-        assert_eq!(
-            matches
-                .get_one::<String>("example_field")
-                .map(String::as_str),
-            Some("JSON")
-        );
-    }
-
-    #[test]
-    fn config_field_arg_uses_help_id_metadata_for_help_text() {
-        let mut field = field_metadata(Some(cli_metadata(true)));
-        field.help_id = "weaver.fields.locale.help".to_string();
-        let arg = config_field_arg(&field).expect("arg should be visible");
-        let mut command = Command::new("test").arg(arg);
-
-        assert!(
-            command
-                .render_long_help()
-                .to_string()
-                .contains("Selects the operator-facing locale")
-        );
-    }
-
-    #[test]
-    fn apply_arg_shape_supports_append_and_boolean_flags() {
-        let append = ConfigFieldArgMetadata {
-            name: "append_field",
-            long: "append-field",
-            short: None,
-            help: "Appends example values",
-            takes_value: true,
-            multiple: true,
-            value_name: Some("VALUE"),
-        };
-        let matches = Command::new("test")
-            .arg(config_arg_from_metadata(&append))
-            .try_get_matches_from(["test", "--append-field", "one", "--append-field", "two"])
-            .expect("append flag should parse");
-        let values = matches
-            .get_many::<String>("append_field")
-            .expect("append values should be present")
-            .map(String::as_str)
-            .collect::<Vec<_>>();
-        assert_eq!(values, ["one", "two"]);
-
-        let switch = ConfigFieldArgMetadata {
-            name: "switch_field",
-            long: "switch-field",
-            short: None,
-            help: "Enables the example switch",
-            takes_value: false,
-            multiple: false,
-            value_name: None,
-        };
-        let matches = Command::new("test")
-            .arg(config_arg_from_metadata(&switch))
-            .try_get_matches_from(["test", "--switch-field"])
-            .expect("switch flag should parse");
-        assert_eq!(matches.get_one::<bool>("switch_field").copied(), Some(true));
-
-        let error = Command::new("test")
-            .arg(config_arg_from_metadata(&switch))
-            .try_get_matches_from(["test", "--switch-field", "value"])
-            .expect_err("switch flag should reject a value");
-        assert_eq!(error.kind(), ErrorKind::UnknownArgument);
-    }
-}
+#[path = "help_tests.rs"]
+mod tests;
 
 #[cfg(test)]
 mod prop_tests {
@@ -343,12 +225,12 @@ mod prop_tests {
 
     use proptest::prelude::*;
 
-    use super::command;
+    use super::try_command;
 
     proptest! {
         #[test]
         fn command_always_includes_config_path(_seed in 0u64..) {
-            let cmd = command();
+            let cmd = try_command().expect("built-in help command should construct");
 
             prop_assert!(
                 cmd.get_arguments().any(|a| a.get_id().as_str() == "config-path"),

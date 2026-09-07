@@ -9,6 +9,7 @@ use crate::{
     AppError,
     ConfigLoader,
     IoStreams,
+    command_tree::{self, CommandNode, CommandSemantics},
     help,
     run_with_loader,
     tests::support::{self, EXPECTED_SHARED_CONFIG_HELP_FLAGS},
@@ -43,13 +44,16 @@ fn help_lists_shared_config_flags_without_loading_config(#[case] argv: &[&str]) 
 
 #[test]
 fn top_level_help_snapshot_matches_augmented_command() {
-    let rendered = help::command().render_long_help().to_string();
+    let rendered = help::try_command()
+        .expect("built-in help command should construct")
+        .render_long_help()
+        .to_string();
     insta::assert_snapshot!("top_level_augmented_help", rendered);
 }
 
 #[test]
 fn daemon_start_help_snapshot_matches_augmented_command() {
-    let mut command = help::command();
+    let mut command = help::try_command().expect("built-in help command should construct");
     let daemon = command
         .find_subcommand_mut("daemon")
         .expect("daemon subcommand must exist");
@@ -74,7 +78,7 @@ fn augmented_command_has_expected_arg_structure() {
         ("locale", Some("LOCALE"), ArgAction::Set),
     ];
 
-    let cmd = help::command();
+    let cmd = help::try_command().expect("built-in help command should construct");
     for (long, expected_value_name, expected_action) in expected {
         let Some(arg) = cmd.get_arguments().find(|a| a.get_long() == Some(*long)) else {
             panic!("augmented command missing --{long}");
@@ -95,6 +99,140 @@ fn augmented_command_has_expected_arg_structure() {
     }
 }
 
+#[test]
+fn projected_structured_surface_appears_in_the_shared_help_and_manpage_command() {
+    assert_command_surface(
+        &help::try_command().expect("built-in help command should construct"),
+        command_tree::root(),
+    );
+}
+
+#[test]
+fn command_ir_structured_surface_coverage_appears_in_rendered_help_and_manpage()
+-> anyhow::Result<()> {
+    let rendered_help = help::try_command()
+        .expect("built-in help command should construct")
+        .render_long_help()
+        .to_string();
+    let rendered_manpage = normalise_manpage(&generated_manpage()?);
+
+    let rendered_surfaces = RenderedSurfaces {
+        help: RenderedDocument {
+            name: "help",
+            content: &rendered_help,
+        },
+        manpage: RenderedDocument {
+            name: "manpage",
+            content: &rendered_manpage,
+        },
+    };
+    assert_rendered_surface(command_tree::root(), &rendered_surfaces);
+    Ok(())
+}
+
+/// Renders the manual page from the same augmented command as the build script.
+fn generated_manpage() -> anyhow::Result<String> {
+    use anyhow::Context;
+
+    let mut manpage = Vec::new();
+    let command = help::try_command().context("construct the augmented help command")?;
+    clap_mangen::Man::new(command)
+        .render(&mut manpage)
+        .context("render manual page from the augmented help command")?;
+    String::from_utf8(manpage).context("decode rendered manual page as UTF-8")
+}
+
+/// Removes troff escapes that would otherwise hide command and flag tokens.
+fn normalise_manpage(manpage: &str) -> String {
+    manpage
+        .replace("\\fB", "")
+        .replace("\\fI", "")
+        .replace("\\fR", "")
+        .replace("\\-", "-")
+}
+
+/// Recursively checks each structured command path and long flag in both surfaces.
+fn assert_rendered_surface(node: &CommandNode, rendered_surfaces: &RenderedSurfaces<'_>) {
+    if let CommandSemantics::Structured = node.semantics {
+        let path = command_path(node);
+        rendered_surfaces.assert_token(&SurfaceToken {
+            value: &path,
+            kind: "command path",
+        });
+        for argument in node.arguments {
+            let flag = format!("--{}", argument.long);
+            rendered_surfaces.assert_token(&SurfaceToken {
+                value: &flag,
+                kind: "long flag",
+            });
+        }
+    }
+
+    for child in node.children {
+        assert_rendered_surface(child, rendered_surfaces);
+    }
+}
+
+/// Returns the displayed command path for one structured command-tree node.
+fn command_path(node: &CommandNode) -> String {
+    let mut segments = node.resource_path.to_vec();
+    if segments.last().copied() != Some(node.verb) {
+        segments.push(node.verb);
+    }
+    segments.join(" ")
+}
+/// Identifies characters that would turn a token match into a substring match.
+fn is_token_character(character: char) -> bool {
+    character.is_ascii_alphanumeric() || matches!(character, '_' | '-')
+}
+fn assert_command_surface(command: &clap::Command, node: &CommandNode) {
+    assert_eq!(command.get_name(), node.verb);
+    for argument in node.arguments {
+        assert!(
+            command
+                .get_arguments()
+                .any(|candidate| candidate.get_long() == Some(argument.long)),
+            "command {:?} is missing projected --{}",
+            node.verb,
+            argument.long,
+        );
+    }
+    for child in node.children {
+        if let CommandSemantics::Structured = child.semantics {
+            let Some(subcommand) = command
+                .get_subcommands()
+                .find(|candidate| candidate.get_name() == child.verb)
+            else {
+                panic!(
+                    "command {:?} is missing projected child {:?}",
+                    node.verb, child.verb
+                );
+            };
+            assert_command_surface(subcommand, child);
+        }
+    }
+}
+
+#[test]
+fn whole_token_matching_rejects_partial_command_paths_and_flags() {
+    let command_path = RenderedDocument {
+        name: "test",
+        content: "definitions getter",
+    };
+    assert!(!command_path.contains_whole_token(&SurfaceToken {
+        value: "definitions get",
+        kind: "command path",
+    }));
+
+    let flag = RenderedDocument {
+        name: "test",
+        content: "--uri-value",
+    };
+    assert!(!flag.contains_whole_token(&SurfaceToken {
+        value: "--uri",
+        kind: "long flag",
+    }));
+}
 #[test]
 fn config_flag_after_domain_is_not_extracted_as_config_argument() {
     use std::sync::{
@@ -151,8 +289,57 @@ fn write_help_for_args_surfaces_io_error_on_broken_writer() {
     let args: Vec<OsString> = vec![OsString::from("weaver"), OsString::from("--help")];
     let result = crate::help::write_help_for_args(&args, &mut BrokenWriter);
     assert!(result.is_err());
-    assert_eq!(
-        result.expect_err("broken writer should fail").kind(),
-        std::io::ErrorKind::BrokenPipe
-    );
+    assert!(matches!(
+        result,
+        Err(crate::help::HelpWriteError::Write(error))
+            if error.kind() == std::io::ErrorKind::BrokenPipe
+    ));
+}
+
+/// The rendered documentation surfaces that must expose command metadata.
+struct RenderedSurfaces<'surface> {
+    help: RenderedDocument<'surface>,
+    manpage: RenderedDocument<'surface>,
+}
+
+/// A rendered documentation surface with its human-readable identity.
+struct RenderedDocument<'document> {
+    name: &'static str,
+    content: &'document str,
+}
+
+/// A command metadata token and its role in rendered documentation.
+struct SurfaceToken<'token> {
+    value: &'token str,
+    kind: &'static str,
+}
+
+impl RenderedDocument<'_> {
+    /// Asserts that one metadata token is present as a whole token.
+    fn assert_contains(&self, token: &SurfaceToken<'_>) {
+        assert!(
+            self.contains_whole_token(token),
+            "{} is missing {} {:?}",
+            self.name,
+            token.kind,
+            token.value,
+        );
+    }
+
+    /// Reports whether a token is delimited from adjacent command-token characters.
+    fn contains_whole_token(&self, token: &SurfaceToken<'_>) -> bool {
+        self.content.match_indices(token.value).any(|(index, _)| {
+            let before = self.content[..index].chars().next_back();
+            let after = self.content[index + token.value.len()..].chars().next();
+            before.is_none_or(|character| !is_token_character(character))
+                && after.is_none_or(|character| !is_token_character(character))
+        })
+    }
+}
+impl RenderedSurfaces<'_> {
+    /// Asserts that a token appears whole in each rendered documentation surface.
+    fn assert_token(&self, token: &SurfaceToken<'_>) {
+        self.help.assert_contains(token);
+        self.manpage.assert_contains(token);
+    }
 }

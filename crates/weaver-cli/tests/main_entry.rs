@@ -10,7 +10,7 @@ use predicates::{
 };
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use weaver_cli::DOMAIN_OPERATIONS;
+use weaver_cli::domain_operations;
 
 const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
     "--config-path <PATH>",
@@ -170,12 +170,13 @@ fn help_output_lists_all_domains_and_operations() {
         combined.contains("Domains and operations:"),
         "weaver --help output missing header"
     );
-    for (domain, _, ops) in DOMAIN_OPERATIONS {
+    for entry in domain_operations() {
         assert!(
-            combined.contains(domain),
-            "weaver --help output missing domain {domain:?}"
+            combined.contains(entry.domain),
+            "weaver --help output missing domain {:?}",
+            entry.domain,
         );
-        for op in *ops {
+        for op in entry.operations {
             assert!(
                 combined.contains(op),
                 "weaver --help output missing operation {op:?}"
@@ -243,6 +244,41 @@ fn daemon_start_help_lists_all_config_flags() {
 }
 
 #[test]
+fn definitions_get_help_exposes_localised_metadata_at_the_binary_boundary() {
+    let mut command = cargo_bin_cmd!("weaver");
+    command.args(["definitions", "get", "--help"]);
+    let output = command.output().expect("execute definitions get --help");
+    let stdout = String::from_utf8(output.stdout).expect("help output is UTF-8");
+    let stderr = String::from_utf8(output.stderr).expect("help errors are UTF-8");
+
+    assert!(
+        output.status.success(),
+        "definitions get --help should succeed"
+    );
+    assert!(
+        stdout
+            .lines()
+            .any(|line| line.trim() == "Returns the definition location for a source position"),
+        "definitions get help must include its localised summary; output was:\n{stdout}"
+    );
+    assert_token_sequence(&stdout, ["--uri", "<URI>"]);
+    assert_token_sequence(&stdout, ["--position", "<LINE:COLUMN>"]);
+    assert!(
+        stderr.is_empty(),
+        "help output must not write to stderr: {stderr}"
+    );
+}
+
+/// Asserts that adjacent help tokens are present without accepting substring matches.
+fn assert_token_sequence<const N: usize>(text: &str, expected: [&str; N]) {
+    let tokens = text.split_whitespace().collect::<Vec<_>>();
+    assert!(
+        tokens.windows(N).any(|window| window == expected),
+        "help output missing token sequence {expected:?}; output was:\n{text}"
+    );
+}
+
+#[test]
 fn generated_man_page_contains_all_shared_config_flags() {
     use cap_std::{ambient_authority, fs::Dir};
 
@@ -276,4 +312,20 @@ fn generated_man_page_contains_all_shared_config_flags() {
             "man page {man_page_path} missing flag {flag_name:?}",
         );
     }
+
+    let normalised = content
+        .replace("\\fB", "")
+        .replace("\\fI", "")
+        .replace("\\fR", "")
+        .replace("\\-", "-");
+    assert!(
+        normalised.contains("definitions get"),
+        "man page {man_page_path} missing definitions get command path"
+    );
+    assert!(
+        normalised.contains("Returns the definition location for a source position"),
+        "man page {man_page_path} missing localised definitions get summary"
+    );
+    assert_token_sequence(&normalised, ["--uri", "<URI>"]);
+    assert_token_sequence(&normalised, ["--position", "<LINE:COLUMN>"]);
 }

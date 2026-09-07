@@ -116,6 +116,25 @@ impl DomainRoutingContext {
     };
 }
 
+/// Returns the daemon's domain-to-operation routing catalogue.
+#[cfg(feature = "test-support")]
+pub(crate) fn routing_catalogue() -> [(&'static str, &'static [&'static str]); 3] {
+    [
+        (
+            DomainRoutingContext::OBSERVE.domain,
+            DomainRoutingContext::OBSERVE.known_operations,
+        ),
+        (
+            DomainRoutingContext::ACT.domain,
+            DomainRoutingContext::ACT.known_operations,
+        ),
+        (
+            DomainRoutingContext::VERIFY.domain,
+            DomainRoutingContext::VERIFY.known_operations,
+        ),
+    ]
+}
+
 /// Routes commands to domain handlers.
 ///
 /// The router parses the domain from the request, validates the operation, and

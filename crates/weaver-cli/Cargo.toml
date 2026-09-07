@@ -30,6 +30,7 @@ camino = { workspace = true }
 clap = { workspace = true }
 clap_mangen = "0.3"
 ortho_config = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 weaver-build-util = { path = "../weaver-build-util" }
 weaver-config = { path = "../weaver-config", features = ["cli"] }
@@ -45,3 +46,4 @@ tempfile = { workspace = true }
 weaver-test-macros = { path = "../weaver-test-macros" }
 insta = { workspace = true }
 proptest = { workspace = true }
+clap_mangen = "0.3"
