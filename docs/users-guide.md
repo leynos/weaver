@@ -52,7 +52,7 @@ weaver references list --uri file:///src/main.rs --position 10:5 --json
 weaver symbols list --query 'fn $NAME(...)' --json \
   | jq -c '
       if .schema == "weaver.selector.v1" then
-        select(.captures.NAME.text | startswith("old_"))
+        select((.captures.NAME.text? // "") | startswith("old_"))
       else
         .
       end
