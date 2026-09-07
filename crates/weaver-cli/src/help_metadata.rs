@@ -1,22 +1,23 @@
 //! Applies recursive command metadata to Clap help rendering.
 
 use clap::Command;
-use ortho_config::{FluentLocalizer, Localizer, NoOpLocalizer, docs::DocMetadata};
+use ortho_config::{FluentLocalizer, Localizer, docs::DocMetadata};
 
+use super::HelpConstructionError;
 use crate::command_tree::{CommandNode, CommandSemantics};
 
-const EN_US_MESSAGES: &str = include_str!("../locales/en-US/messages.ftl");
+pub(super) const EN_US_MESSAGES: &str = include_str!("../locales/en-US/messages.ftl");
 
 /// Applies projected command metadata to the parser-shaped help command.
-pub(super) fn apply(command: Command, metadata: &DocMetadata, node: &CommandNode) -> Command {
-    let localizer = FluentLocalizer::with_en_us_defaults([EN_US_MESSAGES]);
-    match localizer {
-        Ok(localizer) => apply_node(command, metadata, node, &localizer),
-        Err(error) => {
-            tracing::warn!(error = %error, "failed to load help localisation catalogue");
-            apply_node(command, metadata, node, &NoOpLocalizer)
-        }
-    }
+pub(super) fn apply(
+    command: Command,
+    metadata: &DocMetadata,
+    node: &CommandNode,
+    resources: impl IntoIterator<Item = &'static str>,
+) -> Result<Command, HelpConstructionError> {
+    let localizer = FluentLocalizer::with_en_us_defaults(resources)
+        .map_err(HelpConstructionError::load_localisation_catalogue)?;
+    Ok(apply_node(command, metadata, node, &localizer))
 }
 
 /// Applies one projected node and its descendants to the matching clap command.
@@ -41,7 +42,14 @@ fn apply_arguments(
 ) -> Command {
     for (argument, field) in node.arguments.iter().zip(&metadata.fields) {
         let help = localizer.message(&field.help_id, None, argument.help);
-        command = command.mut_arg(argument.long, |arg| arg.help(help));
+        let value_name = field.cli.as_ref().and_then(|cli| cli.value_name.clone());
+        command = command.mut_arg(argument.long, |arg| {
+            let arg = arg.help(help);
+            match value_name {
+                Some(value_name) => arg.value_name(value_name),
+                None => arg,
+            }
+        });
     }
     command
 }
@@ -188,7 +196,7 @@ mod tests {
     use ortho_config::{LocalizationArgs, Localizer};
 
     use super::{apply_node, apply_passthrough_help};
-    use crate::{cli::Cli, command_ir, command_tree};
+    use crate::{cli::Cli, command_ir, command_tree, help::HelpConstructionError};
 
     struct DistinctLocalizer;
 
@@ -239,6 +247,10 @@ mod tests {
         assert!(rendered_help.contains("Translated definition lookup summary"));
         assert!(rendered_help.contains("Translated document URI argument"));
         assert!(rendered_help.contains("Translated source position argument"));
+        assert!(
+            rendered_help.contains("--position <LINE:COLUMN>"),
+            "projected argument metadata must replace Clap's derived value placeholder"
+        );
 
         let mut manpage = Vec::new();
         clap_mangen::Man::new(command).render(&mut manpage)?;
@@ -257,5 +269,17 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn malformed_fluent_catalogue_returns_construction_error_without_a_command() {
+        let root = command_tree::root();
+
+        let result = super::super::build_command(root, ["broken = {"]);
+
+        assert!(matches!(
+            result,
+            Err(HelpConstructionError::LoadLocalisationCatalogue { .. })
+        ));
     }
 }

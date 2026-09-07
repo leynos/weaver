@@ -33,7 +33,7 @@ fn assert_catalogue_complete(text: &str) {
 
 #[test]
 fn clap_after_help_comes_from_the_canonical_command_tree() {
-    let command = help::command();
+    let command = help::try_command().expect("built-in help command should construct");
     let clap_after_help = command
         .get_after_help()
         .expect("augmented command must have after_help set")
@@ -43,7 +43,8 @@ fn clap_after_help_comes_from_the_canonical_command_tree() {
 
 #[test]
 fn after_help_contains_header() {
-    let text = help::command()
+    let text = help::try_command()
+        .expect("built-in help command should construct")
         .get_after_help()
         .expect("augmented command must have after_help set")
         .to_string();

@@ -168,16 +168,20 @@ where
             Ok(cli) => Ok(Some(cli)),
             Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => {
                 tracing::debug!("rendering clap help");
-                help::write_help_for_args(args, &mut *self.io.stdout)
-                    .map(|()| None)
-                    .map_err(|io_error| {
+                match help::write_help_for_args(args, &mut *self.io.stdout) {
+                    Ok(()) => Ok(None),
+                    Err(help::HelpWriteError::Construction(error)) => {
+                        Err(AppError::ConstructHelp(error))
+                    }
+                    Err(help::HelpWriteError::Write(error)) => {
                         tracing::warn!(
-                            error_kind = ?io_error.kind(),
-                            error = %io_error,
+                            error_kind = ?error.kind(),
+                            error = %error,
                             "failed to write clap help"
                         );
-                        AppError::EmitHelp(io_error)
-                    })
+                        Err(AppError::EmitHelp(error))
+                    }
+                }
             }
             Err(error) => Err(AppError::CliUsage(error)),
         }
