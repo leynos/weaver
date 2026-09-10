@@ -7,6 +7,8 @@
 
 use std::path::PathBuf;
 
+use weaver_config::RuntimePaths;
+
 use super::{
     backend_manager::BackendManager,
     errors::DispatchError,
@@ -48,7 +50,7 @@ pub struct DispatchConnectionHandler {
     router: DomainRouter,
     backends: BackendManager,
     endpoint: String,
-    runtime_dir: PathBuf,
+    runtime_paths: RuntimePaths,
 }
 
 impl DispatchConnectionHandler {
@@ -57,13 +59,13 @@ impl DispatchConnectionHandler {
         backends: BackendManager,
         workspace_root: PathBuf,
         endpoint: impl Into<String>,
-        runtime_dir: PathBuf,
+        runtime_paths: RuntimePaths,
     ) -> Result<Self, DispatchError> {
         Ok(Self {
             router: DomainRouter::new(workspace_root)?,
             backends,
             endpoint: endpoint.into(),
-            runtime_dir,
+            runtime_paths,
         })
     }
 
@@ -90,7 +92,7 @@ impl DispatchConnectionHandler {
         let event = StructuredDispatchEvent::new(
             "dispatching_request",
             &self.endpoint,
-            self.runtime_dir.as_path(),
+            &self.runtime_paths,
             StructuredEventMetadata::new(request.domain(), request.operation())
                 .with_size(request_bytes.len()),
         );
@@ -113,7 +115,7 @@ impl DispatchConnectionHandler {
                 return Err(ReadRequestError::ClientDisconnected);
             }
             Err(error) => {
-                let event = read_error_event(&error, &self.endpoint, self.runtime_dir.as_path());
+                let event = read_error_event(&error, &self.endpoint, &self.runtime_paths);
                 emit_structured_event(&event, read_error_message(&error), true);
                 tracing::warn!(target: DISPATCH_TARGET, %error, "failed to read request");
                 return Err(ReadRequestError::BadRequest(error));
@@ -126,7 +128,7 @@ impl DispatchConnectionHandler {
                 let event = StructuredDispatchEvent::new(
                     "request_rejected",
                     &self.endpoint,
-                    self.runtime_dir.as_path(),
+                    &self.runtime_paths,
                     StructuredEventMetadata::none().with_size(request_bytes.len()),
                 );
                 emit_structured_event(&event, "request rejected: malformed JSON", true);
@@ -139,7 +141,7 @@ impl DispatchConnectionHandler {
             let event = StructuredDispatchEvent::new(
                 "request_rejected",
                 &self.endpoint,
-                self.runtime_dir.as_path(),
+                &self.runtime_paths,
                 StructuredEventMetadata::new(request.domain(), request.operation())
                     .with_size(request_bytes.len()),
             );
@@ -227,7 +229,7 @@ impl DispatchConnectionHandler {
         StructuredDispatchEvent::new(
             event_name,
             &self.endpoint,
-            self.runtime_dir.as_path(),
+            &self.runtime_paths,
             StructuredEventMetadata::new(context.request.domain(), context.request.operation())
                 .with_size(context.request_size),
         )

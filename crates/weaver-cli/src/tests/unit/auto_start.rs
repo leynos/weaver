@@ -14,7 +14,7 @@ use std::{ffi::OsStr, io::Cursor, process::ExitCode};
 use rstest::rstest;
 #[cfg(unix)]
 use tempfile::TempDir;
-use weaver_config::{Config, SocketEndpoint};
+use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
 use crate::{
     CommandInvocation,
@@ -210,8 +210,15 @@ fn assert_auto_start_success(exit: ExitCode, stderr_text: &str, stdout_text: &st
 fn auto_start_succeeds_and_proceeds() {
     let dir = TempDir::new().expect("tempdir");
     let socket_path = dir.path().join("daemon.sock");
-    let health_path = dir.path().join("weaverd.health");
     let socket_str = socket_path.to_string_lossy().into_owned();
+    let config = Config {
+        daemon_socket: SocketEndpoint::unix(socket_str),
+        ..Config::default()
+    };
+    let health_path = RuntimePaths::from_config_readonly(&config)
+        .expect("derive runtime paths")
+        .health_path()
+        .to_path_buf();
 
     // Pre-write health snapshot with ready status and recent timestamp.
     // The PID check is skipped when daemonized=true (child exits with 0).
@@ -226,10 +233,6 @@ fn auto_start_succeeds_and_proceeds() {
     // `spawn_delayed_unix_listener` for the timing rationale.
     let listener_handle = spawn_delayed_unix_listener(socket_path);
 
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_str),
-        ..Config::default()
-    };
     let context = LifecycleContext {
         config: &config,
         config_arguments: &[],

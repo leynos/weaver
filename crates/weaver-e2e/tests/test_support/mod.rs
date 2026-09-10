@@ -27,7 +27,7 @@ use serde::Serialize;
 use tempfile::TempDir;
 use url::Url;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_config::{CapabilityMatrix, Config, RuntimePaths, SocketEndpoint};
 use weaver_e2e::card_fixtures::CardFixtureCase;
 use weaverd::{
     BackendManager,
@@ -147,11 +147,17 @@ fn new_handler(
 ) -> Result<DispatchConnectionHandler, String> {
     let workspace_root =
         std::env::current_dir().map_err(|error| format!("workspace root: {error}"))?;
+    let config = Config {
+        daemon_socket: SocketEndpoint::tcp(address.ip().to_string(), address.port()),
+        ..Config::default()
+    };
+    let runtime_paths = RuntimePaths::from_config_readonly(&config)
+        .map_err(|error| format!("derive runtime paths: {error}"))?;
     DispatchConnectionHandler::new(
         backend_manager.clone(),
         workspace_root,
         format!("tcp://{address}"),
-        std::env::temp_dir(),
+        runtime_paths,
     )
     .map_err(|error| format!("absolute workspace root: {error}"))
 }

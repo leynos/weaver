@@ -10,7 +10,7 @@ use weaver_config::{RuntimePaths, SocketEndpoint};
 
 use super::{
     error::LifecycleError,
-    monitoring::{HEALTH_FILENAME, PID_FILENAME, read_health, read_pid, wait_for_ready},
+    monitoring::{read_health, read_pid, wait_for_ready},
     shutdown::{signal_daemon, wait_for_shutdown},
     socket::{ensure_socket_available, socket_is_reachable},
     spawning::spawn_daemon,
@@ -83,7 +83,7 @@ impl SystemLifecycle {
         ensure_no_extra_arguments(invocation)?;
         let paths = prepare_runtime(context)?;
         let dir = open_runtime_dir(&paths)?;
-        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
+        let pid = read_pid(&dir, paths.pid_file_name(), paths.pid_path())?;
         let Some(pid) = pid else {
             if socket_is_reachable(context.config.daemon_socket())? {
                 return Err(LifecycleError::MissingPidWithSocket {
@@ -207,7 +207,7 @@ impl SystemLifecycle {
         }
 
         let dir = open_runtime_dir(&paths)?;
-        let snapshot = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
+        let snapshot = read_health(&dir, paths.health_file_name(), paths.health_path())?;
         let runtime = RuntimeStatusContext {
             paths: &paths,
             endpoint: context.config.daemon_socket(),
@@ -218,7 +218,7 @@ impl SystemLifecycle {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
+        let pid = read_pid(&dir, paths.pid_file_name(), paths.pid_path())?;
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
         self.report_degraded_status(RuntimeProbe { reachable, pid }, runtime, output)?;
         Ok(ExitCode::SUCCESS)

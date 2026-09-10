@@ -238,13 +238,14 @@ fn rejects_duplicate_language_registration() {
 }
 
 #[rstest]
-fn reports_unknown_language_on_request() {
+fn reports_unknown_language_on_request() -> Result<(), String> {
     let mut host = crate::LspHost::new(CapabilityMatrix::default());
-    let params = definition_params().expect("definition params should build");
+    let params = definition_params().map_err(|error| error.to_string())?;
     match host.goto_definition(Language::Rust, params) {
         Err(LspHostError::UnknownLanguage { .. }) => {}
-        other => panic!("expected unknown language error, got {other:?}"),
+        other => return Err(format!("expected unknown language error, got {other:?}")),
     }
+    Ok(())
 }
 
 #[rstest]

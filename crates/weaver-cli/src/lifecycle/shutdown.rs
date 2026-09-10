@@ -14,12 +14,7 @@ use cap_std::fs::Dir;
 use libc::{SIGTERM, kill};
 use weaver_config::{RuntimePaths, SocketEndpoint};
 
-use super::{
-    error::LifecycleError,
-    monitoring::PID_FILENAME,
-    socket::socket_is_reachable,
-    utils::open_runtime_dir,
-};
+use super::{error::LifecycleError, socket::socket_is_reachable, utils::open_runtime_dir};
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
@@ -76,7 +71,7 @@ pub(super) fn wait_for_shutdown(
 /// Uses the runtime directory handle to check file existence, propagating I/O
 /// errors. Only `NotFound` is treated as "file does not exist".
 fn pid_file_exists(dir: &Dir, paths: &RuntimePaths) -> Result<bool, LifecycleError> {
-    match dir.metadata(PID_FILENAME) {
+    match dir.metadata(paths.pid_file_name()) {
         Ok(_) => Ok(true),
         Err(e) if e.kind() == ErrorKind::NotFound => Ok(false),
         Err(source) => Err(LifecycleError::ReadPid {

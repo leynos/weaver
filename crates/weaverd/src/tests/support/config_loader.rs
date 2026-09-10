@@ -8,7 +8,7 @@ use std::{
 use camino::Utf8PathBuf;
 use ortho_config::OrthoError;
 use tempfile::TempDir;
-use weaver_config::{Config, SocketEndpoint};
+use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
 use crate::bootstrap::ConfigLoader;
 
@@ -32,14 +32,13 @@ impl TestConfigLoader {
         })
     }
 
-    /// Returns the directory backing the temporary runtime.
-    #[must_use]
-    pub fn runtime_dir(&self) -> PathBuf {
-        self.socket_dir
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .path()
-            .to_path_buf()
+    /// Derives the runtime artefact paths used by this loader's endpoint.
+    pub fn runtime_paths(&self) -> Result<RuntimePaths, String> {
+        let config = self
+            .load()
+            .map_err(|error| format!("load test configuration: {error}"))?;
+        RuntimePaths::from_config(&config)
+            .map_err(|error| format!("derive test runtime paths: {error}"))
     }
 
     fn socket_path(&self) -> Result<Utf8PathBuf, PathBuf> {
