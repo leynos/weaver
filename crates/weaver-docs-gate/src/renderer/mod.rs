@@ -302,7 +302,7 @@ fn roadmap_anchor(task_id: &str) -> &'static str {
         "12" => "roadmap.md#121-confirm-reusable-contracts-that-weaver-must-not-duplicate",
         "13" => "roadmap.md#13-command-contract-proving-slice",
         "14" => "roadmap.md#14-code-reading-loop-slice",
-        "15" => "roadmap.md#15-sempai-selector-to-context-slice",
+        "15" => "roadmap.md#15-sempai-query-to-selector-slice",
         "16" => "roadmap.md#16-safe-change-loop-slice",
         "17" => "roadmap.md#17-impact-and-history-slice",
         "18" => "roadmap.md#18-provider-ecosystem-slice",

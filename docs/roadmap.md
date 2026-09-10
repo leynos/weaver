@@ -5,10 +5,13 @@ This roadmap translates `docs/weaver-design.md`,
 `docs/adr-008-workspace-scoped-daemon-tenancy.md`,
 `docs/adr-009-workspace-scoped-language-server-lifecycle.md`,
 `docs/adr-010-workspace-local-concurrency.md`,
+`docs/adr-011-sempai-query-input-syntax.md`,
+`docs/adr-012-versioned-selector-streams.md`,
 `docs/sempai-query-language-design.md`,
 `docs/jacquard-card-first-symbol-graph-design.md`, `docs/rfcs/0001-o11y.md`,
-`docs/rfcs/0002-multi-workspace-daemon.md`, and the existing ADR set into an
-outcome-oriented delivery sequence. It does not promise dates. Phases carry
+`docs/rfcs/0002-multi-workspace-daemon.md`,
+`docs/rfcs/0003-sempai-query-to-selector.md`, and the existing ADR set into
+an outcome-oriented delivery sequence. It does not promise dates. Phases carry
 testable product ideas, steps validate or falsify those ideas, and tasks are
 review-sized execution units with explicit dependencies and observable success
 criteria.
@@ -381,47 +384,60 @@ Boundary classifications for these tasks are tracked in the
 - [ ] 14.3.2. Decide whether the static-search pilot graduates into the live
       command contract.
   - Requires 14.3.1.
-  - Success: ADR 007 or the roadmap records one of three outcomes: graduate as
-    `symbols list --pattern`, fold into `symbols list --query`, or defer.
+  - Success: RFC 0003 either accepts the pilot behind
+    `symbols list --query` as an explicit compatibility executor or defers it.
+    `symbols list --pattern` does not become stable public grammar.
 
-## 15. Sempai selector-to-context slice
+## 15. Sempai query-to-selector slice
 
-Idea: if Sempai one-liners can select symbols and immediately feed cards plus
-one-hop graph context, Weaver proves that query language work pays off as a
-composable product loop rather than as a standalone parser layer.
+Idea: if one positive Sempai query can emit versioned selector records and
+those records can cross an ordinary shell pipeline, Weaver proves the product
+loop before completing every Semgrep-compatible operator.
 
-This phase validates Sempai as a selector engine without reducing the original
-backend and integration scope to a vague parser task. It migrates archive work
+This phase validates Sempai as a composable selector engine. It pulls the
+smallest executable path ahead of the full backend while preserving the full
+parser, matcher, language, and compatibility scope as the replacement path.
+It implements [RFC 0003](rfcs/0003-sempai-query-to-selector.md),
+[ADR 011](adr-011-sempai-query-input-syntax.md), and
+[ADR 012](adr-012-versioned-selector-streams.md), and migrates archive work
 from Sempai DSL parsing, Tree-sitter execution, query routing, symbol-first
 cards, and the Sempai-to-Jacquard vertical slice.
 
-### 15.1. Prove a minimal one-liner selector with honest diagnostics
+### 15.1. Prove minimal query compilation and honest recovery
 
-This step answers whether the target one-liner grammar can select real symbols
-without overbuilding the full query engine. It migrates prototype archive work
-4.1.6 through 4.1.7, 4.3.3, and 9.1.1. See
+This step answers whether bare positive patterns and rich expressions can share
+the canonical formula model without making the complete Pratt grammar an entry
+fee for useful search. It migrates prototype archive work 4.1.6 through 4.1.7,
+4.3.3, and 9.1.1. See RFC 0003 §§6.1-6.3 and
 `docs/sempai-query-language-design.md` §§3-6. Boundary classifications for
 these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
-- [ ] 15.1.1. Implement one-liner tokenization and Pratt parsing for positive
-      symbol patterns.
+- [ ] 15.1.1. Implement one-liner tokenization and Pratt parsing for query
+      inputs.
   - Requires 13.2.2.
-  - Success: valid one-liners compile to canonical formula form, malformed
-    input produces stable `E_SEMPAI_*` diagnostics, and recovery preserves
-    partial anchors where safe.
+  - Success: bare `--query` patterns lower directly to canonical positive
+    pattern atoms; `--expr` inputs use spanned Logos tokens and a recovering
+    Chumsky Pratt parser; malformed input produces stable, possibly multiple
+    `E_SEMPAI_*` diagnostics; recovery retains partial nodes only for further
+    guidance; and no query with error-severity diagnostics reaches execution.
 - [ ] 15.1.2. Define selector record schemas for one-liner matches.
   - Requires 15.1.1.
-  - Success: selector records carry identity, range, language, query, capture,
-    confidence, and provider provenance needed for safe downstream context or
-    mutation.
+  - Success: `weaver.selector.v1` records carry selector, stream, sequence,
+    workspace, URI, range, language, query, capture, source-digest or revision,
+    capability, and provider identities. A terminal
+    `weaver.selector-stream-end.v1` record proves successful completion.
+    Deterministic structural evidence and compatibility provenance replace an
+    invented floating-point confidence value.
 
-### 15.2. Prove the Sempai Tree-sitter backend
+### 15.2. Prove and graduate the full Sempai Tree-sitter backend
 
-This step answers whether Semgrep-style matching can run accurately enough on
-real syntax with bounded execution semantics. It preserves prototype archive
-work 4.2.1 through 4.2.12 instead of compressing the backend into a single
-"matching" task. See `docs/sempai-query-language-design.md` §§7-12.
+This step answers whether the complete Semgrep-style subset can replace the
+first compatibility executor without changing query syntax, selector schemas,
+or ordering. It preserves prototype archive work 4.2.1 through 4.2.12 instead
+of compressing the backend into a single "matching" task. Its completion is not
+a prerequisite for the first positive query in step 15.3. See RFC 0003 §7.4 and
+`docs/sempai-query-language-design.md` §§7-12.
 
 - [ ] 15.2.1. Implement language profiles and wrapper registry for Rust,
       Python, TypeScript, and Go, with optional HashiCorp Configuration
@@ -488,32 +504,39 @@ work 4.2.1 through 4.2.12 instead of compressing the backend into a single
   - Success: safety limits are configurable, deterministic, and enforced
     across execution paths.
 
-### 15.3. Prove Sempai Weaver integration and readiness
+### 15.3. Prove the first public selector stream and full-engine graduation
 
-This step answers whether the backend can be exposed through Weaver's
-resource-first command surface with stable schemas, cache behaviour,
-diagnostics, quality gates, and default-enablement rules. It preserves
-prototype archive work 4.3.1 through 4.3.9 under the new public command shape.
-See `docs/weaver-design.md` §2.1.2. Boundary classifications for these tasks
-are tracked in the
+This step answers whether Sempai can expose one useful query through Weaver's
+resource-first command surface before the full matcher lands, then replace its
+compatibility executor without changing the user pipe. It preserves prototype
+archive work 4.3.1 through 4.3.9 under the new public command shape. See RFC
+0003, ADRs 011-012, and `docs/weaver-design.md` §2.1.2. Boundary
+classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 15.3.1. Add Sempai execution routing in `weaverd` for selector-backed
       `symbols list`.
-  - Requires 15.2.12 and 12.3.3.
-  - Success: daemon execution paths compile and execute Sempai plans for
-    supported languages and return structured match streams.
+  - Requires 15.1.2 and 12.3.3.
+  - Success: positive Rust, Python, and TypeScript plans execute through an
+    explicitly labelled `weaver-syntax` compatibility adapter; unsupported
+    constructs refuse rather than drift semantically; and daemon execution
+    returns canonical matches with visible capability and provider provenance.
 - [ ] 15.3.2. Add `weaver symbols list --query` with `--lang`, `--uri`, and
-      `--rule-file|--rule|--query` inputs.
-  - Requires 15.3.1 and 14.2.1.
-  - Success: the CLI validates input combinations and supports YAML rule files,
-    inline YAML rules, and one-liner query workflows with stable error
-    messaging. `weaver observe query` remains archive provenance only.
+      explicit query-source inputs.
+  - Requires 15.3.1 and phase 13.
+  - Success: the CLI implements ADR 011 with mutually exclusive
+    `--query|--query-file|--expr|--expr-file|--rule|--rule-file` inputs,
+    accepts `-` on file forms for standard input, enumerates invalid
+    combinations, and keeps `weaver observe query` as archive provenance only.
 - [ ] 15.3.3. Define stable JSONL request and response schemas for Sempai query
       operations, with snapshot coverage.
   - Requires 15.3.2.
-  - Success: schema fixtures lock field names and payload shapes, and streaming
-    output remains deterministic.
+  - Success: `--json` emits zero or more deterministic
+    `weaver.selector.v1` records followed by one
+    `weaver.selector-stream-end.v1` completion record. Zero matches emit the
+    completion record only; producer failure omits completion; source identity
+    and provenance are present; and schema fixtures lock field names, ordering,
+    bounds, completion, and error separation.
 - [ ] 15.3.4. Integrate parse-cache adapter keyed by URI, language, and
       revision, aligned with daemon document lifecycle.
   - Requires 15.3.3 and 12.3.3.
@@ -524,45 +547,58 @@ are tracked in the
 - [ ] 15.3.5. Implement actuation handoff contract using focus-first selection
       with span fallback and optional capture targeting.
   - Requires 15.3.3.
-  - Success: downstream mutation commands can consume Sempai output
-    deterministically for target selection without hidden state.
+  - Success: consumers read or spool complete bounded streams from
+    `--selectors <path|->`, validate the terminal completion record before
+    planning, use focus, match, or explicit capture spans without hidden state,
+    reject stale or cross-workspace source identities, and expose deterministic
+    zero-, one-, and many-match policy.
 - [ ] 15.3.6. Add diagnostics conformance suites for YAML, domain-specific
       language (DSL), semantic, compilation, and execution error categories.
   - Requires 15.3.3.
-  - Success: each diagnostic category is covered by deterministic snapshots and
-    stable `E_SEMPAI_*` error codes.
+  - Success: each diagnostic category has deterministic snapshots and stable
+    `E_SEMPAI_*` codes; expression recovery reports independent errors where
+    possible; and recovered queries with error-severity diagnostics never emit
+    a successful completion record.
 - [ ] 15.3.7. Add layered quality suites for parser and execution behaviour.
   - Requires 15.3.6.
   - Success: unit, snapshot, corpus, property, and fuzz suites run under
-    repository gates and include representative language corpora plus
-    malformed-input coverage.
+    repository gates and include representative language corpora, malformed
+    input, compatibility-adapter conformance, truncated streams, and
+    bounded-output coverage.
 - [ ] 15.3.8. Publish compatibility boundaries for supported operators, modes,
       constraints, and escape-hatch behaviour.
   - Requires 15.3.7.
-  - Success: user-facing docs distinguish supported, unsupported, and
-    parse-only behaviours with stable terminology.
+  - Success: user-facing docs distinguish implemented, compatibility-subset,
+    parse-only, unsupported, and planned behaviour; provider provenance makes
+    the active execution route visible without adding provider-specific public
+    commands.
 - [ ] 15.3.9. Define release gates for enabling Sempai by default.
-  - Requires 15.3.8.
-  - Success: crash-free requirements, diagnostics parity, and documentation
-    parity are codified in CI policy and block default enablement when
-    thresholds are not met.
+  - Requires 15.2.12 and 15.3.8.
+  - Success: the full Sempai executor replaces compatibility paths only after
+    selector schema and ordering conformance passes; crash-free requirements,
+    diagnostics parity, compatibility boundaries, and documentation parity are
+    codified in CI policy and block default enablement when thresholds are not
+    met.
 
 ### 15.4. Prove query output composes with context commands
 
-This step answers whether one-liner selectors can feed product commands rather
-than remaining search output. It migrates prototype archive work 9.1.4 through
-9.3.2 and 11.2.1. See `docs/weaver-design.md` §2.1.2.
+This step answers whether completed versioned selector streams can feed product
+commands rather than remaining terminal search output. It migrates prototype
+archive work 9.1.4 through 9.3.2 and 11.2.1. See RFC 0003 §§6.7-6.8,
+ADR 012, and `docs/weaver-design.md` §2.1.2.
 
 - [ ] 15.4.1. Allow `cards get` and one-hop relation summaries to consume
       Sempai selectors.
   - Requires 15.3.5 and 14.2.3.
   - Success: one query-to-card-to-relation workflow works in one command and
-    in a pipeline, with deterministic zero-, one-, and many-match behaviour.
+    through `--selectors <path|->`, with deterministic zero-, one-, and
+    many-match behaviour, completion validation, and stale-selector refusal.
 - [ ] 15.4.2. Add Sempai selector conformance and pipeline E2E coverage.
   - Requires 15.4.1.
-  - Success: suites cover YAML-backed and one-liner selectors, malformed query
-    recovery, `jq` filtering, pager consumption, bounded output, and invalid
-    selector-stream rejection.
+  - Success: suites cover YAML-backed, bare-pattern, and expression selectors,
+    malformed query recovery, completion-preserving `jq -c` filtering, pager
+    consumption, bounded output, and malformed, truncated, stale, or
+    incompatible selector-stream rejection.
 
 ## 16. Safe change loop slice
 
@@ -676,8 +712,8 @@ command-contract tasks are tracked in the
 
 This step answers whether provider-hidden actuators can mutate safely from both
 direct references and Sempai streams. It migrates prototype archive work 5.2.1
-through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001 and ADR 004.
-Boundary classifications for these tasks are tracked in the
+through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001, ADR 004, and
+ADR 012. Boundary classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 16.2.1. Implement `weaver symbols rename` for position references.
@@ -687,18 +723,22 @@ Boundary classifications for these tasks are tracked in the
     outcome.
 - [ ] 16.2.2. Add direct Sempai selector support to `symbols rename`.
   - Requires 15.3.5 and 16.2.1.
-  - Success: `symbols rename --query ...` handles zero, one, and many matches
-    deterministically and requires explicit policy for ambiguous mutation.
-- [ ] 16.2.3. Add `--from-stdin` selector stream consumption to mutation
-      commands.
+  - Success: `symbols rename --query ...` produces the same completed versioned
+    selector stream as `symbols list`, handles zero, one, and many matches
+    deterministically, and requires explicit policy for ambiguous mutation.
+- [ ] 16.2.3. Add typed selector stream consumption to mutation commands.
   - Requires 15.3.3, 15.3.5, and 16.2.2.
-  - Success: `weaver symbols list --query … --json | jq … | weaver symbols
-    rename --from-stdin …` works without hidden state.
+  - Success: a completion-preserving
+    `weaver symbols list --query … --json | jq -c … | weaver symbols rename
+    --selectors - …` pipeline works without hidden state. The actuator reads
+    the complete stream before planning; malformed, truncated, cross-workspace,
+    and stale records refuse; and resulting edits commit only through the
+    shared mutation engine.
 - [ ] 16.2.4. Add rename and selector-mutation combinatorial E2E coverage.
   - Requires 16.2.3.
-  - Success: coverage combines selector forms, `--json`, `--dry-run`,
-    idempotency, provider failures, syntactic failures, semantic failures, and
-    rollback assertions.
+  - Success: coverage combines selector forms, completed streams, `--json`,
+    `--dry-run`, idempotency, provider failures, stale selectors, syntactic
+    failures, semantic failures, and rollback assertions.
 
 ### 16.3. Prove the `extricate-symbol` contract with Python first
 
