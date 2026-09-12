@@ -44,12 +44,12 @@ jobs:
       DESCRIPTION: "Semantic editor"
       MAC_IDENTIFIER: "net.df12.weaver"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         # v7.0.0
 
       - name: Install uv
         if: inputs.platform != 'linux'
-        uses: astral-sh/setup-uv@4cda7d73322c50eac316ad623a716f09a2db2ac7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
         # v3.1.2
         with:
           python-version: '3.11'
@@ -219,7 +219,7 @@ jobs:
           (inputs.platform == 'linux' ||
           inputs.platform == 'macos' ||
           inputs.platform == 'freebsd')
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         # v4
         with:
           name: ${{ inputs.artifact-name }}
