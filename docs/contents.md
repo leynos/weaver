@@ -95,8 +95,6 @@ readers can find the source of truth without scanning the whole tree.
   - Current Weaver adoption notes for the published ortho-config release.
 - [Ortho-config v0.8.0 migration guide](ortho-config-v0-8-0-migration-guide.md)
   - Historical Weaver-specific adoption notes for the v0.8.0 upgrade.
-- [Ortho-config v0.6.0 migration guide](ortho-config-v0-6-0-migration-guide.md)
-  - Historical migration notes and compatibility guidance for v0.6.0.
 - [Pratt parser design for DDlog expressions](pratt-parser-for-ddlog-expressions.md)
   - Pratt parsing design, AST modelling, and integration notes for DDlog.
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)

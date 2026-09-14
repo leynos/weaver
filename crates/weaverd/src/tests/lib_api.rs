@@ -21,7 +21,7 @@ fn bootstrap_with_reexport_initialises_daemon() -> Result<(), String> {
     let provider = RecordingBackendProvider::default();
 
     let _daemon = bootstrap_with(&loader, reporter.clone(), provider.clone())
-        .expect("bootstrap should succeed");
+        .map_err(|error| format!("bootstrap should succeed: {error}"))?;
 
     let events = reporter.events();
     assert!(events.contains(&HealthEvent::BootstrapStarting));
@@ -36,11 +36,11 @@ fn daemon_reexport_controls_backends() -> Result<(), String> {
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
     let mut daemon = bootstrap_with(&loader, reporter.clone(), provider.clone())
-        .expect("bootstrap should succeed");
+        .map_err(|error| format!("bootstrap should succeed: {error}"))?;
 
     daemon
         .ensure_backend(BackendKind::Semantic)
-        .expect("backend should start");
+        .map_err(|error| format!("backend should start: {error}"))?;
     assert_eq!(provider.recorded_starts(), vec![BackendKind::Semantic]);
     Ok(())
 }

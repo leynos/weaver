@@ -1,6 +1,6 @@
 //! Behaviour-driven tests for `graph-slice` schema contracts.
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result};
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_test_macros::allow_fixture_expansion_lints;
@@ -125,14 +125,15 @@ fn parse_json(world: &TestWorld) -> Result<serde_json::Value> {
 fn json_pointer(field: &str) -> String { format!("/{}", field.replace('.', "/")) }
 
 #[then("the slice JSON contains a {field} field")]
-fn then_json_contains(world: &mut TestWorld, field: QuotedString) -> Result<()> {
-    let parsed = parse_json(world)?;
+fn then_json_contains(world: &mut TestWorld, field: QuotedString) -> Result<(), String> {
+    let parsed = parse_json(world).map_err(|error| error.to_string())?;
     let pointer = json_pointer(field.as_str());
-    ensure!(
-        parsed.pointer(&pointer).is_some(),
-        "expected JSON to contain field '{}', got: {parsed}",
-        field.as_str()
-    );
+    if parsed.pointer(&pointer).is_none() {
+        return Err(format!(
+            "expected JSON to contain field '{}', got: {parsed}",
+            field.as_str()
+        ));
+    }
     Ok(())
 }
 
@@ -141,127 +142,152 @@ fn then_json_field_value(
     world: &mut TestWorld,
     key: QuotedString,
     value: QuotedString,
-) -> Result<()> {
-    let parsed = parse_json(world)?;
+) -> Result<(), String> {
+    let parsed = parse_json(world).map_err(|error| error.to_string())?;
     let pointer = json_pointer(key.as_str());
     let Some(actual) = parsed.pointer(&pointer) else {
-        bail!("expected JSON to contain key '{}'", key.as_str());
+        return Err(format!("expected JSON to contain key '{}'", key.as_str()));
     };
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(String::from(value.as_str())));
-    ensure!(
-        actual == &expected,
-        "expected '{}' = {:?}, got {:?}",
-        key.as_str(),
-        expected,
-        actual
-    );
+    if actual != &expected {
+        return Err(format!(
+            "expected '{}' = {:?}, got {:?}",
+            key.as_str(),
+            expected,
+            actual
+        ));
+    }
     Ok(())
 }
 
 #[then("the slice JSON field {key} is empty")]
-fn then_json_field_is_empty(world: &mut TestWorld, key: QuotedString) -> Result<()> {
-    let parsed = parse_json(world)?;
+fn then_json_field_is_empty(world: &mut TestWorld, key: QuotedString) -> Result<(), String> {
+    let parsed = parse_json(world).map_err(|error| error.to_string())?;
     let pointer = json_pointer(key.as_str());
     let Some(actual) = parsed.pointer(&pointer) else {
-        bail!("expected JSON to contain key '{}'", key.as_str());
+        return Err(format!("expected JSON to contain key '{}'", key.as_str()));
     };
     match actual {
         serde_json::Value::Array(arr) if arr.is_empty() => {}
         serde_json::Value::Object(obj) if obj.is_empty() => {}
         serde_json::Value::String(s) if s.is_empty() => {}
         serde_json::Value::Null => {}
-        other => bail!("expected '{}' to be empty, got {other:?}", key.as_str()),
+        other => {
+            return Err(format!(
+                "expected '{}' to be empty, got {other:?}",
+                key.as_str()
+            ));
+        }
     }
     Ok(())
 }
 
 #[then("the depth is {depth}")]
-fn then_depth_is(world: &mut TestWorld, depth: QuotedString) -> Result<()> {
-    let request = world.request.as_ref().context("request should be set")?;
+fn then_depth_is(world: &mut TestWorld, depth: QuotedString) -> Result<(), String> {
+    let request = world
+        .request
+        .as_ref()
+        .ok_or_else(|| String::from("request should be set"))?;
     let expected = depth
         .as_str()
         .parse::<u32>()
-        .context("feature file contains a valid u32 depth")?;
-    ensure!(request.depth() == expected, "expected depth {expected}");
+        .map_err(|error| format!("feature file contains a valid u32 depth: {error}"))?;
+    if request.depth() != expected {
+        return Err(format!("expected depth {expected}"));
+    }
     Ok(())
 }
 
 #[then("the direction is {direction}")]
-fn then_direction_is(world: &mut TestWorld, direction: QuotedString) -> Result<()> {
-    let request = world.request.as_ref().context("request should be set")?;
+fn then_direction_is(world: &mut TestWorld, direction: QuotedString) -> Result<(), String> {
+    let request = world
+        .request
+        .as_ref()
+        .ok_or_else(|| String::from("request should be set"))?;
     let expected = direction
         .as_str()
         .parse::<crate::SliceDirection>()
-        .context("feature file contains a valid direction")?;
-    ensure!(
-        request.direction() == expected,
-        "expected direction {expected:?}"
-    );
+        .map_err(|error| format!("feature file contains a valid direction: {error}"))?;
+    if request.direction() != expected {
+        return Err(format!("expected direction {expected:?}"));
+    }
     Ok(())
 }
 
 #[then("the edge types include {edge_type}")]
-fn then_edge_types_include(world: &mut TestWorld, edge_type: QuotedString) -> Result<()> {
-    let request = world.request.as_ref().context("request should be set")?;
+fn then_edge_types_include(world: &mut TestWorld, edge_type: QuotedString) -> Result<(), String> {
+    let request = world
+        .request
+        .as_ref()
+        .ok_or_else(|| String::from("request should be set"))?;
     let expected = edge_type
         .as_str()
         .parse::<SliceEdgeType>()
-        .context("feature file contains a valid edge type")?;
-    ensure!(
-        request.edge_types().contains(&expected),
-        "expected edge types to include {:?}, got: {:?}",
-        expected,
-        request.edge_types()
-    );
+        .map_err(|error| format!("feature file contains a valid edge type: {error}"))?;
+    if !request.edge_types().contains(&expected) {
+        return Err(format!(
+            "expected edge types to include {:?}, got: {:?}",
+            expected,
+            request.edge_types()
+        ));
+    }
     Ok(())
 }
 
 #[then("the edge types are {types}")]
-fn then_edge_types_are(world: &mut TestWorld, types: QuotedString) -> Result<()> {
-    let request = world.request.as_ref().context("request should be set")?;
+fn then_edge_types_are(world: &mut TestWorld, types: QuotedString) -> Result<(), String> {
+    let request = world
+        .request
+        .as_ref()
+        .ok_or_else(|| String::from("request should be set"))?;
     let expected: Vec<SliceEdgeType> = types
         .as_str()
         .split(',')
         .map(|edge_type| edge_type.trim().parse::<SliceEdgeType>())
         .collect::<std::result::Result<_, _>>()
-        .context("feature file contains valid edge types")?;
-    ensure!(request.edge_types() == expected, "unexpected edge types");
+        .map_err(|error| format!("feature file contains valid edge types: {error}"))?;
+    if request.edge_types() != expected {
+        return Err(String::from("unexpected edge types"));
+    }
     Ok(())
 }
 
 #[then("the request is rejected")]
-fn then_request_rejected(world: &mut TestWorld) {
-    assert!(
-        world.request_error.is_some(),
-        "expected request to be rejected, but it succeeded"
-    );
+fn then_request_rejected(world: &mut TestWorld) -> Result<(), String> {
+    if world.request_error.is_none() {
+        return Err(String::from(
+            "expected request to be rejected, but it succeeded",
+        ));
+    }
+    Ok(())
 }
 
 #[then("the response contains edge with resolution_scope {scope}")]
 fn then_response_contains_resolution_scope(
     world: &mut TestWorld,
     scope: QuotedString,
-) -> Result<()> {
-    let parsed = parse_json(world)?;
+) -> Result<(), String> {
+    let parsed = parse_json(world).map_err(|error| error.to_string())?;
     let edges = parsed
         .get("edges")
         .and_then(|v| v.as_array())
-        .context("response contains an edges array")?;
+        .ok_or_else(|| String::from("response contains an edges array"))?;
     let expected_scope = scope
         .as_str()
         .parse::<ResolutionScope>()
-        .context("feature file contains a valid resolution scope")?;
-    let serialized =
-        serde_json::to_string(&expected_scope).context("serialize resolution scope")?;
+        .map_err(|error| format!("feature file contains a valid resolution scope: {error}"))?;
+    let serialized = serde_json::to_string(&expected_scope)
+        .map_err(|error| format!("serialize resolution scope: {error}"))?;
     let expected_str = serialized.trim_matches('"');
     let found = edges
         .iter()
         .any(|edge| edge.get("resolution_scope").and_then(|v| v.as_str()) == Some(expected_str));
-    ensure!(
-        found,
-        "expected to find edge with resolution_scope '{expected_str}'"
-    );
+    if !found {
+        return Err(format!(
+            "expected to find edge with resolution_scope '{expected_str}'"
+        ));
+    }
     Ok(())
 }
 

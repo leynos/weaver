@@ -285,7 +285,7 @@ fn run_with_loader_filters_configuration_arguments() {
 
 fn test_daemon_connection<F>(setup_listener: F) -> Result<()>
 where
-    F: FnOnce() -> (SocketEndpoint, thread::JoinHandle<()>),
+    F: FnOnce() -> (SocketEndpoint, thread::JoinHandle<Result<()>>),
 {
     let (endpoint, handle) = setup_listener();
 
@@ -317,7 +317,7 @@ where
 
     handle
         .join()
-        .map_err(|_| anyhow::anyhow!("listener thread panicked"))?;
+        .map_err(|_| anyhow::anyhow!("listener thread panicked"))??;
     Ok(())
 }
 #[test]
@@ -326,11 +326,7 @@ fn connect_successfully_establishes_tcp_connection() {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind listener");
         let port = listener.local_addr().expect("listener local addr").port();
 
-        let handle = thread::spawn(move || {
-            if let Err(error) = accept_tcp_connection(listener, default_daemon_lines()) {
-                panic!("tcp listener failed: {error:?}");
-            }
-        });
+        let handle = thread::spawn(move || accept_tcp_connection(listener, default_daemon_lines()));
 
         (SocketEndpoint::tcp("127.0.0.1", port), handle)
     })
@@ -352,11 +348,8 @@ fn connect_supports_unix_sockets() {
     test_daemon_connection(move || {
         let listener = UnixListener::bind(&socket_path_for_listener).expect("bind unix socket");
 
-        let handle = thread::spawn(move || {
-            if let Err(error) = accept_unix_connection(listener, default_daemon_lines()) {
-                panic!("unix listener failed: {error:?}");
-            }
-        });
+        let handle =
+            thread::spawn(move || accept_unix_connection(listener, default_daemon_lines()));
 
         (SocketEndpoint::unix(socket_display), handle)
     })

@@ -156,7 +156,7 @@ fn when_edit_creates(
 /// Executes the transaction, if needed, before asserting its outcome.
 fn assert_outcome<F>(world: &SafetyHarnessWorldFixture, assertion: F) -> Result<(), String>
 where
-    F: FnOnce(&Result<TransactionOutcome, SafetyHarnessError>),
+    F: FnOnce(&Result<TransactionOutcome, SafetyHarnessError>) -> Result<(), String>,
 {
     let cell = safety_world(world)?;
     if cell.borrow().outcome().is_none() {
@@ -166,17 +166,17 @@ where
     let Some(outcome) = state.outcome() else {
         return Err("outcome should exist".to_string());
     };
-    assertion(outcome);
-    Ok(())
+    assertion(outcome)
 }
 
 #[then("the transaction commits successfully")]
 fn then_commits(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| {
-        assert!(
-            outcome.as_ref().is_ok_and(|o| o.committed()),
-            "transaction should commit: {outcome:?}"
-        );
+        if outcome.as_ref().is_ok_and(|o| o.committed()) {
+            Ok(())
+        } else {
+            Err(format!("transaction should commit: {outcome:?}"))
+        }
     })?;
     Ok(())
 }
@@ -184,8 +184,8 @@ fn then_commits(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
 #[then("the transaction fails with a syntactic lock error")]
 fn then_syntactic_fails(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
-        Ok(TransactionOutcome::SyntacticLockFailed { .. }) => {}
-        other => panic!("expected syntactic lock failure, got {other:?}"),
+        Ok(TransactionOutcome::SyntacticLockFailed { .. }) => Ok(()),
+        other => Err(format!("expected syntactic lock failure, got {other:?}")),
     })?;
     Ok(())
 }
@@ -193,8 +193,8 @@ fn then_syntactic_fails(world: &SafetyHarnessWorldFixture) -> Result<(), String>
 #[then("the transaction fails with a semantic lock error")]
 fn then_semantic_fails(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
-        Ok(TransactionOutcome::SemanticLockFailed { .. }) => {}
-        other => panic!("expected semantic lock failure, got {other:?}"),
+        Ok(TransactionOutcome::SemanticLockFailed { .. }) => Ok(()),
+        other => Err(format!("expected semantic lock failure, got {other:?}")),
     })?;
     Ok(())
 }
@@ -202,8 +202,8 @@ fn then_semantic_fails(world: &SafetyHarnessWorldFixture) -> Result<(), String> 
 #[then("the transaction fails with a backend error")]
 fn then_backend_error(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
-        Err(SafetyHarnessError::SemanticBackendUnavailable { .. }) => {}
-        other => panic!("expected backend error, got {other:?}"),
+        Err(SafetyHarnessError::SemanticBackendUnavailable { .. }) => Ok(()),
+        other => Err(format!("expected backend error, got {other:?}")),
     })?;
     Ok(())
 }
@@ -211,8 +211,8 @@ fn then_backend_error(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
 #[then("the transaction reports no changes")]
 fn then_no_changes(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| match outcome {
-        Ok(TransactionOutcome::NoChanges) => {}
-        other => panic!("expected no changes, got {other:?}"),
+        Ok(TransactionOutcome::NoChanges) => Ok(()),
+        other => Err(format!("expected no changes, got {other:?}")),
     })?;
     Ok(())
 }
@@ -225,11 +225,12 @@ fn then_file_contains(
     let state = safety_world(world)?;
     let file_name = state.borrow().current_file_name();
     let content = state.borrow().read_file(&file_name)?;
-    assert!(
-        content.contains(expected.as_str()),
-        "expected file to contain '{}', got '{content}'",
-        expected.as_str()
-    );
+    if !content.contains(expected.as_str()) {
+        return Err(format!(
+            "expected file to contain '{}', got '{content}'",
+            expected.as_str()
+        ));
+    }
     Ok(())
 }
 
@@ -240,12 +241,13 @@ fn then_named_file_contains(
     expected: TextPattern,
 ) -> Result<(), String> {
     let content = safety_world(world)?.borrow().read_file(&name)?;
-    assert!(
-        content.contains(expected.as_str()),
-        "expected {} to contain '{}', got '{content}'",
-        name.as_str(),
-        expected.as_str()
-    );
+    if !content.contains(expected.as_str()) {
+        return Err(format!(
+            "expected {} to contain '{}', got '{content}'",
+            name.as_str(),
+            expected.as_str()
+        ));
+    }
     Ok(())
 }
 
@@ -257,7 +259,11 @@ fn then_file_unchanged(world: &SafetyHarnessWorldFixture) -> Result<(), String> 
     let expected = state
         .original_content(&file_name)
         .ok_or_else(|| format!("no original content recorded for {}", file_name.as_str()))?;
-    assert_eq!(content, expected, "file should be unchanged");
+    if content != expected {
+        return Err(format!(
+            "file should be unchanged: expected {expected:?}, got {content:?}"
+        ));
+    }
     Ok(())
 }
 
@@ -271,7 +277,12 @@ fn then_named_file_unchanged(
     let expected = state
         .original_content(&name)
         .ok_or_else(|| format!("no original content recorded for {}", name.as_str()))?;
-    assert_eq!(content, expected, "{} should be unchanged", name.as_str());
+    if content != expected {
+        return Err(format!(
+            "{} should be unchanged: expected {expected:?}, got {content:?}",
+            name.as_str()
+        ));
+    }
     Ok(())
 }
 

@@ -8,6 +8,7 @@ use std::{
 use camino::Utf8PathBuf;
 use ortho_config::OrthoError;
 use tempfile::TempDir;
+use thiserror::Error;
 use weaver_config::{Config, SocketEndpoint};
 
 use crate::bootstrap::ConfigLoader;
@@ -16,6 +17,14 @@ use crate::bootstrap::ConfigLoader;
 #[derive(Clone)]
 pub struct TestConfigLoader {
     socket_dir: Arc<Mutex<TempDir>>,
+}
+
+#[derive(Debug, Error)]
+enum SocketPathError {
+    #[error("failed to lock test socket directory: mutex is poisoned")]
+    MutexPoisoned,
+    #[error("test socket path is not valid UTF-8: {path:?}")]
+    NonUtf8 { path: PathBuf },
 }
 
 impl TestConfigLoader {
@@ -42,22 +51,22 @@ impl TestConfigLoader {
             .to_path_buf()
     }
 
-    fn socket_path(&self) -> Result<Utf8PathBuf, PathBuf> {
+    fn socket_path(&self) -> Result<Utf8PathBuf, SocketPathError> {
         let dir = self
             .socket_dir
             .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+            .map_err(|_| SocketPathError::MutexPoisoned)?;
         let path = dir.path().join("weaverd.sock");
-        Utf8PathBuf::from_path_buf(path)
+        Utf8PathBuf::from_path_buf(path).map_err(|path| SocketPathError::NonUtf8 { path })
     }
 }
 
 impl ConfigLoader for TestConfigLoader {
     fn load(&self) -> Result<Config, Arc<OrthoError>> {
-        let socket_path = self.socket_path().map_err(|path| {
+        let socket_path = self.socket_path().map_err(|error| {
             Arc::new(OrthoError::Validation {
                 key: String::from("daemon_socket"),
-                message: format!("test socket path is not valid UTF-8: {path:?}"),
+                message: error.to_string(),
             })
         })?;
         Ok(Config {

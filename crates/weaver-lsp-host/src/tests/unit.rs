@@ -288,25 +288,25 @@ fn propagates_server_error_from_did_close() {
 }
 
 #[rstest]
-fn calls_initialise_before_requests() {
+fn calls_initialise_before_requests() -> Result<(), String> {
     let uri = sample_uri().expect("sample URI should parse");
-    let calls = recorded_calls(|host| host.diagnostics(Language::Rust, uri))
-        .expect("recording server should register");
-    assert!(
-        calls.starts_with(&[CallKind::Initialise]),
-        "initialise should precede requests: {calls:?}"
-    );
+    assert_initialise_before(
+        |host| host.diagnostics(Language::Rust, uri),
+        &[CallKind::Initialise],
+        "initialise should precede requests",
+    )?;
+    Ok(())
 }
 
 #[rstest]
-fn calls_initialise_before_document_sync() {
+fn calls_initialise_before_document_sync() -> Result<(), String> {
     let params = did_open_params().expect("did-open params should build");
-    let calls = recorded_calls(|host| host.did_open(Language::Rust, params))
-        .expect("recording server should register");
-    assert!(
-        calls.starts_with(&[CallKind::Initialise, CallKind::DidOpen]),
-        "initialise should precede didOpen: {calls:?}"
-    );
+    assert_initialise_before(
+        |host| host.did_open(Language::Rust, params),
+        &[CallKind::Initialise, CallKind::DidOpen],
+        "initialise should precede didOpen",
+    )?;
+    Ok(())
 }
 
 /// Builds a host with `server` registered as the Rust language server.
@@ -346,9 +346,12 @@ where
     Ok(server_error_context(&outcome))
 }
 
-/// Exercises `call` against a recording Rust server and returns the calls it
-/// observed, discarding the call's own outcome.
-fn recorded_calls<T, F>(call: F) -> Result<Vec<CallKind>, LspHostError>
+/// Exercises `call` against a recording Rust server and checks its call prefix.
+fn assert_initialise_before<T, F>(
+    call: F,
+    expected_prefix: &[CallKind],
+    message: &str,
+) -> Result<(), String>
 where
     F: FnOnce(&mut crate::LspHost) -> Result<T, LspHostError>,
 {
@@ -357,9 +360,14 @@ where
         ResponseSet::default(),
     );
     let handle = server.handle();
-    let mut host = host_with_rust_server(server)?;
+    let mut host = host_with_rust_server(server)
+        .map_err(|error| format!("recording server should register: {error}"))?;
 
-    let _ = call(&mut host);
+    call(&mut host).map_err(|error| format!("recorded call should succeed: {error}"))?;
 
-    Ok(handle.calls())
+    let calls = handle.calls();
+    if !calls.starts_with(expected_prefix) {
+        return Err(format!("{message}: {calls:?}"));
+    }
+    Ok(())
 }
