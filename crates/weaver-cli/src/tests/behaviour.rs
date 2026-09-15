@@ -5,7 +5,7 @@
 
 use std::cell::RefCell;
 
-use anyhow::{Result, ensure};
+use anyhow::{Result, bail, ensure};
 use rstest_bdd_macros::{given, scenario, then, when};
 use serde_json::json;
 
@@ -269,7 +269,7 @@ fn then_no_daemon_command(world: &RefCell<TestWorld>) -> Result<()> {
 
 #[then("the lifecycle stub recorded {operation}")]
 fn then_lifecycle_recorded(world: &RefCell<TestWorld>, operation: String) -> Result<()> {
-    let expected = parse_lifecycle_command(&operation);
+    let expected = parse_lifecycle_command(&operation)?;
     let calls = world.borrow().lifecycle_calls();
     ensure!(
         calls.iter().any(|call| call.command == expected),
@@ -372,11 +372,11 @@ fn weaver_cli_output_behaviour(world: RefCell<TestWorld>) { let _ = world; }
 #[scenario(path = "tests/features/weaver_cli_version.feature")]
 fn weaver_cli_version_behaviour(world: RefCell<TestWorld>) { let _ = world; }
 
-fn parse_lifecycle_command(label: &str) -> LifecycleCommand {
+fn parse_lifecycle_command(label: &str) -> anyhow::Result<LifecycleCommand> {
     match label.trim().to_ascii_lowercase().as_str() {
-        "start" => LifecycleCommand::Start,
-        "stop" => LifecycleCommand::Stop,
-        "status" => LifecycleCommand::Status,
-        other => panic!("unsupported lifecycle command label {other}"),
+        "start" => Ok(LifecycleCommand::Start),
+        "stop" => Ok(LifecycleCommand::Stop),
+        "status" => Ok(LifecycleCommand::Status),
+        other => bail!("unsupported lifecycle command label {other}"),
     }
 }

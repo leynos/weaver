@@ -117,7 +117,7 @@ fn build_graph(
 fn test_build_graph_error(
     prepare_response: Response<CallHierarchyItem>,
     expected_error: impl Fn(&GraphError) -> bool,
-) {
+) -> Result<(), String> {
     let counts = Arc::new(Mutex::new(CallCounts::default()));
     let client = TestClient::new(
         prepare_response,
@@ -128,19 +128,19 @@ fn test_build_graph_error(
     let mut provider = LspCallGraphProvider::new(client);
     let position = SourcePosition::new("/src/main.rs", 1, 1);
 
-    let err = provider
-        .build_graph(&position, 1)
-        .expect_err("expected graph error");
-
-    assert!(expected_error(&err), "unexpected error: {err:?}");
+    match provider.build_graph(&position, 1) {
+        Ok(_) => Err(String::from("expected graph error")),
+        Err(error) if expected_error(&error) => Ok(()),
+        Err(error) => Err(format!("unexpected error: {error:?}")),
+    }
 }
 
 #[test]
-fn build_graph_depth_zero_skips_traversal() {
+fn build_graph_depth_zero_skips_traversal() -> Result<(), String> {
     let counts = Arc::new(Mutex::new(CallCounts::default()));
     let client = TestClient::new(
         Response::Ok(Some(vec![
-            item("main", 1, 1).expect("main item should build"),
+            item("main", 1, 1).map_err(|error| format!("main item should build: {error}"))?,
         ])),
         Response::Err,
         Response::Err,
@@ -148,67 +148,114 @@ fn build_graph_depth_zero_skips_traversal() {
     );
     let mut provider = LspCallGraphProvider::new(client);
 
-    let graph = build_graph(&mut provider, 0).expect("depth-zero graph should build");
+    let graph = build_graph(&mut provider, 0)
+        .map_err(|error| format!("depth-zero graph should build: {error}"))?;
 
-    assert_eq!(graph.node_count(), 1);
-    assert_eq!(graph.edge_count(), 0);
+    if graph.node_count() != 1 {
+        return Err(format!(
+            "expected one graph node, got {}",
+            graph.node_count()
+        ));
+    }
+    if graph.edge_count() != 0 {
+        return Err(format!(
+            "expected no graph edges, got {}",
+            graph.edge_count()
+        ));
+    }
     let call_counts = counts.lock().expect("call count mutex poisoned");
-    assert_eq!(call_counts.incoming, 0);
-    assert_eq!(call_counts.outgoing, 0);
+    if call_counts.incoming != 0 {
+        return Err(format!(
+            "expected no incoming calls, got {}",
+            call_counts.incoming
+        ));
+    }
+    if call_counts.outgoing != 0 {
+        return Err(format!(
+            "expected no outgoing calls, got {}",
+            call_counts.outgoing
+        ));
+    }
+    Ok(())
 }
 
 #[test]
-fn build_graph_collects_incoming_and_outgoing_edges() {
+fn build_graph_collects_incoming_and_outgoing_edges() -> Result<(), String> {
     let counts = Arc::new(Mutex::new(CallCounts::default()));
     let client = TestClient::new(
         Response::Ok(Some(vec![
-            item("main", 1, 1).expect("main item should build"),
+            item("main", 1, 1).map_err(|error| format!("main item should build: {error}"))?,
         ])),
         Response::Ok(Some(vec![
-            incoming_call("caller", 3, 0).expect("caller item should build"),
+            incoming_call("caller", 3, 0)
+                .map_err(|error| format!("caller item should build: {error}"))?,
         ])),
         Response::Ok(Some(vec![
-            outgoing_call("helper", 5, 0).expect("helper item should build"),
+            outgoing_call("helper", 5, 0)
+                .map_err(|error| format!("helper item should build: {error}"))?,
         ])),
         Arc::clone(&counts),
     );
     let mut provider = LspCallGraphProvider::new(client);
 
-    let graph = build_graph(&mut provider, 1).expect("graph should build");
+    let graph =
+        build_graph(&mut provider, 1).map_err(|error| format!("graph should build: {error}"))?;
 
-    assert_eq!(graph.node_count(), 3);
-    assert_eq!(graph.edge_count(), 2);
+    if graph.node_count() != 3 {
+        return Err(format!(
+            "expected three graph nodes, got {}",
+            graph.node_count()
+        ));
+    }
+    if graph.edge_count() != 2 {
+        return Err(format!(
+            "expected two graph edges, got {}",
+            graph.edge_count()
+        ));
+    }
 
     let main = graph.find_by_name("main").expect("main node missing");
     let caller = graph.find_by_name("caller").expect("caller node missing");
     let helper = graph.find_by_name("helper").expect("helper node missing");
 
-    assert!(
-        graph
-            .callers_of(main.id())
-            .any(|node| node.id() == caller.id()),
-        "caller edge missing"
-    );
-    assert!(
-        graph
-            .callees_of(main.id())
-            .any(|node| node.id() == helper.id()),
-        "callee edge missing"
-    );
+    if !graph
+        .callers_of(main.id())
+        .any(|node| node.id() == caller.id())
+    {
+        return Err(String::from("caller edge missing"));
+    }
+    if !graph
+        .callees_of(main.id())
+        .any(|node| node.id() == helper.id())
+    {
+        return Err(String::from("callee edge missing"));
+    }
     let call_counts = counts.lock().expect("call count mutex poisoned");
-    assert_eq!(call_counts.incoming, 1);
-    assert_eq!(call_counts.outgoing, 1);
+    if call_counts.incoming != 1 {
+        return Err(format!(
+            "expected one incoming call, got {}",
+            call_counts.incoming
+        ));
+    }
+    if call_counts.outgoing != 1 {
+        return Err(format!(
+            "expected one outgoing call, got {}",
+            call_counts.outgoing
+        ));
+    }
+    Ok(())
 }
 
 #[test]
-fn callers_graph_uses_incoming_only() {
+fn callers_graph_uses_incoming_only() -> Result<(), String> {
     let counts = Arc::new(Mutex::new(CallCounts::default()));
     let client = TestClient::new(
         Response::Ok(Some(vec![
-            item("main", 1, 1).expect("main item should build"),
+            item("main", 1, 1).map_err(|error| format!("main item should build: {error}"))?,
         ])),
         Response::Ok(Some(vec![
-            incoming_call("caller", 3, 0).expect("caller item should build"),
+            incoming_call("caller", 3, 0)
+                .map_err(|error| format!("caller item should build: {error}"))?,
         ])),
         Response::Err,
         Arc::clone(&counts),
@@ -218,24 +265,42 @@ fn callers_graph_uses_incoming_only() {
 
     let graph = provider
         .callers_graph(&position, 1)
-        .expect("callers graph should build");
+        .map_err(|error| format!("callers graph should build: {error}"))?;
 
-    assert_eq!(graph.node_count(), 2);
+    if graph.node_count() != 2 {
+        return Err(format!(
+            "expected two graph nodes, got {}",
+            graph.node_count()
+        ));
+    }
     let call_counts = counts.lock().expect("call count mutex poisoned");
-    assert_eq!(call_counts.outgoing, 0);
-    assert_eq!(call_counts.incoming, 1);
+    if call_counts.outgoing != 0 {
+        return Err(format!(
+            "expected no outgoing calls, got {}",
+            call_counts.outgoing
+        ));
+    }
+    if call_counts.incoming != 1 {
+        return Err(format!(
+            "expected one incoming call, got {}",
+            call_counts.incoming
+        ));
+    }
+    Ok(())
 }
 
 #[test]
-fn build_graph_returns_symbol_not_found_on_empty_prepare() {
+fn build_graph_returns_symbol_not_found_on_empty_prepare() -> Result<(), String> {
     test_build_graph_error(Response::Ok(Some(Vec::new())), |err| {
         matches!(err, GraphError::SymbolNotFound { .. })
-    });
+    })?;
+    Ok(())
 }
 
 #[test]
-fn build_graph_propagates_prepare_error() {
+fn build_graph_propagates_prepare_error() -> Result<(), String> {
     test_build_graph_error(Response::Err, |err| {
         matches!(err, GraphError::Validation(_))
-    });
+    })?;
+    Ok(())
 }

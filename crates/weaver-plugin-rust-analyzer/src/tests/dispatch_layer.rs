@@ -49,28 +49,40 @@ fn run_with_adapter_dispatch_layer(
     #[case] adapter: MockAdapter,
     #[case] expect_success: bool,
     #[case] expected_message: Option<&str>,
-) {
-    let response = dispatch_stdin(&input, &adapter).expect("stdin dispatch should succeed");
-    assert_eq!(response.is_success(), expect_success);
+) -> std::result::Result<(), String> {
+    let response = dispatch_stdin(&input, &adapter)
+        .map_err(|error| format!("stdin dispatch should succeed: {error}"))?;
+    if response.is_success() != expect_success {
+        return Err(format!(
+            "expected success {expect_success}, got {}",
+            response.is_success()
+        ));
+    }
 
     if let Some(needle) = expected_message {
-        assert!(
-            response
-                .diagnostics()
-                .iter()
-                .any(|diagnostic| diagnostic.severity() == DiagnosticSeverity::Error),
-            "expected at least one error diagnostic, got: {:?}",
-            response.diagnostics(),
-        );
-        assert!(
-            response
-                .diagnostics()
-                .iter()
-                .any(|diagnostic| diagnostic.message().contains(needle)),
-            "expected diagnostic mentioning '{needle}', got: {:?}",
-            response.diagnostics(),
-        );
+        if !response
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.severity() == DiagnosticSeverity::Error)
+        {
+            return Err(format!(
+                "expected at least one error diagnostic, got: {:?}",
+                response.diagnostics(),
+            ));
+        }
+        if !response
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.message().contains(needle))
+        {
+            return Err(format!(
+                "expected diagnostic mentioning '{needle}', got: {:?}",
+                response.diagnostics(),
+            ));
+        }
     }
+
+    Ok(())
 }
 
 #[rstest]
@@ -89,21 +101,27 @@ fn run_with_adapter_dispatch_layer(
 fn failure_responses_include_reason_codes(
     #[case] request: weaver_plugins::protocol::PluginRequest,
     #[case] expected_reason: ReasonCode,
-) {
+) -> std::result::Result<(), String> {
     let input = format!(
         "{}\n",
         serde_json::to_string(&request).expect("serialize request")
     );
-    let response =
-        dispatch_stdin(input.as_bytes(), &adapter_unused()).expect("stdin dispatch should succeed");
+    let response = dispatch_stdin(input.as_bytes(), &adapter_unused())
+        .map_err(|error| format!("stdin dispatch should succeed: {error}"))?;
 
-    assert!(!response.is_success());
-    assert!(
-        response
-            .diagnostics()
-            .iter()
-            .any(|diagnostic| diagnostic.reason_code() == Some(expected_reason)),
-        "expected reason code {expected_reason:?}, got: {:?}",
-        response.diagnostics(),
-    );
+    if response.is_success() {
+        return Err(format!("expected failure response, got: {response:?}"));
+    }
+    if !response
+        .diagnostics()
+        .iter()
+        .any(|diagnostic| diagnostic.reason_code() == Some(expected_reason))
+    {
+        return Err(format!(
+            "expected reason code {expected_reason:?}, got: {:?}",
+            response.diagnostics(),
+        ));
+    }
+
+    Ok(())
 }

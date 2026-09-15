@@ -45,6 +45,12 @@ pub struct ProcessTestWorld {
 }
 
 impl ProcessTestWorld {
+    /// Creates the shared process-supervision BDD test world.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when setup fails, including creation of the temporary
+    /// runtime directory.
     pub fn new() -> Result<Self, String> {
         let loader = TestConfigLoader::new()?;
         let world = Self {
@@ -324,6 +330,10 @@ impl ShutdownSignal for TestShutdownSignal {
     }
 }
 
+/// Gets the `status` string from a health snapshot.
+///
+/// Returns the literal `"<missing status>"` when the field is absent or is not
+/// a JSON string.
 pub fn snapshot_status(snapshot: &Value) -> &str {
     snapshot
         .get("status")
