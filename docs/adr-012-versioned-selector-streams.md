@@ -197,6 +197,11 @@ it does not emit a completion record. A selector-aware actuator reads or spools
 the entire bounded stream, validates successful completion, and only then
 plans a mutation. It never mutates while selector input is still arriving.
 
+By default, the actuator also refuses a completed stream whose terminal record
+sets `truncated: true` before mutation planning. It may accept such a stream
+only when an actuator-specific partial-input policy is explicitly enabled and
+documented, including the operation's safety and cardinality semantics.
+
 This in-band rule remains necessary even when a shell enables `pipefail`,
 because the downstream process cannot portably inspect another process's exit
 status.

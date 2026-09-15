@@ -418,6 +418,11 @@ A stream is invalid when:
 - stream identities disagree; or
 - selector sequence numbers are invalid before filtering.
 
+A completed stream whose terminal record sets `truncated: true` is refused by
+default before mutation planning. An actuator may accept it only when it
+explicitly enables and documents a partial-input policy that defines the
+operation's safety and cardinality semantics.
+
 ### 6.7. Streaming semantics
 
 Machine output follows these rules:
