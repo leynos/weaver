@@ -229,8 +229,8 @@ languages come from the YAML rule file; callers do not supply `rule_id` or
 A narrower `compile_pattern` convenience method may accompany `compile` if it
 improves the stable facade. The important boundary is that a bare pattern is
 lowered directly to `Formula::Atom(Atom::Pattern(...))`. The implementation
-must not manufacture an escaped `pattern("...")` string and send it through
-the expression parser.
+must not manufacture an escaped `pattern("...")` string and send it through the
+expression parser.
 
 `compile_dsl` may remain as a compatibility convenience for expression input,
 but the public API and CLI must retain the input kind.
@@ -270,9 +270,9 @@ weaver symbols list \
   --expr 'pattern("foo($X)") and not(regex("test"))'
 ```
 
-The `sempai-dsl` crate uses Logos to produce spanned tokens and Chumsky to parse
-them. Pratt parsing owns prefix and infix precedence. Recovery anchors include
-`)`, `}`, and `,`, with nested-delimiter recovery where appropriate.
+The `sempai-dsl` crate uses Logos to produce spanned tokens and Chumsky to
+parse them. Pratt parsing owns prefix and infix precedence. Recovery anchors
+include `)`, `}`, and `,`, with nested-delimiter recovery where appropriate.
 
 Parser implementation requirements are:
 
@@ -527,8 +527,7 @@ SEMPAI
 ```
 
 The same parser handles argument, file, and standard-input expression text.
-Diagnostics retain byte spans and source labels appropriate to the input
-origin.
+Diagnostics retain byte spans and source labels appropriate to the input origin.
 
 Because one process owns standard input once, mutually exclusive CLI validation
 rejects combinations which request more than one standard-input payload.
@@ -711,8 +710,8 @@ The RFC is satisfied when all of the following are true:
    documented compatibility subset.
 5. `weaver symbols list --query` emits deterministic human results.
 6. `weaver symbols list --query --json` emits valid
-   `weaver.selector.v1` records followed by one
-   `weaver.selector-stream-end.v1` record.
+   `weaver.selector.v1` records followed by one `weaver.selector-stream-end.v1`
+   record.
 7. Zero matches produce a completion-only stream and a successful query exit.
 8. Selector records include source identity and visible backend provenance.
 9. Selector and completion records share one stream identity.

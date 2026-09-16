@@ -69,14 +69,14 @@ Emit compact identifiers which consumers resolve through retained daemon state.
 
 Stream JSONL, but let each command infer what standard input contains.
 
-| Topic | Completed JSONL | Unframed JSONL | JSON array | Opaque handles | Untyped `--from-stdin` |
-| ----- | --------------- | --------------- | ---------- | -------------- | ---------------------- |
-| Streaming | Yes | Yes | No | Yes | Yes |
-| Truncation detection | Yes | No | Yes | Session-bound | No |
-| `jq -c` composition | Natural with pass-through | Natural | Extra iteration | No | Natural, but untyped |
-| Replay after restart | Yes | Yes | Yes | No | Command-dependent |
-| Stale-source evidence | Embedded | Embedded | Embedded | Hidden | Command-dependent |
-| Input schema discoverability | Explicit | Explicit | Explicit | Handle protocol | Implicit |
+| Topic                        | Completed JSONL           | Unframed JSONL | JSON array      | Opaque handles  | Untyped `--from-stdin` |
+| ---------------------------- | ------------------------- | -------------- | --------------- | --------------- | ---------------------- |
+| Streaming                    | Yes                       | Yes            | No              | Yes             | Yes                    |
+| Truncation detection         | Yes                       | No             | Yes             | Session-bound   | No                     |
+| `jq -c` composition          | Natural with pass-through | Natural        | Extra iteration | No              | Natural, but untyped   |
+| Replay after restart         | Yes                       | Yes            | Yes             | No              | Command-dependent      |
+| Stale-source evidence        | Embedded                  | Embedded       | Embedded        | Hidden          | Command-dependent      |
+| Input schema discoverability | Explicit                  | Explicit       | Explicit        | Handle protocol | Implicit               |
 
 _Table 1: Selector stream alternatives._
 
@@ -126,8 +126,8 @@ weaver symbols list --lang rust --query 'fn $NAME($...ARGS)' --json \
   | weaver symbols rename --selectors - --new-name run --dry-run
 ```
 
-The conditional preserves the completion record while filtering selectors.
-A filter that drops or corrupts the completion record causes the consumer to
+The conditional preserves the completion record while filtering selectors. A
+filter that drops or corrupts the completion record causes the consumer to
 refuse the stream.
 
 ## Selector record version 1 contract
@@ -194,8 +194,8 @@ decides whether zero selectors are acceptable for its operation.
 
 A fatal compile or execution failure may leave a partial prefix in a pipe, but
 it does not emit a completion record. A selector-aware actuator reads or spools
-the entire bounded stream, validates successful completion, and only then
-plans a mutation. It never mutates while selector input is still arriving.
+the entire bounded stream, validates successful completion, and only then plans
+a mutation. It never mutates while selector input is still arriving.
 
 By default, the actuator also refuses a completed stream whose terminal record
 sets `truncated: true` before mutation planning. It may accept such a stream
@@ -256,14 +256,14 @@ documented fallback. A command may accept an explicit capture name to select a
 capture span.
 
 Missing focus or capture data never causes a consumer to choose a different
-nearby node heuristically. It either follows the documented fallback or
-returns a structured refusal.
+nearby node heuristically. It either follows the documented fallback or returns
+a structured refusal.
 
 ## Standard-input ownership
 
-A command accepts at most one input whose path is `-`. Command metadata declares
-the expected stream schema. Invalid combinations fail before daemon startup and
-enumerate the conflicting options.
+A command accepts at most one input whose path is `-`. Command metadata
+declares the expected stream schema. Invalid combinations fail before daemon
+startup and enumerate the conflicting options.
 
 This rule leaves later patch, regex replacement, and Language Server Protocol
 (LSP) operations free to consume the same selector protocol without each

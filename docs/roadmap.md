@@ -10,8 +10,8 @@ This roadmap translates `docs/weaver-design.md`,
 `docs/sempai-query-language-design.md`,
 `docs/jacquard-card-first-symbol-graph-design.md`, `docs/rfcs/0001-o11y.md`,
 `docs/rfcs/0002-multi-workspace-daemon.md`,
-`docs/rfcs/0003-sempai-query-to-selector.md`, and the existing ADR set into
-an outcome-oriented delivery sequence. It does not promise dates. Phases carry
+`docs/rfcs/0003-sempai-query-to-selector.md`, and the existing ADR set into an
+outcome-oriented delivery sequence. It does not promise dates. Phases carry
 testable product ideas, steps validate or falsify those ideas, and tasks are
 review-sized execution units with explicit dependencies and observable success
 criteria.
@@ -396,12 +396,12 @@ loop before completing every Semgrep-compatible operator.
 
 This phase validates Sempai as a composable selector engine. It pulls the
 smallest executable path ahead of the full backend while preserving the full
-parser, matcher, language, and compatibility scope as the replacement path.
-It implements [RFC 0003](rfcs/0003-sempai-query-to-selector.md),
-[ADR 011](adr-011-sempai-query-input-syntax.md), and
-[ADR 012](adr-012-versioned-selector-streams.md), and migrates archive work
-from Sempai DSL parsing, Tree-sitter execution, query routing, symbol-first
-cards, and the Sempai-to-Jacquard vertical slice.
+parser, matcher, language, and compatibility scope as the replacement path. It
+implements
+[RFC 0003](rfcs/0003-sempai-query-to-selector.md), [ADR 011](adr-011-sempai-query-input-syntax.md),
+and [ADR 012](adr-012-versioned-selector-streams.md), and migrates archive
+work from Sempai DSL parsing, Tree-sitter execution, query routing,
+symbol-first cards, and the Sempai-to-Jacquard vertical slice.
 
 ### 15.1. Prove minimal query compilation and honest recovery
 
@@ -584,8 +584,8 @@ classifications for these tasks are tracked in the
 
 This step answers whether completed versioned selector streams can feed product
 commands rather than remaining terminal search output. It migrates prototype
-archive work 9.1.4 through 9.3.2 and 11.2.1. See RFC 0003 §§6.7-6.8,
-ADR 012, and `docs/weaver-design.md` §2.1.2.
+archive work 9.1.4 through 9.3.2 and 11.2.1. See RFC 0003 §§6.7-6.8, ADR 012,
+and `docs/weaver-design.md` §2.1.2.
 
 - [ ] 15.4.1. Allow `cards get` and one-hop relation summaries to consume
       Sempai selectors.
@@ -712,8 +712,8 @@ command-contract tasks are tracked in the
 
 This step answers whether provider-hidden actuators can mutate safely from both
 direct references and Sempai streams. It migrates prototype archive work 5.2.1
-through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001, ADR 004, and
-ADR 012. Boundary classifications for these tasks are tracked in the
+through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001, ADR 004, and ADR
+012. Boundary classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 16.2.1. Implement `weaver symbols rename` for position references.

@@ -98,8 +98,8 @@ Pinning `whitaker-installer` alone does not pin the cloned suite. CI must check
 out that exact Whitaker source revision and run the installer with
 `--build-only --no-update` so the build uses the pinned checkout.
 
-Remove this pin after issue #311 is fixed and the fix has been verified
-against Weaver.
+Remove this pin after issue #311 is fixed and the fix has been verified against
+Weaver.
 
 ### Selecting individual lints
 
