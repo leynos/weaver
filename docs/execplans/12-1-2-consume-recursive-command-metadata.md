@@ -587,9 +587,9 @@ mock.
   `projection_serde_roundtrip_preserves_wire_format`. Evidence:
   `cargo test -p weaver-cli command_ir`. Deliberately fails on an upstream
   bump, forcing a conscious review. The wire-format check is not the projection
-  oracle; `crates/weaver-cli/src/command_ir/tests/canonical_projection.rs`
-  test `canonical_projection_matches_the_independent_command_contract`
-  independently checks every projected node and field. The suite entry remains
+  oracle; `crates/weaver-cli/src/command_ir/tests/canonical_projection.rs` test
+  `canonical_projection_matches_the_independent_command_contract` independently
+  checks every projected node and field. The suite entry remains
   `crates/weaver-cli/src/command_ir/tests.rs`; the separate nested module keeps
   both test modules below the repository's 400-line module limit.
 
@@ -1147,3 +1147,16 @@ deferred completion and `weaver context --json` scope, so no implementation
 change is required. The plan remains complete: `make check-fmt`, `make test`,
 `make typecheck`, `make lint`, `make markdownlint`, and `make nixie` passed
 after the rebase.
+
+On 2026-09-16, rebase onto `origin/main` moved this branch from the historical
+`sempai-query-pipeline-rfc` tip `95090d4` to PR #228's squash landing
+`400136e`. The prior rebase reflog proves `95090d4` was the last inherited
+parent commit, so the 20 commits through `6f3997f` were the exclusive replay
+range. The replay had no conflicts; `git range-diff` retained every patch, and
+all `main`-only files, including `Cargo.lock`, are byte-identical to `main`.
+The new Sempai selector-stream vertical-slice documentation preserves this
+task's existing deferral of shell completion and `weaver context --json`, so it
+requires no 12.1.2 implementation change. Per-commit `cargo check --workspace`
+and final `make check-fmt`, `make test`, `make typecheck`, and `make lint`
+passed. `make markdownlint` and `make nixie` also passed. The plan is complete
+and ready for publication.
