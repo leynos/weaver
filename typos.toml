@@ -1,5 +1,5 @@
 # Generated from the shared en-GB-oxendict dictionary.
-# Regenerate with scripts/generate_typos_config.py; do not edit by hand.
+# Regenerate with typos-config-builder; do not edit by hand.
 
 [files]
 extend-exclude = [
@@ -30,14 +30,16 @@ extend-exclude = [
 [default]
 locale = "en-gb"
 extend-ignore-re = [
-    "(?:```(?:[^`]|`{1,2}[^`])*```|``(?:[^`]|`[^`])*``|`[^`]+`)",
     "(?m)^          inputs\\.should-upload-workflow-artifacts &&$",
     "(?m)^        value: \\$\\{\\{ jobs\\.metadata\\.outputs\\.should_upload_workflow_artifacts \\}\\}$",
     "(?m)^      should-upload-workflow-artifacts: \\$\\{\\{ fromJSON\\(needs\\.metadata\\.outputs\\.should_upload_workflow_artifacts\\) \\}\\}$",
     "(?m)^      should-upload-workflow-artifacts:$",
     "(?m)^      should_upload_workflow_artifacts: \\$\\{\\{ steps\\.release_modes\\.outputs\\.should-upload-workflow-artifacts \\}\\}$",
     "(?m)^      should_upload_workflow_artifacts:$",
+    "(?s)``.*?``",
     "(?s)```.*?```",
+    "Azure\\s+Architecture\\s+Center\\s*\\|\\s*Microsoft\\s+Learn\\b",
+    "GitHub\\s+Flavored\\s+Markdown\\b(?:\\s\\(GFM\\))?",
     "\\bGitHub\\s+Flavored\\s+Markdown\\b",
     "\\bHashiCorp\\b",
     "\\bHashiCorp\\s+Configuration\\s+Language\\b",
@@ -46,6 +48,7 @@ extend-ignore-re = [
     "\\bartifact-suffix\\b",
     "\\brust-analyzer\\b",
     "`[^`\\n]+`",
+    "`[^`]+`",
 ]
 
 [default.extend-words]

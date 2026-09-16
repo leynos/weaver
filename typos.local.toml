@@ -11,7 +11,9 @@ accepted = []
 [words.corrections]
 
 [patterns]
-# Ignore inline code and preserve formal names without accepting components broadly.
+# Ignore inline code and preserve formal names without accepting components
+# broadly. Inline code spans were masked by the previous dictionary snapshot;
+# kept until the shared dictionary rules on it.
 ignore = [
   "`[^`\\n]+`",
   "\\brust-analyzer\\b",
@@ -26,8 +28,12 @@ ignore = [
   "(?m)^      should-upload-workflow-artifacts:$",
   "(?m)^      should_upload_workflow_artifacts: \\$\\{\\{ steps\\.release_modes\\.outputs\\.should-upload-workflow-artifacts \\}\\}$",
   "(?m)^      should_upload_workflow_artifacts:$",
-  # Mask multiline code spans and shorter runs inside longer delimiters.
-  "(?:```(?:[^`]|`{1,2}[^`])*```|``(?:[^`]|`[^`])*``|`[^`]+`)",
+  # Mask multiline code spans and shorter runs inside longer delimiters. The
+  # builder's regex-safety check rejects the previous single alternation, so
+  # the same spans are masked by separate, non-nested patterns. Fenced blocks
+  # are already masked by the shared dictionary.
+  "(?s)``.*?``",
+  "`[^`]+`",
   "\\bartifact-name\\b",
   "\\bartifact-suffix\\b",
 ]
