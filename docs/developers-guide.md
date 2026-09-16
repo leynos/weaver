@@ -7,39 +7,28 @@ need but operators do not. For user-facing behaviour see the
 
 ## Spelling policy
 
-`make spelling` is the canonical en-GB-oxendict gate. It validates the helper,
-regenerates `typos.toml`, rejects tracked configuration drift, runs the phrase
-checker, and then invokes the pinned Typos release over tracked Markdown.
-`make markdownlint` depends on this complete gate. The dependency-only
-compatibility alias `make typos` reaches the same target without duplicating
-its recipe; CI invokes that alias in its sole spelling step. `TYPOS_VERSION` in
-the Makefile is the single version pin used locally and in CI.
+`make spelling` is the canonical en-GB-oxendict gate. It runs the shared
+[`typos-config-builder`](https://github.com/leynos/typos-config-builder) gate,
+which regenerates `typos.toml`, enforces the shared `[phrases.corrections]`
+policy, and then runs Typos over tracked Markdown. `make markdownlint` depends
+on this gate, and CI invokes `make spelling` in its sole spelling step.
+`TYPOS_CONFIG_BUILDER_VERSION` in the Makefile pins the builder locally and in
+CI.
 
-The generated `typos.toml` starts from the shared estate dictionary. The
-generator refreshes its untracked local cache only when the authority is newer,
-then applies Weaver's narrow repository policy in `typos.local.toml`. Edit the
-local policy and regenerate the configuration rather than changing generated
-entries by hand or duplicating generally valid vocabulary locally.
-
-When an HTTPS authority is unreachable, the generator may reuse a valid stale
-copy of the untracked shared dictionary cache. Without a valid cache, the
-`spelling-config` stage fails before phrase checking because tracked
-`typos.toml` cannot represent the shared phrase-correction policy. HTTP status
-and local persistence failures also fail the gate.
+`typos.toml` is generated output. The gate regenerates it on every run from the
+live shared estate dictionary and Weaver's narrow overlay in
+`typos.local.toml`, so a word added to the shared dictionary needs no change
+here. Because the dictionary is live, `typos.toml` must never be drift checked
+in continuous integration. Add narrow repository-specific identifier, API,
+proper-name, or fixture exceptions to `typos.local.toml`; hand-editing
+`typos.toml` is not supported and any edits are overwritten on the next run.
 
 The shared `[phrases.corrections]` table covers punctuation-separated forms
-that Typos tokenizes as independent valid words. The companion
-`scripts/typos_rollout_check.py` scans tracked UTF-8 text with the merged file
-exclusions and ignore spans, and runs before Typos. Correct genuine maintained
-prose when it reports a phrase. Use inline or fenced code only for literal API,
-identifier, fixture, or quoted-source spelling that must remain unchanged.
-
-`scripts/typos_rollout_http.py` owns spelling-cache freshness, HTTPS transport
-security, and refresh persistence coordination. Only `scripts/typos_rollout.py`
-may compose that helper with dictionary validation; other project code must not
-reuse its infrastructure internals. This boundary keeps the public
-dictionary-rendering API stable while each Python source remains below the
-repository's 400-line limit.
+that Typos tokenizes as independent valid words. The builder's phrase stage
+scans tracked UTF-8 text with the merged file exclusions and ignore spans, and
+runs before Typos. Correct genuine maintained prose when it reports a phrase.
+Use inline or fenced code only for literal API, identifier, fixture, or
+quoted-source spelling that must remain unchanged.
 
 ## Workspace baseline
 

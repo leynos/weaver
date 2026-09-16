@@ -308,14 +308,14 @@ project:
 ## Markdown guidance
 
 - Validate Markdown files using `make markdownlint`. It depends on the complete
-  `make spelling` gate; `make typos` is a dependency-only compatibility alias
-  for that same gate.
-- The generated `typos.toml` starts from the shared estate dictionary and the
-  narrow repository policy in `typos.local.toml`. Regenerate it with
-  `uv run scripts/generate_typos_config.py`; never edit generated entries by
-  hand or copy estate-wide vocabulary into the local overlay.
-- Shared `[phrases.corrections]` policy is enforced by the companion phrase
-  checker before Typos. Correct genuine maintained prose rather than masking or
+  `make spelling` gate.
+- Enforce spelling with `make spelling`. It regenerates `typos.toml` from the
+  live shared estate dictionary and the `typos.local.toml` overlay on every
+  run, so `typos.toml` is never drift checked in CI. Put narrow
+  repository-specific exceptions in `typos.local.toml`; never edit generated
+  entries by hand or copy estate-wide vocabulary into the local overlay.
+- Shared `[phrases.corrections]` policy is enforced by the gate's phrase stage
+  before Typos. Correct genuine maintained prose rather than masking or
   excluding it.
 - Quoted APIs and identifiers retain upstream spelling. Put them in backticks
   or fenced code blocks, which the spelling gate ignores, rather than adding
