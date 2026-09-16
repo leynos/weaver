@@ -21,13 +21,13 @@ pattern("foo($X)") and not(regex("test"))
 That syntax is appropriate when a query combines operators. It is needlessly
 ceremonial for the dominant command-line case, where the entire query is one
 positive host-language structural pattern. Requiring
-`pattern("fn $NAME($...ARGS)")` introduces nested shell and DSL quotation before
-the user can perform the smallest useful search.
+`pattern("fn $NAME($...ARGS)")` introduces nested shell and DSL quotation
+before the user can perform the smallest useful search.
 
 One flag cannot safely auto-detect both forms. Host-language patterns may
-contain words such as `pattern`, `and`, or `not`, while future expression syntax
-may grow new prefixes. Auto-detection would make diagnostics and backwards
-compatibility depend on heuristics.
+contain words such as `pattern`, `and`, or `not`, while future expression
+syntax may grow new prefixes. Auto-detection would make diagnostics and
+backwards compatibility depend on heuristics.
 
 File and standard-input forms also need explicit ownership so multiline and
 heredoc input do not become a second parser path.
@@ -70,13 +70,13 @@ This is explicit, but it makes the temporary structural-search noun the
 shortest path and weakens ADR 007's decision that Sempai query is the public
 selector abstraction.
 
-| Topic | Option A | Option B | Option C | Option D |
-| ----- | -------- | -------- | -------- | -------- |
-| Common-case quoting | Minimal | Nested | Minimal | Minimal |
-| Grammar ownership | Explicit | Explicit | Heuristic | Explicit |
-| Backwards-compatible growth | Strong | Strong | Weak | Strong |
-| Sempai as public abstraction | Strong | Strong | Strong | Weaker |
-| Heredoc path | Explicit | Explicit | Ambiguous | Explicit |
+| Topic                        | Option A | Option B | Option C  | Option D |
+| ---------------------------- | -------- | -------- | --------- | -------- |
+| Common-case quoting          | Minimal  | Nested   | Minimal   | Minimal  |
+| Grammar ownership            | Explicit | Explicit | Heuristic | Explicit |
+| Backwards-compatible growth  | Strong   | Strong   | Weak      | Strong   |
+| Sempai as public abstraction | Strong   | Strong   | Strong    | Weaker   |
+| Heredoc path                 | Explicit | Explicit | Ambiguous | Explicit |
 
 _Table 1: Query input syntax alternatives._
 
@@ -146,8 +146,8 @@ receives the resulting bytes.
 ## Relationship to ADR 007
 
 This ADR refines the Sempai selector form described by ADR 007. It does not
-change the resource-first command path, universal `--json`, or
-capability-first provider model.
+change the resource-first command path, universal `--json`, or capability-first
+provider model.
 
 The prototype `weaver symbols list --pattern` remains an implementation pilot
 only. If its engine graduates, it does so behind `--query`; its internal
@@ -165,8 +165,8 @@ metadata. An error can therefore say whether it occurred in:
 - a rule file.
 
 Bare patterns receive host-language snippet and metavariable diagnostics. Rich
-expressions receive Logos and Chumsky token, delimiter, precedence, and semantic
-diagnostics.
+expressions receive Logos and Chumsky token, delimiter, precedence, and
+semantic diagnostics.
 
 Recovering expression parsing may retain partial nodes for subsequent
 diagnostics, but any error-severity diagnostic prevents execution.
@@ -178,8 +178,8 @@ Documentation and generated command metadata must stop presenting wrapped
 `pattern("...")` text as the ordinary positive query example.
 
 The stable Sempai library may expose one `QuerySource` enum or separate
-`compile_pattern`, `compile_dsl`, and `compile_yaml` methods. The CLI distinction
-must not be discarded inside a stringly typed adapter.
+`compile_pattern`, `compile_dsl`, and `compile_yaml` methods. The CLI
+distinction must not be discarded inside a stringly typed adapter.
 
 ## Consequences
 
