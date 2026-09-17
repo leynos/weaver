@@ -36,7 +36,17 @@ name: Build and Package
 jobs:
   build:
     name: Build ${{ inputs.platform }} artefacts
+    # The runner is the caller's decision, not this workflow's: one job
+    # definition serves Linux, macOS and FreeBSD cross builds, and only the
+    # caller knows which. `release.yml` passes the reviewed labels, and
+    # `tests/workflow_contracts/ci_runner_placement_test.py` pins them there.
     runs-on: ${{ inputs.runner }}
+    # One ceiling for all three platforms, sized for the slowest leg rather
+    # than per platform, because there is one job here and not three. The
+    # macOS builds took 343 s and 305 s on 2026-09-16 and the Linux builds
+    # 198 s and 219 s, so 30 minutes leaves room for a cold cache on the
+    # slowest without being so wide that a hung build bills for hours.
+    timeout-minutes: 30
     env:
       VERSION: ${{ inputs.version }}
       MAINTAINER: "Payton McIntosh <pmcintosh@df12.net>"

@@ -7,7 +7,29 @@ name: CI
 
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    # The developer-blocking lane, and the one the placement rule moves. It
+    # waited 435 s for a GitHub-hosted runner on 2026-09-16 to do 938 s of
+    # work.
+    #
+    # Four vCPU rather than two. This lane builds Whitaker from source with
+    # Cranelift and then runs Clippy, Mermaid validation and the coverage
+    # suite, which includes two trybuild cases that spawn their own cargo
+    # builds. Ubicloud's four vCPU are already 1.5 to 2 times slower than a
+    # GitHub public runner's four for that kind of work (measured on
+    # wireframe), so two would roughly triple a fifteen-minute lane.
+    #
+    # A pull request from a fork cannot obtain an Ubicloud runner, so the
+    # expression falls back to a GitHub-hosted one for forks only. The
+    # continuation line sits at the SAME indent as the line above it: a
+    # more-indented continuation in a folded scalar keeps its line break and
+    # puts a newline inside the expression, which GitHub evaluates anyway, so
+    # a green run would not show it. On a `workflow_dispatch` the fork field
+    # is absent and the expression selects the Ubicloud arm, which is right:
+    # a dispatch is not a fork.
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork
+      && 'ubuntu-latest' || 'ubicloud-standard-4' }}
+    timeout-minutes: 30
     permissions:
       contents: read
     env:

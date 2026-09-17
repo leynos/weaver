@@ -45,7 +45,16 @@ concurrency:
 
 jobs:
   metadata:
-    runs-on: ubuntu-latest
+    # Reads the crate version and resolves the release modes: 14 s of work on
+    # 2026-09-16. It carries the fork fallback even though this is nominally a
+    # tag workflow, because `release-dry-run.yml` calls it on every pull
+    # request, so it does meet forks. The continuation line sits at the SAME
+    # indent as the line above it; a more-indented continuation in a folded
+    # scalar keeps its line break and puts a newline inside the expression.
+    runs-on: >-
+      ${{ github.event.pull_request.head.repo.fork
+      && 'ubuntu-latest' || 'ubicloud-standard-2' }}
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.ensure_version.outputs.crate-version }}
       should_publish: ${{ steps.release_modes.outputs.should-publish }}
@@ -83,6 +92,9 @@ jobs:
     uses: ./.github/workflows/build-and-package.yml
     with:
       platform: linux
+      # The runner is a `workflow_call` input, so this caller is where the
+      # placement decision lives even though the job declares no `runs-on`.
+      # The contract reads it as a placement for that reason.
       runner: ubuntu-latest
       target: ${{ matrix.target }}
       version: ${{ needs.metadata.outputs.version }}
@@ -101,6 +113,9 @@ jobs:
     uses: ./.github/workflows/build-and-package.yml
     with:
       platform: macos
+      # Stays GitHub-hosted: a macOS build needs a macOS runner and Ubicloud
+      # offers none, so there is no fork arm to write. The contract pins this
+      # label by coordinate so the absence reads as a decision.
       runner: macos-15
       target: ${{ matrix.target }}
       version: ${{ needs.metadata.outputs.version }}
@@ -115,6 +130,13 @@ jobs:
     uses: ./.github/workflows/build-and-package.yml
     with:
       platform: freebsd
+      # Deliberately left on `ubuntu-latest` while the Linux legs move. This
+      # job is switched off by the `ENABLE_FREEBSD_RELEASE_BUILDS` repository
+      # variable, so it has never run: there is nothing to measure, nothing to
+      # speed up, and no way to test that a move worked. Moving it would be a
+      # change to dead code. It is pinned here by coordinate so the choice
+      # reads as one, and it moves when somebody re-enables the leg and can
+      # watch it run.
       runner: ubuntu-latest
       target: x86_64-unknown-freebsd
       version: ${{ needs.metadata.outputs.version }}
@@ -130,7 +152,16 @@ jobs:
       - build-linux
       - build-macos
       - build-freebsd
-    runs-on: ubuntu-latest
+    # No fork arm: this job is gated on `should_publish`, which is only true
+    # on a tag push, so it is skipped on every dry run and never meets a fork.
+    #
+    # The ceiling is a judgement, not a measurement, and is recorded as one:
+    # because the job is skipped on every dry run, no green run of it exists
+    # to size from. Fifteen minutes is generous for creating a draft release
+    # and uploading the staged artefacts, and can be re-sized from the first
+    # real tag.
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         # v7.0.0
