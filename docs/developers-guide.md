@@ -88,7 +88,7 @@ not offer, stay GitHub-hosted, where public-repository minutes are free.
 | `coverage-main.yml`     | `coverage-upload` | push, dispatch         | `ubicloud-standard-2` | 20 min   |
 | `release.yml`           | `metadata`        | tag push, dry run      | `ubicloud-standard-2` | 10 min   |
 | `release.yml`           | `release`         | tag push               | `ubicloud-standard-2` | 15 min   |
-| `release.yml`           | `build-linux`     | tag push, dry run      | `ubuntu-latest`       | callee's |
+| `release.yml`           | `build-linux`     | tag push, dry run      | `ubicloud-standard-4` | callee's |
 | `release.yml`           | `build-freebsd`   | tag push, dry run      | `ubuntu-latest`       | callee's |
 | `release.yml`           | `build-macos`     | tag push, dry run      | `macos-15`            | callee's |
 | `build-and-package.yml` | `build`           | called                 | caller's choice       | 30 min   |
@@ -164,12 +164,16 @@ more-indented continuation in a folded scalar keeps its line break, putting a
 newline inside the expression; GitHub evaluates the broken value and the job
 runs, so a green run is not evidence that the scalar is well formed.
 
-Two lanes carry it: `ci.yml`'s `build-test` and `release.yml`'s `metadata`. The
-release job needs it because the dry run puts it on pull requests.
-`release.yml`'s `release` job does not, because it is gated on `should_publish`
-and is skipped on every dry run, and `coverage-upload` does not, because
-neither push nor dispatch carries a pull request. A constant guard would read
-as a decision nobody made.
+Three lanes carry it: `ci.yml`'s `build-test`, and `release.yml`'s `metadata`
+and `build-linux`. The two release jobs need it because the dry run puts them
+on pull requests. `release.yml`'s `release` job does not, because it is gated on
+`should_publish` and is skipped on every dry run, and `coverage-upload` does
+not, because neither push nor dispatch carries a pull request. A constant guard
+would read as a decision nobody made.
+
+For `build-linux` the expression goes in the caller's `with:` block rather than
+on a `runs-on` line, because `build-and-package.yml` takes its runner as a
+`workflow_call` input.
 
 ### Ceilings
 

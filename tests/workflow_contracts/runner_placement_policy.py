@@ -41,6 +41,7 @@ FORK_GUARD: typ.Final = "github.event.pull_request.head.repo.fork"
 EXPECTED_FORK_FALLBACK: typ.Final = {
     ("ci.yml", "build-test"): UBICLOUD_LARGE,
     ("release.yml", "metadata"): UBICLOUD_SMALL,
+    ("release.yml", "build-linux"): UBICLOUD_LARGE,
 }
 
 #: Lanes that cannot meet a fork and so declare a bare label. A constant
@@ -63,7 +64,6 @@ EXPECTED_LITERAL_LABEL: typ.Final = {
     ("release.yml", "release"): UBICLOUD_SMALL,
     ("release.yml", "build-macos"): MACOS_LABEL,
     ("release.yml", "build-freebsd"): GITHUB_HOSTED_LABEL,
-    ("release.yml", "build-linux"): GITHUB_HOSTED_LABEL,
 }
 
 #: The one job whose runner is genuinely not this repository's decision at the

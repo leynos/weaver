@@ -92,10 +92,18 @@ jobs:
     uses: ./.github/workflows/build-and-package.yml
     with:
       platform: linux
-      # The runner is a `workflow_call` input, so this caller is where the
-      # placement decision lives even though the job declares no `runs-on`.
-      # The contract reads it as a placement for that reason.
-      runner: ubuntu-latest
+      # `release-dry-run.yml` calls this workflow on every pull request, so
+      # these are pull-request lanes despite living in a release workflow, and
+      # they were the longest wait in the repository: 1782 s and 1442 s of
+      # queueing on 2026-09-16 to do 198 s and 219 s of work.
+      #
+      # The fallback goes in the caller's `with:` block rather than on a
+      # `runs-on` line, because the runner is a `workflow_call` input. The
+      # continuation sits at the same indent as the line above it for the same
+      # folded-scalar reason as everywhere else.
+      runner: >-
+        ${{ github.event.pull_request.head.repo.fork
+        && 'ubuntu-latest' || 'ubicloud-standard-4' }}
       target: ${{ matrix.target }}
       version: ${{ needs.metadata.outputs.version }}
       artifact-name: ${{ needs.metadata.outputs.repo_name }}-${{ matrix.artefact }}
