@@ -16,7 +16,21 @@ name: Coverage (main)
 
 jobs:
   coverage-upload:
-    runs-on: ubuntu-latest
+    # A push lane, so Ubicloud rather than GitHub-hosted. It waited 691 s for
+    # a runner on 2026-09-16 to do 174 s of work, the worst queue-to-work
+    # ratio in the repository. There is no fork arm: neither `push` nor
+    # `workflow_dispatch` carries a pull request, so the guard would be
+    # constant here and a constant guard reads as a decision nobody made.
+    #
+    # Two vCPU, unlike `ci.yml`. This lane runs the coverage suite and
+    # nothing else, nobody waits on it, and the arithmetic on the one hazard
+    # that cares about core count works out: the two trybuild cases take
+    # 20.5 s and 25.4 s here on four vCPU, and nextest kills a test at 180 s
+    # by default. Even at three times slower they stay under half the kill.
+    # Should that stop being true the remedy is `ubicloud-standard-4`, as on
+    # `ci.yml`, not a longer deadline for the test.
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 20
     permissions:
       contents: read
     env:

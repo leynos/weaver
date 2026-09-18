@@ -76,6 +76,145 @@ If a workflow's behaviour genuinely depends on a feature only present from a
 particular commit onwards, express that as a comment or a changelog note, not
 as a test assertion on the SHA string.
 
+## GitHub Actions runner placement
+
+Each lane sits where the kind of work decides. Every Linux lane runs on
+Ubicloud, at a size its own workload decides. What stays GitHub-hosted is the
+macOS build, which needs hardware Ubicloud do not offer, and the FreeBSD leg,
+which is switched off and so has nothing to measure; there, public-repository
+minutes are free.
+
+| Workflow                | Job               | Trigger                | Runner                | Ceiling  |
+| ----------------------- | ----------------- | ---------------------- | --------------------- | -------- |
+| `ci.yml`                | `build-test`      | pull request, dispatch | `ubicloud-standard-4` | 30 min   |
+| `coverage-main.yml`     | `coverage-upload` | push, dispatch         | `ubicloud-standard-2` | 20 min   |
+| `release.yml`           | `metadata`        | tag push, dry run      | `ubicloud-standard-2` | 10 min   |
+| `release.yml`           | `release`         | tag push               | `ubicloud-standard-2` | 15 min   |
+| `release.yml`           | `build-linux`     | tag push, dry run      | `ubicloud-standard-4` | callee's |
+| `release.yml`           | `build-freebsd`   | tag push, dry run      | `ubuntu-latest`       | callee's |
+| `release.yml`           | `build-macos`     | tag push, dry run      | `macos-15`            | callee's |
+| `build-and-package.yml` | `build`           | called                 | caller's choice       | 30 min   |
+
+*Table 1: Where each lane runs, and what bounds it.*
+
+`mutation-testing.yml`, `dependabot-automerge.yml`, and `release-dry-run.yml`
+declare no runner and pass none, so their callees place them.
+
+### Why these lanes, and what the measurements were
+
+Queue against work, from the last green run of each workflow on 2026-09-16:
+
+| Lane                  | Queue  | Work  |
+| --------------------- | ------ | ----- |
+| `build-test`          | 435 s  | 938 s |
+| `coverage-upload`     | 691 s  | 174 s |
+| `metadata`            | 96 s   | 14 s  |
+| `build-linux` amd64   | 1782 s | 198 s |
+| `build-linux` arm64   | 1442 s | 219 s |
+| `build-macos` x86\_64 | 656 s  | 343 s |
+| `build-macos` arm64   | 176 s  | 305 s |
+
+*Table 2: What each lane waited, and what it then did.*
+
+The release build matrix is the surprise in that table, and it is easy to miss
+from the workflow's name: `release-dry-run.yml` calls `release.yml` on every
+pull request, so those jobs are pull-request lanes. The two Linux legs waited
+half an hour and twenty-four minutes to do about three and a half minutes of
+work each, which was the largest single block of developer waiting in the
+repository.
+
+`build-macos` stays on `macos-15` because a macOS build needs a macOS runner
+and Ubicloud offer none. `build-freebsd` stays on `ubuntu-latest` for a
+different reason: it is switched off by the `ENABLE_FREEBSD_RELEASE_BUILDS`
+repository variable and has never run, so there is nothing to measure, nothing
+to speed up, and no way to observe that a move worked. Moving it would be a
+change to dead code. The contract pins it where it is, so staying put reads as
+a decision, and it moves when somebody re-enables the leg and can watch it run.
+
+### Sizes
+
+`ubicloud-standard-4` for anything that compiles the workspace, and
+`ubicloud-standard-2` for the rest. Ubicloud's four vCPU are 1.5 to 2 times
+slower than a GitHub public runner's four for Rust compilation, measured on
+wireframe, so two vCPU would roughly triple a lane that already takes a quarter
+of an hour.
+
+`coverage-upload` is the one compile-heavy lane on the smaller shape, and that
+is a computed margin rather than an oversight. The workspace has two trybuild
+cases, `public_api_contracts_compile` and
+`test_support_exports_compile_downstream`, which spawn their own cargo builds;
+they took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
+kills a test after 180 seconds by default, and this repository sets no nextest
+configuration, so that default applies. Even at three times slower those cases
+stay under half the kill. Nobody waits on this lane, so the smaller shape is
+worth the slower run. Should the margin close, the remedy is
+`ubicloud-standard-4`, not a longer deadline for the test.
+
+### The fork fallback
+
+A pull request from a fork cannot obtain an Ubicloud runner, so every lane that
+meets forks falls back to a GitHub-hosted runner for forks only:
+
+```yaml
+runs-on: >-
+  ${{ github.event.pull_request.head.repo.fork
+  && 'ubuntu-latest' || 'ubicloud-standard-4' }}
+```
+
+The continuation line sits at the same indent as the line above it. A
+more-indented continuation in a folded scalar keeps its line break, putting a
+newline inside the expression; GitHub evaluates the broken value and the job
+runs, so a green run is not evidence that the scalar is well-formed.
+
+Three lanes carry it: `ci.yml`'s `build-test`, and `release.yml`'s `metadata`
+and `build-linux`. The two release jobs need it because the dry run puts them
+on pull requests. `release.yml`'s `release` job does not, because it is gated on
+`should_publish` and is skipped on every dry run, and `coverage-upload` does
+not, because neither push nor dispatch carries a pull request. A constant guard
+would read as a decision nobody made.
+
+For `build-linux` the expression goes in the caller's `with:` block rather than
+on a `runs-on` line, because `build-and-package.yml` takes its runner as a
+`workflow_call` input.
+
+### Ceilings
+
+A per-minute runner bills until something stops it, so GitHub's six-hour
+default is the expensive failure mode. A ceiling close to the measured work is
+the other one, because it cancels the run at the moment an overrun becomes
+interesting and discards the log that would explain it.
+
+Every ceiling above is measured except `release.yml`'s `release` job, which is
+skipped on every dry run and so has no green run to size from. That one is a
+judgement and says so in the workflow.
+
+The three release build legs carry no ceiling of their own, and cannot: GitHub
+rejects `timeout-minutes` on a job with `uses:`. What bounds them is
+`build-and-package.yml`'s own ceiling, one number for all three platforms
+because there is one job there and not three, sized for the slowest leg.
+
+### The contract
+
+`tests/workflow_contracts/ci_runner_placement_test.py` holds all of the above,
+beside two modules it imports: `runner_placement_policy.py` for the reviewed
+decisions and the reason for each, and `runner_placement_reader.py` for the
+machinery that derives facts from the workflow tree.
+
+It reads every runner declaration from the parsed document and fails on an
+embedded line break; compares each fork guard and both arms against exact
+strings; pins placement by `(workflow, job id)` coordinate and compares that
+set against the tree in both directions; reads `runner` inputs as placements,
+not just `runs-on` lines; pins each ceiling by value and separately walks the
+tree for any unbounded Ubicloud lane; asserts that delegating jobs declare
+neither a runner nor a ceiling; checks the reviewed tables are total against
+each other; and compares `.github/actionlint.yaml` against the labels in use in
+both directions.
+
+That last comparison is why the registry exists as a checked artefact rather
+than as a list someone remembers to update. A label registered and used nowhere
+silently permits a runner family nobody reviewed for whatever lane adopts it
+next.
+
 ## Whitaker CI setup
 
 CI pins Whitaker, Weaver's external lint engine, to a fixed revision through the
