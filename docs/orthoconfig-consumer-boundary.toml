@@ -33,10 +33,10 @@ gist = "Consume recursive command metadata."
 state = "wraps"
 upstream = [{ task = "OrthoConfig 6.1", role = "metadata" }]
 shipped_in = ""
-removal_gate = "Replace local recursive command metadata once OrthoConfig 6.1 ships command and subcommand records that can drive help, manpages, completions, and context output."
+removal_gate = "Retire the Weaver projection only when OrthoConfig also provides renderer and agent-context contracts for Weaver-specific capability and provider-policy metadata."
 adr_anchor = ""
 next_review_by = ""
-last_reviewed = "2026-06-14"
+last_reviewed = "2026-08-22"
 
 [[task]]
 id = "12.1.3"

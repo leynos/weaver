@@ -67,10 +67,12 @@ Boundary classifications for this step are tracked in the
     invariants, and trybuild public API checks.
   - Success: every command-contract task says whether it consumes OrthoConfig,
     wraps it temporarily, or records a deliberate divergence in ADR 007.
-- [ ] 12.1.2. Consume recursive command metadata.
+- [x] 12.1.2. Consume recursive command metadata.
   - Depends on OrthoConfig 6.1.1 and 6.1.2.
-  - Success: generated help, manpage, completion, and context output converge
-    on the OrthoConfig recursive metadata shape.
+  - Success: generated help and the manual page converge on the OrthoConfig
+    recursive metadata shape. This item establishes the input shape for shell
+    completion and `weaver context --json`; those outputs remain deferred to
+    13.3.3 and 13.3.1 respectively.
 - [ ] 12.1.3. Consume compact context and skill metadata.
   - Depends on OrthoConfig 6.2.1 through 6.3.2.
   - Success: Weaver-specific capability fields extend the reusable context and

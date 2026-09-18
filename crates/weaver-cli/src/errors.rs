@@ -4,7 +4,7 @@ use std::{io, sync::Arc};
 
 use thiserror::Error;
 
-use crate::lifecycle::LifecycleError;
+use crate::{help::HelpConstructionError, lifecycle::LifecycleError};
 
 #[derive(Debug, Error)]
 pub(crate) enum AppError {
@@ -22,6 +22,8 @@ pub(crate) enum AppError {
     EmitBareHelp(io::Error),
     #[error("failed to emit clap help: {0}")]
     EmitHelp(io::Error),
+    #[error("failed to construct clap help: {0}")]
+    ConstructHelp(#[source] HelpConstructionError),
     /// Sentinel for bare invocation — help has already been written.
     #[error("bare invocation")]
     BareInvocation,
