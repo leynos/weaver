@@ -3,8 +3,11 @@ name: Coverage (main)
 # CodeScene accepts `cs-coverage upload` only for analysed branches, so
 # main-branch coverage is uploaded here on push (or on manual dispatch,
 # to re-run the upload without waiting for a new commit); pull requests
-# only run the test-and-coverage step in ci.yml, with no CodeScene
-# upload. This workflow also advances the coverage ratchet baseline:
+# only run the test-and-coverage step in ci.yml, with no CodeScene step
+# of any kind. This is the only workflow in the repository that may
+# touch CodeScene: it is not a pull-request lane, so a move in the
+# unpinned CodeScene CLI can delay a coverage report here but cannot
+# block a merge. This workflow also advances the coverage ratchet baseline:
 # caches saved on main are readable by every pull-request run, so the
 # baseline written here is the one ci.yml's ratchet check compares
 # against.
@@ -52,4 +55,8 @@ jobs:
         uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           format: lcov
+          # Stated rather than left to the action's default, because this
+          # being the upload and not the pull-request check is the whole
+          # point of the split.
+          mode: upload
           access-token: ${{ env.CS_ACCESS_TOKEN }}
