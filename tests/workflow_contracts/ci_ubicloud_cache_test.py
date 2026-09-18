@@ -1,0 +1,223 @@
+"""Every Ubicloud lane that compiles must publish the cache proxy first.
+
+Ubicloud runs a cache proxy on the runner's private network. The runner
+exposes its URL and token to action steps only, so a shell step that starts an
+sccache server cannot learn where the cache lives.
+``export-ubicloud-cache-credentials`` republishes both through the job
+environment and clears ``ACTIONS_CACHE_SERVICE_V2``, which sccache's backend
+reads to select the v2 cache service that Ubicloud's proxy does not implement.
+
+Without that step the lane still succeeds, which is the whole problem. sccache
+falls through to GitHub's cache endpoint from an Ubicloud runner, so the
+symptom is a slower build and metered egress rather than a failure anybody
+notices.
+
+Two orderings matter and both are asserted.
+
+The credentials step must come before the step that configures sccache,
+because sccache reads its cache configuration when its server starts and keeps
+it for that server's life. Publishing afterwards changes nothing.
+
+The step must carry a guard, because the action fails closed on a
+GitHub-hosted runner rather than exporting that runner's endpoint under
+Ubicloud's name. Lanes here can land on either: ``build-test`` has a fork
+fallback, and ``build-and-package.yml`` takes its runner from the caller.
+
+``runner.environment`` is the guard rather than a reading of the label. It is
+the runtime fact, it resolves to ``self-hosted`` on Ubicloud, and it keeps
+working when a lane's label moves.
+"""
+
+from __future__ import annotations
+
+import functools
+import typing as typ
+from pathlib import Path
+
+import pytest
+import yaml
+
+REPO_ROOT: typ.Final = Path(__file__).resolve().parents[2]
+WORKFLOW_DIR: typ.Final = REPO_ROOT / ".github" / "workflows"
+
+#: Both spellings GitHub accepts for a workflow file's extension.
+WORKFLOW_FILE_PATTERNS: typ.Final = ("*.yml", "*.yaml")
+
+#: The action that publishes the proxy credentials, matched on its path so a
+#: repin of the SHA does not need this file edited.
+CREDENTIALS_ACTION: typ.Final = (
+    "leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials"
+)
+
+#: The actions that configure and start sccache, directly or through a nested
+#: ``setup-rust``. Each must be preceded by the credentials step.
+SCCACHE_CONSUMERS: typ.Final = (
+    "leynos/shared-actions/.github/actions/setup-rust",
+    "leynos/shared-actions/.github/actions/rust-build-release",
+)
+
+#: The only guard that is correct here, and why it is not a label test: the
+#: action fails closed on a GitHub-hosted runner, and this is the runtime
+#: fact rather than a reading of ``runs-on``.
+EXPECTED_GUARD: typ.Final = "runner.environment == 'self-hosted'"
+
+#: Jobs that compile on a runner which can be Ubicloud, by ``(workflow, job)``.
+#: ``build-and-package.yml``'s job is here although its ``runs-on`` is an
+#: input: the release workflow passes it an Ubicloud label for the two Linux
+#: legs, so the lane reaches Ubicloud even though this file cannot see that.
+COMPILING_JOBS: typ.Final = (
+    ("ci.yml", "build-test"),
+    ("coverage-main.yml", "coverage-upload"),
+    ("build-and-package.yml", "build"),
+)
+
+
+@functools.cache
+def _documents() -> tuple[tuple[str, dict[str, object]], ...]:
+    """Read and parse every workflow once.
+
+    Returns
+    -------
+    tuple[tuple[str, dict[str, object]], ...]
+        Each workflow's file name with its parsed document, sorted by path.
+    """
+    paths = sorted(
+        path
+        for pattern in WORKFLOW_FILE_PATTERNS
+        for path in WORKFLOW_DIR.glob(pattern)
+    )
+    documents = tuple(
+        (path.name, yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+        for path in paths
+    )
+    assert documents, "the repository should define at least one workflow"
+    return documents
+
+
+def _steps(coordinate: tuple[str, str]) -> list[dict[str, object]]:
+    """Return one job's mapping steps, in order.
+
+    Parameters
+    ----------
+    coordinate
+        The job's ``(workflow, job id)`` coordinate.
+
+    Returns
+    -------
+    list[dict[str, object]]
+        The job's steps, in declaration order.
+    """
+    workflow, job_id = coordinate
+    documents = dict(_documents())
+    assert workflow in documents, f"{workflow} must exist"
+    jobs = documents[workflow].get("jobs") or {}
+    assert job_id in jobs, f"{workflow} must define a job {job_id!r}"
+    steps = (jobs[job_id] or {}).get("steps") or []
+    return [step for step in steps if isinstance(step, dict)]
+
+
+def _indices(steps: list[dict[str, object]], action: str) -> list[int]:
+    """Return the positions of every step using ``action``.
+
+    Parameters
+    ----------
+    steps
+        One job's steps, in order.
+    action
+        An action path, compared without its ``@sha`` suffix.
+
+    Returns
+    -------
+    list[int]
+        Positions in ``steps``, ascending.
+    """
+    return [
+        index
+        for index, step in enumerate(steps)
+        if str(step.get("uses", "")).split("@")[0] == action
+    ]
+
+
+def case_id(value: object) -> str:
+    """Render one parametrized coordinate.
+
+    Parameters
+    ----------
+    value
+        A ``(workflow, job id)`` coordinate, or any other value.
+
+    Returns
+    -------
+    str
+        The coordinate joined by ``-``, or ``str(value)``.
+    """
+    if isinstance(value, tuple):
+        return "-".join(str(item) for item in value)
+    return str(value)
+
+
+@pytest.mark.parametrize("coordinate", COMPILING_JOBS, ids=case_id)
+def test_the_lane_publishes_the_cache_proxy(coordinate: tuple[str, str]) -> None:
+    """Scenario: a compiling lane runs on Ubicloud without the proxy.
+
+    Invariant: every job that can compile on an Ubicloud runner declares
+    exactly one credentials step. Omitting it does not fail the lane; sccache
+    quietly reaches GitHub's cache endpoint instead, so nothing reports the
+    loss.
+    """
+    found = _indices(_steps(coordinate), CREDENTIALS_ACTION)
+    assert len(found) == 1, (
+        f"{coordinate[0]}:{coordinate[1]} compiles on a runner that can be "
+        f"Ubicloud, so it must declare exactly one {CREDENTIALS_ACTION} "
+        f"step; found {len(found)}"
+    )
+
+
+@pytest.mark.parametrize("coordinate", COMPILING_JOBS, ids=case_id)
+def test_the_proxy_is_published_before_sccache_is_configured(
+    coordinate: tuple[str, str],
+) -> None:
+    """Scenario: the credentials step is added after the Rust setup.
+
+    Invariant: the credentials step precedes every step that configures or
+    starts sccache. sccache reads its cache configuration when its server
+    starts and keeps it for that server's life, so credentials published
+    afterwards change nothing and the lane still looks correct.
+    """
+    steps = _steps(coordinate)
+    credentials = _indices(steps, CREDENTIALS_ACTION)
+    consumers = [
+        index
+        for action in SCCACHE_CONSUMERS
+        for index in _indices(steps, action)
+    ]
+    assert consumers, (
+        f"{coordinate[0]}:{coordinate[1]} should configure sccache through "
+        f"one of {SCCACHE_CONSUMERS}; if that stopped being true this "
+        "contract no longer describes the lane"
+    )
+    assert credentials and credentials[0] < min(consumers), (
+        f"{coordinate[0]}:{coordinate[1]} publishes the cache proxy at "
+        f"{credentials} but configures sccache at {min(consumers)}; sccache "
+        "reads its configuration when its server starts, so the credentials "
+        "must come first"
+    )
+
+
+@pytest.mark.parametrize("coordinate", COMPILING_JOBS, ids=case_id)
+def test_the_proxy_step_is_guarded_to_ubicloud(
+    coordinate: tuple[str, str],
+) -> None:
+    """Scenario: the credentials step runs on a GitHub-hosted runner.
+
+    Invariant: the credentials step carries exactly the reviewed guard. The
+    action fails closed off Ubicloud rather than exporting a GitHub-hosted
+    endpoint under Ubicloud's name, so an unguarded step turns the fork arm
+    and the macOS build legs red.
+    """
+    steps = _steps(coordinate)
+    index = _indices(steps, CREDENTIALS_ACTION)[0]
+    assert steps[index].get("if") == EXPECTED_GUARD, (
+        f"{coordinate[0]}:{coordinate[1]}'s credentials step guards on "
+        f"{steps[index].get('if')!r}, not the reviewed {EXPECTED_GUARD!r}"
+    )
