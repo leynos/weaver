@@ -40,6 +40,25 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           fetch-depth: 0
+      # Ubicloud runs a cache proxy on the runner's private network, and the
+      # runner exposes its URL and token to action steps only. This
+      # republishes them through the job environment and clears
+      # ACTIONS_CACHE_SERVICE_V2, which sccache's backend reads to select the
+      # v2 service that the proxy does not implement. Without it sccache
+      # reaches GitHub's cache endpoint from an Ubicloud runner instead.
+      #
+      # Ordering is load-bearing: sccache reads its cache configuration when
+      # its server starts and keeps it for that server's life, so this must
+      # precede the step that configures and starts it.
+      #
+      # The action fails closed on a GitHub-hosted runner rather than
+      # exporting that runner's endpoint under Ubicloud's name, so the guard
+      # is required wherever the lane can land on either. `runner.environment`
+      # is the runtime fact rather than a reading of the label, and it
+      # resolves to `self-hosted` on Ubicloud.
+      - name: Export Ubicloud cache credentials
+        if: runner.environment == 'self-hosted'
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
       - name: Install mdtablefix
