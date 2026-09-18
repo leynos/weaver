@@ -64,6 +64,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      # Ubicloud's cache proxy, published before sccache is configured. See
+      # the note in ci.yml; the guard is needed because this lane's runner is
+      # the caller's choice and may be GitHub-hosted, where the action fails
+      # closed by design.
+      - name: Export Ubicloud cache credentials
+        if: runner.environment == 'self-hosted'
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+
       # Build weaver-cli
       - name: Build weaver-cli release binary
         uses: leynos/shared-actions/.github/actions/rust-build-release@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
