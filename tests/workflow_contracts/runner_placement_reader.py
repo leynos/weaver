@@ -35,6 +35,7 @@ string ``${{ inputs.runner }}``.
 
 from __future__ import annotations
 
+import functools
 import re
 import typing as typ
 from pathlib import Path
@@ -84,38 +85,70 @@ def case_id(value: object) -> str:
     return str(value)
 
 
+@functools.cache
+def _parsed_workflows() -> tuple[tuple[str, dict[str, object]], ...]:
+    """Read and parse the workflow tree once, in a stable order.
+
+    This is the module's only entry point to the filesystem for workflow
+    documents. Every query below derives from its result, so the tree is read
+    and parsed once per session rather than once per parametrized case, and a
+    parse failure is reported from one place instead of from whichever
+    assertion happened to ask first.
+
+    Returns
+    -------
+    tuple[tuple[str, dict[str, object]], ...]
+        Each workflow's file name paired with its parsed document, sorted by
+        path.
+    """
+    paths = sorted(
+        path
+        for pattern in WORKFLOW_FILE_PATTERNS
+        for path in WORKFLOW_DIR.glob(pattern)
+    )
+    documents = tuple(
+        (path.name, yaml.safe_load(path.read_text(encoding="utf-8")))
+        for path in paths
+    )
+    assert documents, "the repository should define at least one workflow"
+    return documents
+
+
 def workflow_paths() -> list[Path]:
     """Return every workflow document's path, in a stable order.
 
     Both spellings of the extension are read, because GitHub runs a workflow
     written either way.
 
+    Returns
+    -------
+    list[Path]
+        Every workflow document under ``.github/workflows``, sorted by path.
+
     Examples
     --------
     >>> "ci.yml" in [path.name for path in workflow_paths()]
     True
     """
-    return sorted(
-        path
-        for pattern in WORKFLOW_FILE_PATTERNS
-        for path in WORKFLOW_DIR.glob(pattern)
-    )
+    return [WORKFLOW_DIR / name for name, _ in _parsed_workflows()]
 
 
 def workflows() -> dict[str, dict[str, object]]:
     """Parse every workflow document, keyed by file name.
+
+    Returns
+    -------
+    dict[str, dict[str, object]]
+        A fresh mapping of file name to parsed document. The mapping is
+        rebuilt on each call so that a caller mutating it cannot disturb
+        another assertion; the parse behind it is cached.
 
     Examples
     --------
     >>> "ci.yml" in workflows()
     True
     """
-    documents = {
-        path.name: yaml.safe_load(path.read_text(encoding="utf-8"))
-        for path in workflow_paths()
-    }
-    assert documents, "the repository should define at least one workflow"
-    return documents
+    return dict(_parsed_workflows())
 
 
 def jobs() -> dict[tuple[str, str], dict[str, object]]:
@@ -250,9 +283,22 @@ def registered_labels() -> set[str]:
     >>> "ubicloud-standard-4" in registered_labels()
     True
     """
+    return set(_registered_labels())
+
+
+@functools.cache
+def _registered_labels() -> frozenset[str]:
+    """Read the actionlint registry once.
+
+    Returns
+    -------
+    frozenset[str]
+        Every label registered under ``self-hosted-runner``, empty when the
+        configuration registers none.
+    """
     assert ACTIONLINT_CONFIG.exists(), (
         "this repository uses a runner label actionlint does not know, so "
         f"{ACTIONLINT_CONFIG.relative_to(REPO_ROOT)} must exist"
     )
     config = yaml.safe_load(ACTIONLINT_CONFIG.read_text(encoding="utf-8")) or {}
-    return set((config.get("self-hosted-runner") or {}).get("labels") or [])
+    return frozenset((config.get("self-hosted-runner") or {}).get("labels") or [])

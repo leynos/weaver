@@ -122,7 +122,7 @@ jobs:
     with:
       platform: macos
       # Stays GitHub-hosted: a macOS build needs a macOS runner and Ubicloud
-      # offers none, so there is no fork arm to write. The contract pins this
+      # offer none, so there is no fork arm to write. The contract pins this
       # label by coordinate so the absence reads as a decision.
       runner: macos-15
       target: ${{ matrix.target }}

@@ -78,9 +78,11 @@ as a test assertion on the SHA string.
 
 ## GitHub Actions runner placement
 
-Each lane sits where the kind of work decides. Lanes a developer waits on run
-on Ubicloud; lanes nobody waits on, and lanes that need hardware Ubicloud does
-not offer, stay GitHub-hosted, where public-repository minutes are free.
+Each lane sits where the kind of work decides. Every Linux lane runs on
+Ubicloud, at a size its own workload decides. What stays GitHub-hosted is the
+macOS build, which needs hardware Ubicloud do not offer, and the FreeBSD leg,
+which is switched off and so has nothing to measure; there, public-repository
+minutes are free.
 
 | Workflow                | Job               | Trigger                | Runner                | Ceiling  |
 | ----------------------- | ----------------- | ---------------------- | --------------------- | -------- |
@@ -95,7 +97,7 @@ not offer, stay GitHub-hosted, where public-repository minutes are free.
 
 *Table 1: Where each lane runs, and what bounds it.*
 
-`mutation-testing.yml`, `dependabot-automerge.yml` and `release-dry-run.yml`
+`mutation-testing.yml`, `dependabot-automerge.yml`, and `release-dry-run.yml`
 declare no runner and pass none, so their callees place them.
 
 ### Why these lanes, and what the measurements were
@@ -122,7 +124,7 @@ work each, which was the largest single block of developer waiting in the
 repository.
 
 `build-macos` stays on `macos-15` because a macOS build needs a macOS runner
-and Ubicloud offers none. `build-freebsd` stays on `ubuntu-latest` for a
+and Ubicloud offer none. `build-freebsd` stays on `ubuntu-latest` for a
 different reason: it is switched off by the `ENABLE_FREEBSD_RELEASE_BUILDS`
 repository variable and has never run, so there is nothing to measure, nothing
 to speed up, and no way to observe that a move worked. Moving it would be a
@@ -162,7 +164,7 @@ runs-on: >-
 The continuation line sits at the same indent as the line above it. A
 more-indented continuation in a folded scalar keeps its line break, putting a
 newline inside the expression; GitHub evaluates the broken value and the job
-runs, so a green run is not evidence that the scalar is well formed.
+runs, so a green run is not evidence that the scalar is well-formed.
 
 Three lanes carry it: `ci.yml`'s `build-test`, and `release.yml`'s `metadata`
 and `build-linux`. The two release jobs need it because the dry run puts them

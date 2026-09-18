@@ -50,7 +50,7 @@ EXPECTED_FORK_FALLBACK: typ.Final = {
 #: ``coverage-upload`` serves push and dispatch, neither of which carries a
 #: pull request. ``release.yml``'s ``release`` is gated on ``should_publish``,
 #: true only on a tag push, so it is skipped on every dry run.
-#: ``build-macos`` needs a macOS runner and Ubicloud offers none, so there is
+#: ``build-macos`` needs a macOS runner and Ubicloud offer none, so there is
 #: no fallback to write.
 #:
 #: ``build-freebsd`` stays GitHub-hosted for a different reason: it is
