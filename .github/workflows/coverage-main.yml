@@ -37,7 +37,6 @@ jobs:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
       CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN || '' }}
-      CODESCENE_CLI_SHA256: ${{ vars.CODESCENE_CLI_SHA256 || '' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Setup Rust
@@ -50,8 +49,7 @@ jobs:
           with-ratchet: 'true'
       - name: Upload coverage data to CodeScene
         if: env.CS_ACCESS_TOKEN != ''
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           format: lcov
           access-token: ${{ env.CS_ACCESS_TOKEN }}
-          installer-checksum: ${{ env.CODESCENE_CLI_SHA256 }}
