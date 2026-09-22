@@ -59,9 +59,26 @@ CODESCENE_ACTION_MARKER: typ.Final = "codescene"
 #: Matched against a ``run:`` block, lowercased.
 CODESCENE_COMMAND_MARKER: typ.Final = "cs-coverage"
 
+#: The lane a reviewer's coverage number comes from, and the action that
+#: produces it. Removing CodeScene from here must not remove the ratchet too.
+RATCHET_LANE: typ.Final = "ci.yml"
+COVERAGE_ACTION: typ.Final = (
+    "leynos/shared-actions/.github/actions/generate-coverage"
+)
+
 #: The ref the publisher may upload for. Compared in full rather than by
 #: suffix: a branch named ``not-main`` ends in ``main``.
 TRUNK_REF: typ.Final = "refs/heads/main"
+
+#: The branch the publisher runs on, as ``push.branches`` must list it.
+TRUNK_BRANCH: typ.Final = "main"
+
+#: The upload step's condition, compared whole. A substring test would accept
+#: ``(github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN != ''
+#: || true)``, which contains both halves and is true everywhere.
+EXPECTED_UPLOAD_CONDITION: typ.Final = (
+    f"env.{TOKEN} != '' && github.ref == '{TRUNK_REF}'"
+)
 
 
 @functools.cache
@@ -113,22 +130,65 @@ def _triggers(document: dict[str, object]) -> dict[str, object]:
     return {}
 
 
-def pull_request_workflows() -> list[str]:
-    """Return every workflow a pull request can start.
+def _local_callees(document: dict[str, object]) -> set[str]:
+    """Return the workflows in this repository that one workflow calls.
 
-    ``pull_request_target`` counts: it runs on a pull request with write
-    permissions, which is more dangerous rather than less.
+    A ``jobs.<id>.uses`` beginning with ``./`` names a workflow in this
+    repository. Anything else is a third-party or cross-repository reference
+    and is somebody else's document to police.
+
+    Parameters
+    ----------
+    document
+        One parsed workflow document.
+
+    Returns
+    -------
+    set[str]
+        File names of the local reusable workflows this one calls.
+    """
+    callees: set[str] = set()
+    for definition in (document.get("jobs") or {}).values():
+        uses = str((definition or {}).get("uses", ""))
+        if uses.startswith("./"):
+            callees.add(uses.split("@")[0].rsplit("/", 1)[-1])
+    return callees
+
+
+def pull_request_workflows() -> list[str]:
+    """Return every workflow a pull request can reach, callees included.
+
+    ``pull_request_target`` counts as a root: it runs on a pull request with
+    write permissions, which is more dangerous rather than less.
+
+    The closure matters as much as the roots. ``release-dry-run.yml`` is
+    triggered by ``pull_request`` and calls ``release.yml``, which calls
+    ``build-and-package.yml``. Reading only the roots would leave both of
+    those outside every assertion here while a pull request still runs them,
+    so a CodeScene step could live in either and nothing would say so.
 
     Returns
     -------
     list[str]
         File names, sorted.
     """
-    return sorted(
+    documents = dict(_documents())
+    pending = [
         name
-        for name, document in _documents()
+        for name, document in documents.items()
         if {"pull_request", "pull_request_target"} & set(_triggers(document))
-    )
+    ]
+    reached: set[str] = set()
+    # A visited set rather than recursion depth: two reusable workflows that
+    # call each other would otherwise loop here, and a contract that hangs is
+    # worse than one that is wrong.
+    while pending:
+        name = pending.pop()
+        if name in reached or name not in documents:
+            continue
+        reached.add(name)
+        pending.extend(_local_callees(documents[name]))
+    return sorted(reached)
 
 
 def _steps(document: dict[str, object]) -> list[dict[str, object]]:
@@ -248,8 +308,16 @@ def test_the_publisher_still_uploads() -> None:
     assert PUBLISHER not in pull_request_workflows(), (
         f"{PUBLISHER} must not be startable by a pull request"
     )
-    assert "push" in _triggers(documents[PUBLISHER]), (
-        f"{PUBLISHER} must run on push to main"
+    triggers = _triggers(documents[PUBLISHER])
+    assert "push" in triggers, f"{PUBLISHER} must run on push to main"
+    branches = (triggers.get("push") or {}).get("branches")
+    # Without this the publisher could run on every branch push and upload
+    # each one as the trunk's coverage. The ref guard on the step would
+    # refuse the upload, but the lane would burn a runner every time and the
+    # two protections would disagree about what this workflow is for.
+    assert branches == [TRUNK_BRANCH], (
+        f"{PUBLISHER}'s push trigger must be restricted to "
+        f"[{TRUNK_BRANCH!r}]; got {branches!r}"
     )
     uploads = [
         step
@@ -287,15 +355,16 @@ def test_the_publisher_only_uploads_from_the_trunk() -> None:
         f"{len(uploads)}"
     )
     condition = str(uploads[0].get("if", ""))
-    assert f"github.ref == '{TRUNK_REF}'" in condition, (
-        f"{PUBLISHER}'s upload runs when {condition!r}, which does not "
-        f"require github.ref to be {TRUNK_REF!r}; a dispatch from any branch "
-        "would publish that branch's coverage as the trunk's"
-    )
-    assert f"{TOKEN} != ''" in condition, (
-        f"{PUBLISHER}'s upload must still skip when {TOKEN} is empty, so a "
-        f"fork or a secret-less environment does not fail the lane; got "
-        f"{condition!r}"
+    # Compared whole, not by substring. Both halves appear in
+    # ``(github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN !=
+    # '' || true)``, which is true on every branch, so a containment test
+    # would pass the very expression it exists to refuse.
+    assert condition == EXPECTED_UPLOAD_CONDITION, (
+        f"{PUBLISHER}'s upload runs when {condition!r}; the reviewed "
+        f"condition is {EXPECTED_UPLOAD_CONDITION!r}. Both halves are "
+        "load-bearing: the ref test stops a dispatch from a feature branch "
+        "publishing that branch's coverage as the trunk's, and the token "
+        "test keeps a secret-less environment from failing the lane."
     )
 
 
@@ -323,4 +392,45 @@ def test_the_publisher_serialises_and_is_not_cancelled() -> None:
         f"{PUBLISHER} must not cancel a run in progress: a cancelled upload "
         "leaves the ratchet baseline describing a commit that is no longer "
         f"the tip; got {concurrency.get('cancel-in-progress')!r}"
+    )
+
+
+def test_the_pull_request_lane_still_ratchets_coverage() -> None:
+    """Scenario: CodeScene leaves and the ratchet leaves with it.
+
+    Invariant: the pull-request lane is still started by ``pull_request`` and
+    still runs ``generate-coverage`` with ``with-ratchet``. Everything else
+    here forbids things, so all of it is satisfied by a repository that
+    measures no coverage at all. This is the half that says what must remain:
+    the ratchet is ours, runs offline, and is what a reviewer's number
+    actually comes from once the CodeScene step is gone.
+    """
+    documents = dict(_documents())
+    assert RATCHET_LANE in documents, f"{RATCHET_LANE} must exist"
+    assert "pull_request" in _triggers(documents[RATCHET_LANE]), (
+        f"{RATCHET_LANE} must still be started by a pull request"
+    )
+    generators = [
+        step
+        for step in _steps(documents[RATCHET_LANE])
+        if str(step.get("uses", "")).split("@")[0] == COVERAGE_ACTION
+    ]
+    assert len(generators) == 1, (
+        f"{RATCHET_LANE} should run {COVERAGE_ACTION} exactly once, found "
+        f"{len(generators)}"
+    )
+    assert generators[0].get("with", {}).get("with-ratchet") == "true", (
+        f"{RATCHET_LANE}'s coverage step must set with-ratchet, or it "
+        "produces a report nothing compares against"
+    )
+    # Presence is not reachability. `if: false` leaves the step in the file,
+    # where every check above still sees it, and runs it never. This lane's
+    # coverage step is meant to run on every trigger the workflow has, so any
+    # condition at all is a way to switch the ratchet off without deleting
+    # anything. If one is ever genuinely needed, pin it here by value.
+    assert "if" not in generators[0], (
+        f"{RATCHET_LANE}'s coverage step carries if: "
+        f"{generators[0]['if']!r}. A condition here can disable the ratchet "
+        "while leaving the step visible; add it to this contract by value if "
+        "it is wanted."
     )

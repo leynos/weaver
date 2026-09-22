@@ -274,6 +274,46 @@ to a suffix test, dropping the token guard, removing the concurrency block,
 making its group constant, and turning cancellation on. Each fails exactly one
 test.
 
+The upload condition is compared whole rather than searched for parts. A
+containment test accepts
+`(github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN != '' ||
+true)`,
+which holds both halves and is true on every branch, so it would pass the one
+expression it exists to refuse. The publisher's `push.branches` is pinned to
+`main` for a related reason: the step's ref guard would still refuse the upload
+from elsewhere, but an unrestricted trigger burns a runner on every branch push
+and leaves the two protections disagreeing about what the workflow is for.
+
+### What must remain
+
+Everything above forbids something, so all of it is satisfied by a repository
+that measures no coverage at all. One test says what must stay: `ci.yml` is
+still started by `pull_request` and still runs `generate-coverage` with
+`with-ratchet`. That is where a reviewer's number comes from once the CodeScene
+step is gone.
+
+It also requires that step to carry no `if:` at all. Presence is not
+reachability: `if: false` leaves the step in the file, where every other check
+still sees it, and runs it never. A condition here would be a way to switch the
+ratchet off while the diff looks untouched. If one is ever wanted, it is pinned
+in the contract by value.
+
+### The pull-request lane is a closure, not a list
+
+The prohibitions apply to every workflow a pull request can reach, not only to
+those carrying a pull-request trigger. `release-dry-run.yml` is triggered by
+`pull_request` and calls `release.yml`, which calls `build-and-package.yml`.
+Reading only the roots would leave both outside every assertion while a pull
+request still runs them.
+
+The contract therefore follows `jobs.<id>.uses` for references beginning with
+`./`, transitively, with a visited set so that two reusable workflows calling
+each other cannot hang it. References to other repositories are not followed:
+those are somebody else's documents to police. Two mutations cover this, a
+CodeScene step hidden in `release.yml` and the token hidden in
+`build-and-package.yml` two calls deep, and neither is visible to a roots-only
+reading.
+
 `pull_request_target` counts as a pull-request trigger here. It runs on a pull
 request with write permissions, which makes it more dangerous than
 `pull_request`, not less. `workflow_dispatch` does not count: a dispatch is not
