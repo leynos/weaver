@@ -252,6 +252,28 @@ startable by a pull request, and to state `mode: upload` rather than inherit
 it. Stating the mode means the publisher cannot quietly become the pull-request
 check gate.
 
+Two further properties of the publisher are asserted, both of which fail
+silently rather than loudly.
+
+The upload step's condition names `github.ref == 'refs/heads/main'` as well as
+the token. `workflow_dispatch` can be run from any branch, and CodeScene
+accepts an upload for the analysed branch whatever the payload came from, so
+without the ref test a dispatch from a feature branch publishes that branch's
+coverage as the trunk's and drags the ratchet baseline with it. The comparison
+is to the full ref, not a suffix: a branch named `not-main` ends in `main`.
+
+The publisher declares a concurrency group keyed on the ref, with
+`cancel-in-progress: false`. Two pushes to the trunk in quick succession would
+otherwise upload at the same time and leave the baseline set by whichever
+finished last, which need not be the later commit. Cancelling is the opposite
+failure and no better: a cancelled run leaves the baseline describing a commit
+that is no longer the tip.
+
+Six mutations cover the pair, three each: dropping the ref guard, loosening it
+to a suffix test, dropping the token guard, removing the concurrency block,
+making its group constant, and turning cancellation on. Each fails exactly one
+test.
+
 `pull_request_target` counts as a pull-request trigger here. It runs on a pull
 request with write permissions, which makes it more dangerous than
 `pull_request`, not less. `workflow_dispatch` does not count: a dispatch is not

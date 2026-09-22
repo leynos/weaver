@@ -17,6 +17,16 @@ name: Coverage (main)
     branches: [main]
   workflow_dispatch:
 
+# One publisher at a time, and never cancelled. Two pushes to main in quick
+# succession would otherwise upload concurrently and advance the ratchet
+# baseline from whichever finished last, which is not necessarily the later
+# commit. `cancel-in-progress` is deliberately false: a cancelled run here
+# leaves the baseline reflecting a commit that is no longer the tip, and
+# nothing reports that.
+concurrency:
+  group: coverage-main-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   coverage-upload:
     # A push lane, so Ubicloud rather than GitHub-hosted. It waited 691 s for
@@ -51,7 +61,13 @@ jobs:
           format: lcov
           with-ratchet: 'true'
       - name: Upload coverage data to CodeScene
-        if: env.CS_ACCESS_TOKEN != ''
+        # The ref guard matters as much as the token. `workflow_dispatch` can
+        # be run from any branch, and CodeScene accepts an upload for the
+        # analysed branch whatever the payload actually came from, so a
+        # dispatch from a feature branch would publish that branch's coverage
+        # as the trunk's and move the ratchet baseline with it. Nothing would
+        # report it.
+        if: env.CS_ACCESS_TOKEN != '' && github.ref == 'refs/heads/main'
         uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           format: lcov

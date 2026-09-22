@@ -59,6 +59,10 @@ CODESCENE_ACTION_MARKER: typ.Final = "codescene"
 #: Matched against a ``run:`` block, lowercased.
 CODESCENE_COMMAND_MARKER: typ.Final = "cs-coverage"
 
+#: The ref the publisher may upload for. Compared in full rather than by
+#: suffix: a branch named ``not-main`` ends in ``main``.
+TRUNK_REF: typ.Final = "refs/heads/main"
+
 
 @functools.cache
 def _documents() -> tuple[tuple[str, dict[str, object]], ...]:
@@ -259,4 +263,64 @@ def test_the_publisher_still_uploads() -> None:
     assert uploads[0].get("with", {}).get("mode") == "upload", (
         f"{PUBLISHER}'s CodeScene step must state mode: upload, so that it "
         "cannot silently become the pull-request check gate"
+    )
+
+
+def test_the_publisher_only_uploads_from_the_trunk() -> None:
+    """Scenario: the publisher is dispatched from a feature branch.
+
+    Invariant: the upload step's condition names the trunk ref as well as the
+    token. ``workflow_dispatch`` can be run from any branch, and CodeScene
+    accepts an upload for the analysed branch whatever the payload came from,
+    so without the ref test a dispatch from a feature branch publishes that
+    branch's coverage as the trunk's and moves the ratchet baseline with it.
+    Nothing reports that, which is why it is asserted rather than trusted.
+    """
+    documents = dict(_documents())
+    uploads = [
+        step
+        for step in _steps(documents[PUBLISHER])
+        if CODESCENE_ACTION_MARKER in str(step.get("uses", "")).lower()
+    ]
+    assert len(uploads) == 1, (
+        f"{PUBLISHER} should hold exactly one CodeScene step, found "
+        f"{len(uploads)}"
+    )
+    condition = str(uploads[0].get("if", ""))
+    assert f"github.ref == '{TRUNK_REF}'" in condition, (
+        f"{PUBLISHER}'s upload runs when {condition!r}, which does not "
+        f"require github.ref to be {TRUNK_REF!r}; a dispatch from any branch "
+        "would publish that branch's coverage as the trunk's"
+    )
+    assert f"{TOKEN} != ''" in condition, (
+        f"{PUBLISHER}'s upload must still skip when {TOKEN} is empty, so a "
+        f"fork or a secret-less environment does not fail the lane; got "
+        f"{condition!r}"
+    )
+
+
+def test_the_publisher_serialises_and_is_not_cancelled() -> None:
+    """Scenario: two pushes to the trunk upload at once.
+
+    Invariant: the publisher declares a concurrency group keyed on the ref,
+    and does not cancel a run in progress. Concurrent uploads advance the
+    ratchet baseline from whichever finishes last, which need not be the later
+    commit; and a cancelled run leaves the baseline describing a commit that
+    is no longer the tip, with nothing to say so.
+    """
+    documents = dict(_documents())
+    concurrency = documents[PUBLISHER].get("concurrency")
+    assert isinstance(concurrency, dict), (
+        f"{PUBLISHER} must declare a concurrency block so two uploads cannot "
+        f"race; got {concurrency!r}"
+    )
+    group = str(concurrency.get("group", ""))
+    assert "github.ref" in group, (
+        f"{PUBLISHER}'s concurrency group is {group!r}, which does not vary "
+        "by ref, so a dispatch elsewhere would queue behind the trunk's run"
+    )
+    assert concurrency.get("cancel-in-progress") is False, (
+        f"{PUBLISHER} must not cancel a run in progress: a cancelled upload "
+        "leaves the ratchet baseline describing a commit that is no longer "
+        f"the tip; got {concurrency.get('cancel-in-progress')!r}"
     )
