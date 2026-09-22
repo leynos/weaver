@@ -30,7 +30,6 @@ working when a lane's label moves.
 
 from __future__ import annotations
 
-import functools
 import typing as typ
 from pathlib import Path
 
@@ -72,33 +71,43 @@ COMPILING_JOBS: typ.Final = (
 )
 
 
-@functools.cache
-def _documents() -> tuple[tuple[str, dict[str, object]], ...]:
-    """Read and parse every workflow once.
+@pytest.fixture(scope="session")
+def workflows() -> dict[str, dict[str, object]]:
+    """Read and parse every workflow once per session.
+
+    Session scope rather than a module-level cache: pytest owns the lifetime,
+    so the parse is visible in a fixture teardown or an ``--setup-show`` run
+    instead of hiding in a decorator, and a test that needs a different tree
+    can override it.
 
     Returns
     -------
-    tuple[tuple[str, dict[str, object]], ...]
-        Each workflow's file name with its parsed document, sorted by path.
+    dict[str, dict[str, object]]
+        Each workflow's file name mapped to its parsed document.
     """
     paths = sorted(
         path
         for pattern in WORKFLOW_FILE_PATTERNS
         for path in WORKFLOW_DIR.glob(pattern)
     )
-    documents = tuple(
-        (path.name, yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+    documents = {
+        path.name: yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         for path in paths
-    )
+    }
     assert documents, "the repository should define at least one workflow"
     return documents
 
 
-def _steps(coordinate: tuple[str, str]) -> list[dict[str, object]]:
+def _steps(
+    documents: dict[str, dict[str, object]],
+    coordinate: tuple[str, str],
+) -> list[dict[str, object]]:
     """Return one job's mapping steps, in order.
 
     Parameters
     ----------
+    documents
+        Every parsed workflow, keyed by file name.
     coordinate
         The job's ``(workflow, job id)`` coordinate.
 
@@ -108,7 +117,6 @@ def _steps(coordinate: tuple[str, str]) -> list[dict[str, object]]:
         The job's steps, in declaration order.
     """
     workflow, job_id = coordinate
-    documents = dict(_documents())
     assert workflow in documents, f"{workflow} must exist"
     jobs = documents[workflow].get("jobs") or {}
     assert job_id in jobs, f"{workflow} must define a job {job_id!r}"
@@ -157,7 +165,10 @@ def case_id(value: object) -> str:
 
 
 @pytest.mark.parametrize("coordinate", COMPILING_JOBS, ids=case_id)
-def test_the_lane_publishes_the_cache_proxy(coordinate: tuple[str, str]) -> None:
+def test_the_lane_publishes_the_cache_proxy(
+    workflows: dict[str, dict[str, object]],
+    coordinate: tuple[str, str],
+) -> None:
     """Scenario: a compiling lane runs on Ubicloud without the proxy.
 
     Invariant: every job that can compile on an Ubicloud runner declares
@@ -165,7 +176,7 @@ def test_the_lane_publishes_the_cache_proxy(coordinate: tuple[str, str]) -> None
     quietly reaches GitHub's cache endpoint instead, so nothing reports the
     loss.
     """
-    found = _indices(_steps(coordinate), CREDENTIALS_ACTION)
+    found = _indices(_steps(workflows, coordinate), CREDENTIALS_ACTION)
     assert len(found) == 1, (
         f"{coordinate[0]}:{coordinate[1]} compiles on a runner that can be "
         f"Ubicloud, so it must declare exactly one {CREDENTIALS_ACTION} "
@@ -175,6 +186,7 @@ def test_the_lane_publishes_the_cache_proxy(coordinate: tuple[str, str]) -> None
 
 @pytest.mark.parametrize("coordinate", COMPILING_JOBS, ids=case_id)
 def test_the_proxy_is_published_before_sccache_is_configured(
+    workflows: dict[str, dict[str, object]],
     coordinate: tuple[str, str],
 ) -> None:
     """Scenario: the credentials step is added after the Rust setup.
@@ -184,7 +196,7 @@ def test_the_proxy_is_published_before_sccache_is_configured(
     starts and keeps it for that server's life, so credentials published
     afterwards change nothing and the lane still looks correct.
     """
-    steps = _steps(coordinate)
+    steps = _steps(workflows, coordinate)
     credentials = _indices(steps, CREDENTIALS_ACTION)
     consumers = [
         index
@@ -196,7 +208,11 @@ def test_the_proxy_is_published_before_sccache_is_configured(
         f"one of {SCCACHE_CONSUMERS}; if that stopped being true this "
         "contract no longer describes the lane"
     )
-    assert credentials and credentials[0] < min(consumers), (
+    assert credentials, (
+        f"{coordinate[0]}:{coordinate[1]} declares no {CREDENTIALS_ACTION} "
+        "step, so there is nothing for the ordering to be right about"
+    )
+    assert credentials[0] < min(consumers), (
         f"{coordinate[0]}:{coordinate[1]} publishes the cache proxy at "
         f"{credentials} but configures sccache at {min(consumers)}; sccache "
         "reads its configuration when its server starts, so the credentials "
@@ -206,6 +222,7 @@ def test_the_proxy_is_published_before_sccache_is_configured(
 
 @pytest.mark.parametrize("coordinate", COMPILING_JOBS, ids=case_id)
 def test_the_proxy_step_is_guarded_to_ubicloud(
+    workflows: dict[str, dict[str, object]],
     coordinate: tuple[str, str],
 ) -> None:
     """Scenario: the credentials step runs on a GitHub-hosted runner.
@@ -215,8 +232,18 @@ def test_the_proxy_step_is_guarded_to_ubicloud(
     endpoint under Ubicloud's name, so an unguarded step turns the fork arm
     and the macOS build legs red.
     """
-    steps = _steps(coordinate)
-    index = _indices(steps, CREDENTIALS_ACTION)[0]
+    steps = _steps(workflows, coordinate)
+    found = _indices(steps, CREDENTIALS_ACTION)
+    # Stated here rather than leaned on from the presence test. Without it,
+    # zero steps raise IndexError instead of failing with a reason, and two
+    # steps silently guard only the first; either way this test stops being
+    # independently meaningful.
+    assert len(found) == 1, (
+        f"{coordinate[0]}:{coordinate[1]} must declare exactly one "
+        f"{CREDENTIALS_ACTION} step for this guard to describe; found "
+        f"{len(found)}"
+    )
+    index = found[0]
     assert steps[index].get("if") == EXPECTED_GUARD, (
         f"{coordinate[0]}:{coordinate[1]}'s credentials step guards on "
         f"{steps[index].get('if')!r}, not the reviewed {EXPECTED_GUARD!r}"

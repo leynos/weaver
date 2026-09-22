@@ -479,7 +479,7 @@ an unquoted `on:` beside the quoted one each fail it.
 
 Ubicloud runs a cache proxy on the runner's private network, and the runner
 exposes its URL and token to action steps only. A `run:` step, such as the one
-that starts an sccache server, never sees them.
+that starts the sccache server, never sees them.
 `export-ubicloud-cache-credentials` reads them where they are visible and
 republishes them through the job environment.
 
