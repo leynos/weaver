@@ -218,9 +218,13 @@ next.
 ## Where CodeScene may appear
 
 The CodeScene command-line tool is installed from a URL at job time and is not
-pinned upstream. Its installer and its output format have both moved without
-notice, and each time they moved, every pull-request lane in this estate that
-invoked the tool went red for a reason no change in the repository could have
+pinned to a version this repository chose: the shared action selects the
+archive from a committed manifest and verifies its digest, so the artefact is
+pinned, but what that artefact talks to is not. The tool calls CodeScene's API
+and refuses to run when the answer changes shape, and that has happened twice.
+Its output format moved, and more recently thirteen projects stopped returning
+a gates configuration at all, so the changed-line gate fails with "received
+project-config isn't valid" for a reason no change in the repository could have
 caused.
 
 So the tool runs in exactly one place: `coverage-main.yml`, on push to main or

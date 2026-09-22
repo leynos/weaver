@@ -103,8 +103,9 @@ jobs:
           with-ratchet: 'true'
       # No CodeScene step belongs in this workflow. The CodeScene
       # command-line tool is installed from a URL at job time and is not
-      # pinned upstream, so a move in its installer or its output format
-      # fails this lane for a reason no change here caused. The upload
+      # pinned to a service contract: it calls CodeScene's API, and a change
+      # in what that returns fails this lane for a reason no change here
+      # caused. The upload
       # happens once, on push to main, in coverage-main.yml; the
       # changed-line gate a reviewer sees is CodeScene's own check against
       # that upload and needs nothing from here.
