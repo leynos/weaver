@@ -231,23 +231,29 @@ So the tool runs in exactly one place: `coverage-main.yml`, on push to main or
 on manual dispatch. A failure there delays a coverage report. It cannot block a
 merge.
 
-A pull-request lane may still generate coverage, because the ratchet is ours
-and runs offline with no network dependency. What it may not do is any of these
-three, each of which fails
+A pull-request lane may still generate coverage, because the ratchet is
+repository-owned and runs offline with no network dependency. What it may not
+do is any of these five, each of which fails
 `tests/workflow_contracts/ci_codescene_placement_test.py`:
 
-| Forbidden in a pull-request lane              | Why it is read                                     |
-| --------------------------------------------- | -------------------------------------------------- |
-| a step whose `uses:` names a CodeScene action | the obvious form                                   |
-| a `run:` step invoking `cs-coverage`          | the same hazard with no action to notice           |
-| `CS_ACCESS_TOKEN` at any scope                | a lane holding the token is one line from using it |
+| Forbidden in a pull-request lane                      | Why it is read                                         |
+| ----------------------------------------------------- | ------------------------------------------------------ |
+| a step or job whose `uses:` names CodeScene           | the obvious form                                       |
+| a `run:` step invoking `cs-coverage`                  | the same hazard with no action to notice               |
+| `CS_ACCESS_TOKEN` at any scope                        | a lane holding the token is one line from using it     |
+| `codescene.io` anywhere                               | `curl` needs neither the action nor the tool           |
+| `secrets: inherit` into another repository's workflow | forwards the token unnamed, to a document nobody reads |
 
 *Table 3: What the CodeScene placement contract refuses.*
 
 The third row is what makes the contract worth having. Deleting the step but
 leaving the token in the job environment looks clean in a diff and leaves the
 hazard in place, so the whole document is walked for the name rather than the
-three scopes that are meant to carry it.
+three scopes that are meant to carry it: a `run` body, an action input, an
+`env` value under any key and a named `secrets:` forwarding are all found. The
+fifth row closes the one route the walk cannot see, since `secrets: inherit`
+names nothing. Inheriting into a workflow in this repository is permitted,
+because that workflow is in the closure described below and read like any other.
 
 A fourth test guards the other direction. Without it the rule could be
 satisfied by deleting coverage reporting altogether, which is compliance by
@@ -266,6 +272,13 @@ without the ref test a dispatch from a feature branch publishes that branch's
 coverage as the trunk's and drags the ratchet baseline with it. The comparison
 is to the full ref, not a suffix: a branch named `not-main` ends in `main`.
 
+The token is declared in the upload step's own `env` and nowhere else in
+`coverage-main.yml`: not at workflow scope, not on the job, not in another
+step. At job scope every earlier step could read it, including the tests that
+generate coverage, which a dispatch can run from any branch before the ref
+guard is reached. The step's `if:` still reads `env.CS_ACCESS_TOKEN`, because a
+step's own environment is in scope for its condition.
+
 The publisher declares a concurrency group keyed on the ref, with
 `cancel-in-progress: false`. Two pushes to the trunk in quick succession would
 otherwise upload at the same time and leave the baseline set by whichever
@@ -280,13 +293,16 @@ test.
 
 The upload condition is compared whole rather than searched for parts. A
 containment test accepts
-`(github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN != '' ||
-true)`,
+`(github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN != '' || true)`,
 which holds both halves and is true on every branch, so it would pass the one
-expression it exists to refuse. The publisher's `push.branches` is pinned to
-`main` for a related reason: the step's ref guard would still refuse the upload
-from elsewhere, but an unrestricted trigger burns a runner on every branch push
-and leaves the two protections disagreeing about what the workflow is for.
+expression it exists to refuse. Appending
+`|| github.event_name == 'workflow_dispatch'` is the same defeat in another
+form: every conjunct is still present and all of them become optional. The
+equality comparison refuses both, so no conjunct-splitting rule is needed. The
+publisher's `push.branches` is pinned to `main` for a related reason: the
+step's ref guard would still refuse the upload from elsewhere, but an
+unrestricted trigger burns a runner on every branch push and leaves the two
+protections disagreeing about what the workflow is for.
 
 ### What must remain
 
@@ -310,21 +326,56 @@ those carrying a pull-request trigger. `release-dry-run.yml` is triggered by
 Reading only the roots would leave both outside every assertion while a pull
 request still runs them.
 
-The contract therefore follows `jobs.<id>.uses` for references beginning with
-`./`, transitively, with a visited set so that two reusable workflows calling
-each other cannot hang it. References to other repositories are not followed:
-those are somebody else's documents to police. Two mutations cover this, a
-CodeScene step hidden in `release.yml` and the token hidden in
-`build-and-package.yml` two calls deep, and neither is visible to a roots-only
-reading.
+The contract therefore follows `jobs.<id>.uses`, transitively, with a visited
+set so that two reusable workflows calling each other cannot hang it. A call is
+local when it resolves to a file directly under `.github/workflows/` once its
+prefix is stripped. That is matched by shape rather than by a list of
+spellings, and three prefixes are stripped: `./`, the documented form; `$/`;
+and this repository's own qualified name, so
+`leynos/weaver/.github/workflows/release.yml@main` is followed like
+`./.github/workflows/release.yml`. The qualified form runs the file at the
+named ref rather than at the pull request's head, but the file in this tree is
+what that ref becomes on merge, so reading it is the conservative choice.
+Accepting a spelling GitHub might refuse only widens the set the prohibitions
+run over; missing one GitHub accepts hides a workflow from all of them.
+
+References to other repositories are not followed: their content is not in this
+tree. That is why `secrets: inherit` into one is refused outright rather than
+traced.
+
+A workflow declaring only `workflow_call` is the case this exists for. It has
+no pull-request trigger, so a trigger-only reading never opens it, yet a
+pull-request job that calls it with `secrets: inherit` hands it the token.
 
 `pull_request_target` counts as a pull-request trigger here. It runs on a pull
 request with write permissions, which makes it more dangerous than
 `pull_request`, not less. `workflow_dispatch` does not count: a dispatch is not
 a pull request, which is why the publisher may carry one.
 
-Each of the five ways to break this was applied alone and reverted while
-writing the contract, and each failed exactly one test.
+### How the readings are proved
+
+The reading machinery lives in
+`tests/workflow_contracts/codescene_placement_reader.py`, and every reader
+takes its documents as an argument. The repository's own workflows are all
+written the one way the first reader understood, so a reading that mishandles
+another shape passes against them either way.
+`tests/workflow_contracts/codescene_placement_reader_test.py` therefore drives
+each reading with constructed trees:
+
+- the closure reaches a `workflow_call` probe that curls CodeScene's API with
+  an inherited token, in each of the three call spellings, and stays out of a
+  reusable workflow nothing calls;
+- workflows are loaded through a strict `SafeLoader` that refuses a duplicated
+  mapping key, because PyYAML otherwise keeps the last `runs-on` or `env` and
+  says nothing;
+- `on:` is read as a scalar, a sequence or a mapping, under both the quoted
+  string key and YAML 1.1's boolean `True`, and any other shape is refused
+  rather than read as "no triggers", which would let the workflow escape every
+  clause; and
+- a `.YML` extension is read like `.yml`.
+
+Each reading was mutated alone and restored from a copy while writing the
+contract, and each mutation failed at least one test that names what it broke.
 
 ## Whitaker CI setup
 

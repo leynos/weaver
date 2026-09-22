@@ -49,7 +49,6 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN || '' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: Setup Rust
@@ -61,6 +60,11 @@ jobs:
           format: lcov
           with-ratchet: 'true'
       - name: Upload coverage data to CodeScene
+        # The token lives on this step alone. At job scope every earlier step
+        # could read it, including the tests that generate coverage, which a
+        # dispatch can run from any branch before the ref guard is reached.
+        env:
+          CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN || '' }}
         # The ref guard matters as much as the token. `workflow_dispatch` can
         # be run from any branch, and CodeScene accepts an upload for the
         # analysed branch whatever the payload actually came from, so a
