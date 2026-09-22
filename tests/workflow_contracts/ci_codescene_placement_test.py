@@ -368,7 +368,7 @@ def test_the_publisher_only_uploads_from_the_trunk() -> None:
     )
 
 
-def test_the_publisher_serialises_and_is_not_cancelled() -> None:
+def test_the_publisher_serializes_and_is_not_cancelled() -> None:
     """Scenario: two pushes to the trunk upload at once.
 
     Invariant: the publisher declares a concurrency group keyed on the ref,
