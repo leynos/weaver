@@ -59,16 +59,13 @@ RUNNER_EXPRESSION: typ.Final = re.compile(
     r" \|\| '(?P<default_arm>[^'\n]*)' \}\}$"
 )
 
-#: Every quoted literal in an expression, used to read the labels a lane can
-#: actually select.
-EXPRESSION_LITERAL: typ.Final = re.compile(r"'([^'\n]*)'")
-
 #: The one expression that may name no label of its own: a reusable workflow
-#: selecting whatever runner its caller passed. Any other literal-free
-#: expression, such as ``${{ matrix.os }}``, selects labels this reader cannot
-#: see, so it is refused rather than read as selecting nothing.
+#: selecting the runner its caller passed as ``with.runner``, which is the
+#: input ``caller_runner_input`` reads at every caller. Any other input name
+#: would be passed through a ``with`` key this reader never inspects, so it is
+#: refused rather than read as selecting nothing.
 CALLER_INPUT_EXPRESSION: typ.Final = re.compile(
-    r"^\$\{\{\s*inputs\.[A-Za-z_][\w-]*\s*\}\}$"
+    rf"^\$\{{\{{\s*inputs\.{RUNNER_INPUT}\s*\}}\}}$"
 )
 
 
@@ -263,28 +260,31 @@ def runner_declarations(definition: dict[str, object]) -> list[object]:
     RunnerShapeError
         When either declaration is not a shape GitHub accepts.
     """
+    # Presence, not truthiness: an explicit `runs-on:` or `runner:` with no
+    # value is a declaration to refuse, not the absence of one.
     declarations: list[object] = []
-    declared = runner_value(definition)
-    if declared is not None:
-        declarations.extend(runs_on_declarations(declared))
-    supplied = caller_runner_input(definition)
-    if supplied is not None:
-        if not isinstance(supplied, str):
-            message = f"unreadable runner input {supplied!r}"
+    if "runs-on" in definition:
+        declarations.extend(runs_on_declarations(definition["runs-on"]))
+    supplied = definition.get("with")
+    if isinstance(supplied, dict) and RUNNER_INPUT in supplied:
+        runner = supplied[RUNNER_INPUT]
+        if not isinstance(runner, str):
+            message = f"unreadable runner input {runner!r}"
             raise RunnerShapeError(message)
-        declarations.append(supplied)
+        declarations.append(runner)
     return declarations
 
 
 def declaration_labels(declaration: object) -> set[str]:
     """Return every label one runner declaration can select.
 
-    Both arms of a conditional count: a label reachable only when a pull
-    request comes from a fork is as much in use as one reachable otherwise.
-    An expression with no quoted literal contributes no label of its own
-    only when it is ``${{ inputs.<name> }}``, a reusable workflow selecting
-    whatever its caller passed; the caller's declaration names the labels.
-    Any other literal-free expression is refused.
+    Two expression forms are modelled, and every other is refused, because a
+    reader that took "some quoted literal" as enough would read
+    ``${{ matrix.os || 'ubuntu-latest' }}`` as selecting only the fallback.
+    The fork fallback ``${{ <guard> && '<a>' || '<b>' }}`` selects both arms:
+    a label reachable only for a fork is as much in use as the other.
+    ``${{ inputs.runner }}`` selects whatever the caller passed as
+    ``with.runner``, which the caller's own declaration names.
 
     Examples
     --------
@@ -295,14 +295,16 @@ def declaration_labels(declaration: object) -> set[str]:
     >>> declaration_labels("${{ inputs.runner }}")
     set()
     """
-    text = str(declaration)
+    text = str(declaration).strip()
     if "${{" not in text:
-        return {text.strip()}
-    literals = set(EXPRESSION_LITERAL.findall(text))
-    if not literals and not CALLER_INPUT_EXPRESSION.match(text.strip()):
-        message = f"expression {text!r} selects labels this reader cannot see"
-        raise RunnerShapeError(message)
-    return literals
+        return {text}
+    if CALLER_INPUT_EXPRESSION.fullmatch(text):
+        return set()
+    fallback = RUNNER_EXPRESSION.fullmatch(text)
+    if fallback:
+        return {fallback["fork_arm"], fallback["default_arm"]}
+    message = f"expression {text!r} selects labels this reader cannot see"
+    raise RunnerShapeError(message)
 
 
 def job_labels(definition: dict[str, object]) -> set[str]:

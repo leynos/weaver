@@ -76,6 +76,11 @@ def test_a_mapping_placed_lane_is_seen_as_ubicloud() -> None:
         pytest.param(["linux", 4], id="non-string-label"),
         pytest.param(4, id="number"),
         pytest.param("${{ matrix.os }}", id="matrix-expression"),
+        pytest.param(
+            "${{ matrix.os || 'ubuntu-latest' }}", id="matrix-with-fallback"
+        ),
+        pytest.param("${{ inputs.os }}", id="other-input"),
+        pytest.param(None, id="explicit-null"),
     ],
 )
 def test_an_unreadable_runs_on_is_refused(runs_on: object) -> None:
@@ -84,10 +89,21 @@ def test_an_unreadable_runs_on_is_refused(runs_on: object) -> None:
         job_labels({"runs-on": runs_on})
 
 
-def test_a_non_string_runner_input_is_refused() -> None:
-    """A ``runner`` input must be one label or expression, like ``runs-on``."""
+@pytest.mark.parametrize(
+    "runner",
+    [
+        pytest.param(["a"], id="sequence"),
+        pytest.param(None, id="explicit-null"),
+    ],
+)
+def test_a_non_string_runner_input_is_refused(runner: object) -> None:
+    """A ``runner`` input must be one label or expression, like ``runs-on``.
+
+    An explicit null is a declaration too: reading it as absent would let a
+    caller with no usable runner pass every placement assertion.
+    """
     with pytest.raises(RunnerShapeError):
-        runner_declarations({"uses": "./b.yml", "with": {"runner": ["a"]}})
+        runner_declarations({"uses": "./b.yml", "with": {"runner": runner}})
 
 
 @pytest.mark.parametrize("coordinate", sorted(jobs()), ids=case_id)
