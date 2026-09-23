@@ -1,0 +1,53 @@
+name: PR 297 Ubuntu user namespace diagnostic
+
+'on':
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sandbox-probe:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnose-pr297-ubuntu-userns-20260924'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: e39abdc710f95ef2ed7554ddff1dfef242fbb137
+          persist-credentials: false
+      - name: Record runner image and exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            printf 'ImageOS=%s\n' "${ImageOS:-unknown}"
+            printf 'ImageVersion=%s\n' "${ImageVersion:-unknown}"
+            printf 'RUNNER_NAME=%s\n' "${RUNNER_NAME:-unknown}"
+            uname -a
+            git rev-parse HEAD
+          } | tee "${RUNNER_TEMP}/sandbox-probe-context.txt"
+          test "$(git rev-parse HEAD)" = e39abdc710f95ef2ed7554ddff1dfef242fbb137
+      - name: Setup repository Rust toolchain
+        uses: leynos/shared-actions/.github/actions/setup-rust@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+      - name: Run unchanged sandbox probe
+        shell: bash
+        run: |
+          set -uo pipefail
+          cargo test --manifest-path Cargo.toml \
+            -p weaver-sandbox \
+            --test sandbox_child_probe 2>&1 | tee "${RUNNER_TEMP}/sandbox-child-probe.out"
+          test_status=${PIPESTATUS[0]}
+          printf 'probe_exit_status=%s\n' "${test_status}" | tee -a "${RUNNER_TEMP}/sandbox-child-probe.out"
+          exit "${test_status}"
+      - name: Upload diagnostic output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr297-ubuntu-userns-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/sandbox-probe-context.txt
+            ${{ runner.temp }}/sandbox-child-probe.out
+          if-no-files-found: warn

@@ -61,6 +61,7 @@ EXPECTED_FORK_FALLBACK: typ.Final = {
 #: it run.
 EXPECTED_LITERAL_LABEL: typ.Final = {
     ("coverage-main.yml", "coverage-upload"): UBICLOUD_SMALL,
+    ("pr297-ubuntu-userns-diagnostic.yml", "sandbox-probe"): GITHUB_HOSTED_LABEL,
     ("release.yml", "release"): UBICLOUD_SMALL,
     ("release.yml", "build-macos"): MACOS_LABEL,
     ("release.yml", "build-freebsd"): GITHUB_HOSTED_LABEL,
@@ -109,6 +110,7 @@ DELEGATED_JOBS: typ.Final = {
 EXPECTED_CEILING_MINUTES: typ.Final = {
     ("ci.yml", "build-test"): 30,
     ("coverage-main.yml", "coverage-upload"): 20,
+    ("pr297-ubuntu-userns-diagnostic.yml", "sandbox-probe"): 30,
     ("release.yml", "metadata"): 10,
     ("release.yml", "release"): 15,
     ("build-and-package.yml", "build"): 30,
