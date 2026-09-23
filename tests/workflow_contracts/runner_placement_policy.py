@@ -27,6 +27,8 @@ UBICLOUD_LARGE: typ.Final = "ubicloud-standard-4"
 UBICLOUD_SMALL: typ.Final = "ubicloud-standard-2"
 
 GITHUB_HOSTED_LABEL: typ.Final = "ubuntu-latest"
+#: Temporary PR #297 coverage diagnostic; not a production CI placement.
+UBUNTU_2204_DIAGNOSTIC: typ.Final = "ubuntu-22.04"
 MACOS_LABEL: typ.Final = "macos-15"
 
 #: The one guard a fork fallback may key on. Compared by equality, because a
@@ -61,6 +63,7 @@ EXPECTED_FORK_FALLBACK: typ.Final = {
 #: it run.
 EXPECTED_LITERAL_LABEL: typ.Final = {
     ("coverage-main.yml", "coverage-upload"): UBICLOUD_SMALL,
+    ("pr297-ubuntu2204-coverage-diagnostic.yml", "coverage-probe"): UBUNTU_2204_DIAGNOSTIC,
     ("release.yml", "release"): UBICLOUD_SMALL,
     ("release.yml", "build-macos"): MACOS_LABEL,
     ("release.yml", "build-freebsd"): GITHUB_HOSTED_LABEL,
@@ -109,6 +112,7 @@ DELEGATED_JOBS: typ.Final = {
 EXPECTED_CEILING_MINUTES: typ.Final = {
     ("ci.yml", "build-test"): 30,
     ("coverage-main.yml", "coverage-upload"): 20,
+    ("pr297-ubuntu2204-coverage-diagnostic.yml", "coverage-probe"): 20,
     ("release.yml", "metadata"): 10,
     ("release.yml", "release"): 15,
     ("build-and-package.yml", "build"): 30,
@@ -118,7 +122,9 @@ EXPECTED_CEILING_MINUTES: typ.Final = {
 #: actionlint, which knows them already. ``macos-15`` is here because the
 #: macOS build legs are legitimately hosted, not because macOS is exempt from
 #: review: ``EXPECTED_LITERAL_LABEL`` pins that leg by coordinate.
-GITHUB_HOSTED_LABELS: typ.Final = frozenset({GITHUB_HOSTED_LABEL, MACOS_LABEL})
+GITHUB_HOSTED_LABELS: typ.Final = frozenset({
+    GITHUB_HOSTED_LABEL, UBUNTU_2204_DIAGNOSTIC, MACOS_LABEL,
+})
 
 #: Prohibited runner families. A prohibition reads by substring on purpose: a
 #: renamed or neutered label still leaves its family's text behind.

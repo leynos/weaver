@@ -1,0 +1,48 @@
+name: PR 297 Ubuntu 22.04 coverage diagnostic
+
+'on':
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  coverage-probe:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnose-pr297-ubuntu2204-coverage-20260924'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: e39abdc710f95ef2ed7554ddff1dfef242fbb137
+          persist-credentials: false
+      - name: Record image and exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            printf 'ImageOS=%s\n' "${ImageOS:-unknown}"
+            printf 'ImageVersion=%s\n' "${ImageVersion:-unknown}"
+            printf 'RUNNER_NAME=%s\n' "${RUNNER_NAME:-unknown}"
+            uname -a
+            git rev-parse HEAD
+          } | tee "${RUNNER_TEMP}/pr297-ubuntu2204-coverage-context.txt"
+          test "$(git rev-parse HEAD)" = e39abdc710f95ef2ed7554ddff1dfef242fbb137
+      - name: Setup Rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+      - name: Generate coverage without publishing a baseline
+        uses: leynos/shared-actions/.github/actions/generate-coverage@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        with:
+          output-path: lcov.info
+          format: lcov
+          with-ratchet: 'true'
+          publish-baseline: auto
+      - name: Upload runner context
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr297-ubuntu2204-coverage-context-${{ github.run_id }}
+          path: ${{ runner.temp }}/pr297-ubuntu2204-coverage-context.txt
+          if-no-files-found: warn
