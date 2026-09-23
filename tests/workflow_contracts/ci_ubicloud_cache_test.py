@@ -34,13 +34,10 @@ import typing as typ
 from pathlib import Path
 
 import pytest
-import yaml
+from workflow_loader import read_workflows
 
 REPO_ROOT: typ.Final = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR: typ.Final = REPO_ROOT / ".github" / "workflows"
-
-#: Both spellings GitHub accepts for a workflow file's extension.
-WORKFLOW_FILE_PATTERNS: typ.Final = ("*.yml", "*.yaml")
 
 #: The action that publishes the proxy credentials, matched on its path so a
 #: repin of the SHA does not need this file edited.
@@ -80,20 +77,16 @@ def workflows() -> dict[str, dict[str, object]]:
     instead of hiding in a decorator, and a test that needs a different tree
     can override it.
 
+    The tree is read through ``workflow_loader``, which every workflow
+    contract here shares: it refuses a duplicated mapping key, so a step
+    declared twice cannot have its first half discarded unseen.
+
     Returns
     -------
     dict[str, dict[str, object]]
         Each workflow's file name mapped to its parsed document.
     """
-    paths = sorted(
-        path
-        for pattern in WORKFLOW_FILE_PATTERNS
-        for path in WORKFLOW_DIR.glob(pattern)
-    )
-    documents = {
-        path.name: yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        for path in paths
-    }
+    documents = read_workflows(WORKFLOW_DIR)
     assert documents, "the repository should define at least one workflow"
     return documents
 
