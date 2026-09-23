@@ -72,14 +72,15 @@ jobs:
           mmdc --version
       # Merman comes from its checksum-verified release archive. `cargo
       # install merman-cli` compiled it from crates.io on every run, 2.6
-      # minutes of a 13-minute job. Python 3.11 matches the uv setup above,
-      # so the action does not download a second managed interpreter.
+      # minutes of a 13-minute job. Nixie installs on the action's default
+      # Python 3.14, which nixie-cli 1.1.0 requires; the uv setup above does
+      # not provide it, so uv fetches a managed 3.14 for the tool, as the
+      # step this replaces already did.
       - name: Install Nixie and Merman
         uses: leynos/shared-actions/.github/actions/install-nixie@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           nixie-version: '1.1.0'
           merman-version: '0.7.0'
-          python-version: '3.11'
       - name: Mermaid lint
         run: make nixie
       - name: Boundary manifest gate

@@ -412,8 +412,8 @@ pinned to a full commit SHA:
   installer falls back to a source build.
 - **Merman**, the Mermaid renderer `make nixie` uses, comes from
   `install-nixie`, which downloads Merman 0.7.0's release archive and verifies
-  it against a pinned checksum, and installs Nixie 1.1.0 with the Python 3.11
-  interpreter the uv setup already provides.
+  it against a pinned checksum, and installs Nixie 1.1.0 on Python 3.14, which
+  that release requires.
 
 Until September 2026 both were compiled on every run.
 `cargo install merman-cli` built Merman from crates.io, a median 2.6 minutes,
