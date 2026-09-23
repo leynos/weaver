@@ -9,7 +9,9 @@ command-line arguments.
 ## Requirements
 
 Weaver requires Rust 1.89 or newer to build from source because its
-`ortho-config` dependency has the same minimum supported Rust version.
+`ortho-config` dependency has the same minimum supported Rust version. See the
+[developer's guide](developers-guide.md#development-build-backend) for the
+pinned toolchain and platform-specific build prerequisites.
 
 ## 0.1.0 command-surface target
 

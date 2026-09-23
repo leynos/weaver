@@ -84,10 +84,11 @@ configuration layering, and the complete command reference.
 
 ## Building from source
 
-Weaver requires the pinned **Nightly Rust toolchain `nightly-2026-03-26`** for
-local builds. The workspace `.cargo/config.toml` uses options that require the
-Nightly toolchain, so stable Rust is not sufficient for local Cargo builds in
-this checkout. To build:
+Weaver supports Rust 1.89 or newer for source builds. This checkout pins
+**Nightly Rust `nightly-2026-03-26`** for its development tools and accelerated
+Make builds. Direct Cargo commands use the ordinary LLVM backend unless they
+select another configuration; a compatible stable toolchain can build with that
+backend. For example:
 
 ```sh
 cargo +nightly-2026-03-26 build --release
@@ -101,13 +102,22 @@ cargo +nightly-2026-03-26 test --workspace
 
 ### Toolchain prerequisites
 
-The workspace `.cargo/config.toml` enables Nightly-only build settings for the
-Cranelift codegen backend in development builds. Install the pinned toolchain
-and component with:
+The pinned toolchain declares `rustfmt`, `clippy`, `rust-analyzer`, and
+`rustc-codegen-cranelift` in `rust-toolchain.toml`. Installing Cranelift alone
+does not activate it. Standard debug Make targets select
+`tools/dev-fast/config.toml` explicitly on Linux and macOS; Linux also requires
+the `mold` linker. FreeBSD Make debug targets use LLVM because the pinned
+Cranelift component is unavailable there. Direct Cargo, release, coverage,
+verification, and Whitaker invocations do not select the development fragment.
+The [developer's guide](docs/developers-guide.md) explains the routing matrix
+and platform-specific prerequisites.
+
+Install the pinned toolchain with:
 
 ```sh
 rustup toolchain install nightly-2026-03-26
-rustup component add rustc-codegen-cranelift --toolchain nightly-2026-03-26
+rustup component add rustfmt clippy rust-analyzer rustc-codegen-cranelift \
+  --toolchain nightly-2026-03-26
 ```
 
 Set a local override so Cargo uses that pinned Nightly automatically in this
@@ -117,13 +127,10 @@ checkout:
 rustup override set nightly-2026-03-26
 ```
 
-If any of these prerequisites are missing, the failure mode is often opaque:
-Cargo may report unstable `-Z` option errors or missing
-`rustc-codegen-cranelift`. When that happens, verify the pinned Nightly
-toolchain and the Cranelift component first.
-
-If local builds fail, verify the pinned Nightly override first, then confirm
-the Cranelift component is installed before investigating the workspace itself.
+If a Make debug build fails on Linux or macOS, verify that the pinned toolchain
+and Cranelift component are installed and the target selects the development
+fragment. Linux also requires `mold`. Direct Cargo builds do not activate
+Cranelift and should be investigated with the ordinary LLVM backend.
 
 ## Documentation
 
