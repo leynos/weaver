@@ -1,0 +1,15 @@
+# Explicit development profile for supported Linux and macOS hosts.
+# Standard debug Make targets pass this fragment to Cargo. Direct Cargo,
+# release, coverage, verification, and Whitaker do not select it.
+
+[unstable]
+codegen-backend = true
+
+[profile.dev]
+codegen-backend = "cranelift"
+
+# This target-scoped flag leaves macOS on its native linker. Make repeats it
+# in RUSTFLAGS for Linux debug Make recipes because inherited or recipe-level
+# RUSTFLAGS overrides target rustflags rather than merging with them.
+[target.'cfg(target_os = "linux")']
+rustflags = ["-Clink-arg=-fuse-ld=mold"]

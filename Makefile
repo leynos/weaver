@@ -1,4 +1,4 @@
-.PHONY: help all clean test test-workflow-contracts build release lint fmt \
+.PHONY: help all clean test dev-test test-workflow-contracts build dev-build release lint fmt \
 	check-fmt markdownlint nixie typecheck install spelling
 
 TARGET ?= weaver
@@ -7,11 +7,19 @@ USER_MDLINT := $(HOME)/.bun/bin/markdownlint-cli2
 USER_WHITAKER := $(HOME)/.local/bin/whitaker
 USER_BIN_PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(HOME)/.bun/bin
 CARGO ?= $(or $(shell command -v cargo 2>/dev/null),$(wildcard $(USER_CARGO)),cargo)
+# The pinned Cranelift component is available for Linux and macOS hosts, but
+# not FreeBSD. Release and coverage retain Cargo's ordinary LLVM backend.
+HOST_OS ?= $(shell uname -s)
+DEV_FAST_CONFIG := $(if $(filter Linux Darwin,$(HOST_OS)),--config tools/dev-fast/config.toml)
+# RUSTFLAGS overrides Cargo's target rustflags. CI's setup-rust action exports
+# it, so preserve its value and add mold explicitly for every Linux debug gate.
+DEV_FAST_RUST_FLAGS := $(if $(filter Linux,$(HOST_OS)),-Clink-arg=-fuse-ld=mold)
+DEV_FAST_LINKER_ENV = $(if $(DEV_FAST_RUST_FLAGS),RUSTFLAGS="$(strip $(RUSTFLAGS) $(DEV_FAST_RUST_FLAGS))")
 BUILD_JOBS ?=
 RUST_FLAGS ?=
-RUST_FLAGS := -D warnings $(RUST_FLAGS)
+override RUST_FLAGS := $(strip -D warnings $(RUST_FLAGS))
 RUSTDOC_FLAGS ?=
-RUSTDOC_FLAGS := -D warnings $(RUSTDOC_FLAGS)
+override RUSTDOC_FLAGS := $(strip -D warnings $(RUSTDOC_FLAGS))
 CARGO_FLAGS ?= --workspace --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
@@ -36,31 +44,39 @@ TYPOS_CONFIG_BUILDER = $(UV_ENV) $(UV) tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
 
-build: target/debug/$(TARGET) ## Build debug binary
-release: target/release/$(TARGET) ## Build release binary
+build: ## Build debug binary
+	$(DEV_FAST_LINKER_ENV) $(CARGO) $(DEV_FAST_CONFIG) build $(BUILD_JOBS) --bin $(TARGET)
 
-all: check-fmt lint test spelling ## Perform a comprehensive check of code and prose
+dev-build: build ## Build with the supported development backend
+
+release: ## Build release binary
+	$(CARGO) build $(BUILD_JOBS) --release --bin $(TARGET)
+
+all: ## Perform a comprehensive check of code and prose
+	$(MAKE) check-fmt
+	$(MAKE) lint
+	$(MAKE) test
+	$(MAKE) spelling
 
 clean: ## Remove build artefacts
 	$(CARGO) clean
 
 test: ## Run tests with warnings treated as errors
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test --doc --workspace --all-features
+	RUSTFLAGS="$(strip $(RUSTFLAGS) $(RUST_FLAGS) $(DEV_FAST_RUST_FLAGS))" $(CARGO) $(DEV_FAST_CONFIG) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$(strip $(RUSTFLAGS) $(RUST_FLAGS) $(DEV_FAST_RUST_FLAGS))" $(CARGO) $(DEV_FAST_CONFIG) test --doc --workspace --all-features
+
+dev-test: test ## Test with the supported development backend
 
 test-workflow-contracts: ## Validate workflow caller and runner-placement contracts
 	uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q
 
-target/%/$(TARGET): ## Build binary in debug or release mode
-	$(CARGO) build $(BUILD_JOBS) $(if $(filter release,$*),--release) --bin $(TARGET)
-
 lint: ## Run Clippy with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
-	$(CARGO) clippy $(CLIPPY_FLAGS)
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(DEV_FAST_LINKER_ENV) $(CARGO) $(DEV_FAST_CONFIG) doc --no-deps --workspace
+	$(DEV_FAST_LINKER_ENV) $(CARGO) $(DEV_FAST_CONFIG) clippy $(CLIPPY_FLAGS)
 	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: ## Type-check without building
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
+	RUSTFLAGS="$(strip $(RUSTFLAGS) $(RUST_FLAGS) $(DEV_FAST_RUST_FLAGS))" $(CARGO) $(DEV_FAST_CONFIG) check $(CARGO_FLAGS)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
