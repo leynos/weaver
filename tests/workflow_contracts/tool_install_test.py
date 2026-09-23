@@ -110,14 +110,21 @@ def _version(text: str) -> tuple[int, ...]:
     return tuple(int(part) for part in text.split("."))
 
 
-def test_no_step_compiles_a_tool_from_source() -> None:
-    """No workflow step runs `cargo install` or clones the Whitaker source."""
-    offenders = [
+def _source_build_offenders(
+    steps: typ.Iterable[tuple[str, str, dict[str, object]]],
+) -> list[str]:
+    """Return workflow steps that build tools from source instead of releases."""
+    return [
         f"{workflow}:{job} step {step.get('name', '')!r}"
-        for workflow, job, step in _every_step()
+        for workflow, job, step in steps
         if CARGO_INSTALL.search(str(step.get("run", "")))
         or WHITAKER_CLONE.search(str(step.get("run", "")))
     ]
+
+
+def test_no_step_compiles_a_tool_from_source() -> None:
+    """No workflow step runs `cargo install` or clones the Whitaker source."""
+    offenders = _source_build_offenders(_every_step())
     assert not offenders, (
         "these steps build a tool from source instead of installing a "
         f"prebuilt release: {', '.join(offenders)}"
@@ -149,34 +156,28 @@ def test_whitaker_clone_detection_respects_shell_continuations(
     script: str, matches_clone: bool
 ) -> None:
     """Only clone commands joined by a shell continuation identify source builds."""
-    assert bool(WHITAKER_CLONE.search(script)) is matches_clone
-
-
-def test_contract_rejects_continued_whitaker_clone(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A shell continuation cannot conceal a Whitaker source clone from the gate."""
-    monkeypatch.setitem(
-        globals(),
-        "workflows",
-        lambda: {
-            "mutated.yml": {
-                "jobs": {
-                    "source-build": {
-                        "steps": [
-                            {
-                                "name": "Clone Whitaker source",
-                                "run": "git clone \\\n  https://github.com/leynos/whitaker",
-                            }
-                        ]
-                    }
-                }
-            }
-        },
+    assert bool(WHITAKER_CLONE.search(script)) is matches_clone, (
+        f"expected Whitaker clone detection {matches_clone} for {script!r}"
     )
 
-    with pytest.raises(AssertionError, match="build a tool from source"):
-        test_no_step_compiles_a_tool_from_source()
+
+def test_contract_rejects_continued_whitaker_clone() -> None:
+    """A shell continuation cannot conceal a Whitaker source clone from the gate."""
+    offenders = _source_build_offenders(
+        [
+            (
+                "mutated.yml",
+                "source-build",
+                {
+                    "name": "Clone Whitaker source",
+                    "run": "git clone \\\n  https://github.com/leynos/whitaker",
+                },
+            )
+        ]
+    )
+    assert offenders == ["mutated.yml:source-build step 'Clone Whitaker source'"], (
+        "a continued Whitaker clone must be rejected as a source build"
+    )
 
 
 @pytest.mark.parametrize("action", [NIXIE_ACTION, WHITAKER_ACTION])
