@@ -25,48 +25,48 @@ MAKE_RUST_FLAG = "-Ctarget-cpu=native"
 MAKE_RUSTDOC_FLAG = "--cfg docsrs"
 
 PLATFORMS = (
-    pytest.param("Linux", True, True, id="linux-cranelift-mold"),
-    pytest.param("Darwin", True, False, id="macos-cranelift-native-linker"),
-    pytest.param("FreeBSD", False, False, id="freebsd-llvm-native-linker"),
+    pytest.param(("Linux", True, True), id="linux-cranelift-mold"),
+    pytest.param(("Darwin", True, False), id="macos-cranelift-native-linker"),
+    pytest.param(("FreeBSD", False, False), id="freebsd-llvm-native-linker"),
 )
 
 DEBUG_TARGETS = (
-    pytest.param("build", (), ("build",), id="build"),
-    pytest.param("dev-build", (), ("build",), id="dev-build"),
+    pytest.param(("build", (), ("build",)), id="build"),
+    pytest.param(("dev-build", (), ("build",)), id="dev-build"),
     pytest.param(
-        "test",
-        ("TEST_CMD=test",),
-        ("test --workspace", "test --doc"),
+        ("test", ("TEST_CMD=test",), ("test --workspace", "test --doc")),
         id="test-cargo",
     ),
     pytest.param(
-        "test",
-        ("TEST_CMD=nextest run",),
-        ("nextest run --workspace", "test --doc"),
+        (
+            "test",
+            ("TEST_CMD=nextest run",),
+            ("nextest run --workspace", "test --doc"),
+        ),
         id="test-nextest-run",
     ),
     pytest.param(
-        "dev-test",
-        ("TEST_CMD=test",),
-        ("test --workspace", "test --doc"),
+        ("dev-test", ("TEST_CMD=test",), ("test --workspace", "test --doc")),
         id="dev-test-cargo",
     ),
     pytest.param(
-        "dev-test",
-        ("TEST_CMD=nextest run",),
-        ("nextest run --workspace", "test --doc"),
+        (
+            "dev-test",
+            ("TEST_CMD=nextest run",),
+            ("nextest run --workspace", "test --doc"),
+        ),
         id="dev-test-nextest-run",
     ),
-    pytest.param("lint", (), ("doc", "clippy"), id="lint-doc-and-clippy"),
-    pytest.param("typecheck", (), ("check",), id="typecheck"),
+    pytest.param(("lint", (), ("doc", "clippy")), id="lint-doc-and-clippy"),
+    pytest.param(("typecheck", (), ("check",)), id="typecheck"),
 )
 
 FORBIDDEN_TARGETS = (
-    pytest.param("release", 1, id="release"),
-    pytest.param("clean", 1, id="clean"),
-    pytest.param("fmt", 1, id="fmt"),
-    pytest.param("check-fmt", 1, id="check-fmt"),
-    pytest.param("install", 2, id="install"),
+    pytest.param(("release", 1), id="release"),
+    pytest.param(("clean", 1), id="clean"),
+    pytest.param(("fmt", 1), id="fmt"),
+    pytest.param(("check-fmt", 1), id="check-fmt"),
+    pytest.param(("install", 2), id="install"),
 )
 
 
@@ -119,14 +119,12 @@ def _cargo_lines(lines: list[str]) -> list[str]:
 def _assert_cargo_routing(
     lines: list[str],
     target: str,
-    host_os: str,
-    *,
-    should_select_fragment: bool,
-    expects_mold: bool,
-    expected_count: int,
+    platform: tuple[str, bool, bool],
     expected_subcommands: tuple[str, ...],
 ) -> None:
     """Check fragment selection and effective linker flags on every invocation."""
+    host_os, should_select_fragment, expects_mold = platform
+    expected_count = len(expected_subcommands)
     invocations = _cargo_lines(lines)
     assert len(invocations) == expected_count, (
         f"{target} on {host_os} should emit {expected_count} Cargo invocations, "
@@ -186,14 +184,12 @@ def _assert_cargo_routing(
 
 def _assert_debug_target(
     makefile: Path,
-    target: str,
-    host_os: str,
-    assignments: tuple[str, ...],
-    expected_subcommands: tuple[str, ...],
-    uses_fragment: bool,
-    expects_mold: bool,
+    platform: tuple[str, bool, bool],
+    debug_target: tuple[str, tuple[str, ...], tuple[str, ...]],
 ) -> None:
     """Require every debug Cargo line to use the selected platform route."""
+    host_os, uses_fragment, _ = platform
+    target, assignments, expected_subcommands = debug_target
     if uses_fragment:
         assert (REPOSITORY / DEV_FAST_CONFIG).is_file(), (
             f"the explicitly selected development fragment is missing: {DEV_FAST_CONFIG}"
@@ -202,48 +198,29 @@ def _assert_debug_target(
     _assert_cargo_routing(
         lines,
         target,
-        host_os,
-        should_select_fragment=uses_fragment,
-        expects_mold=expects_mold,
-        expected_count=len(expected_subcommands),
+        platform,
         expected_subcommands=expected_subcommands,
     )
 
 
-@pytest.mark.parametrize("host_os,uses_fragment,expects_mold", PLATFORMS)
-@pytest.mark.parametrize(
-    "target,assignments,expected_subcommands", DEBUG_TARGETS
-)
+@pytest.mark.parametrize("platform", PLATFORMS)
+@pytest.mark.parametrize("debug_target", DEBUG_TARGETS)
 def test_every_debug_cargo_invocation_obeys_the_routing_matrix(
-    host_os: str,
-    uses_fragment: bool,
-    expects_mold: bool,
-    target: str,
-    assignments: tuple[str, ...],
-    expected_subcommands: tuple[str, ...],
+    platform: tuple[str, bool, bool],
+    debug_target: tuple[str, tuple[str, ...], tuple[str, ...]],
 ) -> None:
     """Each evaluated debug Cargo line selects its backend and linker."""
-    _assert_debug_target(
-        MAKEFILE,
-        target,
-        host_os,
-        assignments,
-        expected_subcommands,
-        uses_fragment,
-        expects_mold,
-    )
+    _assert_debug_target(MAKEFILE, platform, debug_target)
 
 
-@pytest.mark.parametrize("host_os,_uses_fragment,_expects_mold", PLATFORMS)
-@pytest.mark.parametrize("target,expected_count", FORBIDDEN_TARGETS)
+@pytest.mark.parametrize("platform", PLATFORMS)
+@pytest.mark.parametrize("forbidden_target", FORBIDDEN_TARGETS)
 def test_release_and_maintenance_targets_do_not_select_dev_fast(
-    host_os: str,
-    _uses_fragment: bool,
-    _expects_mold: bool,
-    target: str,
-    expected_count: int,
+    platform: tuple[str, bool, bool], forbidden_target: tuple[str, int]
 ) -> None:
     """Release, clean-up, formatting, and installation use ordinary Cargo."""
+    host_os, _uses_fragment, _expects_mold = platform
+    target, expected_count = forbidden_target
     lines = _dry_run(MAKEFILE, target, host_os)
     invocations = _cargo_lines(lines)
     assert len(invocations) == expected_count, (
@@ -282,11 +259,12 @@ def test_any_verification_or_coverage_target_stays_on_the_default_backend() -> N
         )
 
 
-@pytest.mark.parametrize("host_os,_uses_fragment,_expects_mold", PLATFORMS)
+@pytest.mark.parametrize("platform", PLATFORMS)
 def test_whitaker_never_receives_dev_fast_or_mold_flags(
-    host_os: str, _uses_fragment: bool, _expects_mold: bool
+    platform: tuple[str, bool, bool]
 ) -> None:
     """Whitaker keeps its separately pinned toolchain on every host."""
+    host_os, _, _ = platform
     lines = _dry_run(MAKEFILE, "lint", host_os)
     whitaker_lines = [line for line in lines if PROBE_WHITAKER in line]
     assert len(whitaker_lines) == 1, (
@@ -311,7 +289,9 @@ def test_contract_rejects_a_debug_invocation_without_the_fragment(tmp_path: Path
 
     with pytest.raises(AssertionError, match="must omit|must select"):
         _assert_debug_target(
-            mutant_makefile, "build", "Linux", (), ("build",), True, True
+            mutant_makefile,
+            ("Linux", True, True),
+            ("build", (), ("build",)),
         )
 
 
