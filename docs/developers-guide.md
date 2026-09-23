@@ -233,7 +233,7 @@ merge.
 
 A pull-request lane may still generate coverage, because the ratchet is
 repository-owned and runs offline with no network dependency. What it may not
-do is any of these five, each of which fails
+do is any of these six, each of which fails
 `tests/workflow_contracts/ci_codescene_placement_test.py`:
 
 | Forbidden in a pull-request lane                      | Why it is read                                         |
@@ -243,6 +243,7 @@ do is any of these five, each of which fails
 | `CS_ACCESS_TOKEN` at any scope                        | a lane holding the token is one line from using it     |
 | `codescene.io` anywhere                               | `curl` needs neither the action nor the tool           |
 | `secrets: inherit` into another repository's workflow | forwards the token unnamed, to a document nobody reads |
+| a call to this repository's workflow by `@ref`        | runs a revision the contract has not read              |
 
 *Table 3: What the CodeScene placement contract refuses.*
 
@@ -255,12 +256,14 @@ fifth row closes the one route the walk cannot see, since `secrets: inherit`
 names nothing. Inheriting into a workflow in this repository is permitted,
 because that workflow is in the closure described below and read like any other.
 
-A fourth test guards the other direction. Without it the rule could be
+A further test guards the other direction. Without it the rule could be
 satisfied by deleting coverage reporting altogether, which is compliance by
-amputation, so the publisher is asserted to exist, to run on push, not to be
-startable by a pull request, and to state `mode: upload` rather than inherit
-it. Stating the mode means the publisher cannot quietly become the pull-request
-check gate.
+amputation, so the publisher is asserted to exist, to have exactly its reviewed
+triggers, not to be startable by a pull request, and to state `mode: upload`
+rather than inherit it. The trigger set is compared whole: a `pull_request`
+added beside `push` would make the publisher a pull-request lane, and any other
+addition or removal changes what it is for unreviewed. Stating the mode means
+the publisher cannot quietly become the pull-request check gate.
 
 Two further properties of the publisher are asserted, both of which fail
 silently rather than loudly.
@@ -274,10 +277,13 @@ is to the full ref, not a suffix: a branch named `not-main` ends in `main`.
 
 The token is declared in the upload step's own `env` and nowhere else in
 `coverage-main.yml`: not at workflow scope, not on the job, not in another
-step. At job scope every earlier step could read it, including the tests that
-generate coverage, which a dispatch can run from any branch before the ref
-guard is reached. The step's `if:` still reads `env.CS_ACCESS_TOKEN`, because a
-step's own environment is in scope for its condition.
+step. Both of its bindings are pinned by value, the step's `env` entry reading
+the secret and the action's `access-token` reading that `env`, because a
+misspelt secret name reads as empty and the upload silently skips. At job scope
+every earlier step could read it, including the tests that generate coverage,
+which a dispatch can run from any branch before the ref guard is reached. The
+step's `if:` still reads `env.CS_ACCESS_TOKEN`, because a step's own
+environment is in scope for its condition.
 
 The publisher declares a concurrency group keyed on the ref, with
 `cancel-in-progress: false`. Two pushes to the trunk in quick succession would
@@ -292,14 +298,17 @@ making its group constant, and turning cancellation on. Each fails exactly one
 test.
 
 The upload condition is compared whole rather than searched for parts. A
-containment test accepts
-`(github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN != '' || true)`,
-which holds both halves and is true on every branch, so it would pass the one
-expression it exists to refuse. Appending
-`|| github.event_name == 'workflow_dispatch'` is the same defeat in another
-form: every conjunct is still present and all of them become optional. The
-equality comparison refuses both, so no conjunct-splitting rule is needed. The
-publisher's `push.branches` is pinned to `main` for a related reason: the
+containment test accepts this expression, which holds both halves and is true
+on every branch, so it would pass the one expression it exists to refuse:
+
+```yaml
+if: (github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN != '' || true)
+```
+
+Appending `|| github.event_name == 'workflow_dispatch'` is the same defeat in
+another form: every conjunct is still present and all of them become optional.
+The equality comparison refuses both, so no conjunct-splitting rule is needed.
+The publisher's `push.branches` is pinned to `main` for a related reason: the
 step's ref guard would still refuse the upload from elsewhere, but an
 unrestricted trigger burns a runner on every branch push and leaves the two
 protections disagreeing about what the workflow is for.
@@ -330,14 +339,18 @@ The contract therefore follows `jobs.<id>.uses`, transitively, with a visited
 set so that two reusable workflows calling each other cannot hang it. A call is
 local when it resolves to a file directly under `.github/workflows/` once its
 prefix is stripped. That is matched by shape rather than by a list of
-spellings, and three prefixes are stripped: `./`, the documented form; `$/`;
-and this repository's own qualified name, so
-`leynos/weaver/.github/workflows/release.yml@main` is followed like
-`./.github/workflows/release.yml`. The qualified form runs the file at the
-named ref rather than at the pull request's head, but the file in this tree is
-what that ref becomes on merge, so reading it is the conservative choice.
+spellings, with two prefixes stripped: `./`, the documented form, and `$/`.
 Accepting a spelling GitHub might refuse only widens the set the prohibitions
 run over; missing one GitHub accepts hides a workflow from all of them.
+
+A call to this repository by its qualified name and a ref, such as
+`leynos/weaver/.github/workflows/release.yml@main`, is refused rather than
+followed. GitHub runs it at the named ref, not at the pull request's head, so
+the file the closure would read is not the file that runs, and the named
+revision could hold a CodeScene step every clause passes over. No workflow here
+uses the form; one that needs this repository's workflow calls it with `./`.
+For the same reason `secrets: inherit` into such a call counts as inheriting
+into a document the contract cannot read.
 
 References to other repositories are not followed: their content is not in this
 tree. That is why `secrets: inherit` into one is refused outright rather than
@@ -356,15 +369,21 @@ a pull request, which is why the publisher may carry one.
 
 The reading machinery lives in
 `tests/workflow_contracts/codescene_placement_reader.py`, and every reader
-takes its documents as an argument. The repository's own workflows are all
+takes its documents as an argument. The reviewed values live in
+`codescene_placement_policy.py`, the publisher's clauses in
+`codescene_publisher_test.py`, and loading in `workflow_loader.py`, which the
+runner placement contract shares. The repository's own workflows are all
 written the one way the first reader understood, so a reading that mishandles
 another shape passes against them either way.
 `tests/workflow_contracts/codescene_placement_reader_test.py` therefore drives
 each reading with constructed trees:
 
 - the closure reaches a `workflow_call` probe that curls CodeScene's API with
-  an inherited token, in each of the three call spellings, and stays out of a
-  reusable workflow nothing calls;
+  an inherited token, in both local call spellings, and stays out of a reusable
+  workflow nothing calls;
+- a call to this repository by `@ref` is recognized, and kept narrow: a local
+  call, another repository, a repository whose name merely begins the same way
+  and this repository's own actions are not;
 - workflows are loaded through a strict `SafeLoader` that refuses a duplicated
   mapping key, because PyYAML otherwise keeps the last `runs-on` or `env` and
   says nothing;
