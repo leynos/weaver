@@ -40,14 +40,11 @@ import re
 import typing as typ
 from pathlib import Path
 
-import yaml
+from workflow_loader import load_workflow, read_workflows
 
 REPO_ROOT: typ.Final = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR: typ.Final = REPO_ROOT / ".github" / "workflows"
 ACTIONLINT_CONFIG: typ.Final = REPO_ROOT / ".github" / "actionlint.yaml"
-
-#: Both spellings GitHub accepts for a workflow file's extension.
-WORKFLOW_FILE_PATTERNS: typ.Final = ("*.yml", "*.yaml")
 
 #: The input name a reusable-workflow caller uses to place its callee.
 RUNNER_INPUT: typ.Final = "runner"
@@ -65,6 +62,18 @@ RUNNER_EXPRESSION: typ.Final = re.compile(
 #: Every quoted literal in an expression, used to read the labels a lane can
 #: actually select.
 EXPRESSION_LITERAL: typ.Final = re.compile(r"'([^'\n]*)'")
+
+#: The one expression that may name no label of its own: a reusable workflow
+#: selecting whatever runner its caller passed. Any other literal-free
+#: expression, such as ``${{ matrix.os }}``, selects labels this reader cannot
+#: see, so it is refused rather than read as selecting nothing.
+CALLER_INPUT_EXPRESSION: typ.Final = re.compile(
+    r"^\$\{\{\s*inputs\.[A-Za-z_][\w-]*\s*\}\}$"
+)
+
+
+class RunnerShapeError(ValueError):
+    """A runner declaration this contract cannot read."""
 
 
 def case_id(value: object) -> str:
@@ -101,15 +110,7 @@ def _parsed_workflows() -> tuple[tuple[str, dict[str, object]], ...]:
         Each workflow's file name paired with its parsed document, sorted by
         path.
     """
-    paths = sorted(
-        path
-        for pattern in WORKFLOW_FILE_PATTERNS
-        for path in WORKFLOW_DIR.glob(pattern)
-    )
-    documents = tuple(
-        (path.name, yaml.safe_load(path.read_text(encoding="utf-8")))
-        for path in paths
-    )
+    documents = tuple(sorted(read_workflows(WORKFLOW_DIR).items()))
     assert documents, "the repository should define at least one workflow"
     return documents
 
@@ -201,11 +202,52 @@ def caller_runner_input(definition: dict[str, object]) -> object | None:
     return supplied.get(RUNNER_INPUT)
 
 
+def runs_on_declarations(declared: object) -> list[str]:
+    """Return the label declarations one ``runs-on`` value makes.
+
+    GitHub accepts three forms: a scalar label or expression, a sequence of
+    labels a runner must all carry, and a mapping with ``group`` and
+    ``labels``. Each is read; anything else is refused rather than read as
+    declaring no runner, because a reading of "no runner" exempts the lane
+    from every placement, ceiling and registry assertion at once.
+
+    A mapping is read only when ``labels`` is its sole key, so a ``group``
+    is refused. This repository places no lane by runner group, and a group
+    selects runners by an organization setting this contract cannot read, so
+    admitting one is a reviewed decision with its own assertion, not
+    something to fall through to.
+
+    Examples
+    --------
+    >>> runs_on_declarations("ubuntu-latest")
+    ['ubuntu-latest']
+    >>> runs_on_declarations(["self-hosted", "linux"])
+    ['self-hosted', 'linux']
+    >>> runs_on_declarations({"labels": "ubicloud-standard-4"})
+    ['ubicloud-standard-4']
+
+    Raises
+    ------
+    RunnerShapeError
+        When the value is none of the three forms, is empty, carries a
+        non-string label, or names a runner group.
+    """
+    match declared:
+        case str():
+            return [declared]
+        case list() if declared and all(isinstance(x, str) for x in declared):
+            return list(declared)
+        case {"labels": str() | list() as labels} if len(declared) == 1:
+            return runs_on_declarations(labels)
+    message = f"unreadable runs-on {declared!r}"
+    raise RunnerShapeError(message)
+
+
 def runner_declarations(definition: dict[str, object]) -> list[object]:
     """Return every runner declaration a job makes, from either mechanism.
 
-    A ``runs-on`` may itself be a list of labels, which is why this flattens
-    rather than returning a single value.
+    A ``runs-on`` may itself be a list of labels, or a mapping holding one,
+    which is why this flattens rather than returning a single value.
 
     Examples
     --------
@@ -215,13 +257,21 @@ def runner_declarations(definition: dict[str, object]) -> list[object]:
     ['macos-15']
     >>> runner_declarations({})
     []
+
+    Raises
+    ------
+    RunnerShapeError
+        When either declaration is not a shape GitHub accepts.
     """
     declarations: list[object] = []
     declared = runner_value(definition)
     if declared is not None:
-        declarations.extend(declared if isinstance(declared, list) else [declared])
+        declarations.extend(runs_on_declarations(declared))
     supplied = caller_runner_input(definition)
     if supplied is not None:
+        if not isinstance(supplied, str):
+            message = f"unreadable runner input {supplied!r}"
+            raise RunnerShapeError(message)
         declarations.append(supplied)
     return declarations
 
@@ -231,8 +281,10 @@ def declaration_labels(declaration: object) -> set[str]:
 
     Both arms of a conditional count: a label reachable only when a pull
     request comes from a fork is as much in use as one reachable otherwise.
-    An expression with no quoted literal selects whatever it was handed and
-    contributes no label of its own.
+    An expression with no quoted literal contributes no label of its own
+    only when it is ``${{ inputs.<name> }}``, a reusable workflow selecting
+    whatever its caller passed; the caller's declaration names the labels.
+    Any other literal-free expression is refused.
 
     Examples
     --------
@@ -244,9 +296,13 @@ def declaration_labels(declaration: object) -> set[str]:
     set()
     """
     text = str(declaration)
-    if "${{" in text:
-        return set(EXPRESSION_LITERAL.findall(text))
-    return {text.strip()}
+    if "${{" not in text:
+        return {text.strip()}
+    literals = set(EXPRESSION_LITERAL.findall(text))
+    if not literals and not CALLER_INPUT_EXPRESSION.match(text.strip()):
+        message = f"expression {text!r} selects labels this reader cannot see"
+        raise RunnerShapeError(message)
+    return literals
 
 
 def job_labels(definition: dict[str, object]) -> set[str]:
@@ -300,5 +356,5 @@ def _registered_labels() -> frozenset[str]:
         "this repository uses a runner label actionlint does not know, so "
         f"{ACTIONLINT_CONFIG.relative_to(REPO_ROOT)} must exist"
     )
-    config = yaml.safe_load(ACTIONLINT_CONFIG.read_text(encoding="utf-8")) or {}
+    config = load_workflow(ACTIONLINT_CONFIG.read_text(encoding="utf-8"))
     return frozenset((config.get("self-hosted-runner") or {}).get("labels") or [])
