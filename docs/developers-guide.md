@@ -298,14 +298,18 @@ on the job.
 
 Dependabot's automerge merges with the workflow's `GITHUB_TOKEN`, and a push
 made that way starts no workflow, so an automerged dependency bump never runs
-the publisher: a known exception, tracked in shared-actions issue #518.
+the publisher: a known exception, tracked in shared-actions issue #518. A
+dispatch that replaces a pending push run in the concurrency group uploads the
+dispatched commit's coverage, which leaves the baseline one commit behind the
+trunk until the next push; the same issue tracks it.
 
-The publisher declares a concurrency group keyed on the ref, with
-`cancel-in-progress: false`. Without a group, two pushes in quick succession
-upload at once and the baseline is set by whichever finishes last. With one,
-GitHub keeps a single pending run per group, so a newer push replaces an older
-pending run and the newest baseline wins. Cancelling would instead abandon a
-running upload and its baseline write.
+The publisher declares a concurrency group keyed on the ref alone,
+`coverage-main-${{ github.ref }}`, with `cancel-in-progress: false`; the
+contract compares the group whole, so naming the event in it fails. Without a
+group, two pushes in quick succession upload at once and the baseline is set by
+whichever finishes last. With one, GitHub keeps a single pending run per group,
+so a newer push replaces an older pending run and the newest baseline wins.
+Cancelling would instead abandon a running upload and its baseline write.
 
 Six mutations cover the pair, three each: dropping the ref guard, loosening it
 to a suffix test, dropping the token guard, removing the concurrency block,
