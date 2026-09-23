@@ -40,7 +40,9 @@ from workflow_loader import repository_workflows as workflows
 CARGO_INSTALL: typ.Final = re.compile(r"\bcargo\s+(?:\+\S+\s+)?install\b")
 
 #: A clone of the Whitaker source, which only a source build needs.
-WHITAKER_CLONE: typ.Final = re.compile(r"\bgit\s+clone\b[^\n]*leynos/whitaker")
+WHITAKER_CLONE: typ.Final = re.compile(
+    r"\bgit\s+clone\b[^\n]*(?:\\\n[^\n]*)*leynos/whitaker"
+)
 
 #: A full commit SHA, the only pin that names one immutable revision.
 COMMIT_SHA: typ.Final = re.compile(r"^[0-9a-f]{40}$")
@@ -123,6 +125,61 @@ def test_no_step_compiles_a_tool_from_source() -> None:
         "these steps build a tool from source instead of installing a "
         f"prebuilt release: {', '.join(offenders)}"
     )
+
+
+@pytest.mark.parametrize(
+    ("script", "matches_clone"),
+    [
+        pytest.param(
+            "git clone https://github.com/leynos/whitaker",
+            True,
+            id="single-line-clone",
+        ),
+        pytest.param(
+            "git clone \\\n  https://github.com/leynos/whitaker",
+            True,
+            id="continued-clone",
+        ),
+        pytest.param(
+            "git clone https://github.com/example/other\n"
+            "printf '%s\\n' https://github.com/leynos/whitaker",
+            False,
+            id="unrelated-multiline-script",
+        ),
+    ],
+)
+def test_whitaker_clone_detection_respects_shell_continuations(
+    script: str, matches_clone: bool
+) -> None:
+    """Only clone commands joined by a shell continuation identify source builds."""
+    assert bool(WHITAKER_CLONE.search(script)) is matches_clone
+
+
+def test_contract_rejects_continued_whitaker_clone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A shell continuation cannot conceal a Whitaker source clone from the gate."""
+    monkeypatch.setitem(
+        globals(),
+        "workflows",
+        lambda: {
+            "mutated.yml": {
+                "jobs": {
+                    "source-build": {
+                        "steps": [
+                            {
+                                "name": "Clone Whitaker source",
+                                "run": "git clone \\\n  https://github.com/leynos/whitaker",
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+    )
+
+    with pytest.raises(AssertionError, match="build a tool from source"):
+        test_no_step_compiles_a_tool_from_source()
 
 
 @pytest.mark.parametrize("action", [NIXIE_ACTION, WHITAKER_ACTION])
