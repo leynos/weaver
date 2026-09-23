@@ -15,8 +15,18 @@ fn profile_keeps_linux_runtime_roots_separate_from_caller_paths() {
     } else {
         assert!(profile.runtime_paths().is_empty());
     }
-    assert!(profile.read_only_paths_canonicalised().expect("read paths").is_empty());
-    assert!(profile.executable_paths_canonicalised().expect("executable paths").is_empty());
+    assert!(
+        profile
+            .read_only_paths_canonicalised()
+            .expect("read paths")
+            .is_empty()
+    );
+    assert!(
+        profile
+            .executable_paths_canonicalised()
+            .expect("executable paths")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -29,7 +39,7 @@ fn environment_allowlist_deduplicates_entries() {
         EnvironmentPolicy::AllowList(keys) => {
             assert_eq!(keys.len(), 1);
             assert!(keys.contains("KEEP_ME"));
-        },
+        }
         other => panic!("unexpected environment policy: {other:?}"),
     }
 }
@@ -74,14 +84,20 @@ fn read_write_paths_are_recorded() {
         .allow_read_path(PathBuf::from("/tmp"))
         .allow_read_write_path(PathBuf::from("/var/tmp"));
 
-    assert!(profile
-        .read_only_paths()
-        .iter()
-        .any(|path| path.ends_with("tmp")));
-    assert!(profile
-        .read_write_paths()
-        .iter()
-        .any(|path| path.ends_with("tmp")));
+    assert!(
+        profile
+            .read_only_paths_canonicalised()
+            .expect("read paths should canonicalise")
+            .iter()
+            .any(|path| path.ends_with("tmp"))
+    );
+    assert!(
+        profile
+            .read_write_paths_canonicalised()
+            .expect("write paths should canonicalise")
+            .iter()
+            .any(|path| path.ends_with("tmp"))
+    );
 }
 
 #[test]
@@ -91,7 +107,9 @@ fn records_nonexistent_future_path() {
 
     let profile = SandboxProfile::new().allow_read_write_path(&target);
 
-    let set = profile.read_write_paths();
+    let set = profile
+        .read_write_paths_canonicalised()
+        .expect("future write path should canonicalise");
     assert!(
         set.iter().any(|p| p.ends_with("file.txt")),
         "expected future file to be recorded"

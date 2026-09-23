@@ -49,3 +49,6 @@ pub use birdcage::process;
 pub use error::SandboxError;
 pub use profile::{EnvironmentPolicy, NetworkPolicy, SandboxProfile};
 pub use sandbox::{Sandbox, SandboxChild, SandboxCommand, SandboxOutput};
+
+#[cfg(test)]
+mod tests;

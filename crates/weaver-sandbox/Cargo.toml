@@ -12,13 +12,17 @@ thiserror.workspace = true
 [dev-dependencies]
 anyhow = { workspace = true }
 cap-std.workspace = true
+gherkin = "0.14.0"
 libtest-mimic = "0.8"
-rstest.workspace = true
-rstest-bdd.workspace = true
-rstest-bdd-macros.workspace = true
 tempfile.workspace = true
+temp-env = "0.3.6"
 
 [[test]]
 name = "sandbox_child_probe"
 path = "tests/sandbox_child_probe.rs"
+harness = false
+
+[[test]]
+name = "sandbox_behaviour_child"
+path = "tests/sandbox_behaviour_child.rs"
 harness = false

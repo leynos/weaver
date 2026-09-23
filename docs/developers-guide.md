@@ -85,6 +85,31 @@ environment override, and keep the Make repetition for its routed debug
 commands. The local `mold` installation is a source-build prerequisite on
 Linux; macOS uses its native linker and needs no `mold` installation.
 
+## Sandbox behaviour tests
+
+The Linux sandbox behaviour tests use
+`crates/weaver-sandbox/tests/sandbox_behaviour_child.rs`, a `harness = false`
+executable backed by `libtest-mimic`. It parses the five scenarios in
+`tests/features/sandbox.feature` and exposes each as a separate trial. Each
+trial starts the same executable with `Command::env_clear`; where needed, it
+supplies marker variables explicitly with `Command::env`. Child dispatch
+happens before `libtest-mimic` starts in that process. The child checks that it
+has one thread before running the real `Sandbox::spawn` call. The parent checks
+the test-runner environment markers before and after the child exits. The
+sibling `sandbox_child_probe` verifies full environment inheritance and
+restoration around a direct sandbox spawn. On non-Linux targets, the behaviour
+executable exposes zero trials.
+
+Use these commands to list or run the focused target:
+
+```sh
+cargo nextest list -p weaver-sandbox --test sandbox_behaviour_child --all-features
+cargo nextest run -p weaver-sandbox --test sandbox_behaviour_child --all-features
+```
+
+The workspace `make test` includes the target through its configured test
+runner.
+
 ## Workspace lint policy
 
 The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates
