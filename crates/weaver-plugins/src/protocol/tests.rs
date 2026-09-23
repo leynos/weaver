@@ -1,10 +1,32 @@
 //! Unit tests for the IPC protocol types.
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fmt::Debug, path::PathBuf};
 
 use rstest::rstest;
+use serde::{Serialize, de::DeserializeOwned};
 
 use super::*;
+
+/// Check the wire round trip and return the decoded value for contract checks.
+#[track_caller]
+fn assert_json_round_trip<T>(value: &T) -> T
+where
+    T: Serialize + DeserializeOwned + PartialEq + Debug,
+{
+    let json = match serde_json::to_string(value) {
+        Ok(json) => json,
+        Err(error) => panic!("serialize protocol value: {error}"),
+    };
+    let decoded = match serde_json::from_str(&json) {
+        Ok(decoded) => decoded,
+        Err(error) => panic!("deserialize protocol value: {error}"),
+    };
+    assert_eq!(
+        &decoded, value,
+        "protocol value changed across JSON round trip"
+    );
+    decoded
+}
 
 // ---------------------------------------------------------------------------
 // PluginRequest round-trip serialization
@@ -34,9 +56,7 @@ fn request_round_trip(
     #[case] expected_files: usize,
     #[case] expected_args: usize,
 ) {
-    let json = serde_json::to_string(&request).expect("serialize");
-    let back: PluginRequest = serde_json::from_str(&json).expect("deserialize");
-    assert_eq!(back, request);
+    let back = assert_json_round_trip(&request);
     assert_eq!(back.files().len(), expected_files);
     assert_eq!(back.arguments().len(), expected_args);
 }
@@ -72,10 +92,8 @@ fn file_payload_accessors() {
     false
 )]
 fn response_round_trip(#[case] response: PluginResponse, #[case] is_success: bool) {
-    let json = serde_json::to_string(&response).expect("serialise");
-    let back: PluginResponse = serde_json::from_str(&json).expect("deserialise");
+    let back = assert_json_round_trip(&response);
     assert_eq!(back.is_success(), is_success);
-    assert_eq!(back, response);
 }
 
 #[test]
@@ -84,16 +102,14 @@ fn failure_response_preserves_diagnostics() {
         DiagnosticSeverity::Error,
         "something went wrong",
     )]);
-    let json = serde_json::to_string(&response).expect("serialise");
-    let back: PluginResponse = serde_json::from_str(&json).expect("deserialise");
+    let back = assert_json_round_trip(&response);
     assert_eq!(back.diagnostics().len(), 1);
 }
 
 #[test]
 fn empty_output_round_trip() {
     let response = PluginResponse::success(PluginOutput::Empty);
-    let json = serde_json::to_string(&response).expect("serialise");
-    let back: PluginResponse = serde_json::from_str(&json).expect("deserialise");
+    let back = assert_json_round_trip(&response);
     assert!(back.is_success());
     assert_eq!(back.output(), &PluginOutput::Empty);
 }
@@ -102,8 +118,7 @@ fn empty_output_round_trip() {
 fn analysis_output_round_trip() {
     let data = serde_json::json!({"symbols": ["foo", "bar"]});
     let response = PluginResponse::success(PluginOutput::Analysis { data: data.clone() });
-    let json = serde_json::to_string(&response).expect("serialise");
-    let back: PluginResponse = serde_json::from_str(&json).expect("deserialise");
+    let back = assert_json_round_trip(&response);
     assert_eq!(back.output(), &PluginOutput::Analysis { data });
 }
 
