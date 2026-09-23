@@ -133,33 +133,16 @@ This repository is written in Rust and uses Cargo for building and dependency
 management. Contributors should follow these best practices when working on the
 project:
 
-- Run `make check-fmt`, `make lint`, and `make test` before committing. These
-  targets wrap the following commands, so contributors understand the exact
-  behaviour and policy enforced:
-  - `make check-fmt` executes:
-
-    ```sh
-    cargo fmt --workspace -- --check
-    ```
-
-    validating formatting across the entire workspace without modifying files.
-  - `make lint` executes:
-
-    ```sh
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
-    ```
-
-    linting every target with all features enabled and denying all Clippy
-    warnings.
-  - `make test` executes:
-
-    ```sh
-    cargo test --workspace
-    ```
-
-    running the full workspace test suite. Use `make fmt`
-    (`cargo fmt --workspace`) to apply formatting fixes reported by the
-    formatter check.
+- Run `make check-fmt`, `make lint`, and `make test` before committing.
+  These repository targets define the required checks; direct Cargo commands
+  may not select the same build backend. On supported Linux and macOS hosts,
+  the applicable debug build, test, Clippy, documentation, and type-check
+  invocations explicitly select `tools/dev-fast/config.toml`. FreeBSD Make
+  debug builds use LLVM. Release, coverage, verification, and Whitaker
+  invocations do not select the development fragment. See the
+  [developer's guide](docs/developers-guide.md) for the routing matrix and
+  linker prerequisites. Use `make fmt` to apply the Rust and Markdown
+  formatting rules.
 - Clippy warnings MUST be disallowed.
 - Fix any warnings emitted during tests in the code itself rather than
   silencing them.

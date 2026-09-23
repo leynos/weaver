@@ -26,11 +26,8 @@ Run via ``make test-workflow-contracts``.
 
 from __future__ import annotations
 
-import os
 import re
-import subprocess
 import typing as typ
-from pathlib import Path
 
 import pytest
 from workflow_loader import repository_workflows as workflows
@@ -340,41 +337,18 @@ def test_whitaker_takes_the_prebuilt_path() -> None:
     )
 
 
-def test_whitaker_backend_uses_its_installed_toolchain(tmp_path: Path) -> None:
-    """Provision Cranelift on the suite nightly before the lint gate runs."""
-    steps = _steps(*LANE)
+def test_development_backend_and_linker_precede_lint() -> None:
+    """The Linux lint lane provisions the backend and linker selected by Make."""
     matches = [
         (index, str(step.get("run", "")))
-        for index, step in enumerate(steps)
-        if step.get("name") == "Provision Whitaker Cranelift backend"
+        for index, step in enumerate(_steps(*LANE))
+        if step.get("name") == "Provision development backend and linker"
     ]
-    assert len(matches) == 1, "Whitaker needs exactly one backend provisioning step"
+    assert len(matches) == 1, "the lint lane needs one backend setup step"
     index, script = matches[0]
-    assert _action_step(WHITAKER_ACTION)[0] < index < _run_index("make lint"), (
-        "Whitaker's prebuilt install must precede backend provisioning and lint"
-    )
-
-    data_home = tmp_path / "data"
-    whitaker_dir = data_home / "whitaker"
-    whitaker_dir.mkdir(parents=True)
-    (whitaker_dir / "rust-toolchain.toml").write_text(
-        '[toolchain]\nchannel = "nightly-2099-01-01"\n'
-    )
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    rustup = bin_dir / "rustup"
-    rustup.write_text('#!/bin/sh\nprintf "%s\\n" "$*" > "$RUSTUP_CALL"\n')
-    rustup.chmod(0o755)
-    call_file = tmp_path / "rustup-call"
-    environment = os.environ | {
-        "XDG_DATA_HOME": str(data_home),
-        "RUSTUP_CALL": str(call_file),
-        "PATH": f"{bin_dir}:{os.environ['PATH']}",
-    }
-    subprocess.run(["bash", "-e", "-c", script], env=environment, check=True)
-    assert call_file.read_text() == (
-        "component add --toolchain nightly-2099-01-01 rustc-codegen-cranelift\n"
-    ), "backend provisioning must select Whitaker's installed nightly"
+    assert "rustup component add rustc-codegen-cranelift" in script
+    assert "apt-get install --yes mold" in script
+    assert index < _action_step(WHITAKER_ACTION)[0] < _run_index("make lint")
 
 
 @pytest.mark.parametrize(

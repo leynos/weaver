@@ -61,7 +61,9 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 ├── test_expect/
 ├── .github/workflows/
 ├── .agents/
-├── .cargo/
+├── tools/
+│   └── dev-fast/
+│       └── config.toml
 ├── Cargo.toml
 ├── Cargo.lock
 ├── Makefile
@@ -110,7 +112,7 @@ _Table 1: Implemented crate boundaries and responsibilities._
 | `agent-skill/weaver/`              | Packaged Weaver agent skill instructions                                                              | Implemented |
 | `test_expect/`                     | Golden and expectation artefacts used by test suites                                                  | Implemented |
 | `.agents/`                         | Agent-local configuration and Model Context Protocol (MCP) support files                              | Implemented |
-| `.cargo/`                          | Cargo configuration for the workspace                                                                 | Implemented |
+| `tools/dev-fast/config.toml`       | Explicit development-only Cargo profile for supported Linux and macOS Make targets                    | Implemented |
 | `.github/workflows/`               | Continuous Integration (CI) workflows and automation policy                                           | Implemented |
 
 _Table 2: Implemented shared directories and their roles._

@@ -85,6 +85,15 @@ jobs:
         run: make nixie
       - name: Boundary manifest gate
         run: cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
+      # `make lint` selects the development fragment on this Linux runner.
+      # Provision the repository toolchain before installing Whitaker's
+      # separate lint toolchain.
+      - name: Provision development backend and linker
+        run: |
+          set -euo pipefail
+          rustup component add rustc-codegen-cranelift
+          sudo apt-get update
+          sudo apt-get install --yes mold
       # The prebuilt lint suite and Dylint tools from Whitaker's rolling
       # release, digest-verified. The action's ci-mode, on by default, fails
       # the step if the installer falls back to a source build, which is what
@@ -93,22 +102,6 @@ jobs:
         uses: leynos/shared-actions/.github/actions/install-whitaker@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           installer-version: '0.2.8'
-      # Weaver's ambient dev profile selects Cranelift. Whitaker installs a
-      # separate nightly with only the components needed by its lint suite.
-      - name: Provision Whitaker Cranelift backend
-        run: |
-          set -euo pipefail
-          whitaker_toolchain="$(python3 - <<'PY'
-          import os
-          from pathlib import Path
-          import tomllib
-
-          data_home = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
-          with (data_home / "whitaker/rust-toolchain.toml").open("rb") as manifest:
-              print(tomllib.load(manifest)["toolchain"]["channel"])
-          PY
-          )"
-          rustup component add --toolchain "$whitaker_toolchain" rustc-codegen-cranelift
       - name: Lint
         run: make lint
       - name: Workflow contract tests
