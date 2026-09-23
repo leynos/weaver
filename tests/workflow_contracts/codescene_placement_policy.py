@@ -23,11 +23,22 @@ PUBLISHER_TRIGGERS: typ.Final = frozenset({"push", "workflow_dispatch"})
 #: The token's name. Present anywhere in a pull-request workflow is a failure.
 TOKEN: typ.Final = "CS_ACCESS_TOKEN"
 
-#: The upload step's two bindings of the token, pinned by value: the step's
-#: ``env`` reads the secret, and the action's input reads that ``env``. A
-#: misspelt secret name reads as empty and the upload silently skips.
-TOKEN_BINDING: typ.Final = "${{ secrets.CS_ACCESS_TOKEN || '' }}"
-ACCESS_TOKEN_INPUT: typ.Final = "${{ env.CS_ACCESS_TOKEN }}"
+#: The step that reports whether the token is configured, and its sole
+#: command. The expression is evaluated to ``true`` or ``false`` before the
+#: shell runs, so the token itself is in no step's ``env`` and the shell sees
+#: no conditional. A guard on ``env.CS_ACCESS_TOKEN != ''`` instead passes
+#: with its binding deleted, and the upload then skips forever.
+TOKEN_CHECK_STEP_ID: typ.Final = "codescene-token"
+TOKEN_CHECK_COMMAND: typ.Final = (
+    'echo "available=${{ secrets.CS_ACCESS_TOKEN != '
+    '\'\' }}" >> "$GITHUB_OUTPUT"'
+)
+
+#: The upload action's token input, passed directly from the secret. The
+#: uploader is a composite action that hands its step's ``env`` to nested
+#: artefact and cache steps, so the token goes in as an input, never an
+#: ``env`` value.
+ACCESS_TOKEN_INPUT: typ.Final = "${{ secrets.CS_ACCESS_TOKEN }}"
 
 #: Matched against an action or reusable-workflow reference, lowercased.
 CODESCENE_ACTION_MARKER: typ.Final = "codescene"
@@ -54,10 +65,11 @@ TRUNK_REF: typ.Final = "refs/heads/main"
 TRUNK_BRANCH: typ.Final = "main"
 
 #: The upload step's condition, compared whole. A substring test would accept
-#: ``(github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN != ''
-#: || true)``, which contains both halves and is true everywhere, and equally
-#: ``... && github.ref == 'refs/heads/main' || github.event_name ==
-#: 'workflow_dispatch'``, which makes every conjunct optional.
+#: a condition holding both halves inside ``(... || true)``, which is true
+#: everywhere. Equality also refuses any extra conjunct, so an ``||`` hidden
+#: behind one (``<guard> && github.actor != 'x' || github.event_name ==
+#: 'workflow_dispatch'``) fails here with no separate ``||`` rule.
 EXPECTED_UPLOAD_CONDITION: typ.Final = (
-    f"env.{TOKEN} != '' && github.ref == '{TRUNK_REF}'"
+    f"steps.{TOKEN_CHECK_STEP_ID}.outputs.available == 'true' "
+    f"&& github.ref == '{TRUNK_REF}'"
 )

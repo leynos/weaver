@@ -100,11 +100,15 @@ jobs:
       - name: Workflow contract tests
         run: make test-workflow-contracts
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           output-path: lcov.info
           format: lcov
           with-ratchet: 'true'
+          # The ratchet reads this report; nothing else does, so it is not
+          # published as an artefact. The input exists from shared-actions
+          # a5765019, which is why this action is pinned there.
+          publish-artefact: 'false'
       # No CodeScene step belongs in this workflow. The CodeScene
       # command-line tool is installed from a URL at job time and is not
       # pinned to a service contract: it calls CodeScene's API, and a change

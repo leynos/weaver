@@ -54,24 +54,27 @@ jobs:
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           output-path: lcov.info
           format: lcov
           with-ratchet: 'true'
+      # Reports whether the token is configured without binding it anywhere:
+      # the expression is evaluated before the shell runs, so this step
+      # writes `available=true` or `available=false` and the token is in no
+      # `env`. The uploader is a composite action that hands its step's `env`
+      # to nested steps, so the token goes to it as an input instead.
+      - name: Check for the CodeScene token
+        id: codescene-token
+        run: echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
       - name: Upload coverage data to CodeScene
-        # The token lives on this step alone. At job scope every earlier step
-        # could read it, including the tests that generate coverage, which a
-        # dispatch can run from any branch before the ref guard is reached.
-        env:
-          CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN || '' }}
         # The ref guard matters as much as the token. `workflow_dispatch` can
         # be run from any branch, and CodeScene accepts an upload for the
         # analysed branch whatever the payload actually came from, so a
         # dispatch from a feature branch would publish that branch's coverage
         # as the trunk's and move the ratchet baseline with it. Nothing would
         # report it.
-        if: env.CS_ACCESS_TOKEN != '' && github.ref == 'refs/heads/main'
+        if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
         uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
         with:
           format: lcov
@@ -79,4 +82,4 @@ jobs:
           # being the upload and not the pull-request check is the whole
           # point of the split.
           mode: upload
-          access-token: ${{ env.CS_ACCESS_TOKEN }}
+          access-token: ${{ secrets.CS_ACCESS_TOKEN }}

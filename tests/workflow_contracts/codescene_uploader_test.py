@@ -77,7 +77,9 @@ def test_no_workflow_passes_the_deprecated_installer_checksum() -> None:
     the variable is set.
     """
     offending = sorted(
-        name for name, text in _workflow_texts().items() if DEPRECATED_INPUT in text
+        name
+        for name, text in _workflow_texts().items()
+        if DEPRECATED_INPUT in text
     )
 
     assert not offending, (
@@ -136,4 +138,6 @@ def test_every_uploader_call_is_on_the_approved_revision() -> None:
         for reference in references
         if f"{UPLOADER_ACTION}@{UPLOADER_PIN}" not in reference
     ]
-    assert not wrong, f"every uploader call must be pinned to {UPLOADER_PIN}: {wrong}"
+    assert not wrong, (
+        f"every uploader call must be pinned to {UPLOADER_PIN}: {wrong}"
+    )
