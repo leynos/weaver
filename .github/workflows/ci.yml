@@ -11,10 +11,9 @@ jobs:
     # waited 435 s for a GitHub-hosted runner on 2026-09-16 to do 938 s of
     # work.
     #
-    # Four vCPU rather than two. This lane builds Whitaker from source with
-    # Cranelift and then runs Clippy, Mermaid validation and the coverage
-    # suite, which includes two trybuild cases that spawn their own cargo
-    # builds. Ubicloud's four vCPU are already 1.5 to 2 times slower than a
+    # Four vCPU rather than two. This lane runs Clippy, the Whitaker lint
+    # suite, Mermaid validation and the coverage suite, which includes two
+    # trybuild cases that spawn their own cargo builds. Ubicloud's four vCPU are already 1.5 to 2 times slower than a
     # GitHub public runner's four for that kind of work (measured on
     # wireframe), so two would roughly triple a fifteen-minute lane.
     #
@@ -35,7 +34,6 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      WHITAKER_REV: 2bc0c3fafb86914f14bd73461a511588841f0a34
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -72,25 +70,28 @@ jobs:
           bun install --no-progress --global @mermaid-js/mermaid-cli@11.9.0
           bun x @puppeteer/browsers browsers install chrome-headless-shell
           mmdc --version
-      - name: Install Nixie
-        run: uv tool install nixie-cli==1.1.0
-      - name: Install Merman CLI
-        run: cargo install merman-cli --version '=0.7.0' --locked
+      # Merman comes from its checksum-verified release archive. `cargo
+      # install merman-cli` compiled it from crates.io on every run, 2.6
+      # minutes of a 13-minute job. Python 3.11 matches the uv setup above,
+      # so the action does not download a second managed interpreter.
+      - name: Install Nixie and Merman
+        uses: leynos/shared-actions/.github/actions/install-nixie@a5765019912a8ab6882b12db049c7cde635f3a85
+        with:
+          nixie-version: '1.1.0'
+          merman-version: '0.7.0'
+          python-version: '3.11'
       - name: Mermaid lint
         run: make nixie
       - name: Boundary manifest gate
         run: cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
+      # The prebuilt lint suite and Dylint tools from Whitaker's rolling
+      # release, digest-verified. The action's ci-mode, on by default, fails
+      # the step if the installer falls back to a source build, which is what
+      # this step used to do on every run.
       - name: Install Whitaker
-        run: |
-          cargo install --locked \
-            --git https://github.com/leynos/whitaker \
-            --rev "${WHITAKER_REV}" \
-            whitaker-installer
-          whitaker_source_dir="${XDG_DATA_HOME:-${HOME}/.local/share}/whitaker"
-          mkdir -p "$(dirname "${whitaker_source_dir}")"
-          git clone https://github.com/leynos/whitaker "${whitaker_source_dir}"
-          git -C "${whitaker_source_dir}" checkout --detach "${WHITAKER_REV}"
-          whitaker-installer --build-only --no-update --cranelift
+        uses: leynos/shared-actions/.github/actions/install-whitaker@a5765019912a8ab6882b12db049c7cde635f3a85
+        with:
+          installer-version: '0.2.8'
       - name: Lint
         run: make lint
       - name: Workflow contract tests
