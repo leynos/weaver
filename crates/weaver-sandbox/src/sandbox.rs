@@ -113,6 +113,11 @@ impl Sandbox {
         let read_write = self.profile.read_write_paths_canonicalised()?;
         let executables = self.profile.executable_paths_canonicalised()?;
 
+        // Keep original aliases: Birdcage recreates paths such as `/lib64`
+        // inside the sandbox when mounting their canonical targets.
+        for path in self.profile.runtime_paths() {
+            exceptions.push(Exception::ExecuteAndRead(path.clone()));
+        }
         for path in read_only {
             exceptions.push(Exception::Read(path.clone()));
         }
@@ -188,4 +193,40 @@ fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> 
         })?;
 
     Ok(base.join(tail))
+}
+
+#[cfg(all(
+    test,
+    target_os = "linux",
+    any(target_arch = "x86_64", target_arch = "aarch64")
+))]
+mod tests {
+    //! Exact initial-command authorization stays separate from runtime mounts.
+
+    use std::path::Path;
+
+    use super::Sandbox;
+    use crate::{SandboxError, SandboxProfile};
+
+    #[test]
+    fn runtime_loader_is_not_an_initial_command_grant() {
+        let sandbox = Sandbox::new(SandboxProfile::new());
+        #[cfg(target_arch = "x86_64")]
+        let program = Path::new("/lib64/ld-linux-x86-64.so.2");
+        #[cfg(target_arch = "aarch64")]
+        let program = Path::new("/lib/ld-linux-aarch64.so.1");
+        assert!(
+            program.exists(),
+            "host dynamic loader must exist for this test"
+        );
+        let canonical_program =
+            Sandbox::canonical_program(program).expect("host loader must canonicalize");
+        let error = sandbox
+            .ensure_program_whitelisted(&canonical_program)
+            .expect_err("runtime mount must not authorize an initial command");
+        assert!(
+            matches!(error, SandboxError::ExecutableNotAuthorised { program: denied } if denied == canonical_program),
+            "runtime root must stay outside caller executable allowlist"
+        );
+    }
 }

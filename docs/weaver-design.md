@@ -2569,13 +2569,20 @@ principle of the system's design.
 
 The first cut of the dedicated `weaver-sandbox` crate now wraps `birdcage`
 v0.8.1 with Weaver defaults. Executables must be supplied as absolute paths and
-whitelisted explicitly; the wrapper canonicalizes the whitelist before launch
-to prevent symlink escapes. Standard Linux library roots (`/lib`, `/lib64`,
-`/usr/lib`, and their architecture-specific variants) are whitelisted for
-read-only access by default so dynamically linked binaries remain functional
-without exposing the wider filesystem. Network access remains disabled unless
-requested, and the environment is isolated by default with an allowlist for
-specific variables when needed.
+whitelisted explicitly; the wrapper canonicalizes that caller-supplied list
+before launch to prevent symlink escapes. On Linux, standard runtime roots
+(`/lib`, `/lib64`, `/usr/lib`, and existing architecture-specific variants) are
+kept as a separate, private default. They are mounted with Birdcage's
+`ExecuteAndRead` permission so dynamic loaders can map executable pages. The
+roots retain their original path spellings: Birdcage canonicalizes the bind
+sources while recreating aliases such as `/lib64` inside the sandbox. These
+mounts do not add paths to the caller's exact executable allowlist. On macOS,
+the runtime-root defaults remain empty. See
+[ADR 013](adr-013-linux-runtime-library-mounts.md) for the security boundary
+and rationale.
+
+Network access remains disabled unless requested, and the environment is
+isolated by default with an allowlist for specific variables when needed.
 
 `birdcage` enforces a single-threaded caller; the wrapper performs a preflight
 check and reports a `MultiThreaded` error instead of panicking when multiple
@@ -2597,6 +2604,7 @@ classDiagram
     }
 
     class SandboxProfile {
+        - Vec~PathBuf~ runtime_paths
         - Vec~PathBuf~ read_only_paths
         - Vec~PathBuf~ read_write_paths
         - Vec~PathBuf~ executable_paths
@@ -2614,6 +2622,7 @@ classDiagram
         + executable_paths() &[PathBuf]
         + environment_policy() &EnvironmentPolicy
         + network_policy() NetworkPolicy
+        - runtime_paths() &[PathBuf]
     }
 
     class EnvironmentPolicy {
@@ -2688,7 +2697,8 @@ classDiagram
 
     SandboxProfile --> EnvironmentPolicy : has
     SandboxProfile --> NetworkPolicy : has
-    SandboxProfile --> RuntimeHelpers : uses linux_runtime_roots
+    SandboxProfile --> RuntimeHelpers : initializes Linux runtime_paths
+    RuntimeHelpers --> BirdcageException : runtime paths use ExecuteAndRead
 
     EnvironmentPolicy --> BirdcageException : to_exceptions builds
 
