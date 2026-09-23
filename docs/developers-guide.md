@@ -409,14 +409,21 @@ block:
 
 ```yaml
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 ```
+
+When there is no pull request the group falls back to `github.run_id`, so two
+pushes to `main` or two dispatches never share a group. A shared ref group
+would let a third run replace a still-pending second one, and that commit would
+never get CI; two trunk runs overlapping is the cheaper risk, because
+compiler-cache writes are content-addressed and a cache save of an existing key
+is refused harmlessly (estate rule "PR-lane concurrency fallback").
 
 Two halves matter, and each fails in a way nothing else would notice.
 
 - **The group keys on the pull request.** A group built from
-  `github.run_id` is unique to one run, so it matches no predecessor and
+  `github.run_id` alone is unique to one run, so it matches no predecessor and
   cancels nothing while reading exactly like a concurrency control. A constant
   group is the opposite failure: every open pull request shares one queue, and
   the first push anywhere cancels the gates running everywhere else.
@@ -446,25 +453,24 @@ and refuses a workflow declaring both, since GitHub would read one trigger set
 and the contract another; a test drives that reader over each shape directly. A
 floor of the two workflows above keeps discovery from emptying into a vacuous
 pass. For each workflow it requires a group that, rendered by
-`pr_concurrency_groups.py`, keeps together the runs that must queue or cancel
-one another (two pushes to one pull request, a re-run of the first, and two
-pushes to `main`) and keeps apart the runs that must not (that pull request, a
-fork's pull request from a branch of the same name, a push to `main`, and a
-dispatch on another branch); a group keyed on `github.run_id`, `github.sha`,
-`github.run_attempt` or `github.head_ref`, one falling back to the run
-identifier or `github.base_ref` when there is no pull request, or a constant
-one, fails, and an expression the renderer does not model is refused rather
-than guessed at. It also requires exactly the event-conditioned
+`pr_concurrency_groups.py`, keeps two pushes to one pull request together and
+keeps apart that pull request, a fork's pull request from a branch of the same
+name, two pushes to `main`, and two dispatches of another branch; and that uses
+`github.run_id` only as the fallback behind the pull-request number. A
+`github.ref` or `github.base_ref` fallback, a `github.head_ref`, `github.sha` or
+`github.run_id`-only group, the run identifier ahead of the number, or a
+constant group fails, and an expression the renderer does not model is refused
+rather than guessed at. It also requires exactly the event-conditioned
 `cancel-in-progress` expression, so the literal `true` fails. No two
 pull-request workflows may render the same group for one pull request, since
 whichever started last would cancel the others; each is rendered under its own
 name. The files are read through a loader that refuses a duplicated mapping
 key, because PyYAML keeps the last of two `concurrency:` blocks and says
 nothing. Each clause was proved by mutation: the cancel line removed, a literal
-`true`, a `run_id` group, a constant group, a `head_ref` group, a `format()`
-group, a `run_id` fallback, a `run_attempt` group, the block removed, the
-trigger renamed to `pull_request_target`, a duplicated block, and an unquoted
-`on:` beside the quoted one each fail it.
+`true`, a `ref` fallback, the run identifier ahead of the number, a constant
+group, a `head_ref` group, a `format()` group, the block removed, the trigger
+renamed to `pull_request_target`, a duplicated block, and an unquoted `on:`
+beside the quoted one each fail it.
 
 ## Whitaker CI setup
 
