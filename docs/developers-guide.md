@@ -215,6 +215,190 @@ than as a list someone remembers to update. A label registered and used nowhere
 silently permits a runner family nobody reviewed for whatever lane adopts it
 next.
 
+## Where CodeScene may appear
+
+The CodeScene command-line tool is installed from a URL at job time and is not
+pinned to a version this repository chose: the shared action selects the
+archive from a committed manifest and verifies its digest, so the artefact is
+pinned, but what that artefact talks to is not. The tool calls CodeScene's API
+and refuses to run when the answer changes shape, and that has happened twice.
+Its output format moved, and more recently thirteen projects stopped returning
+a gates configuration at all, so the changed-line gate fails with "received
+project-config isn't valid" for a reason no change in the repository could have
+caused.
+
+So the tool runs in exactly one place: `coverage-main.yml`, on push to main or
+on manual dispatch. A failure there delays a coverage report. It cannot block a
+merge.
+
+A pull-request lane may still generate coverage, because the ratchet is
+repository-owned and runs offline with no network dependency. What it may not
+do is any of these six, each of which fails
+`tests/workflow_contracts/ci_codescene_placement_test.py`:
+
+| Forbidden in a pull-request lane                      | Why it is read                                         |
+| ----------------------------------------------------- | ------------------------------------------------------ |
+| a step or job whose `uses:` names CodeScene           | the obvious form                                       |
+| a `run:` step invoking `cs-coverage`                  | the same hazard with no action to notice               |
+| `CS_ACCESS_TOKEN` at any scope                        | a lane holding the token is one line from using it     |
+| `codescene.io` anywhere                               | `curl` needs neither the action nor the tool           |
+| `secrets: inherit` into another repository's workflow | forwards the token unnamed, to a document nobody reads |
+| a call to this repository's workflow by `@ref`        | runs a revision the contract has not read              |
+
+*Table 3: What the CodeScene placement contract refuses.*
+
+The third row is what makes the contract worth having. Deleting the step but
+leaving the token in the job environment looks clean in a diff and leaves the
+hazard in place, so the whole document is walked for the name rather than the
+three scopes that are meant to carry it: a `run` body, an action input, an
+`env` value under any key and a named `secrets:` forwarding are all found. The
+fifth row closes the one route the walk cannot see, since `secrets: inherit`
+names nothing. Inheriting into a workflow in this repository is permitted,
+because that workflow is in the closure described below and read like any other.
+
+A further test guards the other direction. Without it the rule could be
+satisfied by deleting coverage reporting altogether, which is compliance by
+amputation, so the publisher is asserted to exist, to have exactly its reviewed
+triggers, not to be startable by a pull request, and to state `mode: upload`
+rather than inherit it. The trigger set is compared whole: a `pull_request`
+added beside `push` would make the publisher a pull-request lane, and any other
+addition or removal changes what it is for unreviewed. Stating the mode means
+the publisher cannot quietly become the pull-request check gate.
+
+Two further properties of the publisher are asserted, both of which fail
+silently rather than loudly.
+
+The upload step's condition names `github.ref == 'refs/heads/main'` as well as
+the token. `workflow_dispatch` can be run from any branch, and CodeScene
+accepts an upload for the analysed branch whatever the payload came from, so
+without the ref test a dispatch from a feature branch publishes that branch's
+coverage as the trunk's and drags the ratchet baseline with it. The comparison
+is to the full ref, not a suffix: a branch named `not-main` ends in `main`.
+
+The token is declared in the upload step's own `env` and nowhere else in
+`coverage-main.yml`: not at workflow scope, not on the job, not in another
+step. Both of its bindings are pinned by value, the step's `env` entry reading
+the secret and the action's `access-token` reading that `env`, because a
+misspelt secret name reads as empty and the upload silently skips. At job scope
+every earlier step could read it, including the tests that generate coverage,
+which a dispatch can run from any branch before the ref guard is reached. The
+step's `if:` still reads `env.CS_ACCESS_TOKEN`, because a step's own
+environment is in scope for its condition.
+
+The publisher declares a concurrency group keyed on the ref, with
+`cancel-in-progress: false`. Two pushes to the trunk in quick succession would
+otherwise upload at the same time and leave the baseline set by whichever
+finished last, which need not be the later commit. Cancelling is the opposite
+failure and no better: a cancelled run leaves the baseline describing a commit
+that is no longer the tip.
+
+Six mutations cover the pair, three each: dropping the ref guard, loosening it
+to a suffix test, dropping the token guard, removing the concurrency block,
+making its group constant, and turning cancellation on. Each fails exactly one
+test.
+
+The upload condition is compared whole rather than searched for parts. A
+containment test accepts this expression, which holds both halves and is true
+on every branch, so it would pass the one expression it exists to refuse:
+
+```yaml
+if: (github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN != '' || true)
+```
+
+Appending `|| github.event_name == 'workflow_dispatch'` is the same defeat in
+another form: every conjunct is still present and all of them become optional.
+The equality comparison refuses both, so no conjunct-splitting rule is needed.
+The publisher's `push.branches` is pinned to `main` for a related reason: the
+step's ref guard would still refuse the upload from elsewhere, but an
+unrestricted trigger burns a runner on every branch push and leaves the two
+protections disagreeing about what the workflow is for.
+
+### What must remain
+
+Everything above forbids something, so all of it is satisfied by a repository
+that measures no coverage at all. One test says what must stay: `ci.yml` is
+still started by `pull_request` and still runs `generate-coverage` with
+`with-ratchet`. That is where a reviewer's number comes from once the CodeScene
+step is gone.
+
+It also requires that step to carry no `if:` at all. Presence is not
+reachability: `if: false` leaves the step in the file, where every other check
+still sees it, and runs it never. A condition here would be a way to switch the
+ratchet off while the diff looks untouched. If one is ever wanted, it is pinned
+in the contract by value.
+
+### The pull-request lane is a closure, not a list
+
+The prohibitions apply to every workflow a pull request can reach, not only to
+those carrying a pull-request trigger. `release-dry-run.yml` is triggered by
+`pull_request` and calls `release.yml`, which calls `build-and-package.yml`.
+Reading only the roots would leave both outside every assertion while a pull
+request still runs them.
+
+The contract therefore follows `jobs.<id>.uses`, transitively, with a visited
+set so that two reusable workflows calling each other cannot hang it. A call is
+local when it resolves to a file directly under `.github/workflows/` once its
+prefix is stripped. That is matched by shape rather than by a list of
+spellings, with two prefixes stripped: `./`, the documented form, and `$/`.
+Accepting a spelling GitHub might refuse only widens the set the prohibitions
+run over; missing one GitHub accepts hides a workflow from all of them.
+
+A call to this repository by its qualified name and a ref, such as
+`leynos/weaver/.github/workflows/release.yml@main`, is refused rather than
+followed. GitHub runs it at the named ref, not at the pull request's head, so
+the file the closure would read is not the file that runs, and the named
+revision could hold a CodeScene step every clause passes over. No workflow here
+uses the form; one that needs this repository's workflow calls it with `./`.
+For the same reason `secrets: inherit` into such a call counts as inheriting
+into a document the contract cannot read.
+
+References to other repositories are not followed: their content is not in this
+tree. That is why `secrets: inherit` into one is refused outright rather than
+traced.
+
+A workflow declaring only `workflow_call` is the case this exists for. It has
+no pull-request trigger, so a trigger-only reading never opens it, yet a
+pull-request job that calls it with `secrets: inherit` hands it the token.
+
+`pull_request_target`, `merge_group` and `workflow_run` count as pull-request
+triggers here. `pull_request_target` runs on a pull request with write
+permissions, which makes it more dangerous than `pull_request`, not less.
+`merge_group` runs the checks a pull request needs to leave the merge queue, so
+a red one blocks the merge. `workflow_run` runs after a pull-request workflow,
+with the repository's secrets. `workflow_dispatch` does not count: a dispatch
+is not a pull request, which is why the publisher may carry one.
+
+### How the readings are proved
+
+The reading machinery lives in
+`tests/workflow_contracts/codescene_placement_reader.py`, and every reader
+takes its documents as an argument. The reviewed values live in
+`codescene_placement_policy.py`, the publisher's clauses in
+`codescene_publisher_test.py`, and loading in `workflow_loader.py`, which the
+runner placement contract shares. The repository's own workflows are all
+written the one way the first reader understood, so a reading that mishandles
+another shape passes against them either way.
+`tests/workflow_contracts/codescene_placement_reader_test.py` therefore drives
+each reading with constructed trees:
+
+- the closure reaches a `workflow_call` probe that curls CodeScene's API with
+  an inherited token, in both local call spellings, and stays out of a reusable
+  workflow nothing calls;
+- a call to this repository by `@ref` is recognized, and kept narrow: a local
+  call, another repository, a repository whose name merely begins the same way
+  and this repository's own actions are not;
+- workflows are loaded through a strict `SafeLoader` that refuses a duplicated
+  mapping key, because PyYAML otherwise keeps the last `runs-on` or `env` and
+  says nothing;
+- `on:` is read as a scalar, a sequence or a mapping, under both the quoted
+  string key and YAML 1.1's boolean `True`, and any other shape is refused
+  rather than read as "no triggers", which would let the workflow escape every
+  clause; and
+- a `.YML` extension is read like `.yml`.
+
+Each reading was mutated alone and restored from a copy while writing the
+contract, and each mutation failed at least one test that names what it broke.
+
 ## Whitaker CI setup
 
 CI pins Whitaker, Weaver's external lint engine, to a fixed revision through the

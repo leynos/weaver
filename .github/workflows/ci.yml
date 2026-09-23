@@ -101,13 +101,12 @@ jobs:
           output-path: lcov.info
           format: lcov
           with-ratchet: 'true'
-      - name: Check coverage against CodeScene gates
-        env:
-          CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
-        if: env.CS_ACCESS_TOKEN != '' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
-        with:
-          format: lcov
-          mode: check
-          project-url: https://api.codescene.io/v2/projects/71837
-          access-token: ${{ env.CS_ACCESS_TOKEN }}
+      # No CodeScene step belongs in this workflow. The CodeScene
+      # command-line tool is installed from a URL at job time and is not
+      # pinned to a service contract: it calls CodeScene's API, and a change
+      # in what that returns fails this lane for a reason no change here
+      # caused. The upload
+      # happens once, on push to main, in coverage-main.yml; the
+      # changed-line gate a reviewer sees is CodeScene's own check against
+      # that upload and needs nothing from here.
+      # Asserted by tests/workflow_contracts/ci_codescene_placement_test.py.
