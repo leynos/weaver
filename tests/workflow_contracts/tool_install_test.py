@@ -133,13 +133,22 @@ def test_each_install_is_a_shared_action_pinned_to_a_commit(action: str) -> None
 
 
 def test_merman_comes_from_the_verified_release() -> None:
-    """`install-nixie` installs the Merman release it holds a checksum for."""
+    """`install-nixie` installs the verified Merman release on a usable Python.
+
+    nixie-cli 1.1.0 requires Python 3.14, so a lower `python-version` fails
+    the install; the action's default is 3.14.
+    """
     _, step = _action_step(NIXIE_ACTION)
     inputs = step.get("with", {})
     assert isinstance(inputs, dict), "install-nixie must declare its inputs"
     assert inputs.get("merman-version") == "0.7.0", (
         "install-nixie must install Merman 0.7.0, the release whose archive "
         f"checksum the action pins; got {inputs.get('merman-version')!r}"
+    )
+    python = str(inputs.get("python-version", "3.14"))
+    assert _version(f"{python}.0" if python.count(".") == 1 else python) >= (3, 14), (
+        f"install-nixie's python-version {python} is below 3.14, which "
+        "nixie-cli 1.1.0 requires; the install fails to resolve"
     )
 
 

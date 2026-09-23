@@ -665,7 +665,8 @@ instead of compiling them on every run:
   pinned, but the suite itself is not.
 - **Merman**, the Mermaid renderer used by `make nixie`, comes from
   `install-nixie`. The action verifies Merman 0.7.0's release archive against
-  its pinned checksum and installs Nixie 1.1.0 with Python 3.11.
+  its pinned checksum and installs Nixie 1.1.0 on Python 3.14, which that
+  release requires.
 
 Until September 2026 both tools were compiled on every run. `cargo install
 merman-cli` built Merman from crates.io, a median 2.6 minutes, and the former
