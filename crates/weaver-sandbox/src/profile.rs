@@ -32,10 +32,11 @@ pub enum NetworkPolicy {
 ///
 /// The profile defaults to a restrictive configuration: networking and the
 /// environment are disabled, and only standard Linux runtime library roots are
-/// whitelisted for read access. Callers must explicitly list the executables
-/// and data paths a sandboxed process requires.
+/// mounted read-only with executable mappings. Callers must explicitly list
+/// the initial executables and data paths a sandboxed process requires.
 #[derive(Debug, Clone)]
 pub struct SandboxProfile {
+    runtime_paths: Vec<PathBuf>,
     read_only_paths: Vec<PathBuf>,
     read_write_paths: Vec<PathBuf>,
     executable_paths: Vec<PathBuf>,
@@ -47,8 +48,8 @@ pub struct SandboxProfile {
 }
 
 impl SandboxProfile {
-    /// Creates a profile with Linux runtime library paths whitelisted for
-    /// read-only access.
+    /// Creates a profile with Linux runtime library paths mounted read-only
+    /// with executable mappings.
     ///
     /// ```
     /// use weaver_sandbox::SandboxProfile;
@@ -61,7 +62,8 @@ impl SandboxProfile {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            read_only_paths: linux_runtime_roots(),
+            runtime_paths: linux_runtime_roots(),
+            read_only_paths: Vec::new(),
             read_write_paths: Vec::new(),
             executable_paths: Vec::new(),
             read_only_paths_canon: OnceCell::new(),
@@ -124,6 +126,8 @@ impl SandboxProfile {
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
         self.canonicalised_paths(&self.read_only_paths_canon, &self.read_only_paths)
     }
+
+    pub(crate) fn runtime_paths(&self) -> &[PathBuf] { &self.runtime_paths }
 
     pub(crate) fn read_write_paths_canonicalised(
         &self,
