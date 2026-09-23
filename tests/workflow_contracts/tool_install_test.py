@@ -35,9 +35,12 @@ from pathlib import Path
 import pytest
 from workflow_loader import repository_workflows as workflows
 
-#: A `cargo install`, with or without a `+toolchain` override. Matched as text
-#: because this is a prohibition: a false match fails loudly.
-CARGO_INSTALL: typ.Final = re.compile(r"\bcargo\s+(?:\+\S+\s+)?install\b")
+#: A `cargo install`, with an optional `+toolchain` override. A newline only
+#: joins the command when shell escaping continues it; this prohibition fails
+#: loudly when it recognises a source build.
+CARGO_INSTALL: typ.Final = re.compile(
+    r"\bcargo[^\S\r\n]+(?:\\\n[^\S\r\n]*)*(?:\+\S+[^\S\r\n]+(?:\\\n[^\S\r\n]*)*)?install\b"
+)
 
 #: A clone of the Whitaker source, which only a source build needs.
 WHITAKER_CLONE: typ.Final = re.compile(
@@ -131,6 +134,54 @@ def test_no_step_compiles_a_tool_from_source() -> None:
     assert not offenders, (
         "these steps build a tool from source instead of installing a "
         f"prebuilt release: {', '.join(offenders)}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("script", "matches_install"),
+    [
+        pytest.param(
+            "cargo install cargo-dylint",
+            True,
+            id="single-line-install",
+        ),
+        pytest.param(
+            "cargo \\\n  install cargo-dylint",
+            True,
+            id="continued-install",
+        ),
+        pytest.param(
+            "cargo\ninstall cargo-dylint",
+            False,
+            id="uncontinued-multiline-script",
+        ),
+    ],
+)
+def test_cargo_install_detection_respects_shell_continuations(
+    script: str, matches_install: bool
+) -> None:
+    """Only escaped newlines join a `cargo install` source build command."""
+    assert bool(CARGO_INSTALL.search(script)) is matches_install, (
+        f"expected cargo install detection {matches_install} for {script!r}"
+    )
+
+
+def test_contract_rejects_continued_cargo_install() -> None:
+    """A shell continuation cannot conceal a Cargo source build from the gate."""
+    offenders = _source_build_offenders(
+        [
+            (
+                "mutated.yml",
+                "source-build",
+                {
+                    "name": "Install Dylint source",
+                    "run": "cargo \\\n  install cargo-dylint",
+                },
+            )
+        ]
+    )
+    assert offenders == ["mutated.yml:source-build step 'Install Dylint source'"], (
+        "a continued cargo install must be rejected as a source build"
     )
 
 
