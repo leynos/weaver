@@ -64,6 +64,9 @@ enum TestError {
     #[error("expected error but operation succeeded")]
     ExpectedError,
 
+    #[error("test context missing while Pyrefly is available")]
+    ContextMissing,
+
     #[error("expected NotInitialized error, got: {actual}")]
     WrongErrorType { actual: String },
 }
@@ -73,7 +76,7 @@ macro_rules! run_test_with_context {
     ($fixture:expr, $impl_fn:path) => {{
         require_pyrefly!();
         let Some(ctx) = $fixture.as_mut() else {
-            panic!("context should exist when pyrefly is available");
+            return Err(TestError::ContextMissing);
         };
         $impl_fn(ctx)
     }};
@@ -90,10 +93,6 @@ impl Drop for TestContext {
     fn drop(&mut self) { self.client.shutdown().ok(); }
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "fixture setup uses expect to panic on failure for clear test diagnostics"
-)]
 mod fixtures_impl {
     //! Pyrefly-backed fixtures for call hierarchy coverage.
 
@@ -122,13 +121,13 @@ mod fixtures_impl {
     }
 
     #[fixture]
-    pub fn linear_chain_context() -> Option<TestContext> {
-        create_test_context(fixtures::LINEAR_CHAIN).expect("failed to create test context")
+    pub fn linear_chain_context() -> Result<Option<TestContext>, TestError> {
+        create_test_context(fixtures::LINEAR_CHAIN)
     }
 
     #[fixture]
-    pub fn no_calls_context() -> Option<TestContext> {
-        create_test_context(fixtures::NO_CALLS).expect("failed to create test context")
+    pub fn no_calls_context() -> Result<Option<TestContext>, TestError> {
+        create_test_context(fixtures::NO_CALLS)
     }
 }
 
@@ -308,8 +307,9 @@ mod test_impl {
 
 #[rstest]
 fn prepare_call_hierarchy_finds_function(
-    mut linear_chain_context: Option<TestContext>,
+    #[from(linear_chain_context)] linear_chain_context_res: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
+    let mut linear_chain_context = linear_chain_context_res?;
     run_test_with_context!(
         linear_chain_context,
         test_impl::prepare_call_hierarchy_finds_function_impl
@@ -318,8 +318,9 @@ fn prepare_call_hierarchy_finds_function(
 
 #[rstest]
 fn outgoing_calls_returns_callees(
-    mut linear_chain_context: Option<TestContext>,
+    #[from(linear_chain_context)] linear_chain_context_res: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
+    let mut linear_chain_context = linear_chain_context_res?;
     run_test_with_context!(
         linear_chain_context,
         test_impl::outgoing_calls_returns_callees_impl
@@ -328,8 +329,9 @@ fn outgoing_calls_returns_callees(
 
 #[rstest]
 fn incoming_calls_returns_callers(
-    mut linear_chain_context: Option<TestContext>,
+    #[from(linear_chain_context)] linear_chain_context_res: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
+    let mut linear_chain_context = linear_chain_context_res?;
     run_test_with_context!(
         linear_chain_context,
         test_impl::incoming_calls_returns_callers_impl
@@ -338,8 +340,9 @@ fn incoming_calls_returns_callers(
 
 #[rstest]
 fn no_calls_for_standalone_function(
-    mut no_calls_context: Option<TestContext>,
+    #[from(no_calls_context)] no_calls_context_res: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
+    let mut no_calls_context = no_calls_context_res?;
     run_test_with_context!(
         no_calls_context,
         test_impl::no_calls_for_standalone_function_impl
