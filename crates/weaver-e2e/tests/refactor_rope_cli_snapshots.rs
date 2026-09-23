@@ -9,7 +9,7 @@ mod daemon_harness;
 #[path = "test_support/refactor_routing.rs"]
 mod refactor_routing;
 
-use std::io::Write;
+use std::{io::Write, net::TcpStream};
 
 use assert_cmd::Command;
 use daemon_harness::{FakeDaemon, output_to_transcript, resolve_or_build_weaver_binary_path};
@@ -20,6 +20,7 @@ fn run_rename_refactor_snapshot(
     snapshot_name: &str,
     provider: Option<&str>,
 ) -> std::io::Result<()> {
+    let weaver_bin = resolve_or_build_weaver_binary_path()?;
     let daemon = FakeDaemon::start(1, "renamed_symbol")?;
     let endpoint = daemon.endpoint();
 
@@ -55,11 +56,10 @@ fn run_rename_refactor_snapshot(
         "new_name=renamed_symbol".into(),
     ]);
 
-    let mut command = Command::new(resolve_or_build_weaver_binary_path()?);
+    let mut command = Command::new(weaver_bin);
     let output = command.args(&args).output()?;
 
-    let transcript = output_to_transcript(command_string, &output, daemon.requests());
-    daemon.join();
+    let transcript = output_to_transcript(command_string, &output, daemon.join()?);
 
     assert_debug_snapshot!(snapshot_name, transcript);
 
@@ -75,7 +75,7 @@ fn refactor_rope_routing_cli_snapshot(#[case] case_name: &str, #[case] provider:
 }
 
 #[test]
-fn refactor_pipeline_with_observe_and_jq_snapshot() {
+fn refactor_pipeline_with_observe_and_jq_snapshot() -> std::io::Result<()> {
     let jq_available = Command::new("jq").arg("--version").output().is_ok();
     if !jq_available {
         writeln!(
@@ -83,13 +83,12 @@ fn refactor_pipeline_with_observe_and_jq_snapshot() {
             "Skipping test: jq not available on PATH"
         )
         .ok();
-        return;
+        return Ok(());
     }
 
-    let daemon = FakeDaemon::start(2, "renamed_symbol").expect("fake daemon should start");
+    let weaver_bin = resolve_or_build_weaver_binary_path()?;
+    let daemon = FakeDaemon::start(2, "renamed_symbol")?;
     let endpoint = daemon.endpoint();
-    let weaver_bin =
-        resolve_or_build_weaver_binary_path().expect("weaver binary should be locatable");
 
     let shell_script = concat!(
         "\"$WEAVER_BIN\" --daemon-socket \"$WEAVER_ENDPOINT\" --output json ",
@@ -104,13 +103,28 @@ fn refactor_pipeline_with_observe_and_jq_snapshot() {
         .args(["-c", shell_script])
         .env("WEAVER_BIN", weaver_bin)
         .env("WEAVER_ENDPOINT", endpoint.as_str())
-        .output()
-        .expect("pipeline command should execute");
+        .output()?;
 
     let command_string =
         String::from("weaver observe get-definition | jq -r '.[0].symbol' | weaver act refactor");
-    let transcript = output_to_transcript(command_string, &output, daemon.requests());
-    daemon.join();
+    let transcript = output_to_transcript(command_string, &output, daemon.join()?);
 
     assert_debug_snapshot!("refactor_pipeline_observe_jq", transcript);
+    Ok(())
+}
+
+#[test]
+fn malformed_daemon_request_reaches_the_test_as_an_error() {
+    let daemon = FakeDaemon::start(1, "renamed_symbol").expect("fake daemon should start");
+    let mut stream = TcpStream::connect(daemon.endpoint().trim_start_matches("tcp://"))
+        .expect("test should connect to the fake daemon");
+    stream
+        .write_all(b"{invalid json}\n")
+        .expect("test should send malformed JSON");
+    drop(stream);
+
+    let error = daemon
+        .join()
+        .expect_err("malformed JSON must fail the daemon");
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
 }
