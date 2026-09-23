@@ -61,6 +61,7 @@ EXPECTED_FORK_FALLBACK: typ.Final = {
 #: it run.
 EXPECTED_LITERAL_LABEL: typ.Final = {
     ("coverage-main.yml", "coverage-upload"): UBICLOUD_SMALL,
+    ("pr297-birdcage-diagnostic.yml", "trace-sandbox-probe"): UBICLOUD_LARGE,
     ("release.yml", "release"): UBICLOUD_SMALL,
     ("release.yml", "build-macos"): MACOS_LABEL,
     ("release.yml", "build-freebsd"): GITHUB_HOSTED_LABEL,
@@ -108,6 +109,7 @@ DELEGATED_JOBS: typ.Final = {
 #: ``build-and-package.yml`` entry here is the one that bounds all three.
 EXPECTED_CEILING_MINUTES: typ.Final = {
     ("ci.yml", "build-test"): 30,
+    ("pr297-birdcage-diagnostic.yml", "trace-sandbox-probe"): 30,
     ("coverage-main.yml", "coverage-upload"): 20,
     ("release.yml", "metadata"): 10,
     ("release.yml", "release"): 15,

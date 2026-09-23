@@ -1,0 +1,97 @@
+name: PR 297 Birdcage diagnostic
+
+'on':
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  trace-sandbox-probe:
+    if: github.head_ref == 'diagnose-pr297-birdcage-eperm-20260923' && github.event.pull_request.head.repo.fork == false
+    runs-on: ubicloud-standard-4
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - name: Check out pinned coverage tooling
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          repository: leynos/shared-actions
+          ref: 6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+          path: shared-actions
+      - name: Setup repository Rust toolchain
+        uses: leynos/shared-actions/.github/actions/setup-rust@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+      - name: Install uv
+        uses: astral-sh/setup-uv@4cda7d73322c50eac316ad623a716f09a2db2ac7
+        with:
+          python-version: '3.12'
+      - name: Install pinned coverage executables
+        run: |
+          set -euo pipefail
+          uv run --script shared-actions/.github/actions/generate-coverage/scripts/install_cargo_llvm_cov.py
+          uv run --script shared-actions/.github/actions/generate-coverage/scripts/install_cargo_nextest.py
+          cargo llvm-cov --version
+          cargo nextest --version
+      - name: Trace direct and coverage-focused probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          diagnostic_dir="${RUNNER_TEMP}/weaver-pr297-birdcage-eperm-${GITHUB_RUN_ID}"
+          mkdir -p "${diagnostic_dir}"
+          uname -a > "${diagnostic_dir}/runner-context.txt"
+          rustc -Vv >> "${diagnostic_dir}/runner-context.txt"
+          cat /proc/sys/kernel/unprivileged_userns_clone >> "${diagnostic_dir}/runner-context.txt" 2>&1 || true
+          grep -E '^(Cap|Seccomp|NoNewPrivs):' /proc/self/status >> "${diagnostic_dir}/runner-context.txt" || true
+          cat /sys/kernel/security/lsm >> "${diagnostic_dir}/runner-context.txt" 2>&1 || true
+          if ! command -v strace; then
+            sudo apt-get update
+            sudo apt-get install --yes strace
+          fi
+          if ! command -v strace; then
+            echo 'strace unavailable after apt installation' | tee "${diagnostic_dir}/result.txt"
+            exit 1
+          fi
+          strace --version >> "${diagnostic_dir}/runner-context.txt"
+          dpkg-query -W -f='${Version}\n' strace >> "${diagnostic_dir}/runner-context.txt"
+          if ! cargo test -p weaver-sandbox --test sandbox_child_probe --no-run \
+            --message-format=json > "${diagnostic_dir}/build.json" 2> "${diagnostic_dir}/build.stderr"; then
+            echo 'focused direct test build failed' | tee "${diagnostic_dir}/result.txt"
+            exit 1
+          fi
+          test_executable="$(jq -r \
+            'select(.reason == "compiler-artifact" and .target.name == "sandbox_child_probe") | .executable // empty' \
+            "${diagnostic_dir}/build.json" | tail -n 1)"
+          if [[ ! -x "${test_executable}" ]]; then
+            echo 'focused test executable missing' | tee "${diagnostic_dir}/result.txt"
+            exit 1
+          fi
+          trace_syscalls='clone,clone3,unshare,mount,mount_setattr,umount2,pivot_root,openat,openat2,write,prctl,seccomp,execve,execveat'
+          if strace -ff -ttt -yy -s 256 -e "trace=${trace_syscalls}" \
+            -o "${diagnostic_dir}/direct.trace" "${test_executable}" \
+            > "${diagnostic_dir}/direct.out" 2>&1; then
+            direct_status=0
+          else
+            direct_status=$?
+          fi
+          if strace -ff -ttt -yy -s 256 -e "trace=${trace_syscalls}" \
+            -o "${diagnostic_dir}/coverage.trace" \
+            cargo llvm-cov nextest --no-report -p weaver-sandbox --test sandbox_child_probe \
+            > "${diagnostic_dir}/coverage.out" 2>&1; then
+            coverage_status=0
+          else
+            coverage_status=$?
+          fi
+          {
+            echo "direct_status=${direct_status}"
+            echo "coverage_status=${coverage_status}"
+          } | tee "${diagnostic_dir}/result.txt"
+          if (( direct_status != 0 || coverage_status != 0 )); then
+            exit 1
+          fi
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr297-birdcage-eperm-${{ github.run_id }}
+          path: ${{ runner.temp }}/weaver-pr297-birdcage-eperm-${{ github.run_id }}/
+          if-no-files-found: warn

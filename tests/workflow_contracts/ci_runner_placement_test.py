@@ -195,6 +195,15 @@ def test_the_job_carries_its_reviewed_label(
     )
 
 
+def test_birdcage_diagnostic_cannot_use_ubicloud_from_a_fork() -> None:
+    """The temporary diagnostic lane only runs for its same-repository branch."""
+    diagnostic = jobs()[("pr297-birdcage-diagnostic.yml", "trace-sandbox-probe")]
+    assert diagnostic.get("if") == (
+        "github.head_ref == 'diagnose-pr297-birdcage-eperm-20260923' "
+        "&& github.event.pull_request.head.repo.fork == false"
+    )
+
+
 @pytest.mark.parametrize("coordinate", sorted(EXPECTED_FORK_FALLBACK), ids=case_id)
 def test_the_runner_expression_parses_to_one_line(coordinate: tuple[str, str]) -> None:
     """Scenario: the folded scalar's continuation is indented one level deeper.
