@@ -166,25 +166,6 @@ def test_cargo_install_detection_respects_shell_continuations(
     )
 
 
-def test_contract_rejects_continued_cargo_install() -> None:
-    """A shell continuation cannot conceal a Cargo source build from the gate."""
-    offenders = _source_build_offenders(
-        [
-            (
-                "mutated.yml",
-                "source-build",
-                {
-                    "name": "Install Dylint source",
-                    "run": "cargo \\\n  install cargo-dylint",
-                },
-            )
-        ]
-    )
-    assert offenders == ["mutated.yml:source-build step 'Install Dylint source'"], (
-        "a continued cargo install must be rejected as a source build"
-    )
-
-
 @pytest.mark.parametrize(
     ("script", "matches_clone"),
     [
@@ -215,22 +196,41 @@ def test_whitaker_clone_detection_respects_shell_continuations(
     )
 
 
-def test_contract_rejects_continued_whitaker_clone() -> None:
-    """A shell continuation cannot conceal a Whitaker source clone from the gate."""
+@pytest.mark.parametrize(
+    ("step_name", "script", "expected_offender"),
+    [
+        pytest.param(
+            "Install Dylint source",
+            "cargo \\\n  install cargo-dylint",
+            "mutated.yml:source-build step 'Install Dylint source'",
+            id="continued-cargo-install",
+        ),
+        pytest.param(
+            "Clone Whitaker source",
+            "git clone \\\n  https://github.com/leynos/whitaker",
+            "mutated.yml:source-build step 'Clone Whitaker source'",
+            id="continued-whitaker-clone",
+        ),
+    ],
+)
+def test_contract_rejects_continued_source_build(
+    step_name: str, script: str, expected_offender: str
+) -> None:
+    """A shell continuation cannot conceal a source build from the gate."""
     offenders = _source_build_offenders(
         [
             (
                 "mutated.yml",
                 "source-build",
                 {
-                    "name": "Clone Whitaker source",
-                    "run": "git clone \\\n  https://github.com/leynos/whitaker",
+                    "name": step_name,
+                    "run": script,
                 },
             )
         ]
     )
-    assert offenders == ["mutated.yml:source-build step 'Clone Whitaker source'"], (
-        "a continued Whitaker clone must be rejected as a source build"
+    assert offenders == [expected_offender], (
+        f"a continued source build must be rejected: {step_name!r}"
     )
 
 
