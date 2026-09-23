@@ -131,6 +131,17 @@ def test_every_job_is_pinned_by_coordinate() -> None:
     )
 
 
+def test_disposable_ubuntu_2204_probe_excludes_fork_pull_requests() -> None:
+    """The temporary diagnostic cannot request its runner from a fork."""
+    diagnostic = jobs()[
+        ("pr297-ubuntu2204-uidmap-diagnostic.yml", "uid-map-and-sandbox-probe")
+    ]
+    assert diagnostic.get("if") == (
+        "github.event.pull_request.head.repo.full_name == github.repository && "
+        "github.head_ref == 'diagnose-pr297-ubuntu2204-uidmap-20260924'"
+    )
+
+
 def test_the_reviewed_tables_are_total() -> None:
     """Scenario: a lane is added to one reviewed table but not the others.
 

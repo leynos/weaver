@@ -1,0 +1,88 @@
+name: PR 297 Ubuntu 22.04 UID mapping diagnostic
+
+'on':
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  uid-map-and-sandbox-probe:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnose-pr297-ubuntu2204-uidmap-20260924'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: e39abdc710f95ef2ed7554ddff1dfef242fbb137
+          persist-credentials: false
+      - name: Record image and exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          diagnostic_dir="${RUNNER_TEMP}/weaver-pr297-ubuntu2204-${GITHUB_RUN_ID}"
+          mkdir -p "${diagnostic_dir}"
+          {
+            printf 'ImageOS=%s\n' "${ImageOS:-unknown}"
+            printf 'ImageVersion=%s\n' "${ImageVersion:-unknown}"
+            printf 'RUNNER_NAME=%s\n' "${RUNNER_NAME:-unknown}"
+            uname -a
+            git rev-parse HEAD
+            cat /proc/sys/kernel/unprivileged_userns_clone
+            grep -E '^(Cap|Seccomp|NoNewPrivs):' /proc/self/status
+          } | tee "${diagnostic_dir}/context.txt"
+          test "$(git rev-parse HEAD)" = e39abdc710f95ef2ed7554ddff1dfef242fbb137
+      - name: Setup repository Rust toolchain
+        uses: leynos/shared-actions/.github/actions/setup-rust@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+      - name: Probe UID mapping and unchanged sandbox trial
+        shell: bash
+        run: |
+          set -uo pipefail
+          diagnostic_dir="${RUNNER_TEMP}/weaver-pr297-ubuntu2204-${GITHUB_RUN_ID}"
+          if ! command -v strace; then
+            sudo apt-get update
+            sudo apt-get install --yes strace
+          fi
+          strace --version | head -n 1 | tee "${diagnostic_dir}/tools.txt"
+          unshare --version | tee -a "${diagnostic_dir}/tools.txt"
+          trace_syscalls='clone,clone3,unshare,mount,mount_setattr,umount2,pivot_root,openat,write,prctl,seccomp,execve,execveat'
+          # This host-policy probe does not stand in for Birdcage's own path.
+          if strace -ff -ttt -yy -s 256 -e "trace=${trace_syscalls}" \
+            -o "${diagnostic_dir}/uid-map.trace" \
+            unshare --user --map-root-user true 2>&1 | tee "${diagnostic_dir}/uid-map.out"; then
+            uid_map_status=0
+            uid_map_tee_status=0
+          else
+            statuses=("${PIPESTATUS[@]}")
+            uid_map_status="${statuses[0]}"
+            uid_map_tee_status="${statuses[1]}"
+          fi
+          if strace -ff -ttt -yy -s 256 -e "trace=${trace_syscalls}" \
+            -o "${diagnostic_dir}/birdcage.trace" \
+            cargo test --manifest-path Cargo.toml -p weaver-sandbox \
+              --test sandbox_child_probe 2>&1 | tee "${diagnostic_dir}/birdcage.out"; then
+            birdcage_status=0
+            birdcage_tee_status=0
+          else
+            statuses=("${PIPESTATUS[@]}")
+            birdcage_status="${statuses[0]}"
+            birdcage_tee_status="${statuses[1]}"
+          fi
+          {
+            printf 'uid_map_status=%s\n' "${uid_map_status}"
+            printf 'uid_map_tee_status=%s\n' "${uid_map_tee_status}"
+            printf 'birdcage_status=%s\n' "${birdcage_status}"
+            printf 'birdcage_tee_status=%s\n' "${birdcage_tee_status}"
+          } | tee "${diagnostic_dir}/result.txt"
+          if (( uid_map_status != 0 || uid_map_tee_status != 0 || birdcage_status != 0 || birdcage_tee_status != 0 )); then
+            exit 1
+          fi
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr297-ubuntu2204-uidmap-${{ github.run_id }}
+          path: ${{ runner.temp }}/weaver-pr297-ubuntu2204-${{ github.run_id }}/
+          if-no-files-found: warn
