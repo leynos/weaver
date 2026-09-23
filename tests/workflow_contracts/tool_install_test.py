@@ -26,8 +26,11 @@ Run via ``make test-workflow-contracts``.
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 import typing as typ
+from pathlib import Path
 
 import pytest
 from workflow_loader import repository_workflows as workflows
@@ -170,6 +173,41 @@ def test_whitaker_takes_the_prebuilt_path() -> None:
     )
     assert str(inputs.get("allow-suite-pin", "false")).lower() == "false", (
         "allow-suite-pin permits the source build ci-mode exists to refuse"
+    )
+
+
+def test_whitaker_backend_uses_its_installed_toolchain(tmp_path: Path) -> None:
+    """Provision Cranelift on the suite nightly before the lint gate runs."""
+    steps = _steps(*LANE)
+    matches = [
+        (index, str(step.get("run", "")))
+        for index, step in enumerate(steps)
+        if step.get("name") == "Provision Whitaker Cranelift backend"
+    ]
+    assert len(matches) == 1, "Whitaker needs exactly one backend provisioning step"
+    index, script = matches[0]
+    assert _action_step(WHITAKER_ACTION)[0] < index < _run_index("make lint")
+
+    data_home = tmp_path / "data"
+    whitaker_dir = data_home / "whitaker"
+    whitaker_dir.mkdir(parents=True)
+    (whitaker_dir / "rust-toolchain.toml").write_text(
+        '[toolchain]\nchannel = "nightly-2099-01-01"\n'
+    )
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    rustup = bin_dir / "rustup"
+    rustup.write_text('#!/bin/sh\nprintf "%s\\n" "$*" > "$RUSTUP_CALL"\n')
+    rustup.chmod(0o755)
+    call_file = tmp_path / "rustup-call"
+    environment = os.environ | {
+        "XDG_DATA_HOME": str(data_home),
+        "RUSTUP_CALL": str(call_file),
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+    }
+    subprocess.run(["bash", "-e", "-c", script], env=environment, check=True)
+    assert call_file.read_text() == (
+        "component add --toolchain nightly-2099-01-01 rustc-codegen-cranelift\n"
     )
 
 

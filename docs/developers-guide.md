@@ -409,7 +409,12 @@ pinned to a full commit SHA:
   with `installer-version` 0.2.8. From 0.2.7 the installer downloads the
   prebuilt, digest-verified lint suite and Dylint tools from Whitaker's rolling
   release. The action's `ci-mode` is on by default and fails the step if the
-  installer falls back to a source build.
+  installer falls back to a source build. CI adds `rustc-codegen-cranelift` to
+  the suite's own pinned nightly after installation: Weaver's current ambient
+  development profile selects that backend, while Whitaker's default installer
+  components omit it. The step reads Whitaker's installed toolchain file so a
+  rolling suite update cannot silently pair the component with the wrong
+  nightly.
 - **Merman**, the Mermaid renderer `make nixie` uses, comes from
   `install-nixie`, which downloads Merman 0.7.0's release archive and verifies
   it against a pinned checksum, and installs Nixie 1.1.0 on Python 3.14, which
