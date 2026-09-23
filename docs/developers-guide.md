@@ -360,10 +360,13 @@ A workflow declaring only `workflow_call` is the case this exists for. It has
 no pull-request trigger, so a trigger-only reading never opens it, yet a
 pull-request job that calls it with `secrets: inherit` hands it the token.
 
-`pull_request_target` counts as a pull-request trigger here. It runs on a pull
-request with write permissions, which makes it more dangerous than
-`pull_request`, not less. `workflow_dispatch` does not count: a dispatch is not
-a pull request, which is why the publisher may carry one.
+`pull_request_target`, `merge_group` and `workflow_run` count as pull-request
+triggers here. `pull_request_target` runs on a pull request with write
+permissions, which makes it more dangerous than `pull_request`, not less.
+`merge_group` runs the checks a pull request needs to leave the merge queue, so
+a red one blocks the merge. `workflow_run` runs after a pull-request workflow,
+with the repository's secrets. `workflow_dispatch` does not count: a dispatch
+is not a pull request, which is why the publisher may carry one.
 
 ### How the readings are proved
 
