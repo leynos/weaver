@@ -1419,6 +1419,14 @@ stream with the unchanged `OutputAssertion` comparison kind before
 `assert_output` reads the selected stream. Do not promote these types to shared
 test support unless a second CLI BDD module needs this exact contract.
 
+## Plugin protocol round-trip test helper
+
+The JSON round-trip assertion in `crates/weaver-plugins/src/protocol/tests.rs`
+is private to those protocol tests. It handles serialization, deserialization,
+and equality; each caller retains its protocol-specific assertions. Reuse it
+within that module only, rather than exporting a test-support API for an
+unrelated protocol.
+
 ## Test infrastructure for rename-symbol coverage
 
 ### `test-support` feature (`weaver-plugins`)
