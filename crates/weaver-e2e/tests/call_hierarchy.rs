@@ -181,10 +181,6 @@ mod test_impl {
         })
     }
 
-    /// Names the two response types owned by this private test module.
-    ///
-    /// The trait only removes duplicate response collection; each caller keeps
-    /// its own LSP request type and direction-specific name field.
     trait CallName {
         fn name(&self) -> &str;
     }
@@ -197,28 +193,41 @@ mod test_impl {
         fn name(&self) -> &str { &self.to.name }
     }
 
+    fn request_call_names<Response: CallName>(
+        ctx: &mut TestContext,
+        call_item: CallHierarchyItem,
+        request: impl FnOnce(
+            &mut LspClient,
+            CallHierarchyItem,
+        ) -> Result<Option<Vec<Response>>, LspClientError>,
+    ) -> Result<Vec<String>, TestError> {
+        call_names(request(&mut ctx.client, call_item)?)
+    }
+
     fn incoming_call_names(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
     ) -> Result<Vec<String>, TestError> {
-        let params = CallHierarchyIncomingCallsParams {
-            item,
-            work_done_progress_params: WorkDoneProgressParams::default(),
-            partial_result_params: lsp_types::PartialResultParams::default(),
-        };
-        call_names(ctx.client.incoming_calls(params)?)
+        request_call_names(ctx, item, |client, request_item| {
+            client.incoming_calls(CallHierarchyIncomingCallsParams {
+                item: request_item,
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: lsp_types::PartialResultParams::default(),
+            })
+        })
     }
 
     fn outgoing_call_names(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
     ) -> Result<Vec<String>, TestError> {
-        let params = CallHierarchyOutgoingCallsParams {
-            item,
-            work_done_progress_params: WorkDoneProgressParams::default(),
-            partial_result_params: lsp_types::PartialResultParams::default(),
-        };
-        call_names(ctx.client.outgoing_calls(params)?)
+        request_call_names(ctx, item, |client, request_item| {
+            client.outgoing_calls(CallHierarchyOutgoingCallsParams {
+                item: request_item,
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: lsp_types::PartialResultParams::default(),
+            })
+        })
     }
 
     fn ensure_expected_call(names: Vec<String>, expected_name: &str) -> Result<(), TestError> {
