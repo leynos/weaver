@@ -158,15 +158,30 @@ fn candidate_exists(candidate: &Path) -> Result<bool> {
     let Some(file_name) = candidate.file_name() else {
         return Ok(false);
     };
-    let directory = match Dir::open_ambient_dir(parent, cap_std::ambient_authority()) {
-        Ok(directory) => directory,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
-        Err(error) => {
-            return Err(error)
-                .with_context(|| format!("failed to open candidate directory {parent:?}"));
-        }
+    let Some(directory) = open_candidate_directory(parent)? else {
+        return Ok(false);
     };
 
+    candidate_metadata_exists(&directory, file_name, candidate)
+}
+
+#[cfg(target_os = "linux")]
+fn open_candidate_directory(parent: &Path) -> Result<Option<Dir>> {
+    match Dir::open_ambient_dir(parent, cap_std::ambient_authority()) {
+        Ok(directory) => Ok(Some(directory)),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => {
+            Err(error).with_context(|| format!("failed to open candidate directory {parent:?}"))
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn candidate_metadata_exists(
+    directory: &Dir,
+    file_name: &std::ffi::OsStr,
+    candidate: &Path,
+) -> Result<bool> {
     match directory.metadata(file_name) {
         Ok(_) => Ok(true),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),

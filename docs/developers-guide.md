@@ -110,6 +110,13 @@ cargo nextest run -p weaver-sandbox --test sandbox_behaviour_child --all-feature
 The workspace `make test` includes the target through its configured test
 runner.
 
+The private `CallName` trait in `crates/weaver-e2e/tests/call_hierarchy.rs`
+only collects response names for that module's call-hierarchy assertions. Its
+only implementations are the incoming response's `from` name and the outgoing
+response's `to` name. Keep the LSP requests and their direction-specific field
+selection in the local helpers; this trait is not a production API or a
+cross-module test abstraction.
+
 ## Workspace lint policy
 
 The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates

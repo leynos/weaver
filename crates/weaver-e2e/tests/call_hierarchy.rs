@@ -171,38 +171,54 @@ mod test_impl {
         Outgoing,
     }
 
+    fn call_names(calls: Option<Vec<impl CallName>>) -> Result<Vec<String>, TestError> {
+        calls.ok_or(TestError::NoCallsFound).map(|call_entries| {
+            call_entries
+                .iter()
+                .map(CallName::name)
+                .map(str::to_owned)
+                .collect()
+        })
+    }
+
+    /// Names the two response types owned by this private test module.
+    ///
+    /// The trait only removes duplicate response collection; each caller keeps
+    /// its own LSP request type and direction-specific name field.
+    trait CallName {
+        fn name(&self) -> &str;
+    }
+
+    impl CallName for lsp_types::CallHierarchyIncomingCall {
+        fn name(&self) -> &str { &self.from.name }
+    }
+
+    impl CallName for lsp_types::CallHierarchyOutgoingCall {
+        fn name(&self) -> &str { &self.to.name }
+    }
+
     fn incoming_call_names(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
     ) -> Result<Vec<String>, TestError> {
-        let incoming_params = CallHierarchyIncomingCallsParams {
+        let params = CallHierarchyIncomingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: lsp_types::PartialResultParams::default(),
         };
-
-        let calls = ctx
-            .client
-            .incoming_calls(incoming_params)?
-            .ok_or(TestError::NoCallsFound)?;
-        Ok(calls.iter().map(|call| call.from.name.clone()).collect())
+        call_names(ctx.client.incoming_calls(params)?)
     }
 
     fn outgoing_call_names(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
     ) -> Result<Vec<String>, TestError> {
-        let outgoing_params = CallHierarchyOutgoingCallsParams {
+        let params = CallHierarchyOutgoingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: lsp_types::PartialResultParams::default(),
         };
-
-        let calls = ctx
-            .client
-            .outgoing_calls(outgoing_params)?
-            .ok_or(TestError::NoCallsFound)?;
-        Ok(calls.iter().map(|call| call.to.name.clone()).collect())
+        call_names(ctx.client.outgoing_calls(params)?)
     }
 
     fn ensure_expected_call(names: Vec<String>, expected_name: &str) -> Result<(), TestError> {

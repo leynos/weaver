@@ -56,7 +56,7 @@ fn main() -> Result<()> {
 #[cfg(target_os = "linux")]
 fn linux_trials() -> Result<Vec<Trial>> {
     let feature = load_feature()?;
-    Ok(feature
+    let mut trials = feature
         .scenarios
         .iter()
         .enumerate()
@@ -65,7 +65,42 @@ fn linux_trials() -> Result<Vec<Trial>> {
                 run_mimic_trial(index).map_err(|error| format!("{error:#}").into())
             })
         })
-        .collect())
+        .collect::<Vec<_>>();
+    trials.extend([
+        Trial::test("support::resolves_later_candidate", || {
+            resolve_later_candidate().map_err(|error| format!("{error:#}").into())
+        }),
+        Trial::test("support::reports_candidate_directory_error", || {
+            reports_candidate_directory_error().map_err(|error| format!("{error:#}").into())
+        }),
+    ]);
+    Ok(trials)
+}
+
+#[cfg(target_os = "linux")]
+fn resolve_later_candidate() -> Result<()> {
+    let resolved =
+        support::resolve_binary(&["/weaver-sandbox-missing-binary", "/usr/bin/env", "/bin/env"])?;
+    ensure!(
+        resolved == std::path::Path::new("/usr/bin/env")
+            || resolved == std::path::Path::new("/bin/env"),
+        "resolver did not use the available fallback: {resolved:?}"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn reports_candidate_directory_error() -> Result<()> {
+    let Err(error) = support::resolve_binary(&["/dev/null/weaver-sandbox-binary"]) else {
+        bail!("a non-directory candidate parent unexpectedly resolved");
+    };
+    ensure!(
+        error
+            .to_string()
+            .contains("failed to open candidate directory"),
+        "resolution error omitted its candidate-directory context: {error:#}"
+    );
+    Ok(())
 }
 
 #[cfg(target_os = "linux")]
@@ -243,75 +278,82 @@ fn execute_given(world: &mut TestWorld, text: &str) -> Result<()> {
 #[cfg(target_os = "linux")]
 fn execute_then(world: &mut TestWorld, text: &str) -> Result<()> {
     match text {
-        "the sandboxed process succeeds" => {
-            let output = world.output.as_ref().context("process output missing")?;
-            ensure!(
-                output.status.success(),
-                "sandboxed process failed: {:?}; stderr: {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            );
-            ensure!(
-                world.launch_error.is_none(),
-                "sandbox launch failed: {:?}",
-                world.launch_error
-            );
-            Ok(())
-        }
-        "the sandboxed process fails" => {
-            ensure!(
-                world.launch_error.is_none(),
-                "sandbox launch failed: {:?}",
-                world.launch_error
-            );
-            let output = world.output.as_ref().context("process output missing")?;
-            ensure!(
-                !output.status.success(),
-                "sandboxed process unexpectedly succeeded"
-            );
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            ensure!(
-                stderr.contains("cat:")
-                    && stderr.contains(world.forbidden_file.to_string_lossy().as_ref()),
-                "failure did not come from forbidden file access: {stderr}"
-            );
-            Ok(())
-        }
-        "environment markers are cleaned up" => {
-            // Birdcage restores this child's input environment; the mimic
-            // callback separately proves those inputs never reach its process.
-            let markers = environment_markers()?;
-            ensure!(
-                markers.contains(&"KEEP_ME=present".to_owned())
-                    && markers.contains(&"DROP_ME=remove-me".to_owned()),
-                "sandbox did not restore the scenario child's environment"
-            );
-            Ok(())
-        }
-        text if text.starts_with("stdout contains ") => {
-            let wanted = text
-                .trim_start_matches("stdout contains ")
-                .trim_matches('"');
-            let stdout = captured_stdout(world)?;
-            ensure!(
-                stdout.contains(wanted),
-                "stdout lacks {wanted:?}: {stdout:?}"
-            );
-            Ok(())
-        }
+        "the sandboxed process succeeds" => assert_process_succeeds(world),
+        "the sandboxed process fails" => assert_process_fails_for_forbidden_file(world),
+        "environment markers are cleaned up" => assert_environment_markers_cleaned(),
+        text if text.starts_with("stdout contains ") => assert_stdout_content(world, text, true),
         text if text.starts_with("stdout does not contain ") => {
-            let unwanted = text
-                .trim_start_matches("stdout does not contain ")
-                .trim_matches('"');
-            let stdout = captured_stdout(world)?;
-            ensure!(
-                !stdout.contains(unwanted),
-                "stdout contains {unwanted:?}: {stdout:?}"
-            );
-            Ok(())
+            assert_stdout_content(world, text, false)
         }
         _ => bail!("unrecognized Then step: {text}"),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn assert_process_succeeds(world: &TestWorld) -> Result<()> {
+    let output = world.output.as_ref().context("process output missing")?;
+    ensure!(
+        output.status.success(),
+        "sandboxed process failed: {:?}; stderr: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    ensure!(
+        world.launch_error.is_none(),
+        "sandbox launch failed: {:?}",
+        world.launch_error
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn assert_process_fails_for_forbidden_file(world: &TestWorld) -> Result<()> {
+    ensure!(
+        world.launch_error.is_none(),
+        "sandbox launch failed: {:?}",
+        world.launch_error
+    );
+    let output = world.output.as_ref().context("process output missing")?;
+    ensure!(
+        !output.status.success(),
+        "sandboxed process unexpectedly succeeded"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    ensure!(
+        stderr.contains("cat:") && stderr.contains(world.forbidden_file.to_string_lossy().as_ref()),
+        "failure did not come from forbidden file access: {stderr}"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn assert_environment_markers_cleaned() -> Result<()> {
+    // Birdcage restores this child's input environment; the mimic callback
+    // separately proves those inputs never reach its process.
+    let markers = environment_markers()?;
+    ensure!(
+        markers.contains(&"KEEP_ME=present".to_owned())
+            && markers.contains(&"DROP_ME=remove-me".to_owned()),
+        "sandbox did not restore the scenario child's environment"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn assert_stdout_content(world: &TestWorld, text: &str, should_contain: bool) -> Result<()> {
+    let prefix = if should_contain {
+        "stdout contains "
+    } else {
+        "stdout does not contain "
+    };
+    let wanted = text.trim_start_matches(prefix).trim_matches('"');
+    let stdout = captured_stdout(world)?;
+    let contains = stdout.contains(wanted);
+    if contains != should_contain {
+        let state = if should_contain { "lacks" } else { "contains" };
+        bail!("stdout {state} {wanted:?}: {stdout:?}")
+    }
+    Ok(())
 }
 
 #[cfg(target_os = "linux")]
