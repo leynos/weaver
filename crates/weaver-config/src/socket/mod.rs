@@ -20,9 +20,17 @@ pub use preparation::SocketPreparationError;
 #[serde(tag = "transport", rename_all = "snake_case")]
 pub enum SocketEndpoint {
     /// Unix domain socket endpoint.
-    Unix { path: Utf8PathBuf },
+    Unix {
+        /// Filesystem path of the Unix socket.
+        path: Utf8PathBuf,
+    },
     /// TCP socket endpoint.
-    Tcp { host: String, port: u16 },
+    Tcp {
+        /// Host name or IP address of the daemon.
+        host: String,
+        /// TCP port on which the daemon listens.
+        port: u16,
+    },
 }
 
 impl SocketEndpoint {
@@ -49,15 +57,21 @@ impl SocketEndpoint {
     }
 
     /// Ensures the socket's parent directory exists with restrictive permissions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Unix socket path is invalid or its parent
+    /// directory cannot be prepared securely.
     pub fn prepare_filesystem(&self) -> Result<(), SocketPreparationError> {
         preparation::prepare_endpoint_filesystem(self)
     }
 }
 
+/// Decodes the percent-encoded path component of a Unix socket URL.
 fn decode_unix_path(path: &str) -> Result<String, std::str::Utf8Error> {
     percent_decode_str(path)
         .decode_utf8()
-        .map(|decoded| decoded.into_owned())
+        .map(std::borrow::Cow::into_owned)
 }
 
 impl fmt::Display for SocketEndpoint {
@@ -87,41 +101,44 @@ impl FromStr for SocketEndpoint {
         match url.scheme() {
             "unix" => parse_unix_endpoint(&url, input),
             "tcp" => parse_tcp_endpoint(&url, input),
-            other => Err(SocketParseError::UnsupportedScheme(other.to_string())),
+            other => Err(SocketParseError::UnsupportedScheme(other.to_owned())),
         }
     }
 }
 
+/// Validates Unix URL components and decodes the socket path.
 fn parse_unix_endpoint(url: &Url, input: &str) -> Result<SocketEndpoint, SocketParseError> {
     if url.host_str().is_some() {
-        return Err(SocketParseError::InvalidUnixAuthority(input.to_string()));
+        return Err(SocketParseError::InvalidUnixAuthority(input.to_owned()));
     }
     if url.query().is_some() || url.fragment().is_some() {
-        return Err(SocketParseError::InvalidUnixPathOptions(input.to_string()));
+        return Err(SocketParseError::InvalidUnixPathOptions(input.to_owned()));
     }
     let path = url.path();
     if path.is_empty() {
-        return Err(SocketParseError::MissingUnixPath(input.to_string()));
+        return Err(SocketParseError::MissingUnixPath(input.to_owned()));
     }
     let decoded_path =
-        decode_unix_path(path).map_err(|_| SocketParseError::InvalidUnixPath(input.to_string()))?;
+        decode_unix_path(path).map_err(|_| SocketParseError::InvalidUnixPath(input.to_owned()))?;
     Ok(SocketEndpoint::unix(decoded_path))
 }
 
+/// Validates a TCP URL before constructing its endpoint.
 fn parse_tcp_endpoint(url: &Url, input: &str) -> Result<SocketEndpoint, SocketParseError> {
     if tcp_url_has_invalid_components(url) {
-        return Err(SocketParseError::InvalidTcpUrl(input.to_string()));
+        return Err(SocketParseError::InvalidTcpUrl(input.to_owned()));
     }
-    let host = url
+    let raw_host = url
         .host_str()
-        .ok_or_else(|| SocketParseError::MissingHost(input.to_string()))?;
-    let host = host.trim_matches(['[', ']']).to_string();
+        .ok_or_else(|| SocketParseError::MissingHost(input.to_owned()))?;
+    let host = raw_host.trim_matches(['[', ']']).to_owned();
     let port = url
         .port()
-        .ok_or_else(|| SocketParseError::MissingPort(input.to_string()))?;
+        .ok_or_else(|| SocketParseError::MissingPort(input.to_owned()))?;
     Ok(SocketEndpoint::tcp(host, port))
 }
 
+/// Rejects TCP URL components that are outside the endpoint contract.
 fn tcp_url_has_invalid_components(url: &Url) -> bool {
     !url.username().is_empty()
         || url.password().is_some()

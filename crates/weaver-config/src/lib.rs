@@ -53,8 +53,10 @@ pub use runtime::{RuntimePaths, RuntimePathsError};
 use serde::{Deserialize, Serialize};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
 
+/// Returns the locale used when configuration does not specify one.
 fn default_locale() -> Locale { Locale::en_us() }
 
+/// Help text for configuration fields exposed through the CLI.
 const CONFIG_FIELD_HELP: &[(&str, &str)] = &[
     (
         "weaver.fields.daemon_socket.help",
@@ -74,6 +76,7 @@ const CONFIG_FIELD_HELP: &[(&str, &str)] = &[
         "Selects the operator-facing locale",
     ),
 ];
+/// Fallback help text for configuration fields without a specific entry.
 const DEFAULT_CONFIG_FIELD_HELP: &str = "Overrides a shared configuration value";
 
 /// Returns the canonical short help text for a configuration field help ID.
@@ -163,6 +166,11 @@ impl Config {
     /// This wrapper does not introduce its own panic paths, but the
     /// `ortho_config` generated loader may panic if its generated discovery or
     /// CLI metadata trips an internal debug assertion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when configuration discovery, parsing, or merging
+    /// fails.
     pub fn load() -> ortho_config::OrthoResult<Self> { <Self as OrthoConfig>::load() }
 
     /// Loads configuration using a custom iterator of CLI arguments.
@@ -172,6 +180,11 @@ impl Config {
     /// This wrapper does not introduce its own panic paths, but the
     /// `ortho_config` generated loader may panic if its generated discovery or
     /// CLI metadata trips an internal debug assertion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the supplied arguments or other configuration
+    /// sources cannot be parsed or merged.
     pub fn load_from_iter<I, T>(iter: I) -> ortho_config::OrthoResult<Self>
     where
         I: IntoIterator<Item = T>,
@@ -182,15 +195,15 @@ impl Config {
 
     /// Accessor for the configured daemon socket.
     #[must_use]
-    pub fn daemon_socket(&self) -> &SocketEndpoint { &self.daemon_socket }
+    pub const fn daemon_socket(&self) -> &SocketEndpoint { &self.daemon_socket }
 
     /// Accessor for the logging filter expression.
     #[must_use]
-    pub fn log_filter(&self) -> &str { self.log_filter.as_str() }
+    pub const fn log_filter(&self) -> &str { self.log_filter.as_str() }
 
     /// Accessor for the logging format.
     #[must_use]
-    pub fn log_format(&self) -> LogFormat { self.log_format }
+    pub const fn log_format(&self) -> LogFormat { self.log_format }
 
     /// Builds a [`CapabilityMatrix`] from the configured directives.
     #[must_use]
@@ -200,8 +213,9 @@ impl Config {
 
     /// Accessor for the configured locale.
     #[must_use]
-    pub fn locale(&self) -> &Locale { &self.locale }
+    pub const fn locale(&self) -> &Locale { &self.locale }
 
+    /// Removes duplicate capability overrides after configuration sources merge.
     fn normalize_capability_overrides(&mut self) {
         deduplicate_directives(&mut self.capability_overrides);
     }
@@ -277,17 +291,24 @@ mod tests {
         ) {
             let mut layers = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
             for (directive, layer) in assignments {
-                layers[layer].push(directive);
+                let layer_directives = layers
+                    .get_mut(layer)
+                    .ok_or_else(|| TestCaseError::fail("layer index must be within 0..4"))?;
+                layer_directives.push(directive);
             }
 
+            let [default_layer, file_layer, environment_layer, cli_layer] = &layers;
             let mut defaults = serde_json::to_value(Config::default())
                 .map_err(|error| TestCaseError::fail(error.to_string()))?;
-            defaults["capability_overrides"] = json!(&layers[0]);
+            let default_overrides = defaults
+                .get_mut("capability_overrides")
+                .ok_or_else(|| TestCaseError::fail("missing capability_overrides default"))?;
+            *default_overrides = json!(default_layer);
             let mut composer = MergeComposer::with_capacity(4);
             composer.push_defaults(defaults);
-            composer.push_file(json!({ "capability_overrides": &layers[1] }), None);
-            composer.push_environment(json!({ "capability_overrides": &layers[2] }));
-            composer.push_cli(json!({ "capability_overrides": &layers[3] }));
+            composer.push_file(json!({ "capability_overrides": file_layer }), None);
+            composer.push_environment(json!({ "capability_overrides": environment_layer }));
+            composer.push_cli(json!({ "capability_overrides": cli_layer }));
 
             let config = Config::merge_from_layers(composer.layers())
                 .map_err(|error| TestCaseError::fail(error.to_string()))?;

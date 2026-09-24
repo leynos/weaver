@@ -18,8 +18,8 @@ where
     Setup: FnOnce(&Path) -> std::path::PathBuf,
 {
     let tmp = tempdir().map_err(|error| format!("temporary directory: {error}"))?;
-    let socket_path = setup(tmp.path());
-    let socket_path = Utf8PathBuf::from_path_buf(socket_path)
+    let path_buf = setup(tmp.path());
+    let socket_path = Utf8PathBuf::from_path_buf(path_buf)
         .map_err(|_| String::from("socket path should be UTF-8"))?;
     let endpoint = SocketEndpoint::unix(socket_path);
 
@@ -86,8 +86,8 @@ fn prepare_filesystem_enforces_permissions() {
     perms.set_mode(0o755);
     std::fs::set_permissions(&socket_dir, perms).expect("loosen permissions");
 
-    let socket_path = socket_dir.join("daemon.sock");
-    let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("utf8 path");
+    let path_buf = socket_dir.join("daemon.sock");
+    let socket_path = Utf8PathBuf::from_path_buf(path_buf).expect("utf8 path");
     let endpoint = SocketEndpoint::unix(socket_path);
 
     endpoint
@@ -109,8 +109,8 @@ fn prepare_filesystem_allows_lexically_normalized_path() {
     let other_dir = tmp.path().join("other");
     std::fs::create_dir(&other_dir).expect("create other directory");
 
-    let socket_path = real_dir.join("..").join("other").join("daemon.sock");
-    let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("socket path should be UTF-8");
+    let path_buf = real_dir.join("..").join("other").join("daemon.sock");
+    let socket_path = Utf8PathBuf::from_path_buf(path_buf).expect("socket path should be UTF-8");
     let endpoint = SocketEndpoint::unix(socket_path);
 
     endpoint

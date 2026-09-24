@@ -15,10 +15,13 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn temp_dir() -> TempDir { TempDir::new().expect("create temporary directory") }
+fn temp_dir() -> std::io::Result<TempDir> { TempDir::new() }
 
 #[rstest]
-fn malformed_explicit_config_returns_file_error(temp_dir: TempDir) {
+fn malformed_explicit_config_returns_file_error(
+    #[from(temp_dir)] temp_dir_result: std::io::Result<TempDir>,
+) {
+    let temp_dir = temp_dir_result.expect("create temporary directory");
     let cli_path = temp_dir.path().join("cli_weaver.toml");
     let dir = Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
         .expect("open temp dir");
@@ -49,7 +52,10 @@ fn malformed_explicit_config_returns_file_error(temp_dir: TempDir) {
 }
 
 #[rstest]
-fn missing_extends_reports_referencing_and_resolved_paths(temp_dir: TempDir) {
+fn missing_extends_reports_referencing_and_resolved_paths(
+    #[from(temp_dir)] temp_dir_result: std::io::Result<TempDir>,
+) {
+    let temp_dir = temp_dir_result.expect("create temporary directory");
     let config_path = temp_dir.path().join("weaver.toml");
     let missing_parent_path = temp_dir.path().join("missing.toml");
     let dir = Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
