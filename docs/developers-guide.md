@@ -542,6 +542,58 @@ number, a constant group, a `head_ref` group, a `format()` group, the block
 removed, the trigger renamed to `pull_request_target`, a duplicated block, and
 an unquoted `on:` beside the quoted one each fail it.
 
+## The Ubicloud cache proxy
+
+Ubicloud runs a cache proxy on the runner's private network, and the runner
+exposes its URL and token to action steps only. A `run:` step, such as the one
+that starts the sccache server, never sees them.
+`export-ubicloud-cache-credentials` reads them where they are visible and
+republishes them through the job environment.
+
+It also clears `ACTIONS_CACHE_SERVICE_V2`. sccache's GitHub Actions backend
+reads that variable to select the v2 cache service, and Ubicloud's proxy serves
+v1, so leaving the runner's value in place sends every write to an endpoint the
+proxy does not implement.
+
+Omitting the step does not fail anything, which is why it needs a contract.
+sccache falls through to GitHub's own cache endpoint from an Ubicloud runner,
+so the symptom is a slower build and metered egress that nothing reports.
+
+Every job here that compiles on a runner which can be Ubicloud declares the
+step:
+
+| Workflow                | Job               | Why the guard is needed                                                  |
+| ----------------------- | ----------------- | ------------------------------------------------------------------------ |
+| `ci.yml`                | `build-test`      | the fork arm is GitHub-hosted                                            |
+| `coverage-main.yml`     | `coverage-upload` | always Ubicloud today; the guard keeps it correct if a fork arm is added |
+| `build-and-package.yml` | `build`           | the runner is the caller's choice, and two of five legs are macOS        |
+
+*Table 3: Where the credentials step belongs.*
+
+Two orderings are load-bearing and both are asserted by
+`tests/workflow_contracts/ci_ubicloud_cache_test.py`.
+
+The step comes before anything that configures sccache, because sccache reads
+its cache configuration when its server starts and keeps it for that server's
+life. Credentials published afterwards change nothing while looking correct.
+
+The step carries `if: runner.environment == 'self-hosted'`. The action fails
+closed on a GitHub-hosted runner rather than exporting that runner's endpoint
+under Ubicloud's name, so an unguarded step turns the fork arm and the macOS
+legs red. `runner.environment` is the runtime fact rather than a reading of the
+label, it resolves to `self-hosted` on Ubicloud, and it keeps working when a
+lane's label moves.
+
+The step's reference is a full 40-character lowercase commit SHA. The step
+handles the cache token, so a movable reference such as `@main` would let a
+push to shared-actions change what runs with it, and the other assertions
+compare the action without its reference.
+
+Six ways to break this were applied alone and reverted: dropping the step from
+each of the three lanes, widening the guard to always, swapping it for a label
+test, and moving the step after the Rust setup. Four more repin it to `@main`,
+to a short SHA, to an upper-case SHA and to a SHA with a suffix.
+
 ## Whitaker CI setup
 
 CI pins Whitaker, Weaver's external lint engine, to a fixed revision through the
