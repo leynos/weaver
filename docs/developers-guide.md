@@ -685,6 +685,10 @@ returning: no workflow may run `cargo install` or clone Whitaker, and the
 `whitaker_provisioning_test.py` contract holds the current Whitaker action,
 Cranelift input and ordering in place.
 
+The source-build matchers collapse only Bash backslash-newline pairs before
+matching, preserving ordinary newlines as command boundaries. Bounded Hypothesis
+properties compare both detectors with a reference model.
+
 ## Adding or renaming public commands
 
 ADR 007 makes the 0.1.0 public command surface resource-first and generated
