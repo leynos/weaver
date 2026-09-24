@@ -3250,6 +3250,7 @@ version = "0.1.0"
 dependencies = [
  "camino",
  "cap-std 4.0.3",
+ "rstest",
  "tempfile",
  "time",
 ]
