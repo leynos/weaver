@@ -84,27 +84,34 @@ def triggers(document: Document) -> dict[object, object]:
     >>> triggers({True: ["push", "pull_request"]})
     {'push': None, 'pull_request': None}
     """
-    if "on" in document and True in document:
+    declared = [key for key in ("on", True) if key in document]
+    if len(declared) > 1:
         # GitHub merges the two, so reading either alone is blind to the
         # other's triggers.
         message = "a workflow declaring both `on:` and `'on':` is refused"
         raise ValueError(message)
-    for key in ("on", True):
-        if key not in document:
-            continue
-        match document[key]:
-            case dict() as mapping:
-                return mapping
-            case str() as event:
-                return {event: None}
-            case list() as events if all(
-                isinstance(event, str) for event in events
-            ):
-                return dict.fromkeys(events)
-            case other:
-                message = f"unsupported `on:` shape {other!r}"
-                raise ValueError(message)
-    message = "a workflow with no `on:` block cannot be classified"
+    if not declared:
+        message = "a workflow with no `on:` block cannot be classified"
+        raise ValueError(message)
+    return _trigger_mapping(document[declared[0]])
+
+
+def _trigger_mapping(value: object) -> dict[object, object]:
+    """Normalize one ``on:`` value, refusing any shape GitHub does not accept.
+
+    Raises
+    ------
+    ValueError
+        When the value is not a mapping, a name, or a sequence of names.
+    """
+    match value:
+        case dict() as mapping:
+            return mapping
+        case str() as event:
+            return {event: None}
+        case list() as events if all(isinstance(event, str) for event in events):
+            return dict.fromkeys(events)
+    message = f"unsupported `on:` shape {value!r}"
     raise ValueError(message)
 
 
@@ -198,26 +205,43 @@ def pull_request_closure(documents: Mapping[str, Document]) -> list[str]:
     ... })
     ['ci.yml', 'lib.yml']
     """
-    pending = [
-        name
-        for name, document in documents.items()
-        if PULL_REQUEST_TRIGGERS & set(triggers(document))
-    ]
+    pending = _pull_request_roots(documents)
     reached: set[str] = set()
     # A visited set rather than recursion: two reusable workflows calling
     # each other would otherwise loop, and a contract that hangs is worse
-    # than one that is wrong.
+    # than one that is wrong. A callee missing from the tree has nothing to
+    # read, so it is not followed.
     while pending:
         name = pending.pop()
         if name in reached or name not in documents:
             continue
         reached.add(name)
-        pending.extend(
-            callee
-            for job in jobs(documents[name]).values()
-            if (callee := local_callee(str(job.get("uses", ""))))
-        )
+        pending.extend(_local_callees(documents[name]))
     return sorted(reached)
+
+
+def _pull_request_roots(documents: Mapping[str, Document]) -> list[str]:
+    """Return the workflows a pull-request trigger starts directly.
+
+    Raises
+    ------
+    ValueError
+        When any workflow's triggers cannot be read.
+    """
+    return [
+        name
+        for name, document in documents.items()
+        if PULL_REQUEST_TRIGGERS & set(triggers(document))
+    ]
+
+
+def _local_callees(document: Document) -> list[str]:
+    """Return the workflows in this checkout that a workflow's jobs call."""
+    return [
+        callee
+        for job in jobs(document).values()
+        if (callee := local_callee(str(job.get("uses", ""))))
+    ]
 
 
 def mentions(node: object, needle: str, *, ignore_case: bool = False) -> bool:
@@ -258,8 +282,14 @@ def mentions(node: object, needle: str, *, ignore_case: bool = False) -> bool:
         return any(
             mentions(item, needle, ignore_case=ignore_case) for item in node
         )
-    text = str(node)
-    return needle.lower() in text.lower() if ignore_case else needle in text
+    return _contains(str(node), needle, ignore_case=ignore_case)
+
+
+def _contains(text: str, needle: str, *, ignore_case: bool) -> bool:
+    """Return whether one scalar's text holds the needle."""
+    if ignore_case:
+        return needle.lower() in text.lower()
+    return needle in text
 
 
 def external_secret_inheritors(document: Document) -> list[str]:
