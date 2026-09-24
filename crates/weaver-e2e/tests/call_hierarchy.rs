@@ -193,27 +193,21 @@ mod test_impl {
         fn name(&self) -> &str { &self.to.name }
     }
 
-    fn request_call_names<Response: CallName>(
-        ctx: &mut TestContext,
-        call_item: CallHierarchyItem,
-        request: impl FnOnce(
-            &mut LspClient,
-            CallHierarchyItem,
-        ) -> Result<Option<Vec<Response>>, LspClientError>,
-    ) -> Result<Vec<String>, TestError> {
-        call_names(request(&mut ctx.client, call_item)?)
-    }
-
     fn incoming_call_names(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
     ) -> Result<Vec<String>, TestError> {
-        request_call_names(ctx, item, |client, request_item| {
-            client.incoming_calls(CallHierarchyIncomingCallsParams {
-                item: request_item,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: lsp_types::PartialResultParams::default(),
-            })
+        call_names(request_incoming_calls(&mut ctx.client, item)?)
+    }
+
+    fn request_incoming_calls(
+        client: &mut LspClient,
+        item: CallHierarchyItem,
+    ) -> Result<Option<Vec<lsp_types::CallHierarchyIncomingCall>>, LspClientError> {
+        client.incoming_calls(CallHierarchyIncomingCallsParams {
+            item,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: lsp_types::PartialResultParams::default(),
         })
     }
 
@@ -221,12 +215,17 @@ mod test_impl {
         ctx: &mut TestContext,
         item: CallHierarchyItem,
     ) -> Result<Vec<String>, TestError> {
-        request_call_names(ctx, item, |client, request_item| {
-            client.outgoing_calls(CallHierarchyOutgoingCallsParams {
-                item: request_item,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: lsp_types::PartialResultParams::default(),
-            })
+        call_names(request_outgoing_calls(&mut ctx.client, item)?)
+    }
+
+    fn request_outgoing_calls(
+        client: &mut LspClient,
+        item: CallHierarchyItem,
+    ) -> Result<Option<Vec<lsp_types::CallHierarchyOutgoingCall>>, LspClientError> {
+        client.outgoing_calls(CallHierarchyOutgoingCallsParams {
+            item,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: lsp_types::PartialResultParams::default(),
         })
     }
 
