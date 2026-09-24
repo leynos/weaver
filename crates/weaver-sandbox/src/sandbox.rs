@@ -29,7 +29,9 @@ pub type SandboxOutput = Output;
 
 /// Launches commands inside a restrictive sandbox.
 pub struct Sandbox {
+    /// Resource policy applied when launching a child.
     profile: SandboxProfile,
+    /// Injectable thread counter for the single-threaded preflight.
     thread_counter: Box<dyn Fn() -> Result<usize, std::io::Error> + Send + Sync>,
 }
 
@@ -51,6 +53,7 @@ impl Sandbox {
         }
     }
 
+    /// Injects a thread counter for deterministic preflight tests.
     #[cfg(test)]
     pub fn with_thread_counter_for_tests(
         profile: SandboxProfile,
@@ -68,6 +71,12 @@ impl Sandbox {
     /// profile. When more than one thread exists in the current process the
     /// function returns [`SandboxError::MultiThreaded`] to avoid triggering the
     /// single-thread assertion enforced by `birdcage`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the thread count is unavailable or too high, the
+    /// executable is invalid or not whitelisted, a profile path cannot be
+    /// resolved, or `birdcage` rejects the sandbox or child launch.
     pub fn spawn(&self, command: SandboxCommand) -> Result<SandboxChild, SandboxError> {
         self.ensure_single_threaded()?;
         let program = Self::canonical_program(Path::new(command.get_program()))?;
@@ -86,6 +95,7 @@ impl Sandbox {
         Ok(child)
     }
 
+    /// Rejects launch when the caller has more than one thread.
     fn ensure_single_threaded(&self) -> Result<(), SandboxError> {
         let threads = (self.thread_counter)()
             .map_err(|source| SandboxError::ThreadCountUnavailable { source })?;
@@ -97,6 +107,7 @@ impl Sandbox {
         Ok(())
     }
 
+    /// Checks a canonical executable against the profile allowlist.
     fn ensure_program_whitelisted(&self, program: &Path) -> Result<(), SandboxError> {
         let authorized = self.profile.executable_paths_canonicalized()?;
         if authorized.iter().any(|p| p == program) {
@@ -107,6 +118,7 @@ impl Sandbox {
         })
     }
 
+    /// Translates profile grants and original runtime aliases into exceptions.
     fn collect_exceptions(&self, _program: &Path) -> Result<Vec<Exception>, SandboxError> {
         let mut exceptions = Vec::new();
         let read_only = self.profile.read_only_paths_canonicalized()?;
@@ -137,6 +149,7 @@ impl Sandbox {
         Ok(exceptions)
     }
 
+    /// Requires an absolute program path and resolves its canonical location.
     fn canonical_program(program: &Path) -> Result<PathBuf, SandboxError> {
         if !program.is_absolute() {
             return Err(SandboxError::ProgramNotAbsolute(program.to_path_buf()));
@@ -146,10 +159,12 @@ impl Sandbox {
     }
 }
 
+/// Canonicalizes every path in one class of profile grants.
 pub(crate) fn canonicalized_set(paths: &[PathBuf]) -> Result<Vec<PathBuf>, SandboxError> {
     paths.iter().map(|path| canonicalize(path, false)).collect()
 }
 
+/// Resolves an existing path or reconstructs a future path from an existing ancestor.
 fn canonicalize(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxError> {
     match fs::canonicalize(path) {
         Ok(resolved) => Ok(resolved),
@@ -169,6 +184,7 @@ fn canonicalize(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxErr
     }
 }
 
+/// Retains the missing suffix of a path while resolving its existing prefix.
 fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> {
     let Some(existing) = path.ancestors().find(|candidate| candidate.exists()) else {
         return Err(SandboxError::MissingPath {
