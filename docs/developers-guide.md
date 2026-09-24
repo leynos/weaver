@@ -69,6 +69,13 @@ only, and update the invocation contract tests when routing changes.
 The `make lint` target uses the fragment for Cargo documentation and Clippy;
 its Whitaker invocation uses the separate Whitaker toolchain without it.
 
+Clippy receives the fragment after its subcommand so that `cargo-clippy` passes
+it to the Cargo process that compiles the workspace. Cargo-nextest accepts
+Cargo configuration entries rather than a fragment path, so `make test` passes
+the fragment's `unstable.codegen-backend` and `profile.dev.codegen-backend`
+values through nextest's supported `--config` interface. The workflow contract
+and an executable Linux check cover both forwarding paths.
+
 `RUSTFLAGS` replaces Cargo's target-specific rustflags. The CI Rust setup also
 exports `RUSTFLAGS=-D warnings`, so every Linux debug Make invocation that
 selects the fragment repeats the `mold` linker argument in `RUSTFLAGS`. This

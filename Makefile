@@ -11,6 +11,11 @@ CARGO ?= $(or $(shell command -v cargo 2>/dev/null),$(wildcard $(USER_CARGO)),ca
 # not FreeBSD. Release and coverage retain Cargo's ordinary LLVM backend.
 HOST_OS ?= $(shell uname -s)
 DEV_FAST_CONFIG := $(if $(filter Linux Darwin,$(HOST_OS)),--config tools/dev-fast/config.toml)
+# cargo-nextest accepts Cargo configuration entries, but not a configuration
+# file path. Keep its forwarded values equivalent to the development fragment.
+DEV_FAST_NEXTEST_CONFIG := $(if $(filter Linux Darwin,$(HOST_OS)), \
+	--config 'unstable.codegen-backend=true' \
+	--config 'profile.dev.codegen-backend="cranelift"')
 # RUSTFLAGS overrides Cargo's target rustflags. CI's setup-rust action exports
 # it, so preserve its value and add mold explicitly for every Linux debug gate.
 DEV_FAST_RUST_FLAGS := $(if $(filter Linux,$(HOST_OS)),-Clink-arg=-fuse-ld=mold)
@@ -24,6 +29,8 @@ CARGO_FLAGS ?= --workspace --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
+DEV_FAST_TEST_COMMAND := $(if $(filter nextest run,$(TEST_CMD)),\
+	$(TEST_CMD) $(DEV_FAST_NEXTEST_CONFIG),$(DEV_FAST_CONFIG) $(TEST_CMD))
 MDLINT ?= $(shell command -v markdownlint-cli2 2>/dev/null || printf '%s' "$$HOME/.bun/bin/markdownlint-cli2")
 # `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
 # Markdown files Git tracks and `--include-untracked` adds the untracked files
@@ -62,7 +69,7 @@ clean: ## Remove build artefacts
 	$(CARGO) clean
 
 test: ## Run tests with warnings treated as errors
-	RUSTFLAGS="$(strip $(RUSTFLAGS) $(RUST_FLAGS) $(DEV_FAST_RUST_FLAGS))" $(CARGO) $(DEV_FAST_CONFIG) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$(strip $(RUSTFLAGS) $(RUST_FLAGS) $(DEV_FAST_RUST_FLAGS))" $(CARGO) $(DEV_FAST_TEST_COMMAND) $(TEST_FLAGS) $(BUILD_JOBS)
 	RUSTFLAGS="$(strip $(RUSTFLAGS) $(RUST_FLAGS) $(DEV_FAST_RUST_FLAGS))" $(CARGO) $(DEV_FAST_CONFIG) test --doc --workspace --all-features
 
 dev-test: test ## Test with the supported development backend
@@ -72,7 +79,7 @@ test-workflow-contracts: ## Validate workflow caller and runner-placement contra
 
 lint: ## Run Clippy with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(DEV_FAST_LINKER_ENV) $(CARGO) $(DEV_FAST_CONFIG) doc --no-deps --workspace
-	$(DEV_FAST_LINKER_ENV) $(CARGO) $(DEV_FAST_CONFIG) clippy $(CLIPPY_FLAGS)
+	$(DEV_FAST_LINKER_ENV) $(CARGO) clippy $(DEV_FAST_CONFIG) $(CLIPPY_FLAGS)
 	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: ## Type-check without building

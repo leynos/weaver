@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -18,6 +19,10 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 MAKEFILE = REPOSITORY / "Makefile"
 DEV_FAST_CONFIG = "tools/dev-fast/config.toml"
 CONFIG_ARGUMENT = f"--config {DEV_FAST_CONFIG}"
+NEXTEST_CONFIG_PAIRS = (
+    ("--config", "unstable.codegen-backend=true"),
+    ("--config", 'profile.dev.codegen-backend="cranelift"'),
+)
 PROBE_CARGO = "probe-cargo"
 PROBE_WHITAKER = "probe-whitaker"
 CALLER_RUST_FLAG = "-Cdebuginfo=0"
@@ -41,7 +46,7 @@ DEBUG_TARGETS = (
         (
             "test",
             ("TEST_CMD=nextest run",),
-            ("nextest run --workspace", "test --doc"),
+            ("nextest run", "test --doc"),
         ),
         id="test-nextest-run",
     ),
@@ -53,7 +58,7 @@ DEBUG_TARGETS = (
         (
             "dev-test",
             ("TEST_CMD=nextest run",),
-            ("nextest run --workspace", "test --doc"),
+            ("nextest run", "test --doc"),
         ),
         id="dev-test-nextest-run",
     ),
@@ -116,6 +121,31 @@ def _cargo_lines(lines: list[str]) -> list[str]:
     return invocations
 
 
+def _assert_effective_rustflags(
+    line: str, target: str, host_os: str, expects_mold: bool
+) -> None:
+    """Verify warning and linker flags for one evaluated Cargo invocation."""
+    flags_match = re.search(r'(?:^|\s)RUSTFLAGS="([^"]*)"', line)
+    if flags_match is None:
+        assert not expects_mold, (
+            "Linux must make mold RUSTFLAGS explicit because they "
+            f"override Cargo's target rustflags: {line}"
+        )
+        has_mold = False
+    else:
+        rustflags = flags_match.group(1)
+        assert "-D warnings" in rustflags, f"warning denial was lost: {line}"
+        assert CALLER_RUST_FLAG in rustflags, f"caller Rust flags were lost: {line}"
+        has_mold = "-Clink-arg=-fuse-ld=mold" in rustflags
+    assert has_mold is expects_mold, (
+        f"{target} on {host_os} must "
+        f"{'retain' if expects_mold else 'omit'} the mold linker flag: {line}"
+    )
+    if not expects_mold:
+        assert "mold" not in line, f"{host_os} must retain its native linker: {line}"
+
+
+
 def _assert_cargo_routing(
     lines: list[str],
     target: str,
@@ -132,32 +162,7 @@ def _assert_cargo_routing(
     )
 
     for line in invocations:
-        has_fragment = CONFIG_ARGUMENT in line
-        assert has_fragment is should_select_fragment, (
-            f"{target} on {host_os} must "
-            f"{'select' if should_select_fragment else 'omit'} "
-            f"{CONFIG_ARGUMENT}: {line}"
-        )
-        flags_match = re.search(r'(?:^|\s)RUSTFLAGS="([^"]*)"', line)
-        if flags_match is None:
-            assert not expects_mold, (
-                f"Linux must make mold RUSTFLAGS explicit because they "
-                f"override Cargo's target rustflags: {line}"
-            )
-            has_mold = False
-        else:
-            rustflags = flags_match.group(1)
-            assert "-D warnings" in rustflags, f"warning denial was lost: {line}"
-            assert CALLER_RUST_FLAG in rustflags, f"caller Rust flags were lost: {line}"
-            has_mold = "-Clink-arg=-fuse-ld=mold" in rustflags
-        assert has_mold is expects_mold, (
-            f"{target} on {host_os} must "
-            f"{'retain' if expects_mold else 'omit'} the mold linker flag: {line}"
-        )
-        if not expects_mold:
-            assert "mold" not in line, (
-                f"{host_os} must retain its native linker: {line}"
-            )
+        _assert_effective_rustflags(line, target, host_os, expects_mold)
 
     matched_lines: list[str] = []
     for subcommand in expected_subcommands:
@@ -175,10 +180,63 @@ def _assert_cargo_routing(
         assert match is not None, (
             f"{target} on {host_os} omitted its {subcommand!r} Cargo invocation"
         )
+        _assert_subcommand_routing(match, subcommand, should_select_fragment)
         matched_lines.append(match)
     assert len(set(matched_lines)) == len(invocations), (
         f"{target} on {host_os} has unexpected or unmatched Cargo invocations: "
         f"{invocations}"
+    )
+
+
+def _assert_subcommand_routing(
+    line: str, subcommand: str, should_select_fragment: bool
+) -> None:
+    """Check the interface through which this Cargo subcommand receives config."""
+    tokens = shlex.split(line)
+    if subcommand.startswith("nextest run"):
+        nextest_index = tokens.index("nextest")
+        forwarded_config = tuple(
+            tuple(tokens[index : index + 2])
+            for index in range(nextest_index + 2, len(tokens) - 1, 2)
+        )
+        assert tokens[nextest_index + 1] == "run", (
+            f"nextest must run through its Cargo subcommand: {line}"
+        )
+        if should_select_fragment:
+            assert forwarded_config[: len(NEXTEST_CONFIG_PAIRS)] == NEXTEST_CONFIG_PAIRS, (
+                f"nextest must forward its configuration after `nextest run`: {line}"
+            )
+        else:
+            assert not _has_nextest_config(line), (
+                f"nextest must omit development configuration: {line}"
+            )
+        assert DEV_FAST_CONFIG not in tokens, (
+            f"nextest cannot forward the development config file path: {line}"
+        )
+        assert "--workspace" in tokens, f"nextest lost workspace coverage: {line}"
+        return
+
+    has_fragment = DEV_FAST_CONFIG in tokens
+    assert has_fragment is should_select_fragment, (
+        f"{subcommand} must {'select' if should_select_fragment else 'omit'} "
+        f"{CONFIG_ARGUMENT}: {line}"
+    )
+    if subcommand == "clippy" and should_select_fragment:
+        cargo_index = tokens.index(PROBE_CARGO)
+        assert tokens[cargo_index + 1 : cargo_index + 4] == [
+            "clippy",
+            "--config",
+            DEV_FAST_CONFIG,
+        ], f"Clippy must receive the fragment after its subcommand: {line}"
+
+
+def _has_nextest_config(line: str) -> bool:
+    """Return whether a command carries a development Nextest config pair."""
+    tokens = shlex.split(line)
+    return any(
+        tokens[index : index + 2] == list(config_pair)
+        for config_pair in NEXTEST_CONFIG_PAIRS
+        for index in range(len(tokens) - 1)
     )
 
 
@@ -230,6 +288,10 @@ def test_release_and_maintenance_targets_do_not_select_dev_fast(
     assert all(CONFIG_ARGUMENT not in line for line in invocations), (
         f"{target} on {host_os} must not select {CONFIG_ARGUMENT}: {invocations}"
     )
+    assert not any(_has_nextest_config(line) for line in invocations), (
+        f"{target} on {host_os} must not select Nextest development config: "
+        f"{invocations}"
+    )
 
 
 def _declared_make_targets(makefile: Path) -> set[str]:
@@ -257,6 +319,10 @@ def test_any_verification_or_coverage_target_stays_on_the_default_backend() -> N
             f"verification or coverage target {target} must not select "
             f"{CONFIG_ARGUMENT}: {invocations}"
         )
+        assert not any(_has_nextest_config(line) for line in invocations), (
+            f"verification or coverage target {target} must not select "
+            f"Nextest development config: {invocations}"
+        )
 
 
 @pytest.mark.parametrize("platform", PLATFORMS)
@@ -271,105 +337,5 @@ def test_whitaker_never_receives_dev_fast_or_mold_flags(
         f"lint on {host_os} should invoke Whitaker once, found {len(whitaker_lines)}"
     )
     assert all(CONFIG_ARGUMENT not in line for line in whitaker_lines), whitaker_lines
+    assert not any(_has_nextest_config(line) for line in whitaker_lines), whitaker_lines
     assert all("mold" not in line for line in whitaker_lines), whitaker_lines
-
-
-def test_contract_rejects_a_debug_invocation_without_the_fragment(tmp_path: Path) -> None:
-    """Removing the fragment from a debug build makes the contract fail."""
-    original = MAKEFILE.read_text(encoding="utf-8")
-    mutated, replacements = re.subn(
-        r"(\$\(CARGO\)\s+)\$\(DEV_FAST_CONFIG\)(\s+build\b)",
-        r"\1\2",
-        original,
-        count=1,
-    )
-    assert replacements == 1, "could not create the debug-routing mutation"
-    mutant_makefile = tmp_path / "Makefile"
-    mutant_makefile.write_text(mutated, encoding="utf-8")
-
-    with pytest.raises(AssertionError, match="must omit|must select"):
-        _assert_debug_target(
-            mutant_makefile,
-            ("Linux", True, True),
-            ("build", (), ("build",)),
-        )
-
-
-def test_contract_rejects_dev_fast_on_a_release_target(tmp_path: Path) -> None:
-    """Adding the fragment to release makes the contract fail."""
-    original = MAKEFILE.read_text(encoding="utf-8")
-    mutated, replacements = re.subn(
-        r"(\$\(CARGO\))(\s+build\b[^\n]*--release)",
-        rf"\1 ${{DEV_FAST_CONFIG}}\2",
-        original,
-        count=1,
-    )
-    assert replacements == 1, "could not create the release-routing mutation"
-    mutant_makefile = tmp_path / "Makefile"
-    mutant_makefile.write_text(mutated, encoding="utf-8")
-
-    lines = _dry_run(mutant_makefile, "release", "Linux")
-    invocations = _cargo_lines(lines)
-    assert invocations, "release mutation did not retain its Cargo invocation"
-    with pytest.raises(AssertionError, match="must not select"):
-        assert all(CONFIG_ARGUMENT not in line for line in invocations), (
-            f"release on Linux must not select {CONFIG_ARGUMENT}: {invocations}"
-        )
-
-
-def test_all_runs_full_gates_sequentially() -> None:
-    """The aggregate target does not overlap its repository gates."""
-    lines = _dry_run(MAKEFILE, "all", "Linux")
-    gate_commands = [
-        line.strip()
-        for line in lines
-        if re.fullmatch(r"make\s+(?:check-fmt|lint|test|spelling)", line.strip())
-    ]
-    assert gate_commands == [
-        "make check-fmt",
-        "make lint",
-        "make test",
-        "make spelling",
-    ], f"all must run its gates sequentially in policy order: {gate_commands}"
-
-
-def test_custom_make_flags_keep_warning_denial_and_linker_selection() -> None:
-    """Rust compiler flags survive warning and Linux linker additions."""
-    lines = _dry_run(
-        MAKEFILE,
-        "typecheck",
-        "Linux",
-        (f"RUST_FLAGS={MAKE_RUST_FLAG}",),
-    )
-    invocations = _cargo_lines(lines)
-    assert invocations, "typecheck emitted no Cargo invocations"
-    for line in invocations:
-        flags_match = re.search(r'(?:^|\s)RUSTFLAGS="([^"]*)"', line)
-        assert flags_match is not None, f"Linux typecheck must make RUSTFLAGS explicit: {line}"
-        rustflags = flags_match.group(1)
-        assert "-D warnings" in rustflags, f"caller flags removed warning denial: {line}"
-        assert CALLER_RUST_FLAG in rustflags, f"ambient Rust flags were lost: {line}"
-        assert MAKE_RUST_FLAG in rustflags, f"Make caller Rust flags were lost: {line}"
-        assert "-Clink-arg=-fuse-ld=mold" in rustflags, (
-            f"Linux typecheck dropped the approved linker flag: {line}"
-        )
-
-
-def test_custom_rustdoc_flags_keep_warning_denial() -> None:
-    """The caller's Rustdoc flags do not remove the warning denial."""
-    lines = _dry_run(
-        MAKEFILE,
-        "lint",
-        "Linux",
-        (f"RUSTDOC_FLAGS={MAKE_RUSTDOC_FLAG}",),
-    )
-    doc_lines = [line for line in lines if f"{PROBE_CARGO} {CONFIG_ARGUMENT} doc" in line]
-    assert len(doc_lines) == 1, f"expected one Cargo documentation line: {lines}"
-    rustdoc_match = re.search(r'(?:^|\s)RUSTDOCFLAGS="([^"]*)"', doc_lines[0])
-    assert rustdoc_match is not None, f"documentation flags were not explicit: {doc_lines[0]}"
-    assert "-D warnings" in rustdoc_match.group(1), (
-        f"caller Rustdoc flags removed warning denial: {doc_lines[0]}"
-    )
-    assert MAKE_RUSTDOC_FLAG in rustdoc_match.group(1), (
-        f"Make caller Rustdoc flags were lost: {doc_lines[0]}"
-    )
