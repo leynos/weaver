@@ -34,6 +34,57 @@ quoted-source spelling that must remain unchanged.
 
 The workspace targets `ortho_config` v0.9.0 and Rust 1.89.
 
+## Development build backend
+
+The repository pins `nightly-2026-03-26` in `rust-toolchain.toml`, including
+`rustc-codegen-cranelift`, `rustfmt`, `clippy`, and `rust-analyzer`. Installing
+the Cranelift component does not activate it. Standard debug Make targets
+select the repository-owned `tools/dev-fast/config.toml` explicitly on Linux
+and macOS. Direct Cargo commands use Cargo's ordinary LLVM backend unless the
+caller selects another configuration.
+
+The fragment selects Cranelift for the development profile on Linux and macOS
+(x86_64 and aarch64). Linux builds also use `mold`; install it before building
+or linting locally. The CI lint lane ensures the pinned Cranelift component and
+installs `mold` before `make lint`. macOS uses its native linker. The pinned
+Cranelift component is unavailable on FreeBSD, so Make debug targets there omit
+the fragment and use LLVM.
+
+| Invocation                                                                        | Development fragment | Backend or linker                                     |
+| --------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------- |
+| `make build`, `make test`, `make lint` documentation and Clippy, `make typecheck` | Linux and macOS      | Cranelift; Linux uses `mold`, macOS its native linker |
+| The same Make debug targets on FreeBSD                                            | No                   | LLVM and the platform linker                          |
+| `make release`, coverage, verification, direct Cargo, Whitaker                    | No                   | Cargo's ordinary LLVM backend                         |
+
+*Table 1: Cargo configuration used by development and non-development paths.*
+
+`make dev-build` and `make dev-test` are explicit names for the supported
+development build and test paths. The ordinary `make build` and `make test`
+targets also select the fragment on supported hosts. The fragment is kept
+outside `.cargo/`, so it is never auto-discovered by Cargo; this keeps release,
+coverage, verification, Whitaker, and direct Cargo invocations on the ordinary
+backend. Keep the fragment for this repository's standard debug Make targets
+only, and update the invocation contract tests when routing changes.
+
+The `make lint` target uses the fragment for Cargo documentation and Clippy;
+its Whitaker invocation uses the separate Whitaker toolchain without it.
+
+Clippy receives the fragment after its subcommand so that `cargo-clippy` passes
+it to the Cargo process that compiles the workspace. Cargo-nextest accepts
+Cargo configuration entries rather than a fragment path, so `make test` passes
+the fragment's `unstable.codegen-backend` and `profile.dev.codegen-backend`
+values through nextest's supported `--config` interface. The workflow contract
+and an executable Linux check cover both forwarding paths.
+
+`RUSTFLAGS` replaces Cargo's target-specific rustflags. The CI Rust setup also
+exports `RUSTFLAGS=-D warnings`, so every Linux debug Make invocation that
+selects the fragment repeats the `mold` linker argument in `RUSTFLAGS`. This
+includes build, test, Clippy, documentation, and type-check commands. Keep the
+target-scoped setting in the fragment for explicit local selection without that
+environment override, and keep the Make repetition for its routed debug
+commands. The local `mold` installation is a source-build prerequisite on
+Linux; macOS uses its native linker and needs no `mold` installation.
+
 ## Workspace lint policy
 
 The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates
@@ -409,12 +460,8 @@ pinned to a full commit SHA:
   with `installer-version` 0.2.8. From 0.2.7 the installer downloads the
   prebuilt, digest-verified lint suite and Dylint tools from Whitaker's rolling
   release. The action's `ci-mode` is on by default and fails the step if the
-  installer falls back to a source build. CI adds `rustc-codegen-cranelift` to
-  the suite's own pinned nightly after installation: Weaver's current ambient
-  development profile selects that backend, while Whitaker's default installer
-  components omit it. The step reads Whitaker's installed toolchain file so a
-  rolling suite update cannot silently pair the component with the wrong
-  nightly.
+  installer falls back to a source build. Whitaker uses its own installed
+  toolchain without the development fragment or Cranelift component.
 - **Merman**, the Mermaid renderer `make nixie` uses, comes from
   `install-nixie`, which downloads Merman 0.7.0's release archive and verifies
   it against a pinned checksum, and installs Nixie 1.1.0 on Python 3.14, which
