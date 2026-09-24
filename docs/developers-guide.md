@@ -215,6 +215,43 @@ than as a list someone remembers to update. A label registered and used nowhere
 silently permits a runner family nobody reviewed for whatever lane adopts it
 next.
 
+#### Every form of `runs-on`, or a refusal
+
+GitHub accepts `runs-on` in three forms: a scalar label or expression, a
+sequence of labels a runner must all carry, and a mapping with `group` and
+`labels`. Every lane here is a scalar today, so a reader that mishandled the
+other two would pass against this tree whatever it did. The failure it would
+hide is expensive: a mapping read as one stringified label begins with `{`,
+which no Ubicloud prefix matches, so a paid lane would escape the ceiling walk.
+
+The reader therefore models all three, and refuses anything else rather than
+reading it as "declares no runner", because that reading exempts a lane from
+every placement, ceiling and registry assertion at once:
+
+- a mapping is read only when `labels` is its sole key, so a `group` is
+  refused. No lane here is placed by runner group, and a group selects runners
+  by an organization setting the contract cannot read; admitting one is a
+  reviewed decision with its own assertion;
+- an empty sequence, a non-string label, or any other type is refused;
+- an expression is read only in the two forms the tree uses, and refused
+  otherwise: the fork fallback `${{ <guard> && '<a>' || '<b>' }}`, which
+  selects both arms, and `${{ inputs.runner }}`, the reusable-workflow form
+  whose caller names the labels in `with.runner`. A reader that took any quoted
+  literal as enough would read `${{ matrix.os || 'ubuntu-latest' }}` as
+  selecting only the fallback, and one that passed any `inputs.<name>` would
+  miss a caller passing its runner under a key it never reads;
+- an explicit null `runs-on:` or `runner:` is a declaration to refuse, not the
+  absence of one.
+
+`runner_placement_reader_test.py` drives each form and each refusal with
+constructed jobs, and holds every job in the tree to a readable form, naming
+the coordinate when one is not. Both workflow contracts load the tree through
+`workflow_loader.py`, which refuses a duplicated mapping key, so a lane cannot
+declare `runs-on` twice and have the first value discarded unseen. Two
+reader-level tests point the reader at a temporary tree and registry, each
+declaring a key twice, and require the refusal, so a reader reverted to
+`yaml.safe_load` fails them.
+
 ## Where CodeScene may appear
 
 The CodeScene command-line tool is installed from a URL at job time and is not
