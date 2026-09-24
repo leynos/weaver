@@ -307,13 +307,13 @@ The publisher declares a concurrency group keyed on the ref alone,
 `coverage-main-${{ github.ref }}`, with `cancel-in-progress: false`; the
 contract compares the group whole, so naming the event in it fails. Without a
 group, two pushes in quick succession upload at once and the baseline is set by
-whichever finishes last. With one, GitHub keeps a single pending run per group,
-so among triggered runs (push, and dispatch where the workflow allows it) a
-newer one replaces an older pending run and the newest baseline wins. A manual
-"Re-run jobs" on an older main run is an operator action, not a trigger: it
-keeps that run's commit, so it republishes that commit's coverage and baseline
-until the next push supersedes them. Cancelling would instead abandon a running
-upload and its baseline write.
+whichever finishes last. With one, runs in the group never overlap, and a newer
+trigger replaces an older pending run. That is all the group promises: GitHub
+does not promise to start runs in trigger order, so no ordering of uploads by
+commit is claimed. A manual "Re-run jobs" keeps its original `run_id`, so it
+republishes that commit's coverage but replaces no baseline saved under a
+run-keyed cache key. Cancelling would instead abandon a running upload and its
+baseline write.
 
 Six mutations cover the pair, three each: dropping the ref guard, loosening it
 to a suffix test, dropping the token guard, removing the concurrency block,
@@ -367,16 +367,17 @@ spellings, with two prefixes stripped: `./`, the documented form, and `$/`.
 Accepting a spelling GitHub might refuse only widens the set the prohibitions
 run over; missing one GitHub accepts hides a workflow from all of them.
 
-A call to this repository's workflows at a ref, whether written with the
-qualified name (`leynos/weaver/.github/workflows/release.yml@main`) or with a
-local prefix and a ref (`./.github/workflows/release.yml@main`,
-`$/.github/workflows/release.yml@main`), is refused rather than followed.
-GitHub runs it at the named ref, not at the pull request's head, so the file
-the closure would read is not the file that runs, and the named revision could
-hold a CodeScene step every clause passes over. No workflow here uses the form;
-one that needs this repository's workflow calls it with `./`. For the same
-reason `secrets: inherit` into such a call counts as inheriting into a document
-the contract cannot read.
+A local call with a ref, such as `./.github/workflows/release.yml@main` or
+`$/.github/workflows/release.yml@main`, is not valid syntax: GitHub rejects it,
+and it runs at no ref. The contract refuses it rather than reading it as local.
+A qualified call to this repository's workflows
+(`leynos/weaver/.github/workflows/release.yml@main`) is valid and runs at the
+named ref, not at the pull request's head, so the file the closure would read
+is not the file that runs, and the named revision could hold a CodeScene step
+every clause passes over; it is refused rather than followed. No workflow here
+uses the form; one that needs this repository's workflow calls it with `./`.
+For the same reason `secrets: inherit` into such a call counts as inheriting
+into a document the contract cannot read.
 
 References to other repositories are not followed: their content is not in this
 tree. That is why `secrets: inherit` into one is refused outright rather than

@@ -133,11 +133,21 @@ def test_the_token_check_reports_availability_and_nothing_else() -> None:
 
     Invariant: a step with id ``codescene-token`` runs exactly the one
     command that writes ``available`` from the secret's presence, with no
-    ``if:`` and no ``env``, before the upload. A condition on it, or a longer
+    ``if:`` and no ``env``, before the upload and in the same job, since a
+    step output is visible only within its job. A condition on it, or a longer
     command, could leave ``available`` unwritten or wrong while every other
     assertion here still sees the step.
     """
     index, check = _token_check()
+    upload = _sole_upload()
+    # ``steps`` flattens every job, so the ordering below would pass with the
+    # check moved to another job, where the upload cannot read its output and
+    # its guard is false forever.
+    assert any(
+        any(step is check for step in job.get("steps") or [])
+        and any(step is upload for step in job.get("steps") or [])
+        for job in jobs(_documents()[PUBLISHER]).values()
+    ), "the token check and the upload must be steps of the same job"
     command = str(check.get("run", "")).strip()
     assert command == TOKEN_CHECK_COMMAND, (
         f"the token check must run exactly {TOKEN_CHECK_COMMAND!r}; it runs "
@@ -151,7 +161,7 @@ def test_the_token_check_reports_availability_and_nothing_else() -> None:
         "the token check must bind nothing; it declares env "
         f"{check.get('env')!r}"
     )
-    upload_index = steps(_documents()[PUBLISHER]).index(_sole_upload())
+    upload_index = steps(_documents()[PUBLISHER]).index(upload)
     assert index < upload_index, (
         "the token check must run before the upload that reads its output"
     )
@@ -199,12 +209,10 @@ def test_the_publisher_serializes_and_is_not_cancelled() -> None:
 
     Invariant: the publisher declares a concurrency group keyed on the ref,
     and does not cancel a run in progress. Without a group two uploads race
-    and the baseline is set by whichever finishes last. With one, GitHub keeps
-    a single pending run per group, so a newer push replaces an older pending
-    run and, among triggered runs, the newest baseline wins (a manual re-run of
-    an older run republishes that commit's until the next push); cancelling
-    instead would abandon a
-    running upload and its baseline write.
+    and the baseline is set by whichever finishes last. With one, runs never
+    overlap and a newer trigger replaces an older pending run; GitHub does not
+    promise start order, so no commit order is claimed. Cancelling instead
+    would abandon a running upload and its baseline write.
     """
     concurrency = _documents()[PUBLISHER].get("concurrency")
     assert isinstance(concurrency, dict), (
