@@ -442,6 +442,11 @@ ask for an installer at or above 0.2.7 and neither pin the suite nor turn
 from a reintroduced `cargo +1.95.0 install merman-cli` to the Whitaker install
 moved after `make lint`, each fail it.
 
+The contract's private shell-continuation normalizer is restricted to its
+source-build matchers and the sibling property contract's oracle comparison. It
+removes only a Bash backslash-newline pair before matching; it is not a general
+shell parser, and ordinary newlines remain command boundaries.
+
 See the [Whitaker user's guide](whitaker-users-guide.md) for day-to-day usage
 of the installed lints.
 

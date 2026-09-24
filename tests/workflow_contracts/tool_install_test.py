@@ -118,6 +118,16 @@ def _version(text: str) -> tuple[int, ...]:
     return tuple(int(part) for part in text.split("."))
 
 
+def _normalise_shell_continuations(script: str) -> str:
+    """Collapse Bash backslash-newline pairs while retaining command boundaries."""
+    return re.sub(r"\\\r?\n", "", script)
+
+
+def _matches_source_build(script: str, detector: re.Pattern[str]) -> bool:
+    """Match one source-build detector after normalising Bash continuations."""
+    return bool(detector.search(_normalise_shell_continuations(script)))
+
+
 def _source_build_offenders(
     steps: typ.Iterable[tuple[str, str, dict[str, object]]],
 ) -> list[str]:
@@ -125,8 +135,10 @@ def _source_build_offenders(
     return [
         f"{workflow}:{job} step {step.get('name', '')!r}"
         for workflow, job, step in steps
-        if CARGO_INSTALL.search(str(step.get("run", "")))
-        or WHITAKER_CLONE.search(str(step.get("run", "")))
+        if any(
+            _matches_source_build(str(step.get("run", "")), detector)
+            for detector in (CARGO_INSTALL, WHITAKER_CLONE)
+        )
     ]
 
 
@@ -163,7 +175,7 @@ def test_cargo_install_detection_respects_shell_continuations(
     script: str, matches_install: bool
 ) -> None:
     """Only escaped newlines join a `cargo install` source build command."""
-    assert bool(CARGO_INSTALL.search(script)) is matches_install, (
+    assert _matches_source_build(script, CARGO_INSTALL) is matches_install, (
         f"expected cargo install detection {matches_install} for {script!r}"
     )
 
@@ -218,7 +230,7 @@ def test_whitaker_clone_detection_respects_shell_continuations(
     script: str, matches_clone: bool
 ) -> None:
     """Only clone commands joined by a shell continuation identify source builds."""
-    assert bool(WHITAKER_CLONE.search(script)) is matches_clone, (
+    assert _matches_source_build(script, WHITAKER_CLONE) is matches_clone, (
         f"expected Whitaker clone detection {matches_clone} for {script!r}"
     )
 
@@ -243,6 +255,12 @@ def test_whitaker_clone_detection_respects_shell_continuations(
             "git \\\n  clone https://github.com/leynos/whitaker",
             "mutated.yml:source-build step 'Clone Whitaker with continued command'",
             id="continued-git-to-clone",
+        ),
+        pytest.param(
+            "Clone Whitaker with split URL",
+            "git clone https://github.com/leynos/\\\nwhitaker",
+            "mutated.yml:source-build step 'Clone Whitaker with split URL'",
+            id="continued-whitaker-url",
         ),
     ],
 )
@@ -289,6 +307,10 @@ def test_merman_comes_from_the_verified_release() -> None:
     assert inputs.get("merman-version") == "0.7.0", (
         "install-nixie must install Merman 0.7.0, the release whose archive "
         f"checksum the action pins; got {inputs.get('merman-version')!r}"
+    )
+    assert inputs.get("nixie-version") == "1.1.0", (
+        "install-nixie must install Nixie 1.1.0, which requires the Python "
+        f"version checked below; got {inputs.get('nixie-version')!r}"
     )
     python = str(inputs.get("python-version", "3.14"))
     assert _version(f"{python}.0" if python.count(".") == 1 else python) >= (3, 14), (
