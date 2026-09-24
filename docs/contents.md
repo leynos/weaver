@@ -52,6 +52,9 @@ readers can find the source of truth without scanning the whole tree.
   streams](adr-012-versioned-selector-streams.md)
   - Proposed decision for deterministic selector JSONL, typed stream input,
     source identity, and stale-selector refusal.
+- [Architectural decision record (ADR) 014: Sandbox-compatible CI
+  runners](adr-014-sandbox-compatible-ci-runners.md)
+  - Accepted runner placement for sandbox-dependent Rust tests and coverage.
 - [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md)
   - Generated matrix classifying every command-contract roadmap task as an
     OrthoConfig consumer, temporary wrapper, pending dependency, or deliberate

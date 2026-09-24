@@ -27,6 +27,8 @@ UBICLOUD_LARGE: typ.Final = "ubicloud-standard-4"
 UBICLOUD_SMALL: typ.Final = "ubicloud-standard-2"
 
 GITHUB_HOSTED_LABEL: typ.Final = "ubuntu-latest"
+#: The Linux image on which Birdcage's UID/GID mappings passed in PR #301.
+SANDBOX_COMPATIBLE_LINUX: typ.Final = "ubuntu-22.04"
 MACOS_LABEL: typ.Final = "macos-15"
 
 #: The one guard a fork fallback may key on. Compared by equality, because a
@@ -39,17 +41,19 @@ FORK_GUARD: typ.Final = "github.event.pull_request.head.repo.fork"
 #: release jobs do so because ``release-dry-run.yml`` calls ``release.yml`` on
 #: every pull request, which is easy to miss from the workflow's name.
 EXPECTED_FORK_FALLBACK: typ.Final = {
-    ("ci.yml", "build-test"): UBICLOUD_LARGE,
     ("release.yml", "metadata"): UBICLOUD_SMALL,
     ("release.yml", "build-linux"): UBICLOUD_LARGE,
 }
 
-#: Lanes that cannot meet a fork and so declare a bare label. A constant
-#: guard would read as a decision nobody made.
+#: Lanes with a reviewed literal label. ``ci.yml`` now uses a GitHub-hosted
+#: image compatible with Birdcage for forks and same-repository pull requests;
+#: it needs no conditional. A constant guard would read as a decision nobody
+#: made.
 #:
-#: ``coverage-upload`` serves push and dispatch, neither of which carries a
-#: pull request. ``release.yml``'s ``release`` is gated on ``should_publish``,
-#: true only on a tag push, so it is skipped on every dry run.
+#: ``coverage-upload`` uses that same image because it executes the sandbox
+#: suite before publishing a baseline. It serves push and dispatch, neither
+#: of which carries a pull request. ``release.yml``'s ``release`` is gated on
+#: ``should_publish``, true only on a tag push, so it is skipped on dry runs.
 #: ``build-macos`` needs a macOS runner and Ubicloud offer none, so there is
 #: no fallback to write.
 #:
@@ -60,7 +64,8 @@ EXPECTED_FORK_FALLBACK: typ.Final = {
 #: reads as a decision, and it moves when somebody re-enables it and can watch
 #: it run.
 EXPECTED_LITERAL_LABEL: typ.Final = {
-    ("coverage-main.yml", "coverage-upload"): UBICLOUD_SMALL,
+    ("ci.yml", "build-test"): SANDBOX_COMPATIBLE_LINUX,
+    ("coverage-main.yml", "coverage-upload"): SANDBOX_COMPATIBLE_LINUX,
     ("release.yml", "release"): UBICLOUD_SMALL,
     ("release.yml", "build-macos"): MACOS_LABEL,
     ("release.yml", "build-freebsd"): GITHUB_HOSTED_LABEL,
@@ -115,10 +120,12 @@ EXPECTED_CEILING_MINUTES: typ.Final = {
 }
 
 #: GitHub-hosted labels this repository may use without registering them with
-#: actionlint, which knows them already. ``macos-15`` is here because the
-#: macOS build legs are legitimately hosted, not because macOS is exempt from
-#: review: ``EXPECTED_LITERAL_LABEL`` pins that leg by coordinate.
-GITHUB_HOSTED_LABELS: typ.Final = frozenset({GITHUB_HOSTED_LABEL, MACOS_LABEL})
+#: actionlint, which knows them already. ``ubuntu-22.04`` is pinned for the
+#: sandbox-bearing jobs; ``macos-15`` remains pinned for macOS builds. Neither
+#: is exempt from the per-coordinate placement review above.
+GITHUB_HOSTED_LABELS: typ.Final = frozenset({
+    GITHUB_HOSTED_LABEL, SANDBOX_COMPATIBLE_LINUX, MACOS_LABEL,
+})
 
 #: Prohibited runner families. A prohibition reads by substring on purpose: a
 #: renamed or neutered label still leaves its family's text behind.
