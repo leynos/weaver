@@ -1,7 +1,6 @@
 //! Build-time utilities shared across Weaver build scripts.
 
 use std::{
-    env,
     io,
     process,
     sync::atomic::{AtomicU64, Ordering},
@@ -75,23 +74,6 @@ pub fn manual_date(source_date_epoch: Option<&str>, warnings: &mut Vec<String>) 
         ));
         FALLBACK_DATE.into()
     })
-}
-
-/// Convenience wrapper around [`manual_date`] that reads `SOURCE_DATE_EPOCH` from the environment.
-///
-/// # Examples
-/// ```no_run
-/// use weaver_build_util::manual_date_from_env;
-///
-/// let mut warnings = Vec::new();
-/// let date = manual_date_from_env(&mut warnings);
-///
-/// // When SOURCE_DATE_EPOCH is unset, the fallback date is used.
-/// println!("{date}");
-/// ```
-pub fn manual_date_from_env(warnings: &mut Vec<String>) -> String {
-    let source_date_epoch = env::var("SOURCE_DATE_EPOCH").ok();
-    manual_date(source_date_epoch.as_deref(), warnings)
 }
 
 /// Parse and resolve a raw `SOURCE_DATE_EPOCH` value into a `SourceDate`.
@@ -337,7 +319,40 @@ fn remove_existing_file(dir: &Dir, name: &str) -> io::Result<()> {
 mod tests {
     //! Regression tests for capability-based filesystem helpers.
 
+    use rstest::rstest;
+
     use super::*;
+
+    #[rstest]
+    #[case::missing(None, "1970-01-01", None)]
+    #[case::valid(Some("86400"), "1970-01-02", None)]
+    #[case::malformed(
+        Some("invalid"),
+        "1970-01-01",
+        Some(concat!(
+            "Invalid SOURCE_DATE_EPOCH 'invalid'; expected integer seconds since Unix epoch; ",
+            "falling back to 1970-01-01"
+        ))
+    )]
+    #[case::out_of_range(
+        Some("9223372036854775807"),
+        "1970-01-01",
+        Some(concat!(
+            "Invalid SOURCE_DATE_EPOCH '9223372036854775807'; not a valid Unix timestamp; ",
+            "falling back to 1970-01-01"
+        ))
+    )]
+    fn manual_date_uses_fallback_and_reports_invalid_values(
+        #[case] source_date_epoch: Option<&str>,
+        #[case] expected_date: &str,
+        #[case] expected_warning: Option<&str>,
+    ) {
+        let mut warnings = Vec::new();
+        let date = manual_date(source_date_epoch, &mut warnings);
+        assert_eq!(date, expected_date, "date mismatch");
+        let expected_warnings: Vec<_> = expected_warning.into_iter().map(str::to_owned).collect();
+        assert_eq!(warnings, expected_warnings, "warning mismatch");
+    }
 
     #[test]
     fn write_man_page_creates_nested_directories() {

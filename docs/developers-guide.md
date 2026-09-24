@@ -1372,6 +1372,18 @@ alongside those directly included files. When changing any of these metadata
 inputs, keep the corresponding rerun entry in `crates/weaver-cli/build.rs` so
 packaging regenerates the manual page from the same projection.
 
+The CLI and daemon build scripts own ambient Cargo environment reads. They use
+`ortho_config::ProcessEnv` through the existing `EnvSource::get` port inside
+those scripts, then pass parsed values to pure build utilities. This reuse is
+limited to named build inputs such as `SOURCE_DATE_EPOCH`, `OUT_DIR`, and Cargo
+package metadata; configuration discovery still owns its separate use of the
+port. The scripts keep `cargo:rerun-if-env-changed` declarations for each input
+so a changed value regenerates the manual page. A missing or non-Unicode
+`SOURCE_DATE_EPOCH` uses the fixed fallback date, and the daemon continues to
+warn when `OUT_DIR` is non-Unicode. `weaver-build-util` is an internal,
+unpublished helper crate; its date function accepts the value instead of
+reading process state.
+
 The daemon routing catalogue remains private in production. The
 `weaverd::test_support::routing_catalogue()` accessor, its internal re-export,
 and its router definition are all compiled only with the `test-support` feature.
