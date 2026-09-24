@@ -2,6 +2,8 @@
 
 #[path = "support/boundary_properties.rs"]
 mod boundary_properties;
+#[path = "support/heading_anchors.rs"]
+mod heading_anchors;
 #[path = "support/pending_review_date.rs"]
 mod pending_review_date;
 
@@ -9,6 +11,7 @@ use std::collections::BTreeSet;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs::Dir};
+use heading_anchors::{heading_anchors, markdown_anchor};
 use metrics::counter;
 use time::{Date, macros::date};
 use tracing::{debug, warn};
@@ -201,40 +204,6 @@ fn roadmap_task_ids(roadmap: &str) -> BTreeSet<&str> {
                 .all(|char| char.is_ascii_digit() || char == '.')
         })
         .collect()
-}
-
-/// Extract GitHub-style heading anchors from a Markdown document.
-fn heading_anchors(document: &str) -> BTreeSet<String> {
-    document
-        .lines()
-        .filter_map(|line| line.trim_start().strip_prefix("## "))
-        .map(markdown_anchor)
-        .collect()
-}
-
-/// Convert a heading into the anchor form used by GitHub Markdown.
-fn markdown_anchor(heading: &str) -> String {
-    let mut anchor = String::new();
-    let mut previous_was_dash = false;
-
-    for char in heading.chars().flat_map(char::to_lowercase) {
-        if char.is_ascii_alphanumeric() {
-            anchor.push(char);
-            previous_was_dash = false;
-        } else if char.is_whitespace() || char == '-' {
-            push_dash(&mut anchor, &mut previous_was_dash);
-        }
-    }
-
-    anchor.trim_matches('-').to_owned()
-}
-
-/// Append a single collapsed dash while building an anchor.
-fn push_dash(anchor: &mut String, previous_was_dash: &mut bool) {
-    if !*previous_was_dash && !anchor.is_empty() {
-        anchor.push('-');
-        *previous_was_dash = true;
-    }
 }
 
 /// Return an error when a test invariant is false.
