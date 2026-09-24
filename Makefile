@@ -49,7 +49,7 @@ test: ## Run tests with warnings treated as errors
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test --doc --workspace --all-features
 
 test-workflow-contracts: ## Validate workflow caller and runner-placement contracts
-	uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q
+	uv run --with 'pytest>=8' --with 'pyyaml>=6' --with 'hypothesis>=6' pytest tests/workflow_contracts -q
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(filter release,$*),--release) --bin $(TARGET)

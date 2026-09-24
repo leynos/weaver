@@ -399,36 +399,53 @@ each reading with constructed trees:
 Each reading was mutated alone and restored from a copy while writing the
 contract, and each mutation failed at least one test that names what it broke.
 
-## Whitaker CI setup
+## CI tool installs: Whitaker and Merman
 
-CI pins Whitaker, Weaver's external lint engine, to a fixed revision through the
-`WHITAKER_REV` environment variable in `.github/workflows/ci.yml`. The
-`Install Whitaker` step then does three things, in order:
+CI installs its linting tools from prebuilt, pinned releases rather than
+compiling them. Both installs are shared actions from `leynos/shared-actions`,
+pinned to a full commit SHA:
 
-1. Installs the installer binary with:
+- **Whitaker**, Weaver's external lint engine, comes from `install-whitaker`
+  with `installer-version` 0.2.8. From 0.2.7 the installer downloads the
+  prebuilt, digest-verified lint suite and Dylint tools from Whitaker's rolling
+  release. The action's `ci-mode` is on by default and fails the step if the
+  installer falls back to a source build. CI adds `rustc-codegen-cranelift` to
+  the suite's own pinned nightly after installation: Weaver's current ambient
+  development profile selects that backend, while Whitaker's default installer
+  components omit it. The step reads Whitaker's installed toolchain file so a
+  rolling suite update cannot silently pair the component with the wrong
+  nightly.
+- **Merman**, the Mermaid renderer `make nixie` uses, comes from
+  `install-nixie`, which downloads Merman 0.7.0's release archive and verifies
+  it against a pinned checksum, and installs Nixie 1.1.0 on Python 3.14, which
+  that release requires.
 
-   ```sh
-   cargo install --locked \
-     --git https://github.com/leynos/whitaker \
-     --rev "${WHITAKER_REV}" \
-     whitaker-installer
-   ```
+Until September 2026 both were compiled on every run.
+`cargo install merman-cli` built Merman from crates.io, a median 2.6 minutes,
+and the Whitaker step built `whitaker-installer` from a pinned git revision,
+cloned the Whitaker source and compiled the lint suite with Cranelift, a median
+1.9 minutes: about a third of `build-test`'s 13-minute median, on a paid runner.
 
-2. Clones the Whitaker source into
-   `${XDG_DATA_HOME:-${HOME}/.local/share}/whitaker` and checks out
-   `${WHITAKER_REV}` detached.
-3. Runs `whitaker-installer --build-only --no-update --cranelift` to prebuild
-   the Cranelift-accelerated lint libraries.
+The trade is reproducibility of the lint suite. The old step pinned the suite
+to one Whitaker revision. Prebuilt lint libraries are published only for
+Whitaker's default-branch tip, so pinning the suite (`suite-version`) forces a
+source build, and the rest of the estate takes the tip. A new Whitaker lint can
+therefore fail `make lint` with no change here, and the fix is in the code it
+flags or in Whitaker, not a pin.
 
-The clone is a separate step from `cargo install` because the installer expects
-the Whitaker source tree to already exist at that well-known path when it
-builds the lint libraries; `cargo install` only produces the installer binary,
-not the source checkout it operates on. `--no-update` stops the installer from
-fetching a different revision than the one just checked out, and `--build-only`
-skips any installer behaviour beyond compiling the libraries. Together, pinning
-the clone and the installer to the same `WHITAKER_REV` and disabling the
-installer's own update step is what keeps the CI lint environment reproducible
-across runs.
+`tests/workflow_contracts/tool_install_test.py` holds the rule. No step in any
+workflow may run `cargo install` or clone the Whitaker source. `build-test`
+must use each action exactly once, pinned to a commit SHA, before the
+`make nixie` or `make lint` step that needs its tool; `install-whitaker` must
+ask for an installer at or above 0.2.7 and neither pin the suite nor turn
+`ci-mode` off; and `install-nixie` must name Merman 0.7.0. Eleven mutations,
+from a reintroduced `cargo +1.95.0 install merman-cli` to the Whitaker install
+moved after `make lint`, each fail it.
+
+The contract's private shell-continuation normalizer is restricted to its
+source-build matchers and the sibling property contract's oracle comparison. It
+removes only a Bash backslash-newline pair before matching; it is not a general
+shell parser, and ordinary newlines remain command boundaries.
 
 See the [Whitaker user's guide](whitaker-users-guide.md) for day-to-day usage
 of the installed lints.
