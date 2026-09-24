@@ -27,8 +27,8 @@ use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 /// Discriminates the kind of call recorded by the stub server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CallKind {
-    /// `initialise` was invoked.
-    Initialise,
+    /// `initialize` was invoked.
+    Initialize,
     /// `textDocument/definition` was invoked.
     Definition,
     /// `textDocument/references` was invoked.
@@ -69,7 +69,7 @@ impl RecordingLanguageServer {
         }
     }
 
-    /// Creates a server that fails during initialisation.
+    /// Creates a server that fails during initialization.
     pub fn failing_initialize(
         capabilities: ServerCapabilitySet,
         message: impl Into<String>,
@@ -98,9 +98,9 @@ impl RecordingLanguageServer {
     ) -> Result<R, LanguageServerError> {
         with_state(&self.shared, |state| {
             state.record_call(call_kind);
-            if !state.initialised {
+            if !state.initialized {
                 return Err(LanguageServerError::new(format!(
-                    "{operation} requested before initialisation",
+                    "{operation} requested before initialization",
                 )));
             }
             action(&state.responses)
@@ -136,11 +136,11 @@ impl RecordingLanguageServer {
 impl LanguageServer for RecordingLanguageServer {
     fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
         with_state(&self.shared, |state| {
-            state.record_call(CallKind::Initialise);
-            if let Some(message) = &state.fail_initialise {
+            state.record_call(CallKind::Initialize);
+            if let Some(message) = &state.fail_initialize {
                 return Err(LanguageServerError::new(message.clone()));
             }
-            state.initialised = true;
+            state.initialized = true;
             Ok(state.capabilities.clone())
         })
     }
@@ -305,22 +305,22 @@ struct RecordingState {
     capabilities: ServerCapabilitySet,
     responses: ResponseSet,
     calls: Vec<CallKind>,
-    initialised: bool,
-    fail_initialise: Option<String>,
+    initialized: bool,
+    fail_initialize: Option<String>,
 }
 
 impl RecordingState {
     fn new(
         capabilities: ServerCapabilitySet,
         responses: ResponseSet,
-        fail_initialise: Option<String>,
+        fail_initialize: Option<String>,
     ) -> Self {
         Self {
             capabilities,
             responses,
             calls: Vec::new(),
-            initialised: false,
-            fail_initialise,
+            initialized: false,
+            fail_initialize,
         }
     }
 
@@ -361,7 +361,7 @@ mod tests {
         );
         let handle = server.handle();
 
-        server.initialize().expect("server should initialise");
+        server.initialize().expect("server should initialize");
         let hover = server
             .hover(HoverParams {
                 text_document_position_params: TextDocumentPositionParams {
@@ -375,6 +375,6 @@ mod tests {
             .expect("hover should succeed");
 
         assert_eq!(hover, Some(expected_hover));
-        assert_eq!(handle.calls(), vec![CallKind::Initialise, CallKind::Hover]);
+        assert_eq!(handle.calls(), vec![CallKind::Initialize, CallKind::Hover]);
     }
 }

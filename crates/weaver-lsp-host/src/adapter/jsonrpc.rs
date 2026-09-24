@@ -156,7 +156,7 @@ pub struct JsonRpcError {
 
 #[cfg(test)]
 mod tests {
-    //! Unit tests for JSON-RPC message serialisation and deserialisation.
+    //! Unit tests for JSON-RPC message serialization and deserialization.
 
     use rstest::rstest;
     use serde_json::json;

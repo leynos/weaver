@@ -69,7 +69,7 @@ struct GuidanceTemplate {
     forbidden_fragments: &'static [&'static str],
 }
 
-/// Guidance expected when the domain itself is not recognised.
+/// Guidance expected when the domain itself is not recognized.
 ///
 /// Operation guidance is forbidden because it would imply the domain was
 /// valid.

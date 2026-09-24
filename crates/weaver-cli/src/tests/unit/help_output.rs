@@ -114,7 +114,7 @@ fn command_ir_structured_surface_coverage_appears_in_rendered_help_and_manpage()
         .expect("built-in help command should construct")
         .render_long_help()
         .to_string();
-    let rendered_manpage = normalise_manpage(&generated_manpage()?);
+    let rendered_manpage = normalize_manpage(&generated_manpage()?);
 
     let rendered_surfaces = RenderedSurfaces {
         help: RenderedDocument {
@@ -143,7 +143,7 @@ fn generated_manpage() -> anyhow::Result<String> {
 }
 
 /// Removes troff escapes that would otherwise hide command and flag tokens.
-fn normalise_manpage(manpage: &str) -> String {
+fn normalize_manpage(manpage: &str) -> String {
     manpage
         .replace("\\fB", "")
         .replace("\\fI", "")

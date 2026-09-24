@@ -40,7 +40,7 @@ fn captured_node_serde_round_trip(sample_span: Span) {
     assert_eq!(deserialized.text(), Some("foo"));
 }
 
-/// Builds a [`CaptureValue`] variant for parameterised serde testing.
+/// Builds a [`CaptureValue`] variant for parameterized serde testing.
 fn build_capture_value(variant: &str, span: Span) -> (CaptureValue, &'static str, usize) {
     match variant {
         "single_node" => {

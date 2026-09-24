@@ -167,7 +167,7 @@ impl IsolatedEnvironment {
                 .map(|(key, value)| (key, Some(value))),
         );
 
-        // SAFETY: this guard serialises every mutation in this test binary and
+        // SAFETY: this guard serializes every mutation in this test binary and
         // restores the complete captured configuration environment on drop.
         unsafe {
             for key in previous.keys() {

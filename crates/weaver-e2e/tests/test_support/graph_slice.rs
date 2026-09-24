@@ -60,7 +60,7 @@ pub(crate) fn run_graph_slice(
     run_cli(command, &cli_args)
 }
 
-/// Renders `cli_args` as the sanitised `command` string recorded in snapshots.
+/// Renders `cli_args` as the sanitized `command` string recorded in snapshots.
 ///
 /// The ephemeral daemon endpoint and the temporary fixture URI are the only
 /// run-varying arguments, so each is swapped for a stable placeholder. Deriving

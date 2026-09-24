@@ -1,7 +1,7 @@
 //! Metavariable parsing helpers shared across modules.
 //!
 //! Weaver patterns and rewrite templates use `$NAME` and `$$$NAME` metavariables.
-//! This module centralises the name rules so parsing stays consistent.
+//! This module centralizes the name rules so parsing stays consistent.
 
 /// Prefix wrapping a metavariable name when it is substituted into a pattern
 /// so the pattern still parses as valid host-language syntax.
@@ -58,13 +58,13 @@ pub(crate) fn extract_metavar_name(
     name
 }
 
-/// Builds the identifier used to represent a metavariable in a normalised pattern.
+/// Builds the identifier used to represent a metavariable in a normalized pattern.
 #[must_use]
 pub(crate) fn placeholder_for_metavar(name: &str) -> String {
     format!("{METAVAR_PLACEHOLDER_PREFIX}{name}{METAVAR_PLACEHOLDER_SUFFIX}")
 }
 
-/// Extracts the metavariable name from a normalised placeholder identifier.
+/// Extracts the metavariable name from a normalized placeholder identifier.
 #[must_use]
 pub(crate) fn metavar_name_from_placeholder(text: &str) -> Option<&str> {
     text.strip_prefix(METAVAR_PLACEHOLDER_PREFIX)

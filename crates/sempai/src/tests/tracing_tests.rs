@@ -48,7 +48,7 @@ impl TraceCaptureState {
     }
 
     fn install_global_subscriber(state: &Arc<Self>) -> Result<(), String> {
-        // The registry is global, but each guard serialises and resets its
+        // The registry is global, but each guard serializes and resets its
         // capture state so the test cannot leak observations to another test.
         TRACE_SUBSCRIBER_INSTALLATION
             .get_or_init(|| {

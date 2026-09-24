@@ -106,7 +106,7 @@ fn given_rust_source(world: &RefCell<TestWorld>, code: String) {
 
     let mut parser = match Parser::new(SupportedLanguage::Rust) {
         Ok(parser) => parser,
-        Err(error) => panic!("parser should initialise: {error}"),
+        Err(error) => panic!("parser should initialize: {error}"),
     };
     let parsed_source = match parser.parse(source_code) {
         Ok(parsed_source) => parsed_source,

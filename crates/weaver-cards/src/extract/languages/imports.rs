@@ -73,7 +73,7 @@ pub(super) fn import_block_from_group(
         .map(|node| {
             source
                 .get(node.byte_range())
-                .map(|slice| normalise_import(language, slice))
+                .map(|slice| normalize_import(language, slice))
         })
         .collect::<Option<Vec<_>>>()?;
     Some(ImportBlock {
@@ -88,7 +88,7 @@ pub(super) fn import_block_from_group(
 /// The returned string strips leading syntax such as `use`, `import`, or Rust
 /// visibility modifiers, removes trailing statement terminators where
 /// appropriate, and trims surrounding whitespace.
-pub(super) fn normalise_import(language: SupportedLanguage, raw: &str) -> String {
+pub(super) fn normalize_import(language: SupportedLanguage, raw: &str) -> String {
     let trimmed = raw.trim();
     match language {
         SupportedLanguage::Rust => strip_rust_visibility(trimmed)

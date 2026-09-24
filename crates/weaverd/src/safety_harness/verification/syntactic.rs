@@ -121,7 +121,7 @@ mod tests {
     #[fixture]
     fn ctx() -> VerificationContext { VerificationContext::new() }
 
-    // ---- Valid code tests (parameterised) ----
+    // ---- Valid code tests (parameterized) ----
 
     #[rstest]
     #[case::rust("main.rs", "fn main() {}")]
@@ -138,7 +138,7 @@ mod tests {
         assert!(result.passed(), "valid {filename} should pass");
     }
 
-    // ---- Invalid code tests (parameterised) ----
+    // ---- Invalid code tests (parameterized) ----
 
     #[rstest]
     #[case::rust("broken.rs", "fn broken() {")]
@@ -170,7 +170,7 @@ mod tests {
         assert!(failures[0].column().is_some(), "failure should have column");
     }
 
-    // ---- Pass-through tests (parameterised) ----
+    // ---- Pass-through tests (parameterized) ----
 
     #[rstest]
     #[case::json("data.json", "{invalid json")]

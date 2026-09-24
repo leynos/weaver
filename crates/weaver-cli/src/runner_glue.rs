@@ -29,7 +29,7 @@ use crate::{
 /// Maximum patch size accepted from stdin.
 ///
 /// Mirrors the JSON Lines request line-size budget so apply-patch requests do
-/// not exceed the daemon transport limit. Patches or serialised requests that
+/// not exceed the daemon transport limit. Patches or serialized requests that
 /// exceed this limit return [`AppError::RequestTooLarge`].
 const MAX_PATCH_BYTES: u64 = JSONL_REQUEST_MAX_LINE_BYTES as u64;
 
@@ -141,7 +141,7 @@ pub(crate) fn build_request<R: Read>(
 
 fn enforce_request_line_limit(request: &CommandRequest) -> Result<(), AppError> {
     let json_len = serde_json::to_vec(request)
-        .map_err(AppError::SerialiseRequest)?
+        .map_err(AppError::SerializeRequest)?
         .len();
     let request_line_len = json_len + 1;
     if request_line_len > JSONL_REQUEST_MAX_LINE_BYTES {
@@ -226,7 +226,7 @@ mod tests {
         }
     }
 
-    /// Returns the number of payload bytes needed to reach a serialised JSON Lines
+    /// Returns the number of payload bytes needed to reach a serialized JSON Lines
     /// line length of exactly `len` bytes, using `template` to measure the fixed
     /// envelope overhead.
     ///
@@ -260,7 +260,7 @@ mod tests {
     fn request_jsonl_len(request: &CommandRequest) -> usize {
         match serde_json::to_vec(request) {
             Ok(bytes) => bytes.len() + 1,
-            Err(error) => panic!("request must serialise: {error}"),
+            Err(error) => panic!("request must serialize: {error}"),
         }
     }
 

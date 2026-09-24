@@ -38,7 +38,7 @@ fn parse_diagnostic_code(code: &str) -> Result<DiagnosticCode> {
     let serialized_code =
         serde_json::to_string(code).context("diagnostic code should serialize")?;
     serde_json::from_str(&serialized_code)
-        .with_context(|| format!("unrecognised diagnostic code {code}"))
+        .with_context(|| format!("unrecognized diagnostic code {code}"))
 }
 
 // ---------------------------------------------------------------------------

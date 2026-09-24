@@ -3,7 +3,7 @@
 //! [`crate::command_ir`] projects this tree into recursive `DocMetadata`, while
 //! runtime help applies that metadata to Clap and `build.rs` reuses the same
 //! path for manual-page generation. Keeping these consumers rooted here makes
-//! command paths, arguments, and localisation identifiers agree across every
+//! command paths, arguments, and localization identifiers agree across every
 //! rendered documentation surface.
 
 /// One argument accepted by a command-surface node.

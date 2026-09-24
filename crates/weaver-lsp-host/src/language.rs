@@ -48,8 +48,8 @@ impl FromStr for Language {
     type Err = LanguageParseError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let normalised = input.trim().to_ascii_lowercase();
-        match normalised.as_str() {
+        let normalized = input.trim().to_ascii_lowercase();
+        match normalized.as_str() {
             "rust" => Ok(Self::Rust),
             "python" => Ok(Self::Python),
             "typescript" | "ts" => Ok(Self::TypeScript),

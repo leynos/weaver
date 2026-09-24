@@ -64,8 +64,8 @@ pub enum BootstrapError {
         #[source]
         source: Arc<OrthoError>,
     },
-    /// Telemetry initialisation failed.
-    #[error("failed to initialise telemetry: {source}")]
+    /// Telemetry initialization failed.
+    #[error("failed to initialize telemetry: {source}")]
     Telemetry {
         /// Underlying telemetry error.
         #[source]
@@ -160,7 +160,7 @@ where
 
     let config = try_bootstrap!(reporter, loader.load() => Configuration);
 
-    let telemetry = try_bootstrap!(reporter, telemetry::initialise(&config) => Telemetry);
+    let telemetry = try_bootstrap!(reporter, telemetry::initialize(&config) => Telemetry);
 
     try_bootstrap!(reporter, config.daemon_socket().prepare_filesystem() => Socket);
 

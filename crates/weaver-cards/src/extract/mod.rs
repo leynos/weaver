@@ -81,7 +81,7 @@ pub enum CardExtractionError {
         /// One-based request column.
         column: u32,
     },
-    /// Tree-sitter failed to initialise or parse the source file.
+    /// Tree-sitter failed to initialize or parse the source file.
     #[error("Tree-sitter parse failed for {language}: {message}")]
     Parse {
         /// Language name being parsed.
@@ -284,7 +284,7 @@ fn build_doc(
     })?;
     Some(DocInfo {
         docstring: doc_text.clone(),
-        summary: summarise(&doc_text),
+        summary: summarize(&doc_text),
         source: String::from("tree_sitter"),
     })
 }
@@ -310,7 +310,7 @@ fn build_attachment_info(
             let decorators: Vec<attachments::Decorator> =
                 attachments.decorators.iter().map(Into::into).collect();
             NormalizedAttachments {
-                decorators: attachments::normalised_decorators(&decorators),
+                decorators: attachments::normalized_decorators(&decorators),
             }
         },
         bundle_rule: String::from("leading_trivia"),
@@ -375,7 +375,7 @@ fn build_interstitial(candidate: &EntityCandidate) -> Option<InterstitialInfo> {
 
 /// Extracts a one-line summary from `text`'s first non-blank line, falling
 /// back to the whole trimmed text when every line is blank.
-fn summarise(text: &str) -> String {
+fn summarize(text: &str) -> String {
     text.lines()
         .find_map(|line| {
             let trimmed = line.trim();

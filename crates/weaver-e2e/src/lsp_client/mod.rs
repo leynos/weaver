@@ -278,7 +278,7 @@ impl LspClient {
         }
     }
 
-    /// Helper for making LSP requests with automatic initialisation check and serialisation.
+    /// Helper for making LSP requests with automatic initialization check and serialization.
     fn lsp_request<P, R>(&mut self, method: &str, params: P) -> Result<R, LspClientError>
     where
         P: Serialize,

@@ -24,7 +24,7 @@ pub enum GetCardError {
     /// An unknown argument was provided.
     #[error("unknown argument: {argument}")]
     UnknownArgument {
-        /// The unrecognised argument.
+        /// The unrecognized argument.
         argument: String,
     },
 }

@@ -378,7 +378,7 @@ impl LspHost {
             SessionState::Ready { summary } => Ok(summary.clone()),
             SessionState::Pending => {
                 let capabilities = session.server.initialize().map_err(|source| {
-                    LspHostError::server(language, HostOperation::Initialise, source)
+                    LspHostError::server(language, HostOperation::Initialize, source)
                 })?;
 
                 let summary = resolve_capabilities(language, capabilities, overrides);

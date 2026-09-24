@@ -2,7 +2,7 @@
 
 use tree_sitter::Node;
 
-use super::normalise_whitespace;
+use super::normalize_whitespace;
 use crate::ParamInfo;
 
 /// Reports whether `kind` names a receiver or separator node rather than a
@@ -41,7 +41,7 @@ pub(super) fn parse_parameters(param_node: Node<'_>, source: &str) -> Vec<ParamI
                 })
                 .or(Some(child))
                 .and_then(|node| source.get(node.byte_range()))
-                .map(normalise_whitespace)
+                .map(normalize_whitespace)
                 .unwrap_or_default();
             if name.is_empty() {
                 return None;
@@ -51,7 +51,7 @@ pub(super) fn parse_parameters(param_node: Node<'_>, source: &str) -> Vec<ParamI
                 .child_by_field_name("type")
                 .or_else(|| child.child_by_field_name("annotation"))
                 .and_then(|node| source.get(node.byte_range()))
-                .map(normalise_whitespace)
+                .map(normalize_whitespace)
                 .unwrap_or_default();
             Some(ParamInfo {
                 name,

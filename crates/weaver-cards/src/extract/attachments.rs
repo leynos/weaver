@@ -63,7 +63,7 @@ impl<'a> SourceLines<'a> {
 pub(super) struct Decorator(String);
 
 impl Decorator {
-    /// Normalises the decorator name for attachment fingerprints and payloads.
+    /// Normalizes the decorator name for attachment fingerprints and payloads.
     ///
     /// This returns an owned [`String`] with surrounding whitespace trimmed,
     /// any leading `@` removed, any argument suffix starting at the first `(`
@@ -74,7 +74,7 @@ impl Decorator {
     ///
     /// The implementation never panics; it uses `unwrap_or_default()` when the
     /// decorator text contains no split segment.
-    pub(super) fn normalise(&self) -> String {
+    pub(super) fn normalize(&self) -> String {
         self.0
             .trim()
             .trim_start_matches('@')
@@ -108,8 +108,8 @@ pub(super) fn collect_leading_attachments(
 }
 
 /// Builds the normalized decorator representation for the card payload.
-pub(super) fn normalised_decorators(decorators: &[Decorator]) -> Vec<String> {
-    decorators.iter().map(Decorator::normalise).collect()
+pub(super) fn normalized_decorators(decorators: &[Decorator]) -> Vec<String> {
+    decorators.iter().map(Decorator::normalize).collect()
 }
 
 /// Scans backwards from the symbol's anchor line to collect a contiguous
@@ -134,7 +134,7 @@ fn scan_comment_block(
         if trimmed.is_empty() {
             break;
         }
-        if let Some(comment) = normalise_comment_line(trimmed, language) {
+        if let Some(comment) = normalize_comment_line(trimmed, language) {
             comments.push(comment);
             continue;
         }
@@ -148,7 +148,7 @@ fn scan_comment_block(
 /// Dispatches comment-marker stripping to the syntax appropriate for
 /// `language`, so the same scan loop works across Rust, Python, and
 /// TypeScript comment conventions.
-fn normalise_comment_line(line: &str, language: SupportedLanguage) -> Option<String> {
+fn normalize_comment_line(line: &str, language: SupportedLanguage) -> Option<String> {
     match language {
         SupportedLanguage::Rust => rust_comment(line),
         SupportedLanguage::Python => python_comment(line),

@@ -80,7 +80,7 @@ pub(super) fn callable_candidate(
     let returns = node
         .child_by_field_name("return_type")
         .map_or_else(String::new, |return_node| {
-            normalise_whitespace(source.get(return_node.byte_range()).unwrap_or_default())
+            normalize_whitespace(source.get(return_node.byte_range()).unwrap_or_default())
         });
 
     EntityCandidate {
@@ -89,7 +89,7 @@ pub(super) fn callable_candidate(
         container: metadata.container,
         byte_range: node.byte_range(),
         range: range.clone(),
-        signature_display: Some(normalise_whitespace_preserving_literals(signature_source)),
+        signature_display: Some(normalize_whitespace_preserving_literals(signature_source)),
         params,
         returns,
         locals,
@@ -142,8 +142,8 @@ pub(super) fn name_text(node: Node<'_>, source: &str) -> String {
     node.child_by_field_name("name")
         .and_then(|name| source.get(name.byte_range()))
         .map_or_else(
-            || normalise_whitespace(source.get(node.byte_range()).unwrap_or_default()),
-            normalise_whitespace,
+            || normalize_whitespace(source.get(node.byte_range()).unwrap_or_default()),
+            normalize_whitespace,
         )
 }
 
@@ -151,7 +151,7 @@ pub(super) fn name_text(node: Node<'_>, source: &str) -> String {
 pub(super) fn impl_container_name(node: Node<'_>, source: &str) -> Option<String> {
     node.child_by_field_name("type")
         .and_then(|ty| source.get(ty.byte_range()))
-        .map(normalise_whitespace)
+        .map(normalize_whitespace)
 }
 
 /// Collects raw decorator texts from a language-specific syntax node.
@@ -160,7 +160,7 @@ pub(super) fn decorator_texts(node: Node<'_>, source: &str) -> Vec<String> {
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {
         if child.kind() == "decorator" {
-            decorators.push(normalise_whitespace_preserving_literals(
+            decorators.push(normalize_whitespace_preserving_literals(
                 source.get(child.byte_range()).unwrap_or_default(),
             ));
         }
@@ -193,9 +193,9 @@ pub(super) fn python_docstring(node: Node<'_>, source: &str) -> Option<String> {
 /// Placeholder Rust docstring extractor until native docstring support lands.
 pub(super) const fn extract_rust_docstring(_node: Node<'_>) -> Option<String> { None }
 
-/// Normalises whitespace while preserving string and template literal content.
-pub(super) fn normalise_whitespace(raw: &str) -> String {
-    normalise_whitespace_preserving_literals(raw)
+/// Normalizes whitespace while preserving string and template literal content.
+pub(super) fn normalize_whitespace(raw: &str) -> String {
+    normalize_whitespace_preserving_literals(raw)
 }
 
 /// Converts a Tree-sitter node range into Weaver's source-range model.
@@ -276,7 +276,7 @@ fn extract_python_string_content(node: Node<'_>, source: &str) -> Option<String>
 /// Tracks the active quote character (`"`, `'`, or `` ` ``) and counts
 /// trailing backslashes to detect an escaped quote versus a real closing
 /// quote, so escaped quote characters do not prematurely end literal mode.
-fn normalise_whitespace_preserving_literals(raw: &str) -> String {
+fn normalize_whitespace_preserving_literals(raw: &str) -> String {
     let mut result = String::new();
     let chars = raw.chars().peekable();
     let mut quote: Option<char> = None;

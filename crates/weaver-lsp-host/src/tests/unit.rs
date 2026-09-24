@@ -288,23 +288,23 @@ fn propagates_server_error_from_did_close() {
 }
 
 #[rstest]
-fn calls_initialise_before_requests() -> Result<(), String> {
+fn calls_initialize_before_requests() -> Result<(), String> {
     let uri = sample_uri().expect("sample URI should parse");
-    assert_initialise_before(
+    assert_initialize_before(
         |host| host.diagnostics(Language::Rust, uri),
-        &[CallKind::Initialise],
-        "initialise should precede requests",
+        &[CallKind::Initialize],
+        "initialize should precede requests",
     )?;
     Ok(())
 }
 
 #[rstest]
-fn calls_initialise_before_document_sync() -> Result<(), String> {
+fn calls_initialize_before_document_sync() -> Result<(), String> {
     let params = did_open_params().expect("did-open params should build");
-    assert_initialise_before(
+    assert_initialize_before(
         |host| host.did_open(Language::Rust, params),
-        &[CallKind::Initialise, CallKind::DidOpen],
-        "initialise should precede didOpen",
+        &[CallKind::Initialize, CallKind::DidOpen],
+        "initialize should precede didOpen",
     )?;
     Ok(())
 }
@@ -347,7 +347,7 @@ where
 }
 
 /// Exercises `call` against a recording Rust server and checks its call prefix.
-fn assert_initialise_before<T, F>(
+fn assert_initialize_before<T, F>(
     call: F,
     expected_prefix: &[CallKind],
     message: &str,

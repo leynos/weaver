@@ -71,7 +71,7 @@ fn then_bootstrap_succeeds(world: &BootstrapWorld) -> Result<(), String> {
         return Err(format!("bootstrap error: {:?}", world.bootstrap_error()));
     }
     if !world.daemon_started() {
-        return Err("daemon should have been initialised".to_string());
+        return Err("daemon should have been initialized".to_string());
     }
     Ok(())
 }

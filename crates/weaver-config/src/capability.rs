@@ -1,7 +1,7 @@
-//! Capability override parsing, normalisation, and lookup matrix.
+//! Capability override parsing, normalization, and lookup matrix.
 //!
 //! The module exposes helpers for parsing capability directives supplied by
-//! configuration sources and constructing normalised lookup tables for the
+//! configuration sources and constructing normalized lookup tables for the
 //! daemon and CLI.
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
@@ -143,8 +143,8 @@ impl CapabilityMatrix {
         capability: impl Into<String>,
         directive: CapabilityOverride,
     ) {
-        let language = normalise_key(&language.into());
-        let capability = normalise_key(&capability.into());
+        let language = normalize_key(&language.into());
+        let capability = normalize_key(&capability.into());
         let entry = self.languages.entry(language).or_default();
         entry.overrides.insert(capability, directive);
     }
@@ -152,8 +152,8 @@ impl CapabilityMatrix {
     /// Retrieves an override for a capability, when present.
     #[must_use]
     pub fn override_for(&self, language: &str, capability: &str) -> Option<CapabilityOverride> {
-        let language = normalise_key(language);
-        let capability = normalise_key(capability);
+        let language = normalize_key(language);
+        let capability = normalize_key(capability);
         self.languages
             .get(&language)
             .and_then(|caps| caps.overrides.get(&capability).copied())
@@ -172,8 +172,8 @@ pub struct LanguageCapabilities {
 pub fn deduplicate_directives(directives: &mut Vec<CapabilityDirective>) {
     let mut merged: BTreeMap<(String, String), CapabilityDirective> = BTreeMap::new();
     for mut directive in directives.drain(..) {
-        let language = normalise_key(&directive.language);
-        let capability = normalise_key(&directive.capability);
+        let language = normalize_key(&directive.language);
+        let capability = normalize_key(&directive.capability);
         directive.language = language.clone();
         directive.capability = capability.clone();
         merged.insert((language, capability), directive);
@@ -181,7 +181,7 @@ pub fn deduplicate_directives(directives: &mut Vec<CapabilityDirective>) {
     *directives = merged.into_values().collect();
 }
 
-fn normalise_key(key: &str) -> String { key.trim().to_lowercase() }
+fn normalize_key(key: &str) -> String { key.trim().to_lowercase() }
 
 #[cfg(test)]
 mod tests {
@@ -190,7 +190,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn normalises_keys_on_lookup() {
+    fn normalizes_keys_on_lookup() {
         let mut matrix = CapabilityMatrix::default();
         matrix.set_override("Rust", "Observe.Get-Definition", CapabilityOverride::Force);
 

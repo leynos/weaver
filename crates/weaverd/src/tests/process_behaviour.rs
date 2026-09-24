@@ -93,16 +93,16 @@ fn given_lock_without_pid(world: &ProcessWorld) -> Result<(), String> {
     Ok(())
 }
 
-#[then("daemonisation was requested")]
-fn then_daemonisation_requested(world: &ProcessWorld) -> Result<(), String> {
+#[then("daemonization was requested")]
+fn then_daemonization_requested(world: &ProcessWorld) -> Result<(), String> {
     let world = process_world(world)?;
     world
         .borrow()
         .wait_for_condition(
             |state| state.daemonizer_calls() > 0,
-            "daemonisation to be invoked",
+            "daemonization to be invoked",
         )
-        .map_err(|error| format!("expected daemonisation to be invoked at least once: {error}"))
+        .map_err(|error| format!("expected daemonization to be invoked at least once: {error}"))
 }
 
 #[then("the daemon wrote the lock file")]

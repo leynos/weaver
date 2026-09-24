@@ -113,8 +113,8 @@ mod tests {
         }
 
         #[rstest::rstest]
-        #[case::serialises_to_json_string("\"fr-FR\"", JsonLocaleExpectation::Valid("fr-FR"))]
-        #[case::deserialises_from_json_string("\"de-DE\"", JsonLocaleExpectation::Valid("de-DE"))]
+        #[case::serializes_to_json_string("\"fr-FR\"", JsonLocaleExpectation::Valid("fr-FR"))]
+        #[case::deserializes_from_json_string("\"de-DE\"", JsonLocaleExpectation::Valid("de-DE"))]
         #[case::round_trip_preserves_canonical_form(
             "\"en-US\"",
             JsonLocaleExpectation::Valid("en-US")
@@ -127,16 +127,16 @@ mod tests {
         ) {
             match expected {
                 JsonLocaleExpectation::Valid(expected_locale) => {
-                    let locale: Locale = serde_json::from_str(input_json).expect("deserialise");
+                    let locale: Locale = serde_json::from_str(input_json).expect("deserialize");
                     assert_eq!(locale.to_string(), expected_locale);
-                    let json = serde_json::to_string(&locale).expect("serialise");
+                    let json = serde_json::to_string(&locale).expect("serialize");
                     assert_eq!(json, input_json);
-                    let roundtripped: Locale = serde_json::from_str(&json).expect("deserialise");
+                    let roundtripped: Locale = serde_json::from_str(&json).expect("deserialize");
                     assert_eq!(roundtripped.to_string(), expected_locale);
                 }
                 JsonLocaleExpectation::Invalid => {
                     let result: Result<Locale, _> = serde_json::from_str(input_json);
-                    assert!(result.is_err(), "invalid locale must not deserialise");
+                    assert!(result.is_err(), "invalid locale must not deserialize");
                 }
             }
         }
@@ -156,15 +156,15 @@ mod tests {
     }
 
     #[test]
-    fn locale_with_unicode_extension_serialises_round_trips() {
+    fn locale_with_unicode_extension_serializes_round_trips() {
         let expected: LanguageIdentifier = "en-US"
             .parse()
             .expect("language identifier from locale base");
         let original = "en-US-u-ca-gregory"
             .parse::<Locale>()
             .expect("valid locale with Unicode extension");
-        let json = serde_json::to_string(&original).expect("serialise");
-        let roundtripped: Locale = serde_json::from_str(&json).expect("deserialise");
+        let json = serde_json::to_string(&original).expect("serialize");
+        let roundtripped: Locale = serde_json::from_str(&json).expect("deserialize");
 
         assert_eq!(roundtripped, original);
         assert_eq!(roundtripped.0, expected);

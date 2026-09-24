@@ -130,7 +130,7 @@ fn analysis_output_round_trip() {
 #[case::success(r#"{"success":true,"output":{"kind":"empty"}}"#)]
 #[case::failure(r#"{"success":false,"output":{"kind":"empty"}}"#)]
 fn diagnostics_defaults_to_empty_when_omitted(#[case] json: &str) {
-    let response: PluginResponse = serde_json::from_str(json).expect("deserialise");
+    let response: PluginResponse = serde_json::from_str(json).expect("deserialize");
     assert!(
         response.diagnostics().is_empty(),
         "expected empty diagnostics, got {:?}",
@@ -152,8 +152,8 @@ fn diagnostics_defaults_to_empty_when_omitted(#[case] json: &str) {
     "analysis"
 )]
 #[case::empty(PluginOutput::Empty, "empty")]
-fn output_serialises_with_kind_tag(#[case] output: PluginOutput, #[case] expected_kind: &str) {
-    let json = serde_json::to_string(&output).expect("serialise");
+fn output_serializes_with_kind_tag(#[case] output: PluginOutput, #[case] expected_kind: &str) {
+    let json = serde_json::to_string(&output).expect("serialize");
     let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse");
     assert_eq!(
         parsed.get("kind").and_then(serde_json::Value::as_str),
@@ -174,7 +174,7 @@ fn diagnostic_with_file_and_line() {
     assert_eq!(diag.severity(), DiagnosticSeverity::Warning);
     assert_eq!(diag.message(), "unused import");
 
-    let json = serde_json::to_string(&diag).expect("serialise");
+    let json = serde_json::to_string(&diag).expect("serialize");
     assert!(json.contains("\"line\":42"));
     assert!(json.contains("/src/lib.py"));
 }
@@ -184,9 +184,9 @@ fn diagnostic_with_file_and_line() {
 #[case::warning(DiagnosticSeverity::Warning, "warning")]
 #[case::info(DiagnosticSeverity::Info, "info")]
 fn severity_round_trip(#[case] severity: DiagnosticSeverity, #[case] expected_str: &str) {
-    let json = serde_json::to_string(&severity).expect("serialise");
+    let json = serde_json::to_string(&severity).expect("serialize");
     assert_eq!(json, format!("\"{expected_str}\""));
-    let back: DiagnosticSeverity = serde_json::from_str(&json).expect("deserialise");
+    let back: DiagnosticSeverity = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(back, severity);
 }
 
@@ -202,10 +202,10 @@ fn diagnostic_with_reason_code_round_trip() {
         .with_reason_code(ReasonCode::SymbolNotFound);
     assert_eq!(diag.reason_code(), Some(ReasonCode::SymbolNotFound));
 
-    let json = serde_json::to_string(&diag).expect("serialise");
+    let json = serde_json::to_string(&diag).expect("serialize");
     assert!(json.contains("\"reason_code\":\"symbol_not_found\""));
 
-    let back: PluginDiagnostic = serde_json::from_str(&json).expect("deserialise");
+    let back: PluginDiagnostic = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(back.reason_code(), Some(ReasonCode::SymbolNotFound));
     assert_eq!(back, diag);
 }
@@ -215,14 +215,14 @@ fn diagnostic_without_reason_code_omits_field() {
     let diag = PluginDiagnostic::new(DiagnosticSeverity::Warning, "something");
     assert!(diag.reason_code().is_none());
 
-    let json = serde_json::to_string(&diag).expect("serialise");
+    let json = serde_json::to_string(&diag).expect("serialize");
     assert!(!json.contains("reason_code"));
 }
 
 #[test]
-fn diagnostic_deserialises_without_reason_code() {
+fn diagnostic_deserializes_without_reason_code() {
     let json = r#"{"severity":"error","message":"oops"}"#;
-    let diag: PluginDiagnostic = serde_json::from_str(json).expect("deserialise");
+    let diag: PluginDiagnostic = serde_json::from_str(json).expect("deserialize");
     assert!(diag.reason_code().is_none());
     assert_eq!(diag.message(), "oops");
 }

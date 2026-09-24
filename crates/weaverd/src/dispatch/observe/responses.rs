@@ -114,7 +114,7 @@ mod tests {
         }
     }
 
-    /// Response variant for parameterised extraction tests.
+    /// Response variant for parameterized extraction tests.
     enum ResponseVariant {
         Scalar { line: u32, character: u32 },
         Array { positions: Vec<(u32, u32)> },

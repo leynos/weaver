@@ -1,7 +1,7 @@
 //! Command-line interface runtime for the Weaver toolchain.
 //!
 //! The module owns argument parsing, configuration bootstrapping, request
-//! serialisation, and daemon transport negotiation. The interface is designed
+//! serialization, and daemon transport negotiation. The interface is designed
 //! to be exercised both from the binary entrypoint and from tests where
 //! configuration loading and IO streams can be substituted.
 
@@ -77,7 +77,7 @@ pub(crate) use runtime_utils::{exit_code_from_status, handle_capabilities_mode};
 #[cfg(test)]
 pub(crate) use transport::connect;
 
-/// CLI flags recognised by the configuration loader.
+/// CLI flags recognized by the configuration loader.
 ///
 /// MAINTENANCE: This list must be kept in sync with the configuration flags
 /// defined in `weaver-config`. When adding new configuration options, update

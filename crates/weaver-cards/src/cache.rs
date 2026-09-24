@@ -170,7 +170,7 @@ impl CardCache {
     /// Invalidates all entries associated with the given path.
     ///
     /// Path matching is based on the exact `PathBuf` stored in the cache key.
-    /// Callers that need symlink or relative-path canonicalisation must do so
+    /// Callers that need symlink or relative-path canonicalization must do so
     /// before building cache keys.
     pub fn invalidate(&self, path: &Path) { self.evict_matching(|key| key.path() == path); }
 

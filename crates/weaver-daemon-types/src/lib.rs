@@ -2,7 +2,7 @@
 //!
 //! This crate provides shared type definitions for the JSONL protocol used
 //! between the `weaverd` daemon and `weaver` CLI. These types ensure that
-//! serialisation on the daemon side and deserialisation on the CLI side
+//! serialization on the daemon side and deserialization on the CLI side
 //! remain in sync.
 //!
 //! ## Stability
@@ -26,8 +26,8 @@ pub const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
 
 /// Unknown-operation error payload emitted by the daemon.
 ///
-/// This type is used by the CLI for deserialisation. The daemon uses its own
-/// serialisation-optimised types with borrowed string slices.
+/// This type is used by the CLI for deserialization. The daemon uses its own
+/// serialization-optimized types with borrowed string slices.
 #[derive(Debug, Deserialize)]
 pub struct UnknownOperationPayload {
     /// Payload type discriminator.
@@ -40,8 +40,8 @@ pub struct UnknownOperationPayload {
 
 /// Inner details for an unknown-operation error payload.
 ///
-/// This type is used by the CLI for deserialisation. The daemon uses its own
-/// serialisation-optimised types with borrowed string slices.
+/// This type is used by the CLI for deserialization. The daemon uses its own
+/// serialization-optimized types with borrowed string slices.
 #[derive(Debug, Deserialize)]
 pub struct UnknownOperationDetails {
     /// Routed domain containing the unknown operation.

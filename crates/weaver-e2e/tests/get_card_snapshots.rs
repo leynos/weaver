@@ -116,10 +116,10 @@ fn unsupported_fixture_uri(temp_dir: &TempDir) -> Result<String, String> {
     path_uri(&path)
 }
 
-/// Serialises a transcript to pretty-printed JSON for snapshot comparison.
+/// Serializes a transcript to pretty-printed JSON for snapshot comparison.
 ///
 /// # Errors
-/// Returns a description if the transcript cannot be serialised.
+/// Returns a description if the transcript cannot be serialized.
 fn render_snapshot<T: serde::Serialize>(transcript: &T) -> Result<String, String> {
     serde_json::to_string_pretty(transcript)
         .map_err(|error| format!("serialize transcript: {error}"))

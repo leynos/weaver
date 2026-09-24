@@ -49,7 +49,7 @@ pub(super) fn temp_file(dir: &TempDir, name: &str, content: &str) -> Result<Path
     Ok(path)
 }
 
-/// Lock failure type for parameterised testing.
+/// Lock failure type for parameterized testing.
 #[derive(Debug, Clone, Copy)]
 pub(super) enum LockFailureKind {
     Syntactic,

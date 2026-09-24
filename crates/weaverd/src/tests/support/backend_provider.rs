@@ -50,7 +50,7 @@ impl BackendProvider for RecordingBackendProvider {
         if let Some(message) = failure {
             return Err(BackendStartupError::new(kind, message));
         }
-        // Touch the configuration in tests to ensure it is fully initialised.
+        // Touch the configuration in tests to ensure it is fully initialized.
         let _ = config.log_filter();
         Ok(())
     }

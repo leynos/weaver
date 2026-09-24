@@ -94,7 +94,7 @@ fn given_typescript_missing_diagnostics(world: &RefCell<TestWorld>) -> Result<()
     )
 }
 
-#[given("a rust server that fails during initialisation")]
+#[given("a rust server that fails during initialization")]
 fn given_rust_failure(world: &RefCell<TestWorld>) -> Result<()> {
     let configs = vec![TestServerConfig {
         language: Language::Rust,
@@ -144,13 +144,13 @@ fn given_force_override(world: &RefCell<TestWorld>) -> Result<()> {
     )
 }
 
-#[when("rust is initialised")]
-fn when_rust_initialised(world: &RefCell<TestWorld>) {
+#[when("rust is initialized")]
+fn when_rust_initialized(world: &RefCell<TestWorld>) {
     world.borrow_mut().initialize(Language::Rust);
 }
 
-#[when("python is initialised")]
-fn when_python_initialised(world: &RefCell<TestWorld>) {
+#[when("python is initialized")]
+fn when_python_initialized(world: &RefCell<TestWorld>) {
     world.borrow_mut().initialize(Language::Python);
 }
 

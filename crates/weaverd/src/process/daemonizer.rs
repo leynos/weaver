@@ -1,4 +1,4 @@
-//! Implements the daemonisation backend for the `weaverd` process.
+//! Implements the daemonization backend for the `weaverd` process.
 
 use std::ffi::OsStr;
 
@@ -9,26 +9,26 @@ use weaver_config::RuntimePaths;
 
 use super::PROCESS_TARGET;
 
-/// Abstraction over daemonisation strategies.
+/// Abstraction over daemonization strategies.
 pub trait Daemonizer: Send + Sync {
     /// Detaches the process into the background.
     fn daemonize(&self, paths: &RuntimePaths) -> Result<(), DaemonizeError>;
 }
 
-/// Errors surfaced by the daemonisation backend.
+/// Errors surfaced by the daemonization backend.
 #[derive(Debug, Error)]
 pub enum DaemonizeError {
-    /// System-level daemonisation failed.
+    /// System-level daemonization failed.
     #[error("{0}")]
     System(#[from] daemonize_me::DaemonError),
 }
 
-/// Daemoniser that delegates to `daemonize-me`.
+/// Daemonizer that delegates to `daemonize-me`.
 #[derive(Debug, Default)]
 pub struct SystemDaemonizer;
 
 impl SystemDaemonizer {
-    /// Builds a new system daemoniser.
+    /// Builds a new system daemonizer.
     pub fn new() -> Self { Self }
 }
 
@@ -37,7 +37,7 @@ impl Daemonizer for SystemDaemonizer {
         info!(
             target: PROCESS_TARGET,
             runtime = %paths.runtime_dir().display(),
-            "daemonising into background"
+            "daemonizing into background"
         );
         let mut daemon = Daemon::new();
         daemon = daemon.work_dir(paths.runtime_dir());

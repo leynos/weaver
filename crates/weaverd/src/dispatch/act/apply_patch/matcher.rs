@@ -32,7 +32,7 @@ pub(crate) fn apply_search_replace(
                 block_index: index + 1,
             })?;
 
-        let replacement = normalise_line_endings(block.replace.as_str(), line_ending);
+        let replacement = normalize_line_endings(block.replace.as_str(), line_ending);
         content.replace_range(start..end, &replacement);
         cursor = start + replacement.len();
     }
@@ -68,7 +68,7 @@ fn find_fuzzy(
         "fuzzy search cursor out of bounds"
     );
     let normalized_content = NormalizedContent::new(content.as_str());
-    let normalized_search = normalise_line_endings(search.as_str(), LineEnding::Lf);
+    let normalized_search = normalize_line_endings(search.as_str(), LineEnding::Lf);
     let trimmed_search = trim_fuzzy_whitespace(&normalized_search);
     if trimmed_search.is_empty() {
         return None;
@@ -111,14 +111,14 @@ fn dominant_line_ending(content: &str) -> LineEnding {
     }
 }
 
-/// Normalises line endings in text to the specified line ending style.
+/// Normalizes line endings in text to the specified line ending style.
 ///
 /// Converts CRLF to LF when targeting `LineEnding::Lf` and converts bare LF to
 /// CRLF when targeting `LineEnding::CrLf`. Other characters are preserved.
-pub(crate) fn normalise_line_endings(input: &str, line_ending: LineEnding) -> String {
+pub(crate) fn normalize_line_endings(input: &str, line_ending: LineEnding) -> String {
     match line_ending {
         LineEnding::Lf => input.replace("\r\n", "\n"),
-        LineEnding::CrLf => normalise_line_endings_crlf(input),
+        LineEnding::CrLf => normalize_line_endings_crlf(input),
     }
 }
 
@@ -152,7 +152,7 @@ fn calculate_crlf_capacity(input: &str) -> usize {
     extra
 }
 
-fn normalise_line_endings_crlf(input: &str) -> String {
+fn normalize_line_endings_crlf(input: &str) -> String {
     let extra = calculate_crlf_capacity(input);
     // Phase 2: Build normalized output
     let mut output = String::with_capacity(input.len() + extra);

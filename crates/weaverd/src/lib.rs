@@ -2,7 +2,7 @@
 //!
 //! The daemon orchestrates the semantic fusion backends and exposes them over
 //! a transport configured via [`weaver_config`]. At this stage the crate focuses
-//! on the bootstrap sequence: loading configuration, initialising structured
+//! on the bootstrap sequence: loading configuration, initializing structured
 //! telemetry, preparing the socket filesystem, and wiring the lazy backend
 //! supervisor. Future phases will extend the exported [`Daemon`] type with the
 //! request loop described in `docs/weaver-design.md`.

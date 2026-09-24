@@ -66,7 +66,7 @@ fn rejects_unwhitelisted_programs() {
     let error = spawn_expect_error(&program, SandboxProfile::new())
         .expect("unwhitelisted program should fail before Birdcage spawn");
     match error {
-        SandboxError::ExecutableNotAuthorised { program: p } => {
+        SandboxError::ExecutableNotAuthorized { program: p } => {
             let canonical = program
                 .canonicalize()
                 .expect("test executable should exist");

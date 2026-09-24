@@ -121,24 +121,24 @@ impl SandboxProfile {
         self
     }
 
-    pub(crate) fn read_only_paths_canonicalised(
+    pub(crate) fn read_only_paths_canonicalized(
         &self,
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
-        self.canonicalised_paths(&self.read_only_paths_canon, &self.read_only_paths)
+        self.canonicalized_paths(&self.read_only_paths_canon, &self.read_only_paths)
     }
 
     pub(crate) fn runtime_paths(&self) -> &[PathBuf] { &self.runtime_paths }
 
-    pub(crate) fn read_write_paths_canonicalised(
+    pub(crate) fn read_write_paths_canonicalized(
         &self,
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
-        self.canonicalised_paths(&self.read_write_paths_canon, &self.read_write_paths)
+        self.canonicalized_paths(&self.read_write_paths_canon, &self.read_write_paths)
     }
 
-    pub(crate) fn executable_paths_canonicalised(
+    pub(crate) fn executable_paths_canonicalized(
         &self,
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
-        self.canonicalised_paths(&self.executable_paths_canon, &self.executable_paths)
+        self.canonicalized_paths(&self.executable_paths_canon, &self.executable_paths)
     }
 
     /// Returns the configured environment policy.
@@ -150,12 +150,12 @@ impl SandboxProfile {
 }
 
 impl SandboxProfile {
-    fn canonicalised_paths<'a>(
+    fn canonicalized_paths<'a>(
         &'a self,
         cache: &'a OnceCell<Vec<PathBuf>>,
         paths: &[PathBuf],
     ) -> Result<&'a Vec<PathBuf>, crate::SandboxError> {
-        cache.get_or_try_init(|| crate::sandbox::canonicalised_set(paths))
+        cache.get_or_try_init(|| crate::sandbox::canonicalized_set(paths))
     }
 }
 

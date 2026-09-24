@@ -125,7 +125,7 @@ fn validate_file(
     input: FileValidation<'_>,
 ) -> Result<Vec<VerificationFailure>, SafetyHarnessError> {
     let uri = to_uri(input.path)?;
-    initialise_lsp(host, input.language)?;
+    initialize_lsp(host, input.language)?;
     let original = input
         .context
         .original(input.path)
@@ -167,10 +167,10 @@ fn validate_open_document(
     Ok(filter_new_failures(input.path, baseline, updated))
 }
 
-fn initialise_lsp(host: &mut LspHost, language: Language) -> Result<(), SafetyHarnessError> {
+fn initialize_lsp(host: &mut LspHost, language: Language) -> Result<(), SafetyHarnessError> {
     host.initialize(language)
         .map(|_| ())
-        .map_err(|e| lsp_error("initialise", e))
+        .map_err(|e| lsp_error("initialize", e))
 }
 
 fn fetch_diagnostics(

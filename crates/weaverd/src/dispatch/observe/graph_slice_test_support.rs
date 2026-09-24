@@ -54,7 +54,7 @@ pub(crate) fn make_request(arguments: &[&str]) -> Result<CommandRequest, String>
         "arguments": arguments,
     });
     let json =
-        serde_json::to_vec(&payload).map_err(|error| format!("serialise request: {error}"))?;
+        serde_json::to_vec(&payload).map_err(|error| format!("serialize request: {error}"))?;
     CommandRequest::parse(&json).map_err(|error| format!("request: {error}"))
 }
 

@@ -44,7 +44,7 @@ fn signal_daemon_fails_for_init_process_permission_denied() {
         panic!("expected SignalFailed, got {result:?}");
     };
     assert_eq!(pid, 1);
-    // Either EPERM (permission denied) or ESRCH (containerised init).
+    // Either EPERM (permission denied) or ESRCH (containerized init).
     let raw = source.raw_os_error();
     assert!(
         raw == Some(libc::EPERM) || raw == Some(libc::ESRCH),

@@ -138,7 +138,7 @@ impl Parser {
     ///
     /// # Errors
     ///
-    /// Returns an error if the Tree-sitter parser cannot be initialised
+    /// Returns an error if the Tree-sitter parser cannot be initialized
     /// with the language grammar.
     pub fn new(language: SupportedLanguage) -> Result<Self, SyntaxError> {
         let mut inner = tree_sitter::Parser::new();
@@ -211,7 +211,7 @@ fn collect_error_nodes(
 
 #[cfg(test)]
 mod tests {
-    //! Unit tests for Tree-sitter parser initialisation and parsing.
+    //! Unit tests for Tree-sitter parser initialization and parsing.
 
     use rstest::rstest;
 

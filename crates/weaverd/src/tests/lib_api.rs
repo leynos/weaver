@@ -12,10 +12,10 @@ use super::support::{
 };
 use crate::{BackendKind, bootstrap_with};
 
-/// Verifies that the public `bootstrap_with` re-export correctly initialises
+/// Verifies that the public `bootstrap_with` re-export correctly initializes
 /// the daemon without eagerly starting backends.
 #[rstest]
-fn bootstrap_with_reexport_initialises_daemon() -> Result<(), String> {
+fn bootstrap_with_reexport_initializes_daemon() -> Result<(), String> {
     let loader = TestConfigLoader::new()?;
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();

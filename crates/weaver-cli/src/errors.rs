@@ -38,8 +38,8 @@ pub(crate) enum AppError {
     #[cfg(not(unix))]
     #[error("platform does not support Unix sockets: {0}")]
     UnsupportedUnixTransport(String),
-    #[error("failed to serialise command request: {0}")]
-    SerialiseRequest(serde_json::Error),
+    #[error("failed to serialize command request: {0}")]
+    SerializeRequest(serde_json::Error),
     #[error("failed to send request to daemon: {0}")]
     SendRequest(io::Error),
     #[error("failed to read response from daemon: {0}")]
@@ -56,8 +56,8 @@ pub(crate) enum AppError {
     RequestTooLarge { size: usize, limit: usize },
     #[error("daemon closed the stream without sending an exit status")]
     MissingExit,
-    #[error("failed to serialise capability matrix: {0}")]
-    SerialiseCapabilities(serde_json::Error),
+    #[error("failed to serialize capability matrix: {0}")]
+    SerializeCapabilities(serde_json::Error),
     #[error("failed to emit capabilities: {0}")]
     EmitCapabilities(io::Error),
     #[error("failed to emit preflight guidance: {0}")]

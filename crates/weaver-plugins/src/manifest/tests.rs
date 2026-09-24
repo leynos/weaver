@@ -29,9 +29,9 @@ fn kind_display(#[case] kind: PluginKind, #[case] expected: &str) {
 #[case::sensor("\"sensor\"", PluginKind::Sensor)]
 #[case::actuator("\"actuator\"", PluginKind::Actuator)]
 fn kind_serde_round_trip(#[case] json: &str, #[case] expected: PluginKind) {
-    let parsed: PluginKind = serde_json::from_str(json).expect("deserialise");
+    let parsed: PluginKind = serde_json::from_str(json).expect("deserialize");
     assert_eq!(parsed, expected);
-    let back = serde_json::to_string(&parsed).expect("serialise");
+    let back = serde_json::to_string(&parsed).expect("serialize");
     assert_eq!(back, json);
 }
 
@@ -48,14 +48,14 @@ fn make_manifest() -> PluginManifest {
     )
 }
 
-/// Helper to deserialise a manifest from JSON and run assertions on it.
+/// Helper to deserialize a manifest from JSON and run assertions on it.
 fn assert_manifest_from_json<F>(json: &str, assertion: F)
 where
     F: FnOnce(&PluginManifest),
 {
     let m: PluginManifest = match serde_json::from_str(json) {
         Ok(manifest) => manifest,
-        Err(error) => panic!("deserialise: {error}"),
+        Err(error) => panic!("deserialize: {error}"),
     };
     assertion(&m);
 }
@@ -124,13 +124,13 @@ fn manifest_serde_round_trip() {
     let m = make_manifest()
         .with_args(vec!["--flag".into()])
         .with_timeout_secs(10);
-    let json = serde_json::to_string(&m).expect("serialise");
-    let back: PluginManifest = serde_json::from_str(&json).expect("deserialise");
+    let json = serde_json::to_string(&m).expect("serialize");
+    let back: PluginManifest = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(back, m);
 }
 
 #[test]
-fn manifest_deserialise_defaults_timeout() {
+fn manifest_deserialize_defaults_timeout() {
     let json = r#"{
         "name": "test",
         "version": "0.1",
@@ -157,14 +157,14 @@ fn with_capabilities_sets_capabilities() {
 #[test]
 fn manifest_with_capabilities_serde_round_trip() {
     let m = make_manifest().with_capabilities(vec![CapabilityId::RenameSymbol]);
-    let json = serde_json::to_string(&m).expect("serialise");
-    let back: PluginManifest = serde_json::from_str(&json).expect("deserialise");
+    let json = serde_json::to_string(&m).expect("serialize");
+    let back: PluginManifest = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(back.capabilities(), &[CapabilityId::RenameSymbol]);
     assert_eq!(back, m);
 }
 
 #[test]
-fn manifest_without_capabilities_deserialises_to_empty() {
+fn manifest_without_capabilities_deserializes_to_empty() {
     let json = r#"{
         "name": "test",
         "version": "0.1",

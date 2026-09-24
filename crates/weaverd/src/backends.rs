@@ -2,7 +2,7 @@
 //!
 //! The daemon owns a set of backends that contribute to the Semantic Fusion
 //! engine. Each backend is started on demand the first time it is requested.
-//! This minimises boot latency and avoids paying the cost of services that are
+//! This minimizes boot latency and avoids paying the cost of services that are
 //! not required for a given command sequence.
 
 use std::{collections::HashSet, fmt, str::FromStr};

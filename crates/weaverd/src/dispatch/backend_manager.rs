@@ -44,7 +44,7 @@ impl BackendManager {
 
 #[cfg(test)]
 mod tests {
-    //! Unit tests for backend manager initialisation and access.
+    //! Unit tests for backend manager initialization and access.
 
     use rstest::{fixture, rstest};
     use weaver_cards::DEFAULT_CACHE_CAPACITY;

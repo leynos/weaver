@@ -14,7 +14,7 @@ where
     W: Write,
 {
     let matrix: CapabilityMatrix = config.capability_matrix();
-    serde_json::to_writer_pretty(&mut *stdout, &matrix).map_err(AppError::SerialiseCapabilities)?;
+    serde_json::to_writer_pretty(&mut *stdout, &matrix).map_err(AppError::SerializeCapabilities)?;
     stdout
         .write_all(b"\n")
         .map_err(AppError::EmitCapabilities)?;

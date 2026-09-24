@@ -1,8 +1,8 @@
 Feature: LSP host core routing
 
-  Scenario: Initialises Rust server and routes core requests
+  Scenario: Initializes Rust server and routes core requests
     Given stub servers for all primary languages
-    When rust is initialised
+    When rust is initialized
     And rust handles a definition request
     And rust handles a references request
     And rust handles a diagnostics request
@@ -23,10 +23,10 @@ Feature: LSP host core routing
   Scenario: Deny override blocks unsupported capability
     Given a python server missing references
     And a deny override for python references
-    When python is initialised
+    When python is initialized
     And python handles a references request
     Then the request fails with an unavailable capability error
-    And python recorded only initialisation
+    And python recorded only initialization
 
   Scenario: Force override enables diagnostics
     Given a typescript server missing diagnostics
@@ -35,9 +35,9 @@ Feature: LSP host core routing
     Then diagnostics succeed via override
     And typescript recorded a diagnostics call
 
-  Scenario: Server initialisation failures surface errors
-    Given a rust server that fails during initialisation
-    When rust is initialised
+  Scenario: Server initialization failures surface errors
+    Given a rust server that fails during initialization
+    When rust is initialized
     Then the request fails with a server error
 
   Scenario: Document sync failures surface errors

@@ -183,7 +183,7 @@ fn handle_returns_structured_refusals(
     let (mut fusion, _dir) = backends?;
     let dir = temp_dir?;
     let expected_reason = serde_json::to_value(&case.expected_reason)
-        .map_err(|error| format!("serialise reason: {error}"))?;
+        .map_err(|error| format!("serialize reason: {error}"))?;
 
     let (result, payload) = dispatch_source(
         &mut fusion,
