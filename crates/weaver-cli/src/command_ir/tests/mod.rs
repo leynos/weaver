@@ -64,7 +64,7 @@ fn projection_preserves_required_definition_arguments() {
     );
 }
 
-#[path = "tests/canonical_projection.rs"]
+#[path = "canonical_projection.rs"]
 mod canonical_projection;
 #[test]
 fn projection_serde_roundtrip_preserves_wire_format() {
