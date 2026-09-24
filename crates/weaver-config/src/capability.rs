@@ -86,26 +86,27 @@ impl FromStr for CapabilityDirective {
     type Err = CapabilityDirectiveParseError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let (language, rest) = input
+        let (language_text, rest) = input
             .split_once(':')
-            .ok_or_else(|| CapabilityDirectiveParseError::MissingLanguage(input.to_string()))?;
-        let language = language.trim();
+            .ok_or_else(|| CapabilityDirectiveParseError::MissingLanguage(input.to_owned()))?;
+        let language = language_text.trim();
         if language.is_empty() {
             return Err(CapabilityDirectiveParseError::EmptyLanguage(
-                input.to_string(),
+                input.to_owned(),
             ));
         }
-        let (capability, directive) = rest
+        let (capability_text, directive_text) = rest
             .split_once('=')
-            .ok_or_else(|| CapabilityDirectiveParseError::MissingDirective(input.to_string()))?;
-        let capability = capability.trim();
+            .ok_or_else(|| CapabilityDirectiveParseError::MissingDirective(input.to_owned()))?;
+        let capability = capability_text.trim();
         if capability.is_empty() {
             return Err(CapabilityDirectiveParseError::EmptyCapability(
-                input.to_string(),
+                input.to_owned(),
             ));
         }
-        let directive = CapabilityOverride::from_str(directive.trim())
-            .map_err(|_| CapabilityDirectiveParseError::InvalidDirective(directive.to_string()))?;
+        let directive = CapabilityOverride::from_str(directive_text.trim()).map_err(|_| {
+            CapabilityDirectiveParseError::InvalidDirective(directive_text.to_owned())
+        })?;
         Ok(Self::new(language, capability, directive))
     }
 }
@@ -143,20 +144,20 @@ impl CapabilityMatrix {
         capability: impl Into<String>,
         directive: CapabilityOverride,
     ) {
-        let language = normalize_key(&language.into());
-        let capability = normalize_key(&capability.into());
-        let entry = self.languages.entry(language).or_default();
-        entry.overrides.insert(capability, directive);
+        let language_key = normalize_key(&language.into());
+        let capability_key = normalize_key(&capability.into());
+        let entry = self.languages.entry(language_key).or_default();
+        entry.overrides.insert(capability_key, directive);
     }
 
     /// Retrieves an override for a capability, when present.
     #[must_use]
     pub fn override_for(&self, language: &str, capability: &str) -> Option<CapabilityOverride> {
-        let language = normalize_key(language);
-        let capability = normalize_key(capability);
+        let language_key = normalize_key(language);
+        let capability_key = normalize_key(capability);
         self.languages
-            .get(&language)
-            .and_then(|caps| caps.overrides.get(&capability).copied())
+            .get(&language_key)
+            .and_then(|caps| caps.overrides.get(&capability_key).copied())
     }
 }
 
@@ -174,13 +175,16 @@ pub fn deduplicate_directives(directives: &mut Vec<CapabilityDirective>) {
     for mut directive in directives.drain(..) {
         let language = normalize_key(&directive.language);
         let capability = normalize_key(&directive.capability);
-        directive.language = language.clone();
-        directive.capability = capability.clone();
+        directive.language.clone_from(&language);
+        directive.capability.clone_from(&capability);
         merged.insert((language, capability), directive);
     }
     *directives = merged.into_values().collect();
 }
 
+/// Trims surrounding whitespace and converts a key to lowercase.
+///
+/// For example, `" Rust "` becomes `"rust"`.
 fn normalize_key(key: &str) -> String { key.trim().to_lowercase() }
 
 #[cfg(test)]
@@ -209,9 +213,12 @@ mod tests {
         deduplicate_directives(&mut directives);
 
         assert_eq!(directives.len(), 1);
-        assert_eq!(directives[0].directive, CapabilityOverride::Deny);
-        assert_eq!(directives[0].language, "rust");
-        assert_eq!(directives[0].capability, "observe.rename");
+        let directive = directives
+            .first()
+            .expect("deduplication should leave one directive");
+        assert_eq!(directive.directive, CapabilityOverride::Deny);
+        assert_eq!(directive.language, "rust");
+        assert_eq!(directive.capability, "observe.rename");
     }
 
     #[test]

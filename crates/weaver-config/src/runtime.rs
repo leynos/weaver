@@ -13,7 +13,7 @@ use std::{
 #[cfg(unix)]
 use dirs::runtime_dir;
 #[cfg(unix)]
-use libc::geteuid;
+use nix::unistd::Uid;
 use thiserror::Error;
 
 use crate::{Config, SocketEndpoint};
@@ -21,14 +21,23 @@ use crate::{Config, SocketEndpoint};
 /// Canonical paths for runtime artefacts written by the daemon.
 #[derive(Debug, Clone)]
 pub struct RuntimePaths {
+    /// Directory containing the daemon's runtime artefacts.
     runtime_dir: PathBuf,
+    /// Lock-file location within the runtime directory.
     lock_path: PathBuf,
+    /// Process-ID file location within the runtime directory.
     pid_path: PathBuf,
+    /// Health snapshot location within the runtime directory.
     health_path: PathBuf,
 }
 
 impl RuntimePaths {
     /// Derives runtime paths from the shared configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the socket has no parent or the runtime directory
+    /// cannot be created.
     pub fn from_config(config: &Config) -> Result<Self, RuntimePathsError> {
         let paths = Self::derive_paths(config)?;
         fs::create_dir_all(paths.runtime_dir()).map_err(|source| {
@@ -41,24 +50,33 @@ impl RuntimePaths {
     }
 
     /// Derives runtime paths without touching the filesystem.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the configured Unix socket has no parent.
     pub fn from_config_readonly(config: &Config) -> Result<Self, RuntimePathsError> {
         Self::derive_paths(config)
     }
 
     /// Directory holding runtime artefacts.
+    #[must_use]
     pub fn runtime_dir(&self) -> &Path { self.runtime_dir.as_path() }
 
     /// Path to the lock file guarding singleton startup.
+    #[must_use]
     pub fn lock_path(&self) -> &Path { self.lock_path.as_path() }
 
     /// Path to the PID file.
+    #[must_use]
     pub fn pid_path(&self) -> &Path { self.pid_path.as_path() }
 
     /// Path to the health snapshot.
+    #[must_use]
     pub fn health_path(&self) -> &Path { self.health_path.as_path() }
 }
 
 impl RuntimePaths {
+    /// Derives file locations without creating their parent directory.
     fn derive_paths(config: &Config) -> Result<Self, RuntimePathsError> {
         let runtime_dir = runtime_directory(config)?;
         Ok(Self {
@@ -70,20 +88,22 @@ impl RuntimePaths {
     }
 }
 
+/// Resolves the directory from the configured socket transport.
 fn runtime_directory(config: &Config) -> Result<PathBuf, RuntimePathsError> {
     match config.daemon_socket() {
         SocketEndpoint::Unix { path } => {
-            match path.parent().filter(|parent| !parent.as_str().is_empty()) {
-                Some(parent) => Ok(parent.as_std_path().to_path_buf()),
-                None => Err(RuntimePathsError::MissingSocketParent {
+            let Some(parent) = path.parent().filter(|parent| !parent.as_str().is_empty()) else {
+                return Err(RuntimePathsError::MissingSocketParent {
                     path: path.to_string(),
-                }),
-            }
+                });
+            };
+            Ok(parent.as_std_path().to_path_buf())
         }
         SocketEndpoint::Tcp { .. } => Ok(default_runtime_directory()),
     }
 }
 
+/// Selects an XDG runtime directory or a user-namespaced temporary fallback.
 fn default_runtime_directory() -> PathBuf {
     #[cfg(unix)]
     {
@@ -93,10 +113,7 @@ fn default_runtime_directory() -> PathBuf {
         }
         let mut dir = env::temp_dir();
         dir.push("weaver");
-        // SAFETY: `geteuid` has no preconditions and simply returns the
-        // caller's effective UID, which we use to namespace per-user temp
-        // directories.
-        dir.push(format!("uid-{}", unsafe { geteuid() }));
+        dir.push(format!("uid-{}", Uid::effective()));
         dir
     }
 
@@ -113,11 +130,16 @@ fn default_runtime_directory() -> PathBuf {
 pub enum RuntimePathsError {
     /// The socket path lacked a parent directory.
     #[error("socket path '{path}' has no parent directory")]
-    MissingSocketParent { path: String },
+    MissingSocketParent {
+        /// Socket path that lacked a parent component.
+        path: String,
+    },
     /// Creating the runtime directory failed.
     #[error("failed to prepare runtime directory '{path}': {source}")]
     RuntimeDirectory {
+        /// Runtime directory that could not be created.
         path: PathBuf,
+        /// Underlying filesystem failure.
         #[source]
         source: std::io::Error,
     },

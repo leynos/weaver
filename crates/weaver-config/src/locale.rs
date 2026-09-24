@@ -20,6 +20,7 @@ pub struct Locale(LanguageIdentifier, String);
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 #[error("invalid locale {input:?}")]
 pub struct LocaleParseError {
+    /// Original string that failed locale parsing.
     input: String,
 }
 
@@ -28,7 +29,7 @@ impl Locale {
     #[must_use]
     pub fn en_us() -> Self {
         let language_identifier = langid!("en-US");
-        Self(language_identifier, "en-US".to_string())
+        Self(language_identifier, "en-US".to_owned())
     }
 }
 
@@ -45,7 +46,7 @@ impl FromStr for Locale {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let locale = value.parse::<IcuLocale>().map_err(|_| Self::Err {
-            input: value.to_string(),
+            input: value.to_owned(),
         })?;
         let canonical = locale.to_string();
         let language_identifier = locale
@@ -53,7 +54,7 @@ impl FromStr for Locale {
             .to_string()
             .parse::<LanguageIdentifier>()
             .map_err(|_| Self::Err {
-                input: value.to_string(),
+                input: value.to_owned(),
             })?;
         Ok(Self(language_identifier, canonical))
     }

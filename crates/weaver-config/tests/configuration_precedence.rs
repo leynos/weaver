@@ -3,14 +3,7 @@
 
 #![cfg(feature = "cli")]
 
-use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    env,
-    ffi::OsString,
-    path::Path,
-    sync::{Mutex, MutexGuard},
-};
+use std::{cell::RefCell, collections::BTreeMap, ffi::OsString};
 
 use cap_std::fs::Dir;
 use googletest::prelude::*;
@@ -42,8 +35,14 @@ const DISCOVERY_VARIABLES: &[&str] = &[
     "XDG_CONFIG_HOME",
     "XDG_CONFIG_DIRS",
 ];
-
-static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
+const CONFIG_VARIABLES: &[&str] = &[
+    CONFIG_PATH_ENV,
+    LOCALE_ENV,
+    SOCKET_ENV,
+    CAPABILITY_OVERRIDES_ENV,
+    "WEAVER_LOG_FILTER",
+    "WEAVER_LOG_FORMAT",
+];
 
 type HarnessState = Result<Harness, String>;
 
@@ -82,10 +81,10 @@ impl Harness {
     fn add_file_locale(&self, locale: &str) { self.add_file_line(format!("locale = {locale:?}")); }
 
     fn add_file_socket(&self, endpoint: &str) -> Result<(), String> {
-        let endpoint = endpoint
+        let parsed_endpoint = endpoint
             .parse::<SocketEndpoint>()
             .map_err(|error| format!("parse file socket endpoint: {error}"))?;
-        let SocketEndpoint::Tcp { host, port } = endpoint else {
+        let SocketEndpoint::Tcp { host, port } = parsed_endpoint else {
             return Err(String::from(
                 "precedence tests require a TCP socket endpoint",
             ));
@@ -116,14 +115,39 @@ impl Harness {
         }
         let config_path = self.write_file()?;
         let environment = self.environment.borrow().clone();
-        let _scope =
-            IsolatedEnvironment::new(&self.temp_dir, config_path.as_deref(), &environment)?;
         let arguments = std::iter::once(OsString::from("weaver"))
             .chain(self.cli.borrow().iter().cloned())
             .collect::<Vec<_>>();
-        self.resolved.replace(Some(
-            Config::load_from_iter(arguments).map_err(|error| error.to_string()),
+        let mut variables = DISCOVERY_VARIABLES
+            .iter()
+            .chain(CONFIG_VARIABLES.iter())
+            .map(|key| (OsString::from(*key), None))
+            .collect::<Vec<(OsString, Option<OsString>)>>();
+        let temp_root = self.temp_dir.path().as_os_str().to_os_string();
+        for key in ["HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA"] {
+            variables.push((OsString::from(key), Some(temp_root.clone())));
+        }
+        variables.push((
+            OsString::from("XDG_CONFIG_HOME"),
+            Some(self.temp_dir.path().join("xdg-home").into_os_string()),
         ));
+        variables.push((
+            OsString::from("XDG_CONFIG_DIRS"),
+            Some(self.temp_dir.path().join("xdg-dirs").into_os_string()),
+        ));
+        variables.push((
+            OsString::from(CONFIG_PATH_ENV),
+            config_path.map(std::path::PathBuf::into_os_string),
+        ));
+        variables.extend(
+            environment
+                .into_iter()
+                .map(|(key, value)| (OsString::from(key), Some(OsString::from(value)))),
+        );
+        let config = temp_env::with_vars(variables, || {
+            Config::load_from_iter(arguments).map_err(|error| error.to_string())
+        });
+        self.resolved.replace(Some(config));
         Ok(())
     }
 
@@ -139,73 +163,6 @@ impl Harness {
         match self.config() {
             Ok(config) => Err(format!("configuration should fail, got {config:?}")),
             Err(error) => Ok(error),
-        }
-    }
-}
-
-struct IsolatedEnvironment {
-    _lock: MutexGuard<'static, ()>,
-    previous: BTreeMap<OsString, Option<OsString>>,
-}
-
-impl IsolatedEnvironment {
-    fn new(
-        temp_dir: &TempDir,
-        config_path: Option<&Path>,
-        overrides: &BTreeMap<&'static str, String>,
-    ) -> Result<Self, String> {
-        let lock = ENVIRONMENT_LOCK
-            .lock()
-            .map_err(|error| format!("lock configuration environment: {error}"))?;
-        let mut previous = DISCOVERY_VARIABLES
-            .iter()
-            .map(|key| (OsString::from(key), env::var_os(key)))
-            .collect::<BTreeMap<_, _>>();
-        previous.extend(
-            env::vars_os()
-                .filter(|(key, _)| key.to_string_lossy().starts_with("WEAVER_"))
-                .map(|(key, value)| (key, Some(value))),
-        );
-
-        // SAFETY: this guard serializes every mutation in this test binary and
-        // restores the complete captured configuration environment on drop.
-        unsafe {
-            for key in previous.keys() {
-                env::remove_var(key);
-            }
-            env::set_var("HOME", temp_dir.path());
-            env::set_var("USERPROFILE", temp_dir.path());
-            env::set_var("APPDATA", temp_dir.path());
-            env::set_var("LOCALAPPDATA", temp_dir.path());
-            env::set_var("XDG_CONFIG_HOME", temp_dir.path().join("xdg-home"));
-            env::set_var("XDG_CONFIG_DIRS", temp_dir.path().join("xdg-dirs"));
-            if let Some(path) = config_path {
-                env::set_var(CONFIG_PATH_ENV, path);
-            }
-            for (key, value) in overrides {
-                env::set_var(key, value);
-            }
-        }
-        Ok(Self {
-            _lock: lock,
-            previous,
-        })
-    }
-}
-
-impl Drop for IsolatedEnvironment {
-    fn drop(&mut self) {
-        // SAFETY: `new` captured these values while holding the matching lock;
-        // restoring them prevents test configuration from leaking to callers.
-        unsafe {
-            for key in self.previous.keys() {
-                env::remove_var(key);
-            }
-            for (key, value) in &self.previous {
-                if let Some(value) = value {
-                    env::set_var(key, value);
-                }
-            }
         }
     }
 }
@@ -261,9 +218,9 @@ fn given_environment_forces_rename(harness: &HarnessState) -> Result<(), String>
 
 #[when("the CLI sets the locale to \"{locale}\"")]
 fn when_cli_locale(harness: &HarnessState, locale: String) -> Result<(), String> {
-    let harness = configured_harness(harness)?;
-    harness.add_cli_arguments([OsString::from("--locale"), OsString::from(locale)]);
-    harness.resolve()
+    let configured = configured_harness(harness)?;
+    configured.add_cli_arguments([OsString::from("--locale"), OsString::from(locale)]);
+    configured.resolve()
 }
 
 #[when("the configuration loads")]
@@ -278,26 +235,26 @@ fn when_defaults_load(harness: &HarnessState) -> Result<(), String> {
 
 #[when("the environment sets the locale to \"{locale}\"")]
 fn when_invalid_environment_locale(harness: &HarnessState, locale: String) -> Result<(), String> {
-    let harness = configured_harness(harness)?;
-    harness.set_environment(LOCALE_ENV, locale);
-    harness.resolve()
+    let configured = configured_harness(harness)?;
+    configured.set_environment(LOCALE_ENV, locale);
+    configured.resolve()
 }
 
 #[when("the CLI sets the daemon socket to \"{endpoint}\"")]
 fn when_cli_socket(harness: &HarnessState, endpoint: String) -> Result<(), String> {
-    let harness = configured_harness(harness)?;
-    harness.add_cli_arguments([OsString::from("--daemon-socket"), OsString::from(endpoint)]);
-    harness.resolve()
+    let configured = configured_harness(harness)?;
+    configured.add_cli_arguments([OsString::from("--daemon-socket"), OsString::from(endpoint)]);
+    configured.resolve()
 }
 
 #[when("the CLI denies the Rust rename capability")]
 fn when_cli_denies_rename(harness: &HarnessState) -> Result<(), String> {
-    let harness = configured_harness(harness)?;
-    harness.add_cli_arguments([
+    let configured = configured_harness(harness)?;
+    configured.add_cli_arguments([
         OsString::from("--capability-overrides"),
         OsString::from("rust:observe.rename=deny"),
     ]);
-    harness.resolve()
+    configured.resolve()
 }
 
 #[then("loading the configuration resolves the locale to \"{locale}\"")]

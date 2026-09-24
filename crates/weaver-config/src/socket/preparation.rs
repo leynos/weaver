@@ -4,7 +4,7 @@ use std::{fs, fs::DirBuilder};
 
 use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
 #[cfg(unix)]
-use libc::geteuid;
+use nix::unistd::Uid;
 use thiserror::Error;
 
 use super::SocketEndpoint;
@@ -14,57 +14,82 @@ use super::SocketEndpoint;
 pub enum SocketPreparationError {
     /// Parent directory is missing when creating a Unix socket path.
     #[error("socket path '{path}' has no parent directory")]
-    MissingParent { path: Utf8PathBuf },
+    MissingParent {
+        /// Socket path whose parent could not be determined.
+        path: Utf8PathBuf,
+    },
     /// Failed to create or adjust socket directories.
     #[error("failed to create socket directory '{path}': {source}")]
     CreateDirectory {
+        /// Directory path that could not be created.
         path: Utf8PathBuf,
+        /// Filesystem error returned while creating the directory.
         #[source]
         source: std::io::Error,
     },
     /// Failed to read metadata while securing socket directories.
     #[error("failed to inspect socket directory '{path}': {source}")]
     ReadMetadata {
+        /// Directory path whose metadata could not be read.
         path: Utf8PathBuf,
+        /// Filesystem error returned while reading metadata.
         #[source]
         source: std::io::Error,
     },
     /// Failed to canonicalize a socket directory while validating safety.
     #[error("failed to canonicalize socket directory '{path}': {source}")]
     Canonicalize {
+        /// Directory path that could not be canonicalized.
         path: Utf8PathBuf,
+        /// Filesystem error returned while canonicalizing the path.
         #[source]
         source: std::io::Error,
     },
     /// Encountered a symbolic link in the socket directory path.
     #[error("socket directory '{path}' resolves through a symlink")]
-    SymlinkDetected { path: Utf8PathBuf },
+    SymlinkDetected {
+        /// Path component that resolves through a symbolic link.
+        path: Utf8PathBuf,
+    },
     /// Socket directory canonicalization produced a non-UTF-8 path.
     #[error("socket directory canonicalizes to a non-UTF-8 path: {path:?}")]
-    NonUtf8CanonicalPath { path: std::path::PathBuf },
+    NonUtf8CanonicalPath {
+        /// Canonical path that cannot be represented as UTF-8.
+        path: std::path::PathBuf,
+    },
     /// Socket directory escapes the configured base path.
     #[error("socket directory '{path}' escapes to '{canonical}' when canonicalized")]
     PathTraversal {
+        /// Normalized socket directory path supplied for validation.
         path: Utf8PathBuf,
+        /// Canonical path that does not remain beneath the supplied path.
         canonical: Utf8PathBuf,
     },
     /// Socket directory resolves to a non-directory entry.
     #[cfg(unix)]
     #[error("socket directory '{path}' is not a directory")]
-    NotDirectory { path: Utf8PathBuf },
+    NotDirectory {
+        /// Path that resolves to an entry other than a directory.
+        path: Utf8PathBuf,
+    },
     /// Socket directory ownership does not match the effective user ID.
     #[cfg(unix)]
     #[error("socket directory '{path}' is owned by uid {owner} but expected uid {expected}")]
     WrongOwner {
+        /// Directory whose owner does not match the effective user.
         path: Utf8PathBuf,
+        /// User ID that owns the directory.
         owner: u32,
+        /// Effective user ID required for the directory.
         expected: u32,
     },
     /// Updating socket directory permissions failed.
     #[cfg(unix)]
     #[error("failed to update permissions for socket directory '{path}': {source}")]
     SetPermissions {
+        /// Directory whose permissions could not be changed.
         path: Utf8PathBuf,
+        /// Filesystem error returned while updating permissions.
         #[source]
         source: std::io::Error,
     },
@@ -102,6 +127,8 @@ pub fn prepare_endpoint_filesystem(
     Ok(())
 }
 
+/// Finds the deepest existing ancestor and missing components in path order.
+/// Returns metadata and missing-parent failures as preparation errors.
 fn split_existing_prefix(
     parent: &Utf8Path,
 ) -> Result<(Utf8PathBuf, Vec<String>), SocketPreparationError> {
@@ -129,6 +156,7 @@ fn split_existing_prefix(
     }
 }
 
+/// Records a missing component and moves to its parent, if one exists.
 fn handle_not_found(
     current: &Utf8Path,
     parent: &Utf8Path,
@@ -156,6 +184,8 @@ fn handle_not_found(
     }
 }
 
+/// Creates each absent directory, securing it immediately on Unix.
+/// Returns filesystem and security failures to the caller.
 fn create_missing_socket_directories(
     mut existing_prefix: Utf8PathBuf,
     missing_suffix: &[String],
@@ -194,10 +224,7 @@ fn create_socket_directory(parent: &Utf8Path) -> Result<(), SocketPreparationErr
 /// Ensures the socket directory is secure (Unix-only).
 #[cfg(unix)]
 pub fn ensure_secure_directory(parent: &Utf8Path) -> Result<(), SocketPreparationError> {
-    // SAFETY: `geteuid` is a read-only libc FFI call with no pointer
-    // arguments or side effects. We cast its return value to `u32`
-    // immediately and use it only for ownership checks.
-    let expected_uid = unsafe { geteuid() } as u32;
+    let expected_uid = Uid::effective().as_raw();
     let mut current = Utf8PathBuf::new();
 
     for component in parent.components() {
@@ -222,6 +249,8 @@ pub fn ensure_secure_directory(parent: &Utf8Path) -> Result<(), SocketPreparatio
     Ok(())
 }
 
+/// Confirms that `parent` is a directory owned by `expected_uid`.
+/// Returns metadata, type, and ownership failures to the caller.
 #[cfg(unix)]
 fn check_directory_ownership(
     parent: &Utf8Path,
@@ -253,6 +282,7 @@ fn check_directory_ownership(
     Ok(())
 }
 
+/// Sets permission bits to `0o700`, reporting metadata or update failures.
 #[cfg(unix)]
 fn check_directory_permissions(parent: &Utf8Path) -> Result<(), SocketPreparationError> {
     use std::os::unix::fs::PermissionsExt;
@@ -279,15 +309,17 @@ fn check_directory_permissions(parent: &Utf8Path) -> Result<(), SocketPreparatio
     Ok(())
 }
 
+/// Verifies that canonicalizing `parent` preserves its normalized suffix.
+/// Reports canonicalization, UTF-8, and traversal failures.
 #[cfg(unix)]
 fn validate_no_path_traversal(parent: &Utf8Path) -> Result<(), SocketPreparationError> {
-    let canonical = fs::canonicalize(parent.as_std_path()).map_err(|source| {
+    let canonical_path = fs::canonicalize(parent.as_std_path()).map_err(|source| {
         SocketPreparationError::Canonicalize {
             path: parent.to_path_buf(),
             source,
         }
     })?;
-    let canonical = Utf8PathBuf::from_path_buf(canonical)
+    let canonical = Utf8PathBuf::from_path_buf(canonical_path)
         .map_err(|path| SocketPreparationError::NonUtf8CanonicalPath { path })?;
     let normalized_parent = normalize_parent_path(parent);
 
@@ -301,6 +333,7 @@ fn validate_no_path_traversal(parent: &Utf8Path) -> Result<(), SocketPreparation
     Ok(())
 }
 
+/// Collapses path components, retaining leading `..` only for relative paths.
 #[cfg(unix)]
 fn normalize_parent_path(parent: &Utf8Path) -> Utf8PathBuf {
     let mut components = Vec::new();
@@ -312,7 +345,7 @@ fn normalize_parent_path(parent: &Utf8Path) -> Utf8PathBuf {
                 is_absolute = true;
                 components.clear();
             }
-            Utf8Component::CurDir => {}
+            Utf8Component::CurDir | Utf8Component::Prefix(_) => {}
             Utf8Component::ParentDir => {
                 if parent_dir_should_pop(components.last().copied()) {
                     components.pop();
@@ -320,8 +353,7 @@ fn normalize_parent_path(parent: &Utf8Path) -> Utf8PathBuf {
                     components.push("..");
                 }
             }
-            Utf8Component::Normal(component) => components.push(component),
-            Utf8Component::Prefix(_) => {}
+            Utf8Component::Normal(name) => components.push(name),
         }
     }
 
@@ -341,6 +373,7 @@ fn normalize_parent_path(parent: &Utf8Path) -> Utf8PathBuf {
     }
 }
 
+/// Reports whether a parent component can cancel the preceding component.
 #[cfg(unix)]
 fn parent_dir_should_pop(last: Option<&str>) -> bool {
     matches!(last, Some(component) if component != "..")
