@@ -42,9 +42,11 @@ CARGO_INSTALL: typ.Final = re.compile(
     r"\bcargo[^\S\r\n]+(?:\\\n[^\S\r\n]*)*(?:\+\S+[^\S\r\n]+(?:\\\n[^\S\r\n]*)*)?install\b"
 )
 
-#: A clone of the Whitaker source, which only a source build needs.
+#: A clone of the Whitaker source, which only a source build needs. Escaped
+#: newlines may join the command's words; ordinary newlines cannot.
 WHITAKER_CLONE: typ.Final = re.compile(
-    r"\bgit\s+clone\b[^\n]*(?:\\\n[^\n]*)*leynos/whitaker"
+    r"\bgit(?:[^\S\r\n]+(?:\\\n[^\S\r\n]*)*|\\\n[^\S\r\n]+)clone\b"
+    r"[^\n]*(?:\\\n[^\n]*)*leynos/whitaker"
 )
 
 #: A full commit SHA, the only pin that names one immutable revision.
@@ -175,9 +177,34 @@ def test_cargo_install_detection_respects_shell_continuations(
             id="single-line-clone",
         ),
         pytest.param(
+            "git \\\n  clone https://github.com/leynos/whitaker",
+            True,
+            id="continued-git-to-clone-with-space",
+        ),
+        pytest.param(
+            "git\\\n  clone https://github.com/leynos/whitaker",
+            True,
+            id="continued-git-to-clone-without-space",
+        ),
+        pytest.param(
+            "git\nclone https://github.com/leynos/whitaker",
+            False,
+            id="uncontinued-git-to-clone",
+        ),
+        pytest.param(
             "git clone \\\n  https://github.com/leynos/whitaker",
             True,
-            id="continued-clone",
+            id="continued-clone-to-url-with-space",
+        ),
+        pytest.param(
+            "git clone\\\n  https://github.com/leynos/whitaker",
+            True,
+            id="continued-clone-to-url-without-space",
+        ),
+        pytest.param(
+            "git clone\nhttps://github.com/leynos/whitaker",
+            False,
+            id="uncontinued-clone-to-url",
         ),
         pytest.param(
             "git clone https://github.com/example/other\n"
@@ -210,6 +237,12 @@ def test_whitaker_clone_detection_respects_shell_continuations(
             "git clone \\\n  https://github.com/leynos/whitaker",
             "mutated.yml:source-build step 'Clone Whitaker source'",
             id="continued-whitaker-clone",
+        ),
+        pytest.param(
+            "Clone Whitaker with continued command",
+            "git \\\n  clone https://github.com/leynos/whitaker",
+            "mutated.yml:source-build step 'Clone Whitaker with continued command'",
+            id="continued-git-to-clone",
         ),
     ],
 )
