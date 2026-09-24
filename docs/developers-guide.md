@@ -129,16 +129,23 @@ as a test assertion on the SHA string.
 
 ## GitHub Actions runner placement
 
-Each lane sits where the kind of work decides. Every Linux lane runs on
-Ubicloud, at a size its own workload decides. What stays GitHub-hosted is the
-macOS build, which needs hardware Ubicloud do not offer, and the FreeBSD leg,
-which is switched off and so has nothing to measure; there, public-repository
-minutes are free.
+The Rust test and coverage lanes use GitHub-hosted `ubuntu-22.04` because the
+Birdcage sandbox needs working user-namespace UID/GID mappings. The unchanged
+sandbox probe and full pinned coverage run passed on image `20260920.303.1`
+with kernel `6.8.0-1064-azure`: 1,562 tests passed, 4 were skipped, and the
+78.5% coverage result was within the configured tolerance against the 78.16%
+baseline. The diagnostic ratchet check explicitly skipped baseline saving;
+`coverage-main.yml` remains the main-branch publisher. The release Linux lanes
+remain on Ubicloud, with GitHub-hosted fallback for pull requests from forks.
+The macOS build needs macOS hardware; the FreeBSD leg remains on
+`ubuntu-latest` and is switched off, so it has nothing to measure. The
+rationale and revalidation conditions are recorded in
+[ADR 014](adr-014-sandbox-compatible-ci-runners.md).
 
 | Workflow                | Job               | Trigger                | Runner                | Ceiling  |
 | ----------------------- | ----------------- | ---------------------- | --------------------- | -------- |
-| `ci.yml`                | `build-test`      | pull request, dispatch | `ubicloud-standard-4` | 30 min   |
-| `coverage-main.yml`     | `coverage-upload` | push, dispatch         | `ubicloud-standard-2` | 20 min   |
+| `ci.yml`                | `build-test`      | pull request, dispatch | `ubuntu-22.04`        | 30 min   |
+| `coverage-main.yml`     | `coverage-upload` | push, dispatch         | `ubuntu-22.04`        | 20 min   |
 | `release.yml`           | `metadata`        | tag push, dry run      | `ubicloud-standard-2` | 10 min   |
 | `release.yml`           | `release`         | tag push               | `ubicloud-standard-2` | 15 min   |
 | `release.yml`           | `build-linux`     | tag push, dry run      | `ubicloud-standard-4` | callee's |
@@ -153,7 +160,9 @@ declare no runner and pass none, so their callees place them.
 
 ### Why these lanes, and what the measurements were
 
-Queue against work, from the last green run of each workflow on 2026-09-16:
+These timings describe the previous runner arrangement, from the last green run
+of each workflow on 2026-09-16. They are historical measurements, not evidence
+about the current `ubuntu-22.04` routes:
 
 | Lane                  | Queue  | Work  |
 | --------------------- | ------ | ----- |
@@ -169,10 +178,9 @@ Queue against work, from the last green run of each workflow on 2026-09-16:
 
 The release build matrix is the surprise in that table, and it is easy to miss
 from the workflow's name: `release-dry-run.yml` calls `release.yml` on every
-pull request, so those jobs are pull-request lanes. The two Linux legs waited
-half an hour and twenty-four minutes to do about three and a half minutes of
-work each, which was the largest single block of developer waiting in the
-repository.
+pull request, so those jobs are pull-request lanes. In the historical
+measurements, the two Linux legs waited half an hour and twenty-four minutes to
+do about three and a half minutes of work each.
 
 `build-macos` stays on `macos-15` because a macOS build needs a macOS runner
 and Ubicloud offer none. `build-freebsd` stays on `ubuntu-latest` for a
@@ -184,27 +192,26 @@ a decision, and it moves when somebody re-enables the leg and can watch it run.
 
 ### Sizes
 
-`ubicloud-standard-4` for anything that compiles the workspace, and
-`ubicloud-standard-2` for the rest. Ubicloud's four vCPU are 1.5 to 2 times
-slower than a GitHub public runner's four for Rust compilation, measured on
-wireframe, so two vCPU would roughly triple a lane that already takes a quarter
-of an hour.
+The retained Ubicloud release lanes use `ubicloud-standard-4` for Linux
+compilation and `ubicloud-standard-2` for metadata and release coordination.
+The former size reflects historical measurements that found Ubicloud's four
+vCPU 1.5 to 2 times slower than a GitHub public runner's four for Rust
+compilation, measured on wireframe.
 
-`coverage-upload` is the one compile-heavy lane on the smaller shape, and that
-is a computed margin rather than an oversight. The workspace has two trybuild
-cases, `public_api_contracts_compile` and
-`test_support_exports_compile_downstream`, which spawn their own cargo builds;
-they took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
-kills a test after 180 seconds by default, and this repository sets no nextest
-configuration, so that default applies. Even at three times slower those cases
-stay under half the kill. Nobody waits on this lane, so the smaller shape is
-worth the slower run. Should the margin close, the remedy is
-`ubicloud-standard-4`, not a longer deadline for the test.
+The previous `coverage-upload` sizing analysis used the two trybuild cases,
+`public_api_contracts_compile` and `test_support_exports_compile_downstream`,
+which spawn their own cargo builds. They took 20.5 and 25.4 seconds of a
+50.3-second suite on four vCPU. That analysis no longer establishes the current
+lane's runtime or capacity: the lane now uses `ubuntu-22.04`. Diagnostic
+[PR 302](https://github.com/leynos/weaver/pull/302) passed 1,562 tests with 4
+skipped and measured 78.5% coverage against the 78.16% baseline, within the
+configured tolerance.
 
 ### The fork fallback
 
-A pull request from a fork cannot obtain an Ubicloud runner, so every lane that
-meets forks falls back to a GitHub-hosted runner for forks only:
+A pull request from a fork cannot obtain an Ubicloud runner. The release
+metadata and Linux build lanes therefore fall back to GitHub-hosted runners for
+forks:
 
 ```yaml
 runs-on: >-
@@ -217,12 +224,12 @@ more-indented continuation in a folded scalar keeps its line break, putting a
 newline inside the expression; GitHub evaluates the broken value and the job
 runs, so a green run is not evidence that the scalar is well-formed.
 
-Three lanes carry it: `ci.yml`'s `build-test`, and `release.yml`'s `metadata`
-and `build-linux`. The two release jobs need it because the dry run puts them
-on pull requests. `release.yml`'s `release` job does not, because it is gated on
-`should_publish` and is skipped on every dry run, and `coverage-upload` does
-not, because neither push nor dispatch carries a pull request. A constant guard
-would read as a decision nobody made.
+Two lanes carry the guard: `release.yml`'s `metadata` and `build-linux`. The
+dry run puts them on pull requests. `ci.yml`'s `build-test` uses `ubuntu-22.04`
+for both fork and same-repository pull requests, and `coverage-upload` runs on
+push or dispatch, so neither uses a fork guard. `release.yml`'s `release` job
+does not need one because it is gated on `should_publish` and is skipped on
+every dry run.
 
 For `build-linux` the expression goes in the caller's `with:` block rather than
 on a `runs-on` line, because `build-and-package.yml` takes its runner as a
@@ -252,14 +259,14 @@ decisions and the reason for each, and `runner_placement_reader.py` for the
 machinery that derives facts from the workflow tree.
 
 It reads every runner declaration from the parsed document and fails on an
-embedded line break; compares each fork guard and both arms against exact
-strings; pins placement by `(workflow, job id)` coordinate and compares that
-set against the tree in both directions; reads `runner` inputs as placements,
-not just `runs-on` lines; pins each ceiling by value and separately walks the
-tree for any unbounded Ubicloud lane; asserts that delegating jobs declare
-neither a runner nor a ceiling; checks the reviewed tables are total against
-each other; and compares `.github/actionlint.yaml` against the labels in use in
-both directions.
+embedded line break; compares each remaining fork guard and both arms against
+exact strings; pins placement by `(workflow, job id)` coordinate and compares
+that set against the tree in both directions; reads `runner` inputs as
+placements, not just `runs-on` lines; pins each ceiling by value and separately
+walks the tree for any unbounded Ubicloud lane; asserts that delegating jobs
+declare neither a runner nor a ceiling; checks the reviewed tables are total
+against each other; and compares `.github/actionlint.yaml` against the labels
+in use in both directions.
 
 That last comparison is why the registry exists as a checked artefact rather
 than as a list someone remembers to update. A label registered and used nowhere
@@ -323,8 +330,9 @@ The upload step's condition names `github.ref == 'refs/heads/main'` as well as
 the token. `workflow_dispatch` can be run from any branch, and CodeScene
 accepts an upload for the analysed branch whatever the payload came from, so
 without the ref test a dispatch from a feature branch publishes that branch's
-coverage as the trunk's and drags the ratchet baseline with it. The comparison
-is to the full ref, not a suffix: a branch named `not-main` ends in `main`.
+coverage as the trunk's. It does not advance the ratchet baseline: the pinned
+coverage action saves baselines only on a push to `main`. The comparison is to
+the full ref, not a suffix: a branch named `not-main` ends in `main`.
 
 The token is declared in the upload step's own `env` and nowhere else in
 `coverage-main.yml`: not at workflow scope, not on the job, not in another
