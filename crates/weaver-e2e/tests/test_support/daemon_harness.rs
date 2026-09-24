@@ -40,7 +40,7 @@ pub struct Transcript {
 pub struct FakeDaemon {
     address: SocketAddr,
     requests: Arc<Mutex<Vec<serde_json::Value>>>,
-    join_handle: thread::JoinHandle<()>,
+    join_handle: thread::JoinHandle<io::Result<()>>,
 }
 
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -90,7 +90,7 @@ impl FakeDaemon {
                 expected_requests,
                 &shared_requests,
                 renamed_symbol,
-            );
+            )
         });
 
         Ok(Self {
@@ -104,29 +104,24 @@ impl FakeDaemon {
     /// should pass to `--daemon-socket`.
     pub fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
-    /// Returns a snapshot of all JSON request payloads received so far.
-    #[expect(
-        clippy::expect_used,
-        reason = "poisoned mutex in test fixture must surface as panic for clear diagnostics"
-    )]
-    pub fn requests(&self) -> Vec<serde_json::Value> {
+    /// Consumes this `FakeDaemon` and blocks until the background server thread
+    /// exits, returning the captured request payloads.
+    ///
+    /// A panic in the background thread remains a test failure; expected I/O
+    /// and protocol failures instead reach the caller as errors.
+    ///
+    /// # Errors
+    /// Returns an `io::Error` if the server fails or its request mutex is
+    /// poisoned.
+    pub fn join(self) -> io::Result<Vec<serde_json::Value>> {
+        match self.join_handle.join() {
+            Ok(result) => result?,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
         self.requests
             .lock()
-            .expect("request mutex should not be poisoned")
-            .clone()
-    }
-
-    /// Consumes this `FakeDaemon` and blocks until the background server thread
-    /// exits.
-    ///
-    /// This asserts that `join_handle.join().is_ok()`, so any panic from the
-    /// background thread is propagated as a test failure. That fail-fast
-    /// behaviour is intentional for this test harness.
-    pub fn join(self) {
-        assert!(
-            self.join_handle.join().is_ok(),
-            "fake daemon thread should not panic"
-        );
+            .map(|requests| requests.clone())
+            .map_err(|_| io::Error::other("fake daemon request mutex is poisoned"))
     }
 }
 
@@ -150,26 +145,19 @@ pub fn output_to_transcript(
     }
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "non-blocking configuration is fundamental to the deadline mechanism"
-)]
 fn serve_requests(
     listener: &TcpListener,
     expected_requests: usize,
     requests: &Arc<Mutex<Vec<serde_json::Value>>>,
     renamed_symbol: &str,
-) {
-    listener
-        .set_nonblocking(true)
-        .expect("non-blocking mode should be supported");
+) -> io::Result<()> {
+    listener.set_nonblocking(true)?;
 
     for _ in 0..expected_requests {
-        let stream = accept_before_deadline(listener)
-            .expect("fake daemon should accept CLI connection before deadline");
-        respond_to_request(stream, requests, renamed_symbol)
-            .expect("fake daemon should respond without I/O error");
+        let stream = accept_before_deadline(listener)?;
+        respond_to_request(stream, requests, renamed_symbol)?;
     }
+    Ok(())
 }
 
 /// Polls `listener.accept()` until a connection arrives or the deadline elapses.
@@ -205,10 +193,6 @@ fn handle_accept_error(error: io::Error, deadline: Instant) -> Result<(), io::Er
     Ok(())
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "poisoned mutex in test fixture must surface as panic for clear diagnostics"
-)]
 fn respond_to_request(
     stream: TcpStream,
     requests: &Arc<Mutex<Vec<serde_json::Value>>>,
@@ -223,7 +207,7 @@ fn respond_to_request(
 
     requests
         .lock()
-        .expect("request mutex should not be poisoned")
+        .map_err(|_| io::Error::other("fake daemon request mutex is poisoned"))?
         .push(parsed_request.clone());
 
     let operation_str = parsed_request
