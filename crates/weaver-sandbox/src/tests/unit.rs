@@ -5,16 +5,18 @@ use std::path::PathBuf;
 use crate::profile::{EnvironmentPolicy, NetworkPolicy, SandboxProfile};
 
 #[test]
-fn profile_whitelists_linux_runtime_roots() {
+fn profile_keeps_linux_runtime_roots_separate_from_caller_paths() {
     let profile = SandboxProfile::new();
     if cfg!(target_os = "linux") {
         assert!(
-            !profile.read_only_paths().is_empty(),
-            "linux runtime roots should be whitelisted by default"
+            !profile.runtime_paths().is_empty(),
+            "linux runtime roots should be mounted by default"
         );
     } else {
-        assert!(profile.read_only_paths().is_empty());
+        assert!(profile.runtime_paths().is_empty());
     }
+    assert!(profile.read_only_paths_canonicalised().expect("read paths").is_empty());
+    assert!(profile.executable_paths_canonicalised().expect("executable paths").is_empty());
 }
 
 #[test]
