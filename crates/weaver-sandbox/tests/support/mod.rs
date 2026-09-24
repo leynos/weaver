@@ -1,85 +1,58 @@
-//! Shared fixtures for sandbox behavioural tests.
+//! Shared fixtures for the standalone sandbox behaviour test executable.
 
-use std::fs;
-use std::io::Write;
+#[cfg(target_os = "linux")]
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::sync::MutexGuard;
 
 use anyhow::{Context as _, Result};
+use cap_std::fs::Dir;
 use tempfile::TempDir;
+use weaver_sandbox::{
+    Sandbox,
+    SandboxChild,
+    SandboxCommand,
+    SandboxError,
+    SandboxOutput,
+    SandboxProfile,
+    process::Stdio,
+};
 
-use crate::error::SandboxError;
-use crate::env_guard::EnvGuard;
-use crate::process::Stdio;
-use crate::profile::SandboxProfile;
-use crate::sandbox::{Sandbox, SandboxChild, SandboxCommand, SandboxOutput};
-
-mod env;
-pub(crate) use env::lock_env;
-
-#[derive(Debug)]
-struct EnvHandle {
-    guard: MutexGuard<'static, ()>,
-    snapshot: EnvGuard,
-}
-
-impl EnvHandle {
-    fn acquire() -> Self {
-        Self {
-            guard: lock_env(),
-            snapshot: EnvGuard::capture(),
-        }
-    }
-
-    fn set_var(&mut self, key: &'static str, value: &str) {
-        // SAFETY: Environment mutation is guarded by `ENV_MUTEX`, ensuring
-        // serialised access across tests. The accompanying `EnvGuard`
-        // restores the snapshot on drop so mutations cannot leak.
-        unsafe { std::env::set_var(key, value) };
-    }
-}
-
-impl Drop for EnvHandle {
-    fn drop(&mut self) {
-        // Restore the snapshot before releasing the mutex to avoid races with
-        // other tests mutating the environment.
-        self.snapshot.restore();
-    }
-}
-
-/// Shared state for behavioural sandbox tests.
+/// Shared state for sandbox behaviour scenarios.
 pub struct TestWorld {
     pub profile: SandboxProfile,
     pub command: Option<SandboxCommand>,
     pub output: Option<SandboxOutput>,
     pub launch_error: Option<SandboxError>,
-    pub temp_dir: TempDir,
+    _temp_dir: TempDir,
     pub allowed_file: PathBuf,
     pub forbidden_file: PathBuf,
-    env: Option<EnvHandle>,
 }
 
 impl TestWorld {
-    pub fn new() -> Self {
-        let temp_dir = TempDir::new().expect("failed to allocate temporary directory");
+    /// Creates fixture files for one sandbox scenario.
+    ///
+    /// # Errors
+    /// Returns an error if the temporary directory or either fixture file
+    /// cannot be created.
+    pub fn new() -> Result<Self> {
+        let temp_dir = TempDir::new().context("failed to allocate temporary directory")?;
         let allowed_file = temp_dir.path().join("allowed.txt");
         let forbidden_file = temp_dir.path().join("forbidden.txt");
+        let fixture_dir = Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
+            .context("failed to open fixture directory")?;
 
-        write_fixture(&allowed_file, "allowed file content")
-            .expect("allowed fixture file should be written");
-        write_fixture(&forbidden_file, "forbidden file content")
-            .expect("forbidden fixture file should be written");
+        write_fixture(&fixture_dir, "allowed.txt", "allowed file content")?;
+        write_fixture(&fixture_dir, "forbidden.txt", "forbidden file content")?;
 
-        Self {
+        Ok(Self {
             profile: SandboxProfile::new(),
             command: None,
             output: None,
             launch_error: None,
-            temp_dir,
+            _temp_dir: temp_dir,
             allowed_file,
             forbidden_file,
-            env: None,
-        }
+        })
     }
 
     /// Configures a `cat` invocation against `target`.
@@ -88,7 +61,7 @@ impl TestWorld {
     ///
     /// Returns an error if no `cat` binary is present on the host.
     pub fn configure_cat(&mut self, target: &Path) -> Result<()> {
-        let mut command = SandboxCommand::new(resolve_binary(&["/bin/cat", "/usr/bin/cat"])?);
+        let mut command = SandboxCommand::new(resolve_binary(&["/usr/bin/cat", "/bin/cat"])?);
         command.arg(target);
         command.stdout(Stdio::piped());
         command.stderr(Stdio::piped());
@@ -108,27 +81,10 @@ impl TestWorld {
         let mut command = SandboxCommand::new(resolve_binary(&["/usr/bin/env", "/bin/env"])?);
         command.stdout(Stdio::piped());
 
-        self.profile = self
-            .profile
-            .clone()
-            .allow_executable(command.get_program());
+        self.profile = self.profile.clone().allow_executable(command.get_program());
 
         self.command = Some(command);
         Ok(())
-    }
-
-    pub fn set_env_var(&mut self, key: &'static str, value: &str) {
-        if self.env.is_none() {
-            self.env = Some(EnvHandle::acquire());
-        }
-        self.env
-            .as_mut()
-            .expect("env handle missing")
-            .set_var(key, value);
-    }
-
-    pub fn restore_env(&mut self) {
-        self.env = None;
     }
 
     /// Launches the configured command, recording either its output or the
@@ -143,7 +99,8 @@ impl TestWorld {
         let command = self.command.take().context("command not configured")?;
 
         let sandbox = Sandbox::new(profile);
-        match sandbox.spawn(command) {
+        let spawn_result = sandbox.spawn(command);
+        match spawn_result {
             Ok(child) => self.capture_output(child)?,
             // A rejected spawn is an expected outcome for some scenarios, so
             // it is recorded rather than propagated.
@@ -157,18 +114,12 @@ impl TestWorld {
     /// # Errors
     ///
     /// Returns an error if the child's output could not be read.
-    pub fn capture_output(&mut self, mut child: SandboxChild) -> Result<()> {
+    pub fn capture_output(&mut self, child: SandboxChild) -> Result<()> {
         let output = child
             .wait_with_output()
             .context("failed to read child output")?;
         self.output = Some(output);
         Ok(())
-    }
-}
-
-impl Drop for TestWorld {
-    fn drop(&mut self) {
-        self.restore_env();
     }
 }
 
@@ -179,12 +130,14 @@ impl Drop for TestWorld {
 /// Returns an error if none of the candidates are present.
 #[cfg(target_os = "linux")]
 pub fn resolve_binary(candidates: &[&str]) -> Result<PathBuf> {
-    candidates
-        .iter()
-        .map(Path::new)
-        .find(|path| path.exists())
-        .map(Path::to_path_buf)
-        .with_context(|| format!("no candidate binary found in {candidates:?}"))
+    for candidate in candidates {
+        let candidate_path = Path::new(*candidate);
+        if candidate_exists(candidate_path)? {
+            return Ok(candidate_path.to_path_buf());
+        }
+    }
+
+    anyhow::bail!("no candidate binary found in {candidates:?}")
 }
 
 /// Rejects binary resolution outwith Linux.
@@ -197,9 +150,47 @@ pub fn resolve_binary(_candidates: &[&str]) -> Result<PathBuf> {
     anyhow::bail!("sandbox behaviour tests are intended for Linux hosts only")
 }
 
-fn write_fixture(path: &Path, contents: &str) -> Result<()> {
-    let mut file =
-        fs::File::create(path).with_context(|| format!("failed to create fixture {path:?}"))?;
-    file.write_all(contents.as_bytes())
-        .with_context(|| format!("failed to write fixture {path:?}"))
+#[cfg(target_os = "linux")]
+fn candidate_exists(candidate: &Path) -> Result<bool> {
+    let Some(parent) = candidate.parent() else {
+        return Ok(false);
+    };
+    let Some(file_name) = candidate.file_name() else {
+        return Ok(false);
+    };
+    let Some(directory) = open_candidate_directory(parent)? else {
+        return Ok(false);
+    };
+
+    candidate_metadata_exists(&directory, file_name, candidate)
+}
+
+#[cfg(target_os = "linux")]
+fn open_candidate_directory(parent: &Path) -> Result<Option<Dir>> {
+    match Dir::open_ambient_dir(parent, cap_std::ambient_authority()) {
+        Ok(directory) => Ok(Some(directory)),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => {
+            Err(error).with_context(|| format!("failed to open candidate directory {parent:?}"))
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn candidate_metadata_exists(
+    directory: &Dir,
+    file_name: &std::ffi::OsStr,
+    candidate: &Path,
+) -> Result<bool> {
+    match directory.metadata(file_name) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error).with_context(|| format!("failed to inspect {candidate:?}")),
+    }
+}
+
+fn write_fixture(directory: &Dir, name: &str, contents: &str) -> Result<()> {
+    directory
+        .write(name, contents.as_bytes())
+        .with_context(|| format!("failed to write fixture {name:?}"))
 }

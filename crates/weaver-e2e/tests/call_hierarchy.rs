@@ -64,6 +64,9 @@ enum TestError {
     #[error("expected error but operation succeeded")]
     ExpectedError,
 
+    #[error("test context missing while Pyrefly is available")]
+    ContextMissing,
+
     #[error("expected NotInitialized error, got: {actual}")]
     WrongErrorType { actual: String },
 }
@@ -73,7 +76,7 @@ macro_rules! run_test_with_context {
     ($fixture:expr, $impl_fn:path) => {{
         require_pyrefly!();
         let Some(ctx) = $fixture.as_mut() else {
-            panic!("context should exist when pyrefly is available");
+            return Err(TestError::ContextMissing);
         };
         $impl_fn(ctx)
     }};
@@ -90,10 +93,6 @@ impl Drop for TestContext {
     fn drop(&mut self) { self.client.shutdown().ok(); }
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "fixture setup uses expect to panic on failure for clear test diagnostics"
-)]
 mod fixtures_impl {
     //! Pyrefly-backed fixtures for call hierarchy coverage.
 
@@ -122,13 +121,13 @@ mod fixtures_impl {
     }
 
     #[fixture]
-    pub fn linear_chain_context() -> Option<TestContext> {
-        create_test_context(fixtures::LINEAR_CHAIN).expect("failed to create test context")
+    pub fn linear_chain_context() -> Result<Option<TestContext>, TestError> {
+        create_test_context(fixtures::LINEAR_CHAIN)
     }
 
     #[fixture]
-    pub fn no_calls_context() -> Option<TestContext> {
-        create_test_context(fixtures::NO_CALLS).expect("failed to create test context")
+    pub fn no_calls_context() -> Result<Option<TestContext>, TestError> {
+        create_test_context(fixtures::NO_CALLS)
     }
 }
 
@@ -172,38 +171,62 @@ mod test_impl {
         Outgoing,
     }
 
+    fn call_names(calls: Option<Vec<impl CallName>>) -> Result<Vec<String>, TestError> {
+        calls.ok_or(TestError::NoCallsFound).map(|call_entries| {
+            call_entries
+                .iter()
+                .map(CallName::name)
+                .map(str::to_owned)
+                .collect()
+        })
+    }
+
+    trait CallName {
+        fn name(&self) -> &str;
+    }
+
+    impl CallName for lsp_types::CallHierarchyIncomingCall {
+        fn name(&self) -> &str { &self.from.name }
+    }
+
+    impl CallName for lsp_types::CallHierarchyOutgoingCall {
+        fn name(&self) -> &str { &self.to.name }
+    }
+
     fn incoming_call_names(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
     ) -> Result<Vec<String>, TestError> {
-        let incoming_params = CallHierarchyIncomingCallsParams {
+        call_names(request_incoming_calls(&mut ctx.client, item)?)
+    }
+
+    fn request_incoming_calls(
+        client: &mut LspClient,
+        item: CallHierarchyItem,
+    ) -> Result<Option<Vec<lsp_types::CallHierarchyIncomingCall>>, LspClientError> {
+        client.incoming_calls(CallHierarchyIncomingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: lsp_types::PartialResultParams::default(),
-        };
-
-        let calls = ctx
-            .client
-            .incoming_calls(incoming_params)?
-            .ok_or(TestError::NoCallsFound)?;
-        Ok(calls.iter().map(|call| call.from.name.clone()).collect())
+        })
     }
 
     fn outgoing_call_names(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
     ) -> Result<Vec<String>, TestError> {
-        let outgoing_params = CallHierarchyOutgoingCallsParams {
+        call_names(request_outgoing_calls(&mut ctx.client, item)?)
+    }
+
+    fn request_outgoing_calls(
+        client: &mut LspClient,
+        item: CallHierarchyItem,
+    ) -> Result<Option<Vec<lsp_types::CallHierarchyOutgoingCall>>, LspClientError> {
+        client.outgoing_calls(CallHierarchyOutgoingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: lsp_types::PartialResultParams::default(),
-        };
-
-        let calls = ctx
-            .client
-            .outgoing_calls(outgoing_params)?
-            .ok_or(TestError::NoCallsFound)?;
-        Ok(calls.iter().map(|call| call.to.name.clone()).collect())
+        })
     }
 
     fn ensure_expected_call(names: Vec<String>, expected_name: &str) -> Result<(), TestError> {
@@ -308,8 +331,9 @@ mod test_impl {
 
 #[rstest]
 fn prepare_call_hierarchy_finds_function(
-    mut linear_chain_context: Option<TestContext>,
+    #[from(linear_chain_context)] linear_chain_context_res: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
+    let mut linear_chain_context = linear_chain_context_res?;
     run_test_with_context!(
         linear_chain_context,
         test_impl::prepare_call_hierarchy_finds_function_impl
@@ -318,8 +342,9 @@ fn prepare_call_hierarchy_finds_function(
 
 #[rstest]
 fn outgoing_calls_returns_callees(
-    mut linear_chain_context: Option<TestContext>,
+    #[from(linear_chain_context)] linear_chain_context_res: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
+    let mut linear_chain_context = linear_chain_context_res?;
     run_test_with_context!(
         linear_chain_context,
         test_impl::outgoing_calls_returns_callees_impl
@@ -328,8 +353,9 @@ fn outgoing_calls_returns_callees(
 
 #[rstest]
 fn incoming_calls_returns_callers(
-    mut linear_chain_context: Option<TestContext>,
+    #[from(linear_chain_context)] linear_chain_context_res: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
+    let mut linear_chain_context = linear_chain_context_res?;
     run_test_with_context!(
         linear_chain_context,
         test_impl::incoming_calls_returns_callers_impl
@@ -338,8 +364,9 @@ fn incoming_calls_returns_callers(
 
 #[rstest]
 fn no_calls_for_standalone_function(
-    mut no_calls_context: Option<TestContext>,
+    #[from(no_calls_context)] no_calls_context_res: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
+    let mut no_calls_context = no_calls_context_res?;
     run_test_with_context!(
         no_calls_context,
         test_impl::no_calls_for_standalone_function_impl

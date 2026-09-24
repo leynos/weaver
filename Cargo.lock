@@ -2623,6 +2623,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "876fef147edbcbddc8ac5cbbba92c7b86519e314e86638596c09673b2ed01e7f"
 
 [[package]]
+name = "temp-env"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96374855068f47402c3121c6eed88d29cb1de8f3ab27090e273e420bdabcf050"
+dependencies = [
+ "parking_lot",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3479,11 +3488,10 @@ dependencies = [
  "anyhow",
  "birdcage",
  "cap-std 4.0.3",
+ "gherkin",
  "libtest-mimic",
  "once_cell",
- "rstest",
- "rstest-bdd",
- "rstest-bdd-macros",
+ "temp-env",
  "tempfile",
  "thiserror 2.0.20",
 ]
