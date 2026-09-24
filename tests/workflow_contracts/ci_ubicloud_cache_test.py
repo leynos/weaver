@@ -30,6 +30,7 @@ working when a lane's label moves.
 
 from __future__ import annotations
 
+import re
 import typing as typ
 from pathlib import Path
 
@@ -44,6 +45,11 @@ WORKFLOW_DIR: typ.Final = REPO_ROOT / ".github" / "workflows"
 CREDENTIALS_ACTION: typ.Final = (
     "leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials"
 )
+
+#: A full commit SHA. The credentials step handles the cache token, so a
+#: movable ref such as ``@main`` would let a push to shared-actions change
+#: what runs with it.
+COMMIT_SHA: typ.Final = re.compile(r"[0-9a-f]{40}")
 
 #: The actions that configure and start sccache, directly or through a nested
 #: ``setup-rust``. Each must be preceded by the credentials step.
@@ -240,4 +246,31 @@ def test_the_proxy_step_is_guarded_to_ubicloud(
     assert steps[index].get("if") == EXPECTED_GUARD, (
         f"{coordinate[0]}:{coordinate[1]}'s credentials step guards on "
         f"{steps[index].get('if')!r}, not the reviewed {EXPECTED_GUARD!r}"
+    )
+
+
+@pytest.mark.parametrize("coordinate", COMPILING_JOBS, ids=case_id)
+def test_the_proxy_action_is_pinned_to_a_commit(
+    workflows: dict[str, dict[str, object]],
+    coordinate: tuple[str, str],
+) -> None:
+    """Scenario: the credentials step is repinned to a branch or a tag.
+
+    Invariant: the credentials step's reference is exactly 40 lowercase
+    hexadecimal characters. ``_indices`` compares actions without their
+    reference, so every other test here passes on ``@main``. The shape is
+    what can be checked offline; whether the 40 characters name a commit
+    rather than an annotated tag object is the repin's review to confirm.
+    """
+    steps = _steps(workflows, coordinate)
+    found = _indices(steps, CREDENTIALS_ACTION)
+    assert len(found) == 1, (
+        f"{coordinate[0]}:{coordinate[1]} must declare exactly one "
+        f"{CREDENTIALS_ACTION} step for its pin to be checked; found "
+        f"{len(found)}"
+    )
+    _, separator, ref = str(steps[found[0]].get("uses", "")).partition("@")
+    assert separator and COMMIT_SHA.fullmatch(ref), (
+        f"{coordinate[0]}:{coordinate[1]} must pin {CREDENTIALS_ACTION} to a "
+        f"full commit SHA; it references {ref!r}"
     )

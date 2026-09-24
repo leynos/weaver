@@ -517,9 +517,15 @@ legs red. `runner.environment` is the runtime fact rather than a reading of the
 label, it resolves to `self-hosted` on Ubicloud, and it keeps working when a
 lane's label moves.
 
+The step's reference is a full 40-character lowercase commit SHA. The step
+handles the cache token, so a movable reference such as `@main` would let a
+push to shared-actions change what runs with it, and the other assertions
+compare the action without its reference.
+
 Six ways to break this were applied alone and reverted: dropping the step from
 each of the three lanes, widening the guard to always, swapping it for a label
-test, and moving the step after the Rust setup.
+test, and moving the step after the Rust setup. Four more repin it to `@main`,
+to a short SHA, to an upper-case SHA and to a SHA with a suffix.
 
 ## Whitaker CI setup
 
