@@ -399,6 +399,82 @@ each reading with constructed trees:
 Each reading was mutated alone and restored from a copy while writing the
 contract, and each mutation failed at least one test that names what it broke.
 
+## Cancelling superseded pull-request runs
+
+Every push to a pull request starts a fresh run of each gate. The run already
+in flight is answering a question about a commit nobody will merge, and left
+alone it holds a runner until it finishes, so the branch pays twice for one
+answer. Every workflow a pull request can start therefore carries a concurrency
+block:
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+```
+
+When there is no pull request the group falls back to `github.run_id`, so two
+pushes to `main` or two dispatches never share a group. A shared ref group
+would let a third run replace a still-pending second one, and that commit would
+never get CI; two trunk runs overlapping is the cheaper risk, because
+compiler-cache writes are content-addressed and a cache save of an existing key
+is refused harmlessly (estate rule "PR-lane concurrency fallback").
+
+Two halves matter, and each fails in a way nothing else would notice.
+
+- **The group keys on the pull request.** A group built from
+  `github.run_id` alone is unique to one run, so it matches no predecessor and
+  cancels nothing while reading exactly like a concurrency control. A constant
+  group is the opposite failure: every open pull request shares one queue, and
+  the first push anywhere cancels the gates running everywhere else.
+- **Cancellation is conditioned on the event.** A literal
+  `cancel-in-progress: true` reads as the stricter setting and is a regression.
+  A push to `main`, a schedule, and a dispatch have no successor waiting, and
+  the run on `main` writes the warm cache and records the coverage that no
+  later run repeats.
+
+`pull_request_target` workflows are out of scope. They run against the base
+repository to carry a token, and the one here, `dependabot-automerge.yml`,
+merges Dependabot pull requests rather than building, so cancelling it
+mid-flight is a hazard with no minutes to win.
+
+### The cancellation contract
+
+`ci.yml` and `release-dry-run.yml` carry the block above. The dry run calls
+`release.yml` through `workflow_call`, and a called workflow evaluates its own
+`release-${{ github.ref }}` group in the caller's context, where `github.ref` is
+`refs/pull/<n>/merge`; the caller's block makes the superseded dry run itself
+cancellable rather than leaving that to the callee.
+
+`tests/workflow_contracts/pr_concurrency_test.py` holds the rule. It discovers
+every workflow declaring a `pull_request` trigger, reading `on:` as a mapping,
+a list or a bare name under both the quoted key and PyYAML's boolean `True`,
+and refuses a workflow declaring both, since GitHub would read one trigger set
+and the contract another; a test drives that reader over each shape directly. A
+floor of the two workflows above keeps discovery from emptying into a vacuous
+pass. For each workflow it requires a group that, rendered by
+`pr_concurrency_groups.py`, keeps two pushes to one pull request together and
+keeps apart that pull request, a fork's pull request from a branch of the same
+name, two pushes to `main`, and two dispatches of another branch; and that uses
+`github.run_id` only as the fallback behind the pull-request number. A
+`github.ref` or `github.base_ref` fallback, a `github.head_ref`, `github.sha` or
+`github.run_id`-only group, the run identifier ahead of the number, or a
+constant group fails, and an expression the renderer does not model is refused
+rather than guessed at. It also requires exactly the event-conditioned
+`cancel-in-progress` expression, so the literal `true` fails. No two
+pull-request workflows may render the same group for one pull request, since
+whichever started last would cancel the others; each is rendered under its own
+name. The files are read at test setup, not at import, through
+`workflow_loader.py`, which refuses a duplicated mapping key because PyYAML
+keeps the last of two `concurrency:` blocks and says nothing; a file that
+cannot be read or parsed fails the tests that need it, with the reason. Scope
+is a pure function of the parsed documents, and a test drives it over a
+constructed directory. Each clause was proved by mutation: the cancel line
+removed, a literal `true`, a `ref` fallback, the run identifier ahead of the
+number, a constant group, a `head_ref` group, a `format()` group, the block
+removed, the trigger renamed to `pull_request_target`, a duplicated block, and
+an unquoted `on:` beside the quoted one each fail it.
+
 ## Whitaker CI setup
 
 CI pins Whitaker, Weaver's external lint engine, to a fixed revision through the
