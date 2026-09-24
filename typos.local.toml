@@ -11,16 +11,15 @@ accepted = []
 [words.corrections]
 
 [patterns]
-# Ignore inline code and preserve formal names without accepting components
-# broadly. Inline code spans were masked by the previous dictionary snapshot;
-# kept until the shared dictionary rules on it.
+# Preserve formal names and fixed external identifiers without accepting their
+# component spellings in ordinary prose. The shared dictionary masks fences;
+# the three backtick patterns cover inline code, including short single-line
+# spans that the multiline patterns do not mask reliably.
 ignore = [
   "`[^`\\n]+`",
   "\\brust-analyzer\\b",
   "\\bRust\\s+Analyzer\\b",
   "\\bHashiCorp\\b",
-  "\\bHashiCorp\\s+Configuration\\s+Language\\b",
-  "\\bGitHub\\s+Flavored\\s+Markdown\\b",
 
   "(?m)^          inputs\\.should-upload-workflow-artifacts &&$",
   "(?m)^        value: \\$\\{\\{ jobs\\.metadata\\.outputs\\.should_upload_workflow_artifacts \\}\\}$",

@@ -252,7 +252,7 @@ impl PluginManifest {
 
     /// Converts all language entries to ASCII lowercase for
     /// allocation-free lookups.
-    pub(crate) fn normalise_languages(&mut self) {
+    pub(crate) fn normalize_languages(&mut self) {
         for lang in &mut self.languages {
             lang.make_ascii_lowercase();
         }

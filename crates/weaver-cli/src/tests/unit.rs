@@ -1,6 +1,6 @@
 //! Unit tests for Weaver CLI core functionality.
 //!
-//! Exercises command serialisation, daemon message parsing, configuration
+//! Exercises command serialization, daemon message parsing, configuration
 //! loading, and socket connection establishment (TCP and Unix domain sockets).
 
 use std::{
@@ -44,7 +44,7 @@ use crate::{
 };
 
 #[test]
-fn serialises_command_request_matches_golden() {
+fn serializes_command_request_matches_golden() {
     let invocation = CommandInvocation {
         domain: String::from("observe"),
         operation: String::from("get-definition"),
@@ -54,7 +54,7 @@ fn serialises_command_request_matches_golden() {
     let mut buffer: Vec<u8> = Vec::new();
     request
         .write_jsonl(&mut buffer)
-        .expect("serialises request");
+        .expect("serializes request");
     let actual = decode_utf8(buffer, "request").expect("decode request to utf8");
     let expected =
         read_fixture("request_observe_get_definition.jsonl").expect("load golden request");
@@ -62,7 +62,7 @@ fn serialises_command_request_matches_golden() {
 }
 
 #[test]
-fn serialises_apply_patch_request_with_patch_payload() {
+fn serializes_apply_patch_request_with_patch_payload() {
     let invocation = CommandInvocation {
         domain: String::from("act"),
         operation: String::from("apply-patch"),
@@ -84,7 +84,7 @@ fn serialises_apply_patch_request_with_patch_payload() {
     let mut buffer: Vec<u8> = Vec::new();
     request
         .write_jsonl(&mut buffer)
-        .expect("serialises request");
+        .expect("serializes request");
     let actual = decode_utf8(buffer, "request").expect("decode request to utf8");
     let expected = read_fixture("request_act_apply_patch.jsonl").expect("load golden request");
     assert_eq!(actual, expected);
@@ -379,7 +379,7 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
     assert!(!is_daemon_not_running(&AppError::MissingExit));
     assert!(!is_daemon_not_running(&AppError::BareInvocation));
     assert!(!is_daemon_not_running(&AppError::PreflightGuidance));
-    let ser_err = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").expect_err("bad"));
+    let ser_err = AppError::SerializeRequest(serde_json::from_str::<()>("bad").expect_err("bad"));
     assert!(!is_daemon_not_running(&ser_err));
 }
 mod actionable_guidance;

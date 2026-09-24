@@ -199,7 +199,7 @@ impl Diagnostic {
     pub fn notes(&self) -> &[String] { &self.notes }
 }
 
-/// Summarises the first diagnostic in a report for the `Display` impl.
+/// Summarizes the first diagnostic in a report for the `Display` impl.
 fn diagnostic_summary(diagnostics: &[Diagnostic]) -> String {
     diagnostics.first().map_or_else(
         || String::from("empty diagnostic report"),

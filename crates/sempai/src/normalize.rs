@@ -58,7 +58,7 @@ use crate::{
 ///
 /// # Errors
 ///
-/// Returns a schema diagnostic when a recognised `where` clause shape is
+/// Returns a schema diagnostic when a recognized `where` clause shape is
 /// malformed.
 #[tracing::instrument(
     level = "debug",

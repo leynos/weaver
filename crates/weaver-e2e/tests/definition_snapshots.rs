@@ -85,7 +85,7 @@ macro_rules! run_test_with_context {
     }};
 }
 
-/// Test context containing an initialised LSP client and file URIs.
+/// Test context containing an initialized LSP client and file URIs.
 ///
 /// Implements `Drop` to ensure the LSP client is shut down even on early panics.
 struct TestContext {

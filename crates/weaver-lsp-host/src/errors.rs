@@ -13,8 +13,8 @@ use crate::{
 /// Operation being executed when an error occurred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HostOperation {
-    /// Server initialisation handshake.
-    Initialise,
+    /// Server initialization handshake.
+    Initialize,
     /// `textDocument/definition` handling.
     Definition,
     /// `textDocument/references` handling.
@@ -40,7 +40,7 @@ pub enum HostOperation {
 impl fmt::Display for HostOperation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let label = match self {
-            Self::Initialise => "initialisation",
+            Self::Initialize => "initialization",
             Self::Definition => "definition",
             Self::References => "references",
             Self::Diagnostics => "diagnostics",

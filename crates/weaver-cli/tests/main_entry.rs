@@ -244,7 +244,7 @@ fn daemon_start_help_lists_all_config_flags() {
 }
 
 #[test]
-fn definitions_get_help_exposes_localised_metadata_at_the_binary_boundary() {
+fn definitions_get_help_exposes_localized_metadata_at_the_binary_boundary() {
     let mut command = cargo_bin_cmd!("weaver");
     command.args(["definitions", "get", "--help"]);
     let output = command.output().expect("execute definitions get --help");
@@ -259,7 +259,7 @@ fn definitions_get_help_exposes_localised_metadata_at_the_binary_boundary() {
         stdout
             .lines()
             .any(|line| line.trim() == "Returns the definition location for a source position"),
-        "definitions get help must include its localised summary; output was:\n{stdout}"
+        "definitions get help must include its localized summary; output was:\n{stdout}"
     );
     assert_token_sequence(&stdout, ["--uri", "<URI>"]);
     assert_token_sequence(&stdout, ["--position", "<LINE:COLUMN>"]);
@@ -313,19 +313,19 @@ fn generated_man_page_contains_all_shared_config_flags() {
         );
     }
 
-    let normalised = content
+    let normalized = content
         .replace("\\fB", "")
         .replace("\\fI", "")
         .replace("\\fR", "")
         .replace("\\-", "-");
     assert!(
-        normalised.contains("definitions get"),
+        normalized.contains("definitions get"),
         "man page {man_page_path} missing definitions get command path"
     );
     assert!(
-        normalised.contains("Returns the definition location for a source position"),
-        "man page {man_page_path} missing localised definitions get summary"
+        normalized.contains("Returns the definition location for a source position"),
+        "man page {man_page_path} missing localized definitions get summary"
     );
-    assert_token_sequence(&normalised, ["--uri", "<URI>"]);
-    assert_token_sequence(&normalised, ["--position", "<LINE:COLUMN>"]);
+    assert_token_sequence(&normalized, ["--uri", "<URI>"]);
+    assert_token_sequence(&normalized, ["--position", "<LINE:COLUMN>"]);
 }

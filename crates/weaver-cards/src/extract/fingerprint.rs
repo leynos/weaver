@@ -2,7 +2,7 @@
 //!
 //! Fingerprints are SHA-256 digests over the canonical field order:
 //! language, symbol kind, symbol name, container, parameter list, return type,
-//! structure fingerprint, and the normalised path hint.
+//! structure fingerprint, and the normalized path hint.
 
 use std::path::Path;
 
@@ -31,7 +31,7 @@ pub(super) fn symbol_id(
     }
     update_field(&mut hasher, &candidate.returns);
     update_field(&mut hasher, &candidate.structure_fingerprint);
-    update_field(&mut hasher, &normalise_path_hint(path));
+    update_field(&mut hasher, &normalize_path_hint(path));
 
     let digest = hasher.finalize();
     format!("sym_{}", hex_prefix(digest.iter().take(8).copied()))
@@ -72,6 +72,6 @@ const fn nibble_to_hex(nibble: u8) -> char {
     }
 }
 
-/// Normalises the file path so it contributes weakly but deterministically to
+/// Normalizes the file path so it contributes weakly but deterministically to
 /// the symbol fingerprint.
-fn normalise_path_hint(path: &Path) -> String { path.to_string_lossy().replace('\\', "/") }
+fn normalize_path_hint(path: &Path) -> String { path.to_string_lossy().replace('\\', "/") }

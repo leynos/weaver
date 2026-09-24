@@ -64,7 +64,7 @@ pub enum LaunchError {
         /// PID recorded in the existing PID file.
         pid: u32,
     },
-    /// Another launch is still initialising the runtime artefacts.
+    /// Another launch is still initializing the runtime artefacts.
     #[error("daemon launch already in progress (lock: '{lock}', pid: '{pid}')")]
     StartupInProgress {
         /// Lock file guarding the active launch.
@@ -90,7 +90,7 @@ pub enum LaunchError {
         #[source]
         source: io::Error,
     },
-    /// Serialising or writing the health snapshot failed.
+    /// Serializing or writing the health snapshot failed.
     #[error("failed to write health snapshot '{path}': {source}")]
     HealthWrite {
         /// Health file path.
@@ -99,10 +99,10 @@ pub enum LaunchError {
         #[source]
         source: io::Error,
     },
-    /// Serialising the health snapshot failed.
-    #[error("failed to serialise health snapshot: {source}")]
-    HealthSerialise {
-        /// Underlying serialisation error.
+    /// Serializing the health snapshot failed.
+    #[error("failed to serialize health snapshot: {source}")]
+    HealthSerialize {
+        /// Underlying serialization error.
         #[from]
         source: serde_json::Error,
     },
@@ -124,10 +124,10 @@ pub enum LaunchError {
     /// Health updates were attempted before writing the PID file.
     #[error("pid must be written before updating health state")]
     MissingPid,
-    /// Daemonisation failed.
-    #[error("failed to daemonise: {source}")]
+    /// Daemonization failed.
+    #[error("failed to daemonize: {source}")]
     Daemonize {
-        /// Underlying daemonisation error.
+        /// Underlying daemonization error.
         #[source]
         source: DaemonizeError,
     },

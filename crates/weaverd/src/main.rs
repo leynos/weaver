@@ -1,6 +1,6 @@
 //! Daemon entrypoint for the Weaver semantic code tool.
 //!
-//! The executable initialises the daemon, backgrounds it using the shared
+//! The executable initializes the daemon, backgrounds it using the shared
 //! process supervisor, and then waits for termination signals. Future phases
 //! will attach the command loop described in the design document.
 

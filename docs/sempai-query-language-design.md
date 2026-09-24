@@ -99,7 +99,7 @@ execution against a Tree-sitter parse tree, producing matches and captures.
 flowchart LR
   A[Rule file YAML\nSemgrep legacy or v2] --> B[sempai_yaml\nsaphyr + serde-saphyr]
   A2[One-liner DSL] --> B2[sempai_dsl\nlogos + chumsky]
-  B --> C[sempai_core\nNormalise to Formula]
+  B --> C[sempai_core\nNormalize to Formula]
   B2 --> C
   C --> D[sempai_core\nSemantic validation]
   D --> E[sempai_ts\nCompile atoms\nLanguage profiles]

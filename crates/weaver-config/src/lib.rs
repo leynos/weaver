@@ -202,14 +202,14 @@ impl Config {
     #[must_use]
     pub fn locale(&self) -> &Locale { &self.locale }
 
-    fn normalise_capability_overrides(&mut self) {
+    fn normalize_capability_overrides(&mut self) {
         deduplicate_directives(&mut self.capability_overrides);
     }
 }
 
 impl PostMergeHook for Config {
     fn post_merge(&mut self, _context: &PostMergeContext) -> OrthoResult<()> {
-        self.normalise_capability_overrides();
+        self.normalize_capability_overrides();
         Ok(())
     }
 }
@@ -223,7 +223,7 @@ impl Default for Config {
             capability_overrides: Vec::new(),
             locale: default_locale(),
         };
-        config.normalise_capability_overrides();
+        config.normalize_capability_overrides();
         config
     }
 }
@@ -263,7 +263,7 @@ mod tests {
             })
     }
 
-    fn normalised_key(directive: &CapabilityDirective) -> (String, String) {
+    fn normalized_key(directive: &CapabilityDirective) -> (String, String) {
         (
             directive.language.trim().to_lowercase(),
             directive.capability.trim().to_lowercase(),
@@ -272,7 +272,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn merged_capability_overrides_are_normalised_and_last_wins(
+        fn merged_capability_overrides_are_normalized_and_last_wins(
             assignments in prop::collection::vec(directive_layer_strategy(), 10..40),
         ) {
             let mut layers = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
@@ -294,19 +294,19 @@ mod tests {
             let mut expected = BTreeMap::new();
             for directives in &layers {
                 for directive in directives {
-                    expected.insert(normalised_key(directive), directive.directive);
+                    expected.insert(normalized_key(directive), directive.directive);
                 }
             }
 
             for directive in &config.capability_overrides {
-                let (language, capability) = normalised_key(directive);
+                let (language, capability) = normalized_key(directive);
                 prop_assert_eq!(&directive.language, &language);
                 prop_assert_eq!(&directive.capability, &capability);
             }
             let actual = config
                 .capability_overrides
                 .iter()
-                .map(|directive| (normalised_key(directive), directive.directive))
+                .map(|directive| (normalized_key(directive), directive.directive))
                 .collect::<BTreeMap<_, _>>();
 
             prop_assert_eq!(config.capability_overrides.len(), actual.len());

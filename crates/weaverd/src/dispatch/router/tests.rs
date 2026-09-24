@@ -17,7 +17,7 @@ fn make_request(domain: &str, operation: &str) -> Result<CommandRequest, String>
         "command": {"domain": domain, "operation": operation},
     });
     let json =
-        serde_json::to_vec(&payload).map_err(|error| format!("serialise test request: {error}"))?;
+        serde_json::to_vec(&payload).map_err(|error| format!("serialize test request: {error}"))?;
     CommandRequest::parse(&json).map_err(|error| format!("test request: {error}"))
 }
 
@@ -189,7 +189,7 @@ fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBack
         "command": {"domain": "observe", "operation": "get-card"},
         "arguments": ["--uri", uri, "--position", "1:1"],
     });
-    let json = serde_json::to_vec(&payload).expect("serialise test request");
+    let json = serde_json::to_vec(&payload).expect("serialize test request");
     let request = CommandRequest::parse(&json).expect("test request");
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);

@@ -242,7 +242,7 @@ enum MetavarEvent {
 /// Scans `source` character by character, invoking `handler` with a
 /// [`MetavarEvent`] for each literal character and each metavariable
 /// reference found. Shared by both metavariable extraction and pattern
-/// normalisation so the two stay in lockstep.
+/// normalization so the two stay in lockstep.
 fn visit_metavariables<F>(source: RawSource<'_>, mut handler: F) -> Result<(), SyntaxError>
 where
     F: FnMut(MetavarEvent),

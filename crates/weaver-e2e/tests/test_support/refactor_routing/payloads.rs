@@ -12,7 +12,7 @@ use super::{RequestedProvider, language_for_extension};
 /// Builds a capability-resolution `stderr` JSON payload for automatic
 /// provider selection based on the file extension.
 ///
-/// Returns `None` when the file extension is not recognised.
+/// Returns `None` when the file extension is not recognized.
 pub(super) fn automatic_resolution_payload(file: &Path) -> Option<String> {
     match language_for_extension(file) {
         Some("python") => Some(
@@ -63,7 +63,7 @@ pub(super) fn automatic_resolution_payload(file: &Path) -> Option<String> {
 /// language.
 ///
 /// Returns `None` when the provider and language are compatible, or when the
-/// file extension is not recognised.
+/// file extension is not recognized.
 pub(super) fn provider_mismatch_payload(
     file: &Path,
     provider: RequestedProvider,

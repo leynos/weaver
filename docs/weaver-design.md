@@ -201,7 +201,7 @@ classDiagram
         +did_close(language: Language, params: DidCloseTextDocumentParams) Result~(), LspHostError~
         -call_with_capability(context: CallContext, call: FnOnce) Result~T, LspHostError~
         -call_on_server(language: Language, operation: HostOperation, call: FnOnce) Result~T, LspHostError~
-        -ensure_initialised(language: Language, session: Session, overrides: CapabilityMatrix)
+        -ensure_initialized(language: Language, session: Session, overrides: CapabilityMatrix)
           Result~CapabilitySummary, LspHostError~
         -session_mut(language: Language) Result~Session, LspHostError~
     }
@@ -299,7 +299,7 @@ classDiagram
 
     class HostOperation {
         <<enum>>
-        Initialise
+        Initialize
         Definition
         References
         Diagnostics
@@ -2267,7 +2267,7 @@ flowchart TD
 
     D --> E{Operation type}
     E --> F[Modify operation] --> F1[Load target file into memory]
-    F1 --> F2[Initialise cursor at byte offset 0]
+    F1 --> F2[Initialize cursor at byte offset 0]
     F2 --> F3[For each SEARCH/REPLACE block]
     F3 --> F4[Try exact match from cursor]
     F4 --> F5{Exact match found?}
@@ -2651,9 +2651,9 @@ classDiagram
     class SandboxError {
         <<enum>>
         ProgramNotAbsolute(path: PathBuf)
-        ExecutableNotAuthorised(program: PathBuf)
+        ExecutableNotAuthorized(program: PathBuf)
         MissingPath(path: PathBuf)
-        CanonicalisationFailed(path: PathBuf, source: io::Error)
+        CanonicalizationFailed(path: PathBuf, source: io::Error)
         MultiThreaded(thread_count: usize)
         ThreadCountUnavailable(source: io::Error)
         Activation(source: BirdcageError)

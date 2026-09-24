@@ -99,7 +99,7 @@ fn baseline_world() -> Result<(TestWorld, Baseline), TestCaseError> {
     let calls = world.calls(Language::Rust);
     prop_assert_eq!(
         calls.clone(),
-        Some(vec![CallKind::Initialise]),
+        Some(vec![CallKind::Initialize]),
         "baseline call history should record the initialize"
     );
 

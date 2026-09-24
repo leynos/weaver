@@ -13,16 +13,16 @@ pub enum SandboxError {
     ProgramNotAbsolute(PathBuf),
 
     /// The program was not whitelisted in the profile.
-    #[error("executable {program} is not authorised by the sandbox profile")]
-    ExecutableNotAuthorised { program: PathBuf },
+    #[error("executable {program} is not authorized by the sandbox profile")]
+    ExecutableNotAuthorized { program: PathBuf },
 
     /// The supplied path does not exist and therefore cannot be whitelisted.
     #[error("path {path} does not exist on the host filesystem")]
     MissingPath { path: PathBuf },
 
-    /// Canonicalisation of a path failed.
-    #[error("failed to canonicalise {path}: {source}")]
-    CanonicalisationFailed { path: PathBuf, source: io::Error },
+    /// Canonicalization of a path failed.
+    #[error("failed to canonicalize {path}: {source}")]
+    CanonicalizationFailed { path: PathBuf, source: io::Error },
 
     /// The current process hosts more than one thread.
     #[error("sandboxing must occur in a single-threaded context (observed {thread_count} threads)")]

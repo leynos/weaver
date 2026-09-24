@@ -180,7 +180,7 @@ pub(crate) fn path_uri(path: &Path) -> Result<String, String> {
 
 /// Runs the `weaver` CLI with `cli_args` and captures the result as a `Transcript`.
 ///
-/// `command` is the sanitised display form recorded in the snapshot, with the
+/// `command` is the sanitized display form recorded in the snapshot, with the
 /// ephemeral endpoint and temporary paths already replaced by placeholders.
 ///
 /// # Errors

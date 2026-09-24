@@ -98,20 +98,20 @@ impl Sandbox {
     }
 
     fn ensure_program_whitelisted(&self, program: &Path) -> Result<(), SandboxError> {
-        let authorised = self.profile.executable_paths_canonicalised()?;
-        if authorised.iter().any(|p| p == program) {
+        let authorized = self.profile.executable_paths_canonicalized()?;
+        if authorized.iter().any(|p| p == program) {
             return Ok(());
         }
-        Err(SandboxError::ExecutableNotAuthorised {
+        Err(SandboxError::ExecutableNotAuthorized {
             program: program.to_path_buf(),
         })
     }
 
     fn collect_exceptions(&self, _program: &Path) -> Result<Vec<Exception>, SandboxError> {
         let mut exceptions = Vec::new();
-        let read_only = self.profile.read_only_paths_canonicalised()?;
-        let read_write = self.profile.read_write_paths_canonicalised()?;
-        let executables = self.profile.executable_paths_canonicalised()?;
+        let read_only = self.profile.read_only_paths_canonicalized()?;
+        let read_write = self.profile.read_write_paths_canonicalized()?;
+        let executables = self.profile.executable_paths_canonicalized()?;
 
         // Keep original aliases: Birdcage recreates paths such as `/lib64`
         // inside the sandbox when mounting their canonical targets.
@@ -142,15 +142,15 @@ impl Sandbox {
             return Err(SandboxError::ProgramNotAbsolute(program.to_path_buf()));
         }
 
-        canonicalise(program, true)
+        canonicalize(program, true)
     }
 }
 
-pub(crate) fn canonicalised_set(paths: &[PathBuf]) -> Result<Vec<PathBuf>, SandboxError> {
-    paths.iter().map(|path| canonicalise(path, false)).collect()
+pub(crate) fn canonicalized_set(paths: &[PathBuf]) -> Result<Vec<PathBuf>, SandboxError> {
+    paths.iter().map(|path| canonicalize(path, false)).collect()
 }
 
-fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxError> {
+fn canonicalize(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxError> {
     match fs::canonicalize(path) {
         Ok(resolved) => Ok(resolved),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -162,7 +162,7 @@ fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxErr
 
             rebuild_from_existing_ancestor(path)
         }
-        Err(source) => Err(SandboxError::CanonicalisationFailed {
+        Err(source) => Err(SandboxError::CanonicalizationFailed {
             path: path.to_path_buf(),
             source,
         }),
@@ -177,7 +177,7 @@ fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> 
     };
 
     let base =
-        fs::canonicalize(existing).map_err(|source| SandboxError::CanonicalisationFailed {
+        fs::canonicalize(existing).map_err(|source| SandboxError::CanonicalizationFailed {
             path: existing.to_path_buf(),
             source,
         })?;
@@ -187,7 +187,7 @@ fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> 
     // break rather than a caller error.
     let tail = path
         .strip_prefix(existing)
-        .map_err(|_| SandboxError::CanonicalisationFailed {
+        .map_err(|_| SandboxError::CanonicalizationFailed {
             path: path.to_path_buf(),
             source: std::io::Error::other("strip_prefix failed for known ancestor"),
         })?;
@@ -225,7 +225,7 @@ mod tests {
             .ensure_program_whitelisted(&canonical_program)
             .expect_err("runtime mount must not authorize an initial command");
         assert!(
-            matches!(error, SandboxError::ExecutableNotAuthorised { program: denied } if denied == canonical_program),
+            matches!(error, SandboxError::ExecutableNotAuthorized { program: denied } if denied == canonical_program),
             "runtime root must stay outside caller executable allowlist"
         );
     }

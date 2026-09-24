@@ -53,7 +53,7 @@ impl PluginRegistry {
                 message: format!("plugin '{name}' is already registered"),
             });
         }
-        manifest.normalise_languages();
+        manifest.normalize_languages();
         self.manifests.insert(name, manifest);
         Ok(())
     }
@@ -73,7 +73,7 @@ impl PluginRegistry {
 
     /// Returns all plugins that declare support for the given language.
     ///
-    /// Languages are normalised to ASCII lowercase at registration time,
+    /// Languages are normalized to ASCII lowercase at registration time,
     /// so this method only allocates once for the query string.
     #[must_use]
     pub fn find_for_language(&self, language: &str) -> Vec<&PluginManifest> {
@@ -104,7 +104,7 @@ impl PluginRegistry {
 
     /// Returns plugins that declare both the given language and capability.
     ///
-    /// Languages are normalised to ASCII lowercase at registration time,
+    /// Languages are normalized to ASCII lowercase at registration time,
     /// so this method only allocates once for the query string.
     #[must_use]
     pub fn find_for_language_and_capability(

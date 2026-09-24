@@ -93,7 +93,7 @@ fn extract_multiple_capture<'a>(
 
 #[rstest]
 fn find_literal_pattern(rust_parser: Result<Parser, SyntaxError>) {
-    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let mut parser = rust_parser.expect("Rust parser should initialize");
     let (source, pattern) = parse_and_pattern(&mut parser, "fn main() { let x = 1; }", "let x = 1")
         .expect("literal pattern should compile against parsed source");
 
@@ -103,7 +103,7 @@ fn find_literal_pattern(rust_parser: Result<Parser, SyntaxError>) {
 
 #[rstest]
 fn find_pattern_with_metavariable(rust_parser: Result<Parser, SyntaxError>) {
-    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let mut parser = rust_parser.expect("Rust parser should initialize");
     let (source, pattern) = parse_and_pattern(
         &mut parser,
         "fn main() { let x = 1; let y = 2; }",
@@ -117,7 +117,7 @@ fn find_pattern_with_metavariable(rust_parser: Result<Parser, SyntaxError>) {
 
 #[rstest]
 fn capture_metavariable_text(rust_parser: Result<Parser, SyntaxError>) {
-    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let mut parser = rust_parser.expect("Rust parser should initialize");
     let (source, pattern) = parse_and_pattern(&mut parser, "fn hello() {}", "fn $NAME() {}")
         .expect("named pattern should compile against parsed source");
 
@@ -128,7 +128,7 @@ fn capture_metavariable_text(rust_parser: Result<Parser, SyntaxError>) {
 
 #[rstest]
 fn no_match_returns_empty(rust_parser: Result<Parser, SyntaxError>) {
-    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let mut parser = rust_parser.expect("Rust parser should initialize");
     let (source, pattern) = parse_and_pattern(&mut parser, "fn main() {}", "struct $NAME {}")
         .expect("struct pattern should compile against parsed source");
 
@@ -138,7 +138,7 @@ fn no_match_returns_empty(rust_parser: Result<Parser, SyntaxError>) {
 
 #[rstest]
 fn match_result_has_position(rust_parser: Result<Parser, SyntaxError>) {
-    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let mut parser = rust_parser.expect("Rust parser should initialize");
     let (source, pattern) = parse_and_pattern(&mut parser, "fn test() {}", "fn $NAME() {}")
         .expect("named pattern should compile against parsed source");
 
@@ -150,7 +150,7 @@ fn match_result_has_position(rust_parser: Result<Parser, SyntaxError>) {
 
 #[rstest]
 fn trailing_multiple_metavariable_can_match_empty(rust_parser: Result<Parser, SyntaxError>) {
-    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let mut parser = rust_parser.expect("Rust parser should initialize");
     let text =
         extract_multiple_capture_text(&mut parser, "fn main() {}", "fn main() { $$$BODY }", "BODY")
             .expect("trailing multiple metavariable should capture");
@@ -162,7 +162,7 @@ fn trailing_multiple_metavariable_can_match_empty(rust_parser: Result<Parser, Sy
 
 #[rstest]
 fn empty_multiple_metavariable_has_anchored_byte_range(rust_parser: Result<Parser, SyntaxError>) {
-    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let mut parser = rust_parser.expect("Rust parser should initialize");
     let (source, pattern) = parse_and_pattern(
         &mut parser,
         "fn main() { let x = 1; }",
@@ -205,7 +205,7 @@ fn multiple_metavariable_capture_behaves(
     rust_parser: Result<Parser, SyntaxError>,
     #[case] case: MultipleMetavariableCaptureCase,
 ) {
-    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let mut parser = rust_parser.expect("Rust parser should initialize");
     let text =
         extract_multiple_capture_text(&mut parser, case.source_code, case.pattern_str, "BODY")
             .expect("BODY should capture multiple nodes");
@@ -227,7 +227,7 @@ fn multiple_metavariable_capture_behaves(
 
 #[rstest]
 fn operator_tokens_must_match(rust_parser: Result<Parser, SyntaxError>) {
-    let mut parser = rust_parser.expect("Rust parser should initialise");
+    let mut parser = rust_parser.expect("Rust parser should initialize");
     let (source, pattern) = parse_and_pattern(
         &mut parser,
         "fn main() { let _ = 1 - 2; }",

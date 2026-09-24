@@ -1,4 +1,4 @@
-//! Structured telemetry initialisation for the daemon.
+//! Structured telemetry initialization for the daemon.
 
 use std::io::{self, IsTerminal};
 
@@ -9,7 +9,7 @@ use weaver_config::{Config, LogFormat};
 
 static TELEMETRY_GUARD: OnceCell<()> = OnceCell::new();
 
-/// Handle returned when telemetry has been initialised.
+/// Handle returned when telemetry has been initialized.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TelemetryHandle;
 
@@ -38,8 +38,8 @@ pub enum TelemetryError {
 ///
 /// # fn main() -> Result<(), weaverd::telemetry::TelemetryError> {
 /// let config = Config::default();
-/// let first = telemetry::initialise(&config)?;
-/// let second = telemetry::initialise(&config)?;
+/// let first = telemetry::initialize(&config)?;
+/// let second = telemetry::initialize(&config)?;
 ///
 /// // Both handles remain usable; only the first call installs
 /// // telemetry.
@@ -48,7 +48,7 @@ pub enum TelemetryError {
 /// # Ok(())
 /// # }
 /// ```
-pub fn initialise(config: &Config) -> Result<TelemetryHandle, TelemetryError> {
+pub fn initialize(config: &Config) -> Result<TelemetryHandle, TelemetryError> {
     TELEMETRY_GUARD
         .get_or_try_init(|| install_subscriber(config))
         .map(|_| TelemetryHandle)

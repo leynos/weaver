@@ -135,7 +135,7 @@ impl CommandRequest {
     where
         W: Write,
     {
-        serde_json::to_writer(&mut *writer, self).map_err(AppError::SerialiseRequest)?;
+        serde_json::to_writer(&mut *writer, self).map_err(AppError::SerializeRequest)?;
         writer.write_all(b"\n").map_err(AppError::SendRequest)?;
         writer.flush().map_err(AppError::SendRequest)
     }

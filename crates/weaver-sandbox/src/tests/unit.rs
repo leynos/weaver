@@ -17,13 +17,13 @@ fn profile_keeps_linux_runtime_roots_separate_from_caller_paths() {
     }
     assert!(
         profile
-            .read_only_paths_canonicalised()
+            .read_only_paths_canonicalized()
             .expect("read paths")
             .is_empty()
     );
     assert!(
         profile
-            .executable_paths_canonicalised()
+            .executable_paths_canonicalized()
             .expect("executable paths")
             .is_empty()
     );
@@ -86,15 +86,15 @@ fn read_write_paths_are_recorded() {
 
     assert!(
         profile
-            .read_only_paths_canonicalised()
-            .expect("read paths should canonicalise")
+            .read_only_paths_canonicalized()
+            .expect("read paths should canonicalize")
             .iter()
             .any(|path| path.ends_with("tmp"))
     );
     assert!(
         profile
-            .read_write_paths_canonicalised()
-            .expect("write paths should canonicalise")
+            .read_write_paths_canonicalized()
+            .expect("write paths should canonicalize")
             .iter()
             .any(|path| path.ends_with("tmp"))
     );
@@ -108,8 +108,8 @@ fn records_nonexistent_future_path() {
     let profile = SandboxProfile::new().allow_read_write_path(&target);
 
     let set = profile
-        .read_write_paths_canonicalised()
-        .expect("future write path should canonicalise");
+        .read_write_paths_canonicalized()
+        .expect("future write path should canonicalize");
     assert!(
         set.iter().any(|p| p.ends_with("file.txt")),
         "expected future file to be recorded"

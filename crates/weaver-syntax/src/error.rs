@@ -13,10 +13,10 @@ use crate::language::SupportedLanguage;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum SyntaxError {
-    /// Failed to initialise the Tree-sitter parser for a language.
-    #[error("failed to initialise parser for {language}: {message}")]
+    /// Failed to initialize the Tree-sitter parser for a language.
+    #[error("failed to initialize parser for {language}: {message}")]
     ParserInitError {
-        /// The language that failed to initialise.
+        /// The language that failed to initialize.
         language: SupportedLanguage,
         /// Description of the failure.
         message: String,
@@ -25,7 +25,7 @@ pub enum SyntaxError {
     /// The file extension is not supported for syntactic analysis.
     #[error("unsupported file extension: {extension}")]
     UnsupportedExtension {
-        /// The extension that was not recognised.
+        /// The extension that was not recognized.
         extension: String,
     },
 
@@ -84,7 +84,7 @@ pub enum SyntaxError {
 }
 
 impl SyntaxError {
-    /// Creates a parser initialisation error.
+    /// Creates a parser initialization error.
     #[must_use]
     pub fn parser_init(language: SupportedLanguage, message: impl Into<String>) -> Self {
         Self::ParserInitError {

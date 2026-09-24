@@ -113,7 +113,7 @@ fn find_by_kind_sensors(populated_registry: Result<PluginRegistry, PluginError>)
 
 #[rstest]
 #[case::lowercase("python")]
-#[case::capitalised("Python")]
+#[case::capitalized("Python")]
 fn find_for_language_is_case_insensitive(
     populated_registry: Result<PluginRegistry, PluginError>,
     #[case] query: &str,

@@ -119,15 +119,15 @@ fn then_missing_capability(world: &RefCell<TestWorld>) -> Result<()> {
     Ok(())
 }
 
-#[then("python recorded only initialisation")]
+#[then("python recorded only initialization")]
 fn then_python_calls(world: &RefCell<TestWorld>) -> Result<()> {
     let calls = world
         .borrow()
         .calls(Language::Python)
         .context("calls missing")?;
     ensure!(
-        calls == [CallKind::Initialise],
-        "python should record initialisation alone, got {calls:?}"
+        calls == [CallKind::Initialize],
+        "python should record initialization alone, got {calls:?}"
     );
     Ok(())
 }
@@ -139,7 +139,7 @@ fn then_override_order(world: &RefCell<TestWorld>) -> Result<()> {
 
 #[then("the request fails with a server error")]
 fn then_server_error(world: &RefCell<TestWorld>) -> Result<()> {
-    ensure_server_error(world, HostOperation::Initialise)
+    ensure_server_error(world, HostOperation::Initialize)
 }
 
 #[then("the document sync request fails with a server error")]

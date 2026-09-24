@@ -3,7 +3,7 @@ Feature: Daemon process management
   Scenario: Background launch publishes lifecycle artefacts
     Given a fresh daemon process world
     When the daemon starts in background mode
-    Then daemonisation was requested
+    Then daemonization was requested
     And the daemon wrote the lock file
     And the daemon wrote the pid file
     And the daemon wrote the ready health snapshot
@@ -17,7 +17,7 @@ Feature: Daemon process management
     Given a fresh daemon process world
     When the daemon starts in background mode
     And the daemon wrote the ready health snapshot
-    Then daemonisation was requested
+    Then daemonization was requested
     And the daemon wrote the lock file
     And the daemon wrote the pid file
     And the daemon recorded the starting health snapshot

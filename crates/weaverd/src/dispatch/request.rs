@@ -70,10 +70,10 @@ impl CommandRequest {
         Ok(())
     }
 
-    /// Returns the normalised domain (trimmed).
+    /// Returns the normalized domain (trimmed).
     pub fn domain(&self) -> &str { self.command.domain.trim() }
 
-    /// Returns the normalised operation (trimmed).
+    /// Returns the normalized operation (trimmed).
     pub fn operation(&self) -> &str { self.command.operation.trim() }
 
     /// Returns the patch payload, if provided.

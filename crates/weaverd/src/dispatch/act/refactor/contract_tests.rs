@@ -238,7 +238,7 @@ fn file_uri(path: &Path) -> Result<String, String> {
     position: Some("4"),
     new_name: Some("woven"),
 })]
-fn handler_rename_contract_parametrised(
+fn handler_rename_contract_parameterized(
     socket_dir: Result<TempDir, String>,
     #[case] case: RenameContractCase,
 ) -> Result<(), String> {

@@ -16,7 +16,7 @@ pub(super) fn apply(
     resources: impl IntoIterator<Item = &'static str>,
 ) -> Result<Command, HelpConstructionError> {
     let localizer = FluentLocalizer::with_en_us_defaults(resources)
-        .map_err(HelpConstructionError::load_localisation_catalogue)?;
+        .map_err(HelpConstructionError::load_localization_catalogue)?;
     Ok(apply_node(command, metadata, node, &localizer))
 }
 
@@ -132,7 +132,7 @@ fn append_structured_commands(
     }
 }
 
-/// Appends localised argument descriptions for a structured command.
+/// Appends localized argument descriptions for a structured command.
 fn append_argument_help(output: &mut String, node: &CommandNode, localizer: &dyn Localizer) {
     for argument in node.arguments {
         let help = localizer.message(argument.help_id, None, argument.help);
@@ -279,7 +279,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(HelpConstructionError::LoadLocalisationCatalogue { .. })
+            Err(HelpConstructionError::LoadLocalizationCatalogue { .. })
         ));
     }
 }

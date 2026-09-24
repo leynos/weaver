@@ -2,7 +2,7 @@
 
 use tree_sitter::Node;
 
-use super::{normalise_whitespace, to_u32};
+use super::{normalize_whitespace, to_u32};
 use crate::{BranchInfo, LocalInfo};
 
 /// Tracks traversal state while collecting locals and branches from a body.
@@ -197,7 +197,7 @@ fn bound_names(node: Node<'_>, source: &str) -> Vec<String> {
 /// skipping it if the slice is empty (e.g. because the byte range could not
 /// be read from `source`).
 fn push_identifier_name(node: Node<'_>, source: &str, names: &mut Vec<String>) {
-    let name = normalise_whitespace(source.get(node.byte_range()).unwrap_or_default());
+    let name = normalize_whitespace(source.get(node.byte_range()).unwrap_or_default());
     if !name.is_empty() {
         names.push(name);
     }

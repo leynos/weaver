@@ -133,7 +133,7 @@ fn tcp_url_has_invalid_components(url: &Url) -> bool {
 /// Errors encountered while parsing a [`SocketEndpoint`] from text.
 #[derive(Debug, Error)]
 pub enum SocketParseError {
-    /// Scheme was not recognised.
+    /// Scheme was not recognized.
     #[error("unsupported socket scheme '{0}'")]
     UnsupportedScheme(String),
     /// TCP host name was missing.

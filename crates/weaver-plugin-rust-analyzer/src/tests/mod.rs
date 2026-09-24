@@ -57,7 +57,7 @@ enum UriOverride {
     None,
     /// Point at a different file to trigger the mismatch guard.
     Mismatch,
-    /// Use an equivalent but non-normalised path.
+    /// Use an equivalent but non-normalized path.
     Relative,
     /// Use a value that is not a `file://` URI at all.
     Invalid,

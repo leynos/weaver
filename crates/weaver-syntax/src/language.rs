@@ -25,7 +25,7 @@ pub enum SupportedLanguage {
 impl SupportedLanguage {
     /// Detects the language from a file extension.
     ///
-    /// Returns `None` if the extension is not recognised.
+    /// Returns `None` if the extension is not recognized.
     ///
     /// # Examples
     ///
@@ -40,8 +40,8 @@ impl SupportedLanguage {
     /// ```
     #[must_use]
     pub fn from_extension(ext: &str) -> Option<Self> {
-        let normalised = ext.to_ascii_lowercase();
-        match normalised.as_str() {
+        let normalized = ext.to_ascii_lowercase();
+        match normalized.as_str() {
             "rs" => Some(Self::Rust),
             "py" | "pyi" => Some(Self::Python),
             "ts" | "tsx" | "mts" | "cts" => Some(Self::TypeScript),
@@ -52,7 +52,7 @@ impl SupportedLanguage {
     /// Detects the language from a file path by examining its extension.
     ///
     /// Returns `None` if the path has no extension or the extension is not
-    /// recognised.
+    /// recognized.
     ///
     /// # Examples
     ///
@@ -121,8 +121,8 @@ impl FromStr for SupportedLanguage {
     type Err = LanguageParseError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let normalised = input.trim().to_ascii_lowercase();
-        match normalised.as_str() {
+        let normalized = input.trim().to_ascii_lowercase();
+        match normalized.as_str() {
             "rust" | "rs" => Ok(Self::Rust),
             "python" | "py" => Ok(Self::Python),
             "typescript" | "ts" => Ok(Self::TypeScript),
@@ -147,7 +147,7 @@ mod tests {
     #[case("tsx", SupportedLanguage::TypeScript)]
     #[case("mts", SupportedLanguage::TypeScript)]
     #[case("cts", SupportedLanguage::TypeScript)]
-    fn from_extension_recognises_supported_languages(
+    fn from_extension_recognizes_supported_languages(
         #[case] ext: &str,
         #[case] expected: SupportedLanguage,
     ) {

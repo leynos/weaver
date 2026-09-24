@@ -84,11 +84,11 @@ fn renders_definition_output_with_context() -> Result<(), TestError> {
 
     let context = OutputContext::new("observe", "get-definition", Vec::new());
     let rendered = render_human_output(&context, &json).ok_or(TestError::RenderFailed)?;
-    let normalised = rendered.replace(temp_dir.path().to_string_lossy().as_ref(), "<temp>");
+    let normalized = rendered.replace(temp_dir.path().to_string_lossy().as_ref(), "<temp>");
 
-    let result = if !normalised.contains("def b():") {
+    let result = if !normalized.contains("def b():") {
         Err(TestError::MissingOutput(String::from("def b():")))
-    } else if !normalised.contains("^ definition") {
+    } else if !normalized.contains("^ definition") {
         Err(TestError::MissingOutput(String::from("^ definition")))
     } else {
         Ok(())

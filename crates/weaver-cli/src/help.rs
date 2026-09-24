@@ -47,10 +47,10 @@ pub(crate) enum HelpConstructionError {
         #[source]
         source: command_ir::ProjectionError,
     },
-    /// The embedded Fluent catalogue could not localise help metadata.
-    #[error("failed to load the embedded help localisation catalogue: {source}")]
-    LoadLocalisationCatalogue {
-        /// Fluent resource failure that prevents localised help output.
+    /// The embedded Fluent catalogue could not localize help metadata.
+    #[error("failed to load the embedded help localization catalogue: {source}")]
+    LoadLocalizationCatalogue {
+        /// Fluent resource failure that prevents localized help output.
         #[source]
         source: FluentLocalizerError,
     },
@@ -63,8 +63,8 @@ impl HelpConstructionError {
     }
 
     /// Adds the help-construction context to a Fluent catalogue loading failure.
-    pub(super) fn load_localisation_catalogue(source: FluentLocalizerError) -> Self {
-        Self::LoadLocalisationCatalogue { source }
+    pub(super) fn load_localization_catalogue(source: FluentLocalizerError) -> Self {
+        Self::LoadLocalizationCatalogue { source }
     }
 }
 
@@ -82,7 +82,7 @@ pub(crate) enum HelpWriteError {
 /// Returns an augmented `clap::Command` for runtime help and manpage generation.
 ///
 /// The command is returned only when the full recursive metadata projection and
-/// the embedded localisation catalogue both succeed.
+/// the embedded localization catalogue both succeed.
 pub(crate) fn try_command() -> Result<Command, HelpConstructionError> {
     build_command(command_tree::root(), [metadata::EN_US_MESSAGES])
 }
@@ -116,13 +116,13 @@ pub fn write_help_for_args<W: Write>(
 
 fn build_command(
     root: &command_tree::CommandNode,
-    localisation_resources: impl IntoIterator<Item = &'static str>,
+    localization_resources: impl IntoIterator<Item = &'static str>,
 ) -> Result<Command, HelpConstructionError> {
     tracing::debug!("building augmented help command");
     let mut command = Cli::command();
     let projected =
         command_ir::project(root).map_err(HelpConstructionError::project_command_metadata)?;
-    command = metadata::apply(command, &projected, root, localisation_resources)?;
+    command = metadata::apply(command, &projected, root, localization_resources)?;
     command = command.arg(config_path_arg());
 
     for field in Config::get_doc_metadata().fields {

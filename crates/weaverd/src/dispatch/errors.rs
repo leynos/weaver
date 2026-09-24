@@ -25,11 +25,11 @@ pub enum DispatchError {
     #[error("invalid request structure: {message}")]
     InvalidStructure { message: String },
 
-    /// Domain field contains an unrecognised value.
+    /// Domain field contains an unrecognized value.
     #[error("unknown domain: {domain}")]
     UnknownDomain { domain: String },
 
-    /// Operation field contains an unrecognised value for the given domain.
+    /// Operation field contains an unrecognized value for the given domain.
     #[error("unknown operation '{operation}' for domain '{domain}'")]
     UnknownOperation {
         domain: String,

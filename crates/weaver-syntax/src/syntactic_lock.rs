@@ -16,7 +16,7 @@ use crate::{error::SyntaxError, language::SupportedLanguage, parser::Parser};
 /// Tree-sitter based syntactic validation.
 ///
 /// This validator parses modified files using Tree-sitter and reports any
-/// syntax errors found. Files with unrecognised extensions are skipped
+/// syntax errors found. Files with unrecognized extensions are skipped
 /// (passed through), allowing non-code files to coexist in the codebase.
 ///
 /// # Thread Safety
@@ -64,12 +64,12 @@ impl TreeSitterSyntacticLock {
     /// # Returns
     ///
     /// * `Ok(Vec<...>)` - List of validation failures (empty if valid)
-    /// * `Err(...)` - If language detection or parser initialisation fails
+    /// * `Err(...)` - If language detection or parser initialization fails
     ///
     /// # Errors
     ///
     /// Returns an error if the parser for the detected language cannot be
-    /// initialised, or if the internal parser lock is poisoned.
+    /// initialized, or if the internal parser lock is poisoned.
     pub fn validate_file(
         &self,
         path: &Path,
@@ -127,7 +127,7 @@ impl TreeSitterSyntacticLock {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::validate_file`], such as parser
-    /// initialisation failures or internal lock poisoning.
+    /// initialization failures or internal lock poisoning.
     pub fn validate_owned_file(
         &self,
         file: OwnedFile,
@@ -166,7 +166,7 @@ impl TreeSitterSyntacticLock {
     ///
     /// # Errors
     ///
-    /// Returns an error if any file's parser cannot be initialised.
+    /// Returns an error if any file's parser cannot be initialized.
     pub fn validate_files<'a, I>(&self, files: I) -> Result<Vec<ValidationFailure>, SyntaxError>
     where
         I: IntoIterator<Item = (&'a Path, &'a str)>,
@@ -182,7 +182,7 @@ impl TreeSitterSyntacticLock {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::validate_files`], such as parser
-    /// initialisation failures.
+    /// initialization failures.
     pub fn validate_owned_files<I>(&self, files: I) -> Result<Vec<ValidationFailure>, SyntaxError>
     where
         I: IntoIterator<Item = OwnedFile>,
@@ -196,7 +196,7 @@ impl TreeSitterSyntacticLock {
 
     /// Checks if a file would be validated by this lock.
     ///
-    /// Returns `true` if the file has a recognised extension that maps
+    /// Returns `true` if the file has a recognized extension that maps
     /// to a supported language.
     #[must_use]
     pub fn supports_file(path: &Path) -> bool { SupportedLanguage::from_path(path).is_some() }

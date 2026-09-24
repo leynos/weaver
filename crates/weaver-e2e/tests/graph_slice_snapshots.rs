@@ -99,10 +99,10 @@ const fn snapshot_harness() -> SnapshotHarness {
     }
 }
 
-/// Serialises a transcript to pretty-printed JSON for snapshot comparison.
+/// Serializes a transcript to pretty-printed JSON for snapshot comparison.
 ///
 /// # Errors
-/// Returns a description if the transcript cannot be serialised.
+/// Returns a description if the transcript cannot be serialized.
 fn render_snapshot<T: serde::Serialize>(transcript: &T) -> Result<String, String> {
     serde_json::to_string_pretty(transcript)
         .map_err(|error| format!("serialize transcript: {error}"))
@@ -212,7 +212,7 @@ enum RefusalWorkspace {
 }
 
 impl RefusalWorkspace {
-    /// Materialises the workspace this case runs against.
+    /// Materializes the workspace this case runs against.
     ///
     /// # Errors
     /// Returns a description if the temporary directory or the fixture file

@@ -102,7 +102,7 @@ fn refusal_response_round_trips() {
 #[case::rust(CardLanguage::Rust, "\"rust\"")]
 #[case::python(CardLanguage::Python, "\"python\"")]
 #[case::typescript(CardLanguage::TypeScript, "\"typescript\"")]
-fn card_language_serialises_as_snake_case(#[case] lang: CardLanguage, #[case] expected: &str) {
+fn card_language_serializes_as_snake_case(#[case] lang: CardLanguage, #[case] expected: &str) {
     let json = serde_json::to_string(&lang).expect("serialize");
     assert_eq!(json, expected);
 }
@@ -116,7 +116,7 @@ fn card_language_serialises_as_snake_case(#[case] lang: CardLanguage, #[case] ex
 #[case::variable(CardSymbolKind::Variable, "\"variable\"")]
 #[case::module(CardSymbolKind::Module, "\"module\"")]
 #[case::field(CardSymbolKind::Field, "\"field\"")]
-fn symbol_kind_serialises_as_snake_case(#[case] kind: CardSymbolKind, #[case] expected: &str) {
+fn symbol_kind_serializes_as_snake_case(#[case] kind: CardSymbolKind, #[case] expected: &str) {
     let json = serde_json::to_string(&kind).expect("serialize");
     assert_eq!(json, expected);
 }

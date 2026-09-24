@@ -49,7 +49,7 @@ pub struct SliceParseError {
     kind: &'static str,
     /// Comma-separated list of the accepted tokens, shown to help the caller.
     expected: &'static str,
-    /// The unrecognised token that was supplied.
+    /// The unrecognized token that was supplied.
     name: String,
 }
 
@@ -171,13 +171,13 @@ pub enum GraphSliceError {
     /// An unknown positional argument was provided.
     #[error("unknown argument: {argument}")]
     UnknownArgument {
-        /// The unrecognised argument.
+        /// The unrecognized argument.
         argument: String,
     },
     /// An unknown flag was provided.
     #[error("unknown flag: {flag}")]
     UnknownFlag {
-        /// The unrecognised flag.
+        /// The unrecognized flag.
         flag: String,
     },
 }
