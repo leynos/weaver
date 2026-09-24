@@ -286,6 +286,25 @@ def declaration_labels(declaration: object) -> set[str]:
     ``${{ inputs.runner }}`` selects whatever the caller passed as
     ``with.runner``, which the caller's own declaration names.
 
+    Parameters
+    ----------
+    declaration
+        One runner declaration, as ``runner_declarations`` returns it: a
+        literal label or an expression.
+
+    Returns
+    -------
+    set[str]
+        Every label the declaration can select; empty for the
+        ``${{ inputs.runner }}`` passthrough, whose labels the caller's
+        declaration supplies.
+
+    Raises
+    ------
+    RunnerShapeError
+        When the declaration is an expression other than the two modelled
+        forms, since its labels cannot be read.
+
     Examples
     --------
     >>> declaration_labels("ubuntu-latest")
