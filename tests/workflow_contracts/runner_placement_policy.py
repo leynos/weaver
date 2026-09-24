@@ -66,6 +66,7 @@ EXPECTED_FORK_FALLBACK: typ.Final = {
 EXPECTED_LITERAL_LABEL: typ.Final = {
     ("ci.yml", "build-test"): SANDBOX_COMPATIBLE_LINUX,
     ("coverage-main.yml", "coverage-upload"): SANDBOX_COMPATIBLE_LINUX,
+    ("pr303-whitaker-ubuntu2204-diagnostic.yml", "whitaker-probe"): SANDBOX_COMPATIBLE_LINUX,
     ("release.yml", "release"): UBICLOUD_SMALL,
     ("release.yml", "build-macos"): MACOS_LABEL,
     ("release.yml", "build-freebsd"): GITHUB_HOSTED_LABEL,
@@ -114,6 +115,7 @@ DELEGATED_JOBS: typ.Final = {
 EXPECTED_CEILING_MINUTES: typ.Final = {
     ("ci.yml", "build-test"): 30,
     ("coverage-main.yml", "coverage-upload"): 20,
+    ("pr303-whitaker-ubuntu2204-diagnostic.yml", "whitaker-probe"): 20,
     ("release.yml", "metadata"): 10,
     ("release.yml", "release"): 15,
     ("build-and-package.yml", "build"): 30,

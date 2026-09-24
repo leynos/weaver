@@ -1,0 +1,162 @@
+name: PR 303 Ubuntu 22.04 Whitaker diagnostic
+
+'on':
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  whitaker-probe:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnose-pr303-whitaker-ubuntu2204-20260924'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+      BUILD_PROFILE: debug
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: d23cf2bb568e1db72535eaf90464c7683a6dd2e4
+          persist-credentials: false
+      - name: Set up Rust exactly as CI
+        uses: leynos/shared-actions/.github/actions/setup-rust@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+      - name: Provision backend and linker exactly as CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup component add rustc-codegen-cranelift
+          sudo apt-get update
+          sudo apt-get install --yes mold
+      - name: Record image and tools before installation
+        shell: bash
+        run: |
+          set -uo pipefail
+          diagnostic_dir="${RUNNER_TEMP}/pr303-whitaker-diagnostic"
+          mkdir -p "$diagnostic_dir"
+          probe_before() {
+            local name="$1"
+            shift
+            local status
+            if "$@" > "$diagnostic_dir/before-${name}.stdout" 2> "$diagnostic_dir/before-${name}.stderr"; then
+              status=0
+            else
+              status=$?
+            fi
+            {
+              printf 'before-%s exit=%s command=' "$name" "$status"
+              printf '%q ' "$@"
+              printf '\n'
+              cat "$diagnostic_dir/before-${name}.stdout"
+              cat "$diagnostic_dir/before-${name}.stderr"
+            } | tee -a "$diagnostic_dir/before.log"
+          }
+          {
+            printf 'ImageOS=%s\n' "${ImageOS:-unknown}"
+            printf 'ImageVersion=%s\n' "${ImageVersion:-unknown}"
+            printf 'RUNNER_NAME=%s\n' "${RUNNER_NAME:-unknown}"
+            uname -a
+            printf 'HEAD=%s\n' "$(git rev-parse HEAD)"
+            printf 'PATH=%s\n' "$PATH"
+            printf 'CARGO_HOME=%s\n' "${CARGO_HOME:-unset}"
+            command -v cargo
+            command -v cargo-dylint || true
+          } 2>&1 | tee "$diagnostic_dir/before.log"
+          probe_before cargo-version cargo --version
+          probe_before rustc-version rustc --version
+          probe_before active-toolchain rustup show active-toolchain
+          probe_before cargo-subcommand cargo dylint --version
+          cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+          for metadata_name in .crates.toml .crates2.json; do
+            metadata_path="$cargo_home/$metadata_name"
+            if [[ -f "$metadata_path" ]]; then
+              probe_before "${metadata_name#.}" cat "$metadata_path"
+            else
+              printf 'before %s absent\n' "$metadata_path" | tee -a "$diagnostic_dir/before.log"
+            fi
+          done
+          test "$(git rev-parse HEAD)" = d23cf2bb568e1db72535eaf90464c7683a6dd2e4
+      - name: Run unchanged pinned Whitaker install action
+        id: install_whitaker
+        continue-on-error: true
+        uses: leynos/shared-actions/.github/actions/install-whitaker@a5765019912a8ab6882b12db049c7cde635f3a85
+        with:
+          installer-version: '0.2.8'
+      - name: Inspect installation result
+        if: always()
+        shell: bash
+        env:
+          INSTALL_OUTCOME: ${{ steps.install_whitaker.outcome }}
+        run: |
+          set -uo pipefail
+          diagnostic_dir="${RUNNER_TEMP}/pr303-whitaker-diagnostic"
+          mkdir -p "$diagnostic_dir"
+          probe() {
+            local name="$1"
+            shift
+            local status
+            if "$@" > "$diagnostic_dir/${name}.stdout" 2> "$diagnostic_dir/${name}.stderr"; then
+              status=0
+            else
+              status=$?
+            fi
+            {
+              printf '%s exit=%s command=' "$name" "$status"
+              printf '%q ' "$@"
+              printf '\n'
+              cat "$diagnostic_dir/${name}.stdout"
+              cat "$diagnostic_dir/${name}.stderr"
+            } | tee -a "$diagnostic_dir/after.log"
+          }
+          {
+            printf 'install_action_outcome=%s\n' "$INSTALL_OUTCOME"
+            printf 'PATH=%s\n' "$PATH"
+            printf 'CARGO_HOME=%s\n' "${CARGO_HOME:-unset}"
+            printf 'HOME=%s\n' "$HOME"
+            command -v cargo
+            command -v cargo-dylint || true
+            type -a cargo-dylint || true
+            command -v whitaker || true
+          } 2>&1 | tee "$diagnostic_dir/after.log"
+          probe cargo-subcommand cargo dylint --version
+          probe whitaker-command whitaker --version
+          cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+          for metadata_name in .crates.toml .crates2.json; do
+            metadata_path="$cargo_home/$metadata_name"
+            if [[ -f "$metadata_path" ]]; then
+              probe "${metadata_name#.}" cat "$metadata_path"
+            else
+              printf '%s absent\n' "$metadata_path" | tee -a "$diagnostic_dir/after.log"
+            fi
+          done
+          cargo_dylint_path="${CARGO_HOME:-$HOME/.cargo}/bin/cargo-dylint"
+          if [[ -e "$cargo_dylint_path" || -L "$cargo_dylint_path" ]]; then
+            probe path-entry ls -l "$cargo_dylint_path"
+            probe path-stat stat -Lc '%n %F %a %U:%G %s bytes' "$cargo_dylint_path"
+            probe path-target readlink -f "$cargo_dylint_path"
+            probe direct-version "$cargo_dylint_path" --version
+            probe binary-file file "$cargo_dylint_path"
+            probe binary-sha256 sha256sum "$cargo_dylint_path"
+            probe binary-interpreter readelf -l "$cargo_dylint_path"
+            probe binary-dependencies ldd -v "$cargo_dylint_path"
+          else
+            printf 'cargo-dylint binary absent at %s\n' "$cargo_dylint_path" | tee -a "$diagnostic_dir/after.log"
+          fi
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr303-whitaker-ubuntu2204-${{ github.run_id }}
+          path: ${{ runner.temp }}/pr303-whitaker-diagnostic/
+          if-no-files-found: warn
+      - name: Preserve the install action verdict
+        if: always()
+        shell: bash
+        env:
+          INSTALL_OUTCOME: ${{ steps.install_whitaker.outcome }}
+        run: |
+          set -euo pipefail
+          printf 'Whitaker install action outcome: %s\n' "$INSTALL_OUTCOME"
+          test "$INSTALL_OUTCOME" = success
