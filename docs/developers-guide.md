@@ -1120,7 +1120,7 @@ format error context themselves.
 ## Graph-slice handler architecture
 
 The `observe graph-slice` command handler lives in
-`crates/weaverd/src/dispatch/observe/graph_slice.rs`. It is the sole
+`crates/weaverd/src/dispatch/observe/graph_slice/mod.rs`. It is the sole
 implementation of the stable same-file slice contract.
 
 ### Entry point
@@ -1598,10 +1598,10 @@ let file = argument_value(&arguments, "--file").expect("refactor requests need -
 let payload = automatic_resolution_payload(std::path::Path::new(file));
 ```
 
-### `refactor_helpers` (`weaverd/src/dispatch/act/refactor/refactor_helpers.rs`)
+### `refactor_helpers` (`weaverd/src/dispatch/act/refactor/refactor_helpers/mod.rs`)
 
 `refactor_helpers` is a `#[cfg(test)]` support module for the daemon-side
-`act refactor` tests. It is split into small inline modules and then
+`act refactor` tests. It is split into small sibling modules and then
 re-exported at the top-level so sibling test modules can import a compact test
 API instead of reaching into several implementation details.
 
@@ -1631,7 +1631,7 @@ Future shared test-helper modules must follow the same rule: add the helper as
 a named `#[cfg(test)] mod` in the parent module, and never re-include it with
 `#[path]`.
 
-The inline modules are:
+The sibling modules are:
 
 - `builders` — request and backend constructors such as `command_request(...)`,
   `build_backends(...)`, `standard_rename_args_for_provider(...)`, and

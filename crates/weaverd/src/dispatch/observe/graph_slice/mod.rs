@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[path = "graph_slice/status.rs"]
+#[path = "status.rs"]
 mod status;
 
 use url::Url;
@@ -390,5 +390,5 @@ fn map_extraction_error(error: CardExtractionError) -> Result<GraphSliceResponse
     }
 }
 #[cfg(test)]
-#[path = "graph_slice_tests.rs"]
+#[path = "../graph_slice_tests.rs"]
 mod tests;
