@@ -36,14 +36,23 @@ pub enum NetworkPolicy {
 /// the initial executables and data paths a sandboxed process requires.
 #[derive(Debug, Clone)]
 pub struct SandboxProfile {
+    /// Original runtime aliases mounted for executable library loading.
     runtime_paths: Vec<PathBuf>,
+    /// Paths granted read-only access before canonicalization.
     read_only_paths: Vec<PathBuf>,
+    /// Paths granted read-write access before canonicalization.
     read_write_paths: Vec<PathBuf>,
+    /// Executables granted launch access before canonicalization.
     executable_paths: Vec<PathBuf>,
+    /// Cached canonical forms of read-only paths.
     read_only_paths_canon: OnceCell<Vec<PathBuf>>,
+    /// Cached canonical forms of read-write paths.
     read_write_paths_canon: OnceCell<Vec<PathBuf>>,
+    /// Cached canonical forms of executable paths.
     executable_paths_canon: OnceCell<Vec<PathBuf>>,
+    /// Which environment variables the child may inherit.
     environment: EnvironmentPolicy,
+    /// Whether the child may use the host network namespace.
     network: NetworkPolicy,
 }
 
@@ -116,42 +125,46 @@ impl SandboxProfile {
 
     /// Allows the sandboxed process to use the host network namespace.
     #[must_use]
-    pub fn allow_networking(mut self) -> Self {
+    pub const fn allow_networking(mut self) -> Self {
         self.network = NetworkPolicy::Allow;
         self
     }
 
+    /// Returns cached canonical read-only paths, resolving them on first use.
     pub(crate) fn read_only_paths_canonicalized(
         &self,
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
-        self.canonicalized_paths(&self.read_only_paths_canon, &self.read_only_paths)
+        Self::canonicalized_paths(&self.read_only_paths_canon, &self.read_only_paths)
     }
 
+    /// Returns original runtime aliases without granting initial-command access.
     pub(crate) fn runtime_paths(&self) -> &[PathBuf] { &self.runtime_paths }
 
+    /// Returns cached canonical read-write paths, resolving them on first use.
     pub(crate) fn read_write_paths_canonicalized(
         &self,
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
-        self.canonicalized_paths(&self.read_write_paths_canon, &self.read_write_paths)
+        Self::canonicalized_paths(&self.read_write_paths_canon, &self.read_write_paths)
     }
 
+    /// Returns cached canonical executable paths, resolving them on first use.
     pub(crate) fn executable_paths_canonicalized(
         &self,
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
-        self.canonicalized_paths(&self.executable_paths_canon, &self.executable_paths)
+        Self::canonicalized_paths(&self.executable_paths_canon, &self.executable_paths)
     }
 
     /// Returns the configured environment policy.
-    pub(crate) fn environment_policy(&self) -> &EnvironmentPolicy { &self.environment }
+    pub(crate) const fn environment_policy(&self) -> &EnvironmentPolicy { &self.environment }
 
     /// Returns the network policy.
     #[must_use]
-    pub fn network_policy(&self) -> NetworkPolicy { self.network }
+    pub const fn network_policy(&self) -> NetworkPolicy { self.network }
 }
 
 impl SandboxProfile {
+    /// Resolves and caches one class of profile paths.
     fn canonicalized_paths<'a>(
-        &'a self,
         cache: &'a OnceCell<Vec<PathBuf>>,
         paths: &[PathBuf],
     ) -> Result<&'a Vec<PathBuf>, crate::SandboxError> {
@@ -166,10 +179,11 @@ impl Default for SandboxProfile {
 impl NetworkPolicy {
     /// Returns true when networking is denied.
     #[must_use]
-    pub fn is_denied(self) -> bool { matches!(self, Self::Deny) }
+    pub const fn is_denied(self) -> bool { matches!(self, Self::Deny) }
 }
 
 impl EnvironmentPolicy {
+    /// Adds a key to the allowlist unless all inheritance is already enabled.
     pub(crate) fn with_allowed(self, key: String) -> Self {
         match self {
             Self::Isolated => {
@@ -185,6 +199,7 @@ impl EnvironmentPolicy {
         }
     }
 
+    /// Translates environment inheritance into `birdcage` exceptions.
     pub(crate) fn to_exceptions(&self) -> Vec<birdcage::Exception> {
         match self {
             Self::Isolated => Vec::new(),

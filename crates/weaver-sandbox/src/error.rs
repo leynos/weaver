@@ -14,23 +14,40 @@ pub enum SandboxError {
 
     /// The program was not whitelisted in the profile.
     #[error("executable {program} is not authorized by the sandbox profile")]
-    ExecutableNotAuthorized { program: PathBuf },
+    ExecutableNotAuthorized {
+        /// Path of the executable rejected by the sandbox profile.
+        program: PathBuf,
+    },
 
     /// The supplied path does not exist and therefore cannot be whitelisted.
     #[error("path {path} does not exist on the host filesystem")]
-    MissingPath { path: PathBuf },
+    MissingPath {
+        /// Path that could not be resolved on the host filesystem.
+        path: PathBuf,
+    },
 
     /// Canonicalization of a path failed.
     #[error("failed to canonicalize {path}: {source}")]
-    CanonicalizationFailed { path: PathBuf, source: io::Error },
+    CanonicalizationFailed {
+        /// Path being canonicalized when the operation failed.
+        path: PathBuf,
+        /// I/O error returned by the canonicalization operation.
+        source: io::Error,
+    },
 
     /// The current process hosts more than one thread.
     #[error("sandboxing must occur in a single-threaded context (observed {thread_count} threads)")]
-    MultiThreaded { thread_count: usize },
+    MultiThreaded {
+        /// Number of threads observed in the current process.
+        thread_count: usize,
+    },
 
     /// Thread count could not be determined from `/proc`.
     #[error("failed to determine thread count: {source}")]
-    ThreadCountUnavailable { source: io::Error },
+    ThreadCountUnavailable {
+        /// I/O error encountered while determining the process thread count.
+        source: io::Error,
+    },
 
     /// The underlying sandbox library rejected activation.
     #[error("birdcage activation failed: {0}")]
