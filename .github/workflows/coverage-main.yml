@@ -43,6 +43,10 @@ jobs:
     # Should that stop being true the remedy is `ubicloud-standard-4`, as on
     # `ci.yml`, not a longer deadline for the test.
     runs-on: ubicloud-standard-2
+    # The CodeScene token lives in this environment, whose deployment policy
+    # admits `main` alone; the codescene environment contract holds it to
+    # this job.
+    environment: codescene
     timeout-minutes: 20
     permissions:
       contents: read
