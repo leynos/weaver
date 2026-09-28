@@ -114,6 +114,12 @@ jobs:
           git clone https://github.com/leynos/whitaker "${whitaker_source_dir}"
           git -C "${whitaker_source_dir}" checkout --detach "${WHITAKER_REV}"
           whitaker-installer --build-only --no-update --cranelift
+      - name: Install mold linker
+        # `make lint` restates the build standard's mold flag, so the linker
+        # must be present before the first gate target builds.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends mold
       - name: Lint
         run: make lint
       - name: Workflow contract tests

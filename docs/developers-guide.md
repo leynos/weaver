@@ -34,6 +34,29 @@ quoted-source spelling that must remain unchanged.
 
 The workspace targets `ortho_config` v0.9.0 and Rust 1.89.
 
+## The build standard
+
+Development builds follow the estate's Rust build standard, which
+`.cargo/config.toml` sets and Cargo auto-discovers, so a bare `cargo build`
+gets it:
+
+- Cranelift is the development-profile codegen backend. The whole suite passes
+  under it.
+- Every `rustflags` source enables the parallel `rustc` frontend with
+  `-Zthreads=8`.
+- The `cfg(target_os = "linux")` source also links with `mold`. macOS and
+  Windows keep their platform linker.
+
+Cargo applies a single `rustflags` source rather than merging them, and an
+assigned `RUSTFLAGS` replaces every source. So each source repeats the frontend
+flag, and the Makefile restates both flags as `STANDARD_RUSTFLAGS` for the
+targets that assign `RUSTFLAGS` (`test`, `lint`, `typecheck`). Release builds
+assign an empty inherited `RUSTFLAGS` and so take neither flag; CI's coverage
+and release actions run under their own `RUSTFLAGS` for the same reason. The CI
+job installs `mold` before `make lint`.
+`tests/workflow_contracts/build_standard_test.py` holds the configuration and
+the Makefile recipes to this.
+
 ## Workspace lint policy
 
 The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates
