@@ -126,7 +126,9 @@ def _make_rustflags(
     commands = [
         line
         for line in result.stdout.replace("\\\n", " ").splitlines()
+        # An `echo` of a tool's path names it without running it.
         if any(word in line for word in COMMAND_WORDS)
+        and line.split(maxsplit=1)[:1] not in (["echo"], ["printf"])
     ]
     assert commands, f"`make -n {target}` runs no cargo command"
     assigned: list[list[str] | None] = []
