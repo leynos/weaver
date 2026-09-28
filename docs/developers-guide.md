@@ -50,12 +50,12 @@ gets it:
 Cargo applies a single `rustflags` source rather than merging them, and an
 assigned `RUSTFLAGS` replaces every source. So each source repeats the frontend
 flag, and the Makefile restates both flags as `STANDARD_RUSTFLAGS` for the
-targets that assign `RUSTFLAGS` (`test`, `lint`, `typecheck`). Release builds
-assign an empty inherited `RUSTFLAGS` and so take neither flag; CI's coverage
-and release actions run under their own `RUSTFLAGS` for the same reason. The CI
-job installs `mold` before `make lint`.
-`tests/workflow_contracts/build_standard_test.py` holds the configuration and
-the Makefile recipes to this.
+targets that assign `RUSTFLAGS` (`test`, `lint`, `typecheck`); `make build`
+adds them to any `RUSTFLAGS` it inherits. Release builds assign an empty
+inherited `RUSTFLAGS` and so take neither flag; CI's coverage and release
+actions run under their own `RUSTFLAGS` for the same reason. The CI job installs
+`mold` before `make lint`. `tests/workflow_contracts/build_standard_test.py`
+holds the configuration and the Makefile recipes to this.
 
 ## Workspace lint policy
 
