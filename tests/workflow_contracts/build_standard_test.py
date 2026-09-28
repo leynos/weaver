@@ -10,7 +10,8 @@ and release recipes, which measure or ship and so stay on the default flags.
 
 The Makefile clauses are checked by running ``make -n`` and reading the
 commands it would run, rather than by reading the Makefile's text, so a flag
-lost through a variable or a recipe edit fails here.
+lost through a variable or a recipe edit fails here. They run as a Linux host
+and as a macOS host, because mold is added on Linux alone.
 
 Run via ``make test-workflow-contracts``.
 """
@@ -30,6 +31,10 @@ THREADS_FLAG = "-Zthreads=8"
 MOLD_FLAG = "-Clink-arg=-fuse-ld=mold"
 LINUX_TABLES = {"x86_64-unknown-linux-gnu", 'cfg(target_os = "linux")'}
 RUSTFLAGS_RE = re.compile(r'RUSTFLAGS="([^"]*)"')
+#: Makefile targets that build for development. A command in one either
+#: assigns RUSTFLAGS with the standard flags or assigns none and so takes the
+#: configuration's.
+DEVELOPMENT_TARGETS = ["test", "typecheck", "lint", "build"]
 #: Makefile targets that measure or ship, and so must take neither flag.
 #: Coverage has no Makefile target here; CI runs it through the shared
 #: coverage action under the job's own `RUSTFLAGS`.
@@ -56,24 +61,43 @@ def _sources() -> dict[str, list[str]]:
     return {key: _normalized(flags) for key, flags in sources.items() if flags}
 
 
-def _make_rustflags(target: str) -> list[list[str]]:
-    """Return the ``RUSTFLAGS`` each command of ``make -n TARGET`` assigns."""
+def _make_rustflags(target: str, host: str = "Linux") -> list[list[str] | None]:
+    """Return, per cargo or whitaker command ``make -n TARGET`` would run on
+    the named host, the ``RUSTFLAGS`` it assigns, or ``None`` when it assigns
+    none."""
     result = subprocess.run(
-        ["make", "-n", "-B", "BUILD_HOST_OS=Linux", target],
+        ["make", "-n", "-B", f"BUILD_HOST_OS={host}", target],
         cwd=ROOT,
         capture_output=True,
         text=True,
         check=True,
     )
     # A recipe continued with a trailing backslash is one command.
-    commands = result.stdout.replace("\\\n", " ").splitlines()
-    return [
-        shlex.split(match.group(1))
-        for line in commands
+    commands = [
+        line
+        for line in result.stdout.replace("\\\n", " ").splitlines()
         if "cargo" in line or "whitaker" in line
-        for match in [RUSTFLAGS_RE.search(line)]
-        if match
     ]
+    assert commands, f"`make -n {target}` runs no cargo command"
+    return [
+        _normalized(shlex.split(match.group(1))) if match else None
+        for match in (RUSTFLAGS_RE.search(line) for line in commands)
+    ]
+
+
+def _development_problems(host: str, *, expects_mold: bool) -> list[str]:
+    """Check every development target on one host: an assigned ``RUSTFLAGS``
+    carries the frontend flag, and carries mold exactly when on Linux."""
+    problems = []
+    for target in DEVELOPMENT_TARGETS:
+        for flags in filter(None, _make_rustflags(target, host)):
+            if THREADS_FLAG not in flags:
+                problems.append(
+                    f"`make {target}` on {host} drops {THREADS_FLAG}: {flags}"
+                )
+            if (MOLD_FLAG in flags) != expects_mold:
+                problems.append(f"`make {target}` on {host} gets mold wrong: {flags}")
+    return problems
 
 
 def test_every_rustflags_source_carries_the_parallel_frontend() -> None:
@@ -106,27 +130,31 @@ def test_sources_differ_only_by_the_linker() -> None:
     assert len(stripped) == 1, f"rustflags sources disagree: {stripped}"
 
 
-@pytest.mark.parametrize("target", ["test", "typecheck", "lint"])
-def test_gate_targets_restate_both_flags(target: str) -> None:
+def test_development_targets_restate_both_flags_on_linux() -> None:
     """An assigned RUSTFLAGS replaces the configuration's sources."""
-    assignments = _make_rustflags(target)
-    assert assignments, f"`make {target}` assigns no RUSTFLAGS"
-    for flags in assignments:
-        assert THREADS_FLAG in flags, f"`make {target}` drops {THREADS_FLAG}: {flags}"
-        assert MOLD_FLAG in flags, f"`make {target}` drops {MOLD_FLAG}: {flags}"
+    problems = _development_problems("Linux", expects_mold=True)
+    assert problems == [], problems
+    assert any(_make_rustflags("test")), (
+        "`make test` assigns no RUSTFLAGS, so this proves nothing"
+    )
+
+
+def test_development_targets_keep_the_frontend_but_not_mold_elsewhere() -> None:
+    """mold is a Linux linker; other hosts keep only the frontend flag."""
+    problems = _development_problems("Darwin", expects_mold=False)
+    assert problems == [], problems
 
 
 @pytest.mark.parametrize("target", HELD_OUT_TARGETS)
 def test_coverage_and_release_take_neither_flag(target: str) -> None:
     """Coverage measures and release ships, so both stay on default flags.
 
-    Each must also assign RUSTFLAGS, since only an assignment displaces the
-    configuration's sources.
+    Every command must assign RUSTFLAGS, since only an assignment displaces
+    the configuration's sources.
     """
-    assignments = _make_rustflags(target)
-    assert assignments, (
-        f"`make {target}` assigns no RUSTFLAGS, so it takes the configuration's"
-    )
-    for flags in assignments:
+    for flags in _make_rustflags(target):
+        assert flags is not None, (
+            f"`make {target}` runs a command that takes the configuration's flags"
+        )
         assert THREADS_FLAG not in flags, f"`make {target}` takes {THREADS_FLAG}"
         assert MOLD_FLAG not in flags, f"`make {target}` takes {MOLD_FLAG}"
