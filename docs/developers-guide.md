@@ -50,12 +50,17 @@ gets it:
 Cargo applies a single `rustflags` source rather than merging them, and an
 assigned `RUSTFLAGS` replaces every source. So each source repeats the frontend
 flag, and the Makefile restates both flags as `STANDARD_RUSTFLAGS` for the
-targets that assign `RUSTFLAGS` (`test`, `lint`, `typecheck`, and `build`),
-adding them to any `RUSTFLAGS` the recipe inherits (setup-rust exports one in
-CI) rather than replacing it. Release builds assign an empty inherited
-`RUSTFLAGS` and so take neither flag; CI's coverage and release actions run
-under their own `RUSTFLAGS` for the same reason. The CI job installs `mold`
-before `make lint`. `tests/workflow_contracts/build_standard_test.py` holds the
+targets that assign `RUSTFLAGS` (`test`, every `lint` command, `typecheck`, and
+`build`), adding them to any `RUSTFLAGS` the recipe inherits (setup-rust
+exports one in CI) rather than replacing it. `make release` assigns an empty
+inherited `RUSTFLAGS` and so takes neither flag; a bare `cargo build --release`
+still reads the configuration and takes both, because Cargo does not select
+`rustflags` by profile, so release artefacts come from `make release` or CI,
+whose coverage and release actions run under their own `RUSTFLAGS`. The
+Makefile adds `mold` only when both the host and the compilation target
+(`CARGO_BUILD_TARGET`, when set) are Linux. The CI job installs `mold` before
+the boundary manifest gate, which composes the same flags onto its `RUSTFLAGS`,
+and `make lint`. `tests/workflow_contracts/build_standard_test.py` holds the
 configuration and the Makefile recipes to this.
 
 ## Workspace lint policy

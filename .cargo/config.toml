@@ -3,8 +3,10 @@
 # Cranelift is the development-profile backend, the parallel `rustc` frontend
 # is the default for every build, and the mold linker is the default on Linux.
 # Cargo auto-discovers this file, so a bare `cargo build` gets all three.
-# Release builds and coverage assign `RUSTFLAGS`, which displaces every
+# `make release` and coverage assign `RUSTFLAGS`, which displaces every
 # `rustflags` source below, so neither takes the frontend flag or mold.
+# Cargo does not select `rustflags` by profile, so a bare
+# `cargo build --release` takes both; build releases through `make release`.
 #
 # Cargo selects a single `rustflags` source rather than merging them: a
 # matching `[target.*]` table replaces `[build] rustflags` outright. Every flag

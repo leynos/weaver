@@ -101,8 +101,21 @@ jobs:
         run: cargo install merman-cli --version '=0.7.0' --locked
       - name: Mermaid lint
         run: make nixie
+      - name: Install mold linker
+        # The boundary manifest gate and `make lint` add the build standard's
+        # mold flag, so the linker must be present before the first of them.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends mold
       - name: Boundary manifest gate
-        run: cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
+        # setup-rust exports `RUSTFLAGS`, which displaces the configuration's
+        # sources, so the step composes the standard flags onto it as the
+        # Makefile does.
+        env:
+          STANDARD_RUSTFLAGS: -Zthreads=8 -Clink-arg=-fuse-ld=mold
+        run: >-
+          RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }$STANDARD_RUSTFLAGS"
+          cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
       - name: Install Whitaker
         run: |
           cargo install --locked \
@@ -114,12 +127,6 @@ jobs:
           git clone https://github.com/leynos/whitaker "${whitaker_source_dir}"
           git -C "${whitaker_source_dir}" checkout --detach "${WHITAKER_REV}"
           whitaker-installer --build-only --no-update --cranelift
-      - name: Install mold linker
-        # `make lint` restates the build standard's mold flag, so the linker
-        # must be present before the first gate target builds.
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends mold
       - name: Lint
         run: make lint
       - name: Workflow contract tests

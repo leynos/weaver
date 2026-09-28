@@ -19,7 +19,11 @@ RUST_FLAGS := -D warnings $(RUST_FLAGS)
 STANDARD_THREADS_FLAG ?= -Zthreads=8
 STANDARD_MOLD_FLAG ?= -Clink-arg=-fuse-ld=mold
 BUILD_HOST_OS := $(shell uname -s)
-STANDARD_RUSTFLAGS = $(STANDARD_THREADS_FLAG)$(if $(filter Linux,$(BUILD_HOST_OS)), $(STANDARD_MOLD_FLAG))
+# mold is added only when the machine doing the build is Linux (only Make can
+# tell whether it has mold) and the compilation target is Linux too, which is
+# the host unless `CARGO_BUILD_TARGET` names another triple.
+STANDARD_TARGET_IS_LINUX = $(if $(CARGO_BUILD_TARGET),$(findstring -linux-,$(CARGO_BUILD_TARGET)),yes)
+STANDARD_RUSTFLAGS = $(STANDARD_THREADS_FLAG)$(if $(filter Linux,$(BUILD_HOST_OS)),$(if $(STANDARD_TARGET_IS_LINUX), $(STANDARD_MOLD_FLAG)))
 # Release builds take neither flag: assigning `RUSTFLAGS`, even to an empty
 # inherited value, displaces every `rustflags` source in the configuration.
 RELEASE_RUSTFLAGS = RUSTFLAGS="$${RUSTFLAGS-}"
@@ -71,8 +75,8 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 	$(if $(filter release,$*),$(RELEASE_RUSTFLAGS),$(DEBUG_RUSTFLAGS)) $(CARGO) build $(BUILD_JOBS) $(if $(filter release,$*),--release) --bin $(TARGET)
 
 lint: ## Run Clippy with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
-	$(CARGO) clippy $(CLIPPY_FLAGS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
 	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: ## Type-check without building
