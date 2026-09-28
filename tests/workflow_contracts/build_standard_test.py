@@ -1,7 +1,7 @@
 """Contract tests for the Rust build standard.
 
 The standard makes the parallel ``rustc`` frontend the default for every
-development build and mold the default linker on Linux. Cargo reads both from
+development build and `mold` the default linker on Linux. Cargo reads both from
 ``.cargo/config.toml``, but it applies a single ``rustflags`` source rather
 than merging them, and an assigned ``RUSTFLAGS`` replaces every source. So the
 flags must be repeated in each configuration source, restated wherever the
@@ -11,7 +11,7 @@ and release recipes, which measure or ship and so stay on the default flags.
 The Makefile clauses are checked by running ``make -n`` and reading the
 commands it would run, rather than by reading the Makefile's text, so a flag
 lost through a variable or a recipe edit fails here. They run as a Linux host
-and as a macOS host, because mold is added on Linux alone.
+and as a macOS host, because `mold` is added on Linux alone.
 
 Run via ``make test-workflow-contracts``.
 """
@@ -28,9 +28,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 THREADS_FLAG = "-Zthreads=8"
-MOLD_FLAG = "-Clink-arg=-fuse-ld=mold"
+LINKER_FLAG = "-Clink-arg=-fuse-ld=mold"
 LINUX_TABLES = {"x86_64-unknown-linux-gnu", 'cfg(target_os = "linux")'}
 RUSTFLAGS_RE = re.compile(r'RUSTFLAGS="([^"]*)"')
+#: Words that mark a command whose RUSTFLAGS the contract reads.
+COMMAND_WORDS = ("cargo", "whitaker")
 #: Makefile targets that build for development. A command in one either
 #: assigns RUSTFLAGS with the standard flags or assigns none and so takes the
 #: configuration's.
@@ -76,18 +78,24 @@ def _make_rustflags(target: str, host: str = "Linux") -> list[list[str] | None]:
     commands = [
         line
         for line in result.stdout.replace("\\\n", " ").splitlines()
-        if "cargo" in line or "whitaker" in line
+        if any(word in line for word in COMMAND_WORDS)
     ]
     assert commands, f"`make -n {target}` runs no cargo command"
-    return [
-        _normalized(shlex.split(match.group(1))) if match else None
-        for match in (RUSTFLAGS_RE.search(line) for line in commands)
-    ]
+    assigned: list[list[str] | None] = []
+    for line in commands:
+        match = RUSTFLAGS_RE.search(line)
+        # Any other spelling still replaces the configuration's sources, so a
+        # form this reader cannot parse fails rather than passing.
+        assert match or "RUSTFLAGS=" not in line, (
+            f"unreadable RUSTFLAGS assignment in {line!r}"
+        )
+        assigned.append(_normalized(shlex.split(match.group(1))) if match else None)
+    return assigned
 
 
-def _development_problems(host: str, *, expects_mold: bool) -> list[str]:
+def _development_problems(host: str, *, expects_linker: bool) -> list[str]:
     """Check every development target on one host: an assigned ``RUSTFLAGS``
-    carries the frontend flag, and carries mold exactly when on Linux."""
+    carries the frontend flag, and carries `mold` exactly when on Linux."""
     problems = []
     for target in DEVELOPMENT_TARGETS:
         for flags in filter(None, _make_rustflags(target, host)):
@@ -95,8 +103,8 @@ def _development_problems(host: str, *, expects_mold: bool) -> list[str]:
                 problems.append(
                     f"`make {target}` on {host} drops {THREADS_FLAG}: {flags}"
                 )
-            if (MOLD_FLAG in flags) != expects_mold:
-                problems.append(f"`make {target}` on {host} gets mold wrong: {flags}")
+            if (LINKER_FLAG in flags) != expects_linker:
+                problems.append(f"`make {target}` on {host} gets `mold` wrong: {flags}")
     return problems
 
 
@@ -108,40 +116,40 @@ def test_every_rustflags_source_carries_the_parallel_frontend() -> None:
     assert missing == [], f"{THREADS_FLAG} missing from {missing}"
 
 
-def test_mold_is_confined_to_linux() -> None:
-    """mold ships for Linux only; a wider source would break other hosts."""
+def test_linker_is_confined_to_linux() -> None:
+    """`mold` ships for Linux only; a wider source would break other hosts."""
     sources = _sources()
     linux = [key for key in sources if key in LINUX_TABLES]
     assert linux, "no Linux target table carries rustflags"
-    assert all(MOLD_FLAG in sources[key] for key in linux), "Linux lost mold"
+    assert all(LINKER_FLAG in sources[key] for key in linux), "Linux lost `mold`"
     wider = [
         key
         for key, flags in sources.items()
-        if key not in LINUX_TABLES and MOLD_FLAG in flags
+        if key not in LINUX_TABLES and LINKER_FLAG in flags
     ]
-    assert wider == [], f"mold named beyond Linux in {wider}"
+    assert wider == [], f"`mold` named beyond Linux in {wider}"
 
 
 def test_sources_differ_only_by_the_linker() -> None:
     """A flag named in one source and not another vanishes on some host."""
     stripped = {
-        tuple(f for f in flags if f != MOLD_FLAG) for flags in _sources().values()
+        tuple(f for f in flags if f != LINKER_FLAG) for flags in _sources().values()
     }
     assert len(stripped) == 1, f"rustflags sources disagree: {stripped}"
 
 
 def test_development_targets_restate_both_flags_on_linux() -> None:
     """An assigned RUSTFLAGS replaces the configuration's sources."""
-    problems = _development_problems("Linux", expects_mold=True)
+    problems = _development_problems("Linux", expects_linker=True)
     assert problems == [], problems
     assert any(_make_rustflags("test")), (
         "`make test` assigns no RUSTFLAGS, so this proves nothing"
     )
 
 
-def test_development_targets_keep_the_frontend_but_not_mold_elsewhere() -> None:
-    """mold is a Linux linker; other hosts keep only the frontend flag."""
-    problems = _development_problems("Darwin", expects_mold=False)
+def test_development_targets_keep_the_frontend_but_not_the_linker_elsewhere() -> None:
+    """`mold` is a Linux linker; other hosts keep only the frontend flag."""
+    problems = _development_problems("Darwin", expects_linker=False)
     assert problems == [], problems
 
 
@@ -157,4 +165,4 @@ def test_coverage_and_release_take_neither_flag(target: str) -> None:
             f"`make {target}` runs a command that takes the configuration's flags"
         )
         assert THREADS_FLAG not in flags, f"`make {target}` takes {THREADS_FLAG}"
-        assert MOLD_FLAG not in flags, f"`make {target}` takes {MOLD_FLAG}"
+        assert LINKER_FLAG not in flags, f"`make {target}` takes {LINKER_FLAG}"
