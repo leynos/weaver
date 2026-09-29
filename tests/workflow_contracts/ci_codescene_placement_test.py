@@ -29,8 +29,8 @@ rather than only the obvious one:
   because a lane holding the token is a lane one line away from using it;
 - ``codescene.io`` appearing anywhere, since ``curl`` needs neither the action
   nor the tool; and
-- ``secrets: inherit`` into another repository's workflow, which forwards the
-  token without naming it to a document this contract cannot read; and
+- ``secrets: inherit`` on any call, which forwards the token, and every other
+  secret, without naming them; and
 - a call to this repository's own workflow by ``owner/repo`` and ``@ref``,
   which runs the file at that ref rather than the one the closure reads.
 
@@ -61,9 +61,9 @@ from codescene_placement_policy import (
 )
 from codescene_placement_reader import (
     calls,
-    external_secret_inheritors,
     mentions,
     pull_request_closure,
+    secret_inheritors,
     steps,
     triggers,
 )
@@ -78,10 +78,9 @@ def pull_request_workflows() -> list[str]:
     """Return every workflow a pull request can reach, callees included.
 
     The closure matters as much as the roots. ``release-dry-run.yml`` is
-    triggered by ``pull_request`` and calls ``release.yml`` with
-    ``secrets: inherit``, which calls ``build-and-package.yml``. Reading only
-    the roots would leave both outside every assertion here while a pull
-    request still runs them.
+    triggered by ``pull_request`` and calls ``release.yml``, which calls
+    ``build-and-package.yml``. Reading only the roots would leave both outside
+    every assertion here while a pull request still runs them.
     """
     return pull_request_closure(_documents())
 
@@ -156,21 +155,22 @@ def test_no_pull_request_lane_names_the_codescene_host(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", pull_request_workflows())
-def test_no_pull_request_lane_inherits_secrets_into_another_repository(
+def test_no_pull_request_lane_inherits_secrets(
     name: str,
 ) -> None:
-    """Scenario: a pull-request job hands every secret to a foreign workflow.
+    """Scenario: a pull-request job hands every secret to the workflow it calls.
 
-    Invariant: no job in the closure calls a workflow outside this repository
-    with ``secrets: inherit``. Inheritance forwards ``CS_ACCESS_TOKEN``
-    without naming it, so the token clause cannot see it, and the callee is a
-    document this contract cannot read. A local callee is fine: it is in the
-    closure and read like every other workflow here.
+    Invariant: no job in the closure calls any workflow with
+    ``secrets: inherit``. Inheritance forwards ``CS_ACCESS_TOKEN`` without
+    naming it, so the token clause cannot see it, and it forwards every other
+    secret too. A local callee is read, but a called workflow has
+    ``GITHUB_TOKEN`` without being forwarded it, so a pull request needs
+    nothing more; ``release-dry-run.yml`` forwards none.
     """
-    offenders = external_secret_inheritors(_documents()[name])
+    offenders = secret_inheritors(_documents()[name])
     assert not offenders, (
         f"{name} is a pull-request lane and must not inherit secrets into "
-        f"another repository's workflow; jobs {offenders} do"
+        f"the workflow it calls; jobs {offenders} do"
     )
 
 
