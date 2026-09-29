@@ -151,6 +151,37 @@ def _contains(flags: list[str], wanted: list[str]) -> bool:
     )
 
 
+def _flag_problems(
+    target: str,
+    host: str,
+    flags: list[str],
+    *,
+    expects_linker: bool,
+    inherited: str | None,
+) -> list[str]:
+    """Check one assigned ``RUSTFLAGS`` value against the standard on a host."""
+    problems = []
+    if (THREADS_FLAG in flags) != NIGHTLY:
+        problems.append(f"`make {target}` on {host} gets {THREADS_FLAG} wrong: {flags}")
+    if (LINKER_FLAG in flags) != expects_linker:
+        problems.append(f"`make {target}` on {host} gets `mold` wrong: {flags}")
+    if inherited is not None and not _contains(flags, shlex.split(inherited)):
+        problems.append(f"`make {target}` drops the caller's RUSTFLAGS: {flags}")
+    return problems
+
+
+def _unassigned_problems(target: str, inherited: str | None) -> list[str]:
+    """Report a command with no assignment that would take only the caller's flags.
+
+    Without an assignment the command takes the configuration's flags, unless
+    the caller exports RUSTFLAGS, which displaces them; setup-rust does exactly
+    that in CI.
+    """
+    if inherited is None:
+        return []
+    return [f"`make {target}` runs a command that takes only the caller's RUSTFLAGS"]
+
+
 def _development_problems(
     host: str,
     *,
@@ -164,24 +195,17 @@ def _development_problems(
     problems = []
     for target in DEVELOPMENT_TARGETS:
         for flags in _make_rustflags(target, host, inherited, overrides):
-            if flags is None:
-                # Without an assignment the command takes the configuration's
-                # flags, unless the caller exports RUSTFLAGS, which displaces
-                # them; setup-rust does exactly that in CI.
-                if inherited is not None:
-                    problems.append(
-                        f"`make {target}` runs a command that takes only the "
-                        "caller's RUSTFLAGS"
-                    )
-                continue
-            if (THREADS_FLAG in flags) != NIGHTLY:
-                problems.append(
-                    f"`make {target}` on {host} gets {THREADS_FLAG} wrong: {flags}"
+            problems += (
+                _unassigned_problems(target, inherited)
+                if flags is None
+                else _flag_problems(
+                    target,
+                    host,
+                    flags,
+                    expects_linker=expects_linker,
+                    inherited=inherited,
                 )
-            if (LINKER_FLAG in flags) != expects_linker:
-                problems.append(f"`make {target}` on {host} gets `mold` wrong: {flags}")
-            if inherited is not None and not _contains(flags, shlex.split(inherited)):
-                problems.append(f"`make {target}` drops the caller's RUSTFLAGS: {flags}")
+            )
     return problems
 
 
@@ -320,12 +344,19 @@ def _first_positions(step: dict) -> tuple[int | None, int | None]:
     return min(installs, default=None), min(gates, default=None)
 
 
+def _gate_precedes_install(install_at: int | None, gate_at: int | None) -> bool:
+    """Report whether a step's first gate target comes before its `mold` install."""
+    if gate_at is None:
+        return False
+    return install_at is None or gate_at < install_at
+
+
 def _runs_a_gate_target_first(job: dict) -> bool:
     """Report whether a job runs a gate target before any step installs `mold`,
     comparing positions within a step that does both."""
     for step in job.get("steps") or []:
         install_at, gate_at = _first_positions(step)
-        if gate_at is not None and (install_at is None or gate_at < install_at):
+        if _gate_precedes_install(install_at, gate_at):
             return True
         if install_at is not None:
             return False
