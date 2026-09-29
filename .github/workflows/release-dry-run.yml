@@ -1,6 +1,13 @@
 ---
 name: Release Dry Run
 
+# Rehearses the release on every pull request by calling `release.yml` with
+# `dry-run: true`, so a change that would break the release is found before
+# the tag is pushed. It runs on pull requests, so it forwards no secrets:
+# `release.yml` reads only `secrets.GITHUB_TOKEN`, which a called workflow
+# receives without being forwarded it. tests/workflow_contracts holds the rule
+# that no pull-request call inherits secrets.
+
 'on':
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
