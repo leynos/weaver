@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 from codescene_placement_reader import (
     calls,
-    external_secret_inheritors,
     mentions,
     pull_request_closure,
+    secret_inheritors,
     triggers,
 )
 from workflow_calls import (
@@ -245,8 +245,8 @@ def test_the_closure_is_narrow(tmp_path: Path) -> None:
     )
 
 
-def test_only_inheritance_into_another_repository_is_flagged() -> None:
-    """``secrets: inherit`` is visible locally, and invisible anywhere else."""
+def test_inheritance_into_any_workflow_is_flagged() -> None:
+    """``secrets: inherit`` is flagged wherever it points; named forwarding is not."""
     document = load_workflow(
         textwrap.dedent(
             """\
@@ -259,18 +259,20 @@ def test_only_inheritance_into_another_repository_is_flagged() -> None:
               named:
                 uses: other/repo/.github/workflows/b.yml@v1
                 secrets: {X: y}
+              none: {uses: ./.github/workflows/a.yml}
               self-by-ref:
                 uses: leynos/weaver/.github/workflows/a.yml@main
                 secrets: inherit
             """
         )
     )
-    assert external_secret_inheritors(document) == [
+    assert secret_inheritors(document) == [
+        "local",
         "foreign",
         "self-by-ref",
     ], (
-        "inheriting into another repository or into this one by ref "
-        "should be flagged; inheriting locally should not"
+        "inheriting into a local workflow, another repository or this one by "
+        "ref should be flagged; named forwarding and none should not"
     )
 
 

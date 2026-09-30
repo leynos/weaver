@@ -292,14 +292,16 @@ def _contains(text: str, needle: str, *, ignore_case: bool) -> bool:
     return needle in text
 
 
-def external_secret_inheritors(document: Document) -> list[str]:
-    """Return jobs that hand every secret to a workflow outside this checkout.
+def secret_inheritors(document: Document) -> list[str]:
+    """Return jobs that hand every secret to the workflow they call.
 
-    ``secrets: inherit`` to a local callee is visible, because the callee is
-    in the closure and read like any other workflow. The same line pointed at
-    another repository, or at this one by ``@ref``, forwards the token to a
-    document this contract cannot read, without naming it anywhere a sweep
-    for the name could find.
+    ``secrets: inherit`` forwards ``CS_ACCESS_TOKEN`` without naming it, so a
+    sweep for the name cannot see it, and it hands the callee every other
+    secret as well. A local callee is in the closure and read like any other
+    workflow, but a pull request still has no need of the secrets, and a
+    called workflow has ``GITHUB_TOKEN`` without being forwarded it. So the
+    line is flagged wherever it points: at a local workflow, at another
+    repository, or at this one by ``@ref``.
 
     Parameters
     ----------
@@ -309,12 +311,10 @@ def external_secret_inheritors(document: Document) -> list[str]:
     Returns
     -------
     list[str]
-        Ids of the jobs that inherit secrets into an unreadable workflow.
+        Ids of the jobs that inherit every secret into the workflow they call.
     """
     return [
         str(name)
         for name, job in jobs(document).items()
-        if job.get("secrets") == "inherit"
-        and "uses" in job
-        and local_callee(str(job["uses"])) is None
+        if job.get("secrets") == "inherit" and "uses" in job
     ]
