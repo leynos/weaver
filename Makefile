@@ -30,7 +30,7 @@ NIXIE_FLAGS ?= --no-sandbox
 WHITAKER ?= $(or $(shell command -v whitaker 2>/dev/null),$(wildcard $(USER_WHITAKER)),whitaker)
 UV ?= uv
 UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
-TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.1
+TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.3
 # CI pins uv to Python 3.11, so ask for the interpreter the builder requires.
 TYPOS_CONFIG_BUILDER = $(UV_ENV) $(UV) tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
