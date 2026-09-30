@@ -273,14 +273,14 @@ repository-owned and runs offline with no network dependency. What it may not
 do is any of these six, each of which fails
 `tests/workflow_contracts/ci_codescene_placement_test.py`:
 
-| Forbidden in a pull-request lane                      | Why it is read                                         |
-| ----------------------------------------------------- | ------------------------------------------------------ |
-| a step or job whose `uses:` names CodeScene           | the obvious form                                       |
-| a `run:` step invoking `cs-coverage`                  | the same hazard with no action to notice               |
-| `CS_ACCESS_TOKEN` at any scope                        | a lane holding the token is one line from using it     |
-| `codescene.io` anywhere                               | `curl` needs neither the action nor the tool           |
-| `secrets: inherit` into another repository's workflow | forwards the token unnamed, to a document nobody reads |
-| a call to this repository's workflow by `@ref`        | runs a revision the contract has not read              |
+| Forbidden in a pull-request lane               | Why it is read                                     |
+| ---------------------------------------------- | -------------------------------------------------- |
+| a step or job whose `uses:` names CodeScene    | the obvious form                                   |
+| a `run:` step invoking `cs-coverage`           | the same hazard with no action to notice           |
+| `CS_ACCESS_TOKEN` at any scope                 | a lane holding the token is one line from using it |
+| `codescene.io` anywhere                        | `curl` needs neither the action nor the tool       |
+| `secrets: inherit` on any call                 | forwards the token unnamed, and every other secret |
+| a call to this repository's workflow by `@ref` | runs a revision the contract has not read          |
 
 *Table 3: What the CodeScene placement contract refuses.*
 
@@ -290,8 +290,9 @@ hazard in place, so the whole document is walked for the name rather than the
 three scopes that are meant to carry it: a `run` body, an action input, an
 `env` value under any key and a named `secrets:` forwarding are all found. The
 fifth row closes the one route the walk cannot see, since `secrets: inherit`
-names nothing. Inheriting into a workflow in this repository is permitted,
-because that workflow is in the closure described below and read like any other.
+names nothing, so it is refused wherever it points, including at a workflow in
+this repository: a called workflow has `GITHUB_TOKEN` without being forwarded
+it, and `release-dry-run.yml` forwards no secret.
 
 A further test guards the other direction. Without it the rule could be
 satisfied by deleting coverage reporting altogether, which is compliance by
@@ -413,8 +414,8 @@ named ref, not at the pull request's head, so the file the closure would read
 is not the file that runs, and the named revision could hold a CodeScene step
 every clause passes over; it is refused rather than followed. No workflow here
 uses the form; one that needs this repository's workflow calls it with `./`.
-For the same reason `secrets: inherit` into such a call counts as inheriting
-into a document the contract cannot read.
+For the same reason `secrets: inherit` into such a call is refused like any
+other.
 
 References to other repositories are not followed: their content is not in this
 tree. That is why `secrets: inherit` into one is refused outright rather than
