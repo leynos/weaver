@@ -597,34 +597,22 @@ to a short SHA, to an upper-case SHA and to a SHA with a suffix.
 
 ## Whitaker CI setup
 
-CI pins Whitaker, Weaver's external lint engine, to a fixed revision through the
-`WHITAKER_REV` environment variable in `.github/workflows/ci.yml`. The
-`Install Whitaker` step then does three things, in order:
+CI installs Whitaker, Weaver's external lint engine, through the shared
+`leynos/shared-actions/.github/actions/install-whitaker` action, pinned to a
+full commit SHA in `.github/workflows/ci.yml`. The `Install Whitaker` step
+passes `cranelift: true`, so the lint libraries are built for the Cranelift
+backend, and nothing else.
 
-1. Installs the installer binary with:
-
-   ```sh
-   cargo install --locked \
-     --git https://github.com/leynos/whitaker \
-     --rev "${WHITAKER_REV}" \
-     whitaker-installer
-   ```
-
-2. Clones the Whitaker source into
-   `${XDG_DATA_HOME:-${HOME}/.local/share}/whitaker` and checks out
-   `${WHITAKER_REV}` detached.
-3. Runs `whitaker-installer --build-only --no-update --cranelift` to prebuild
-   the Cranelift-accelerated lint libraries.
-
-The clone is a separate step from `cargo install` because the installer expects
-the Whitaker source tree to already exist at that well-known path when it
-builds the lint libraries; `cargo install` only produces the installer binary,
-not the source checkout it operates on. `--no-update` stops the installer from
-fetching a different revision than the one just checked out, and `--build-only`
-skips any installer behaviour beyond compiling the libraries. Together, pinning
-the clone and the installer to the same `WHITAKER_REV` and disabling the
-installer's own update step is what keeps the CI lint environment reproducible
-across runs.
+The action owns the rest. It installs a digest-verified, prebuilt
+`whitaker-installer` (0.2.9 or later), never builds the installer from source,
+and passes `--no-source-fallback`. Whitaker's lint suite is a rolling release
+that every consumer takes from the default branch tip, so Weaver no longer pins
+the suite to a revision: an earlier revision of this workflow cloned the
+Whitaker source at a fixed `WHITAKER_REV` and ran
+`whitaker-installer --build-only --no-update`. The step is therefore not
+reproducible to a lint-suite revision; the pinned action revision and the
+installer version are what stay fixed. The workflow-contract tests do not
+assert this step, so changing the action pin is an ordinary reviewed diff.
 
 See the [Whitaker user's guide](whitaker-users-guide.md) for day-to-day usage
 of the installed lints.
