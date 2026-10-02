@@ -58,11 +58,14 @@ takes neither flag; a bare `cargo build --release` still reads the
 configuration and takes both, because Cargo does not select `rustflags` by
 profile, so release artefacts come from `make release` or CI, whose coverage
 and release actions run under their own `RUSTFLAGS`. The Makefile adds `mold`
-only when both the host and the compilation target (`CARGO_BUILD_TARGET`, when
-set) are Linux. The CI job installs `mold` before the boundary manifest gate,
-which composes the same flags onto its `RUSTFLAGS`, and `make lint`.
+only when both the host and the compilation target are Linux. The target is an
+explicit `--target` in `TEST_FLAGS`, `CARGO_FLAGS` or `CLIPPY_FLAGS` when there
+is one, because Cargo prefers the argument, and otherwise `CARGO_BUILD_TARGET`.
+The CI job installs `mold` before the boundary manifest gate, which composes
+the same flags onto its `RUSTFLAGS`, and `make lint`.
 `tests/workflow_contracts/build_standard_test.py` holds the configuration and
-the Makefile recipes to this.
+the Makefile recipes to this, and `build_standard_ci_test.py` holds the install
+order and the boundary gate's composed flags.
 
 ## Workspace lint policy
 

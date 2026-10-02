@@ -58,9 +58,6 @@ ASSIGNING_TARGETS = ["test", "typecheck", "lint", "build"]
 #: Coverage has no Makefile target here; CI runs it through the shared
 #: coverage action under the job's own `RUSTFLAGS`.
 HELD_OUT_TARGETS = ["release"]
-#: Make targets whose CI invocation builds Rust, so the job needs `mold`.
-GATE_TARGETS = {"test", "lint", "typecheck", "build", "all"}
-MAKE_TARGET_RE = re.compile(r"\bmake\s+(?:-\S+\s+)*([\w-]+)")
 
 
 def _normalized(flags: list[str]) -> list[str]:
@@ -293,6 +290,47 @@ def test_development_targets_leave_the_linker_off_a_non_linux_target() -> None:
     assert problems == [], problems
 
 
+@pytest.mark.parametrize(
+    ("flags", "expects_linker"),
+    [
+        ("--target aarch64-apple-darwin", False),
+        ("--target=aarch64-apple-darwin", False),
+        ("--target aarch64-unknown-linux-gnu", True),
+    ],
+)
+def test_an_explicit_cargo_target_decides_the_linker(
+    flags: str, expects_linker: bool
+) -> None:
+    """An explicit ``--target`` in a flag variable beats ``CARGO_BUILD_TARGET``.
+
+    Cargo prefers the argument, so a macOS target reached through
+    ``TEST_FLAGS`` or ``CARGO_FLAGS`` must not be handed `mold`, even though
+    the environment names no target.
+    """
+    problems = _development_problems(
+        "Linux",
+        expects_linker=expects_linker,
+        overrides=(f"TEST_FLAGS={flags}", f"CARGO_FLAGS={flags}"),
+    )
+    assert problems == [], problems
+
+
+#: A marker no recipe adds, to prove the gate recipes keep ``RUST_FLAGS``.
+SENTINEL = ["--cfg", "sentinel_marker"]
+
+
+@pytest.mark.parametrize("target", ["test", "typecheck", "lint"])
+def test_gate_targets_keep_the_warning_flags(target: str) -> None:
+    """Every gate command carries ``RUST_FLAGS`` beside the inherited and
+    standard flags, so a recipe cannot drop the warning policy."""
+    for flags in _make_rustflags(
+        target, "Linux", INHERITED, ("RUST_FLAGS=--cfg sentinel_marker",)
+    ):
+        assert flags is not None, f"`make {target}` assigns no RUSTFLAGS"
+        assert _contains(flags, SENTINEL), f"`make {target}` lost RUST_FLAGS: {flags}"
+        assert _contains(flags, shlex.split(INHERITED)), flags
+
+
 @pytest.mark.parametrize("target", HELD_OUT_TARGETS)
 def test_coverage_and_release_take_neither_flag(target: str) -> None:
     """Coverage measures and release ships, so both stay on default flags.
@@ -306,71 +344,3 @@ def test_coverage_and_release_take_neither_flag(target: str) -> None:
         )
         assert THREADS_FLAG not in flags, f"`make {target}` takes {THREADS_FLAG}"
         assert LINKER_FLAG not in flags, f"`make {target}` takes {LINKER_FLAG}"
-
-
-def _linux_jobs() -> list[tuple[str, dict]]:
-    """Return every CI job not placed on Windows or macOS, named by file."""
-    jobs = []
-    for path in sorted((ROOT / ".github" / "workflows").glob("*.y*ml")):
-        workflow = yaml.safe_load(path.read_text("utf-8")) or {}
-        jobs.extend(
-            (f"{path.name}:{name}", job)
-            for name, job in (workflow.get("jobs") or {}).items()
-            if not re.search(r"windows|macos", str(job.get("runs-on", "")), re.I)
-        )
-    return jobs
-
-
-def _first_positions(step: dict) -> tuple[int | None, int | None]:
-    """Return where a step first installs `mold` and first runs a gate target.
-
-    Positions are offsets into the step's ``run`` text; a setup-rust step that
-    installs `mold` through its input counts as installing at offset 0.
-    """
-    run = str(step.get("run", ""))
-    inputs = step.get("with") or {}
-    installs = [
-        match.start()
-        for match in re.finditer(r"apt(-get)?\s+install[^\n]*\bmold\b", run)
-    ]
-    if "setup-rust" in str(step.get("uses", "")) and (
-        str(inputs.get("install-mold", "")).lower() == "true"
-    ):
-        installs.append(0)
-    gates = [
-        match.start()
-        for match in MAKE_TARGET_RE.finditer(run)
-        if match.group(1) in GATE_TARGETS
-    ]
-    return min(installs, default=None), min(gates, default=None)
-
-
-def _gate_precedes_install(install_at: int | None, gate_at: int | None) -> bool:
-    """Report whether a step's first gate target comes before its `mold` install."""
-    if gate_at is None:
-        return False
-    return install_at is None or gate_at < install_at
-
-
-def _runs_a_gate_target_first(job: dict) -> bool:
-    """Report whether a job runs a gate target before any step installs `mold`,
-    comparing positions within a step that does both."""
-    for step in job.get("steps") or []:
-        install_at, gate_at = _first_positions(step)
-        if _gate_precedes_install(install_at, gate_at):
-            return True
-        if install_at is not None:
-            return False
-    return False
-
-
-def _jobs_missing_the_linker() -> list[str]:
-    """Return the Linux CI jobs that run a gate target without installing
-    `mold` first."""
-    return [name for name, job in _linux_jobs() if _runs_a_gate_target_first(job)]
-
-
-def test_ci_installs_the_linker_before_gate_targets() -> None:
-    """The gate targets restate `mold`, so a Linux job must install it first."""
-    missing = _jobs_missing_the_linker()
-    assert missing == [], f"jobs run a gate target before installing `mold`: {missing}"
