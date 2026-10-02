@@ -43,6 +43,18 @@ continues to deny undocumented public items.
 
 ## Workflow pins and Dependabot
 
+Dependabot checks both ecosystems (`github-actions` and `cargo`) daily. The
+schedule does not guarantee a pull request each day: cooldown settings can
+delay eligible updates, and the limit of five open pull requests can defer
+additional version-update pull requests. Within each ecosystem, one catch-all
+group covers minor and patch updates. Major updates arrive in their own pull
+requests unless they match the unrestricted `rstest-bdd` group, which can group
+them. The `rstest-bdd` crates release in lockstep and one bumped alone does not
+build, so the `cargo` entry also has a narrow `rstest-bdd` group, which must
+precede the catch-all because Dependabot uses the first group that matches.
+Keep the schedule, the single catch-all group and that exception when changing
+`.github/dependabot.yml`.
+
 Dependabot owns the upgrade of GitHub Actions and reusable workflows, including
 calls into `leynos/shared-actions`. Contract tests that assert a caller's exact
 commit SHA create a lockstep dependency: every time Dependabot opens a bump PR,
