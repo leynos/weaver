@@ -41,7 +41,7 @@ jobs:
       BUILD_PROFILE: debug
       WHITAKER_REV: 2bc0c3fafb86914f14bd73461a511588841f0a34
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
       # Ubicloud runs a cache proxy on the runner's private network, and the
@@ -86,7 +86,7 @@ jobs:
       - name: Spelling (en-GB-oxendict)
         run: make spelling
       - name: Install bun
-        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76  # v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
         with:
           bun-version: '1.2.21'
       - name: Install Mermaid CLI
