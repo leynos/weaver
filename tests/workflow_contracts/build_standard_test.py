@@ -26,11 +26,12 @@ import os
 import re
 import shlex
 import subprocess
-import tomllib
 from pathlib import Path
 
 import pytest
-import yaml
+import tomllib
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 ROOT = Path(__file__).resolve().parents[2]
 THREADS_FLAG = "-Zthreads=8"
@@ -344,3 +345,50 @@ def test_coverage_and_release_take_neither_flag(target: str) -> None:
         )
         assert THREADS_FLAG not in flags, f"`make {target}` takes {THREADS_FLAG}"
         assert LINKER_FLAG not in flags, f"`make {target}` takes {LINKER_FLAG}"
+
+
+#: Triples with whether `mold` applies to a Linux host building for them.
+TRIPLES = [
+    ("x86_64-unknown-linux-gnu", True),
+    ("aarch64-unknown-linux-musl", True),
+    ("aarch64-apple-darwin", False),
+    ("x86_64-pc-windows-msvc", False),
+]
+
+
+@settings(
+    max_examples=25,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+@given(
+    variable=st.sampled_from(["TEST_FLAGS", "CARGO_FLAGS", "CLIPPY_FLAGS"]),
+    spelling=st.sampled_from(["--target {}", "--target={}"]),
+    explicit=st.one_of(st.none(), st.sampled_from(TRIPLES)),
+    environment=st.one_of(st.none(), st.sampled_from(TRIPLES)),
+)
+def test_the_effective_target_is_the_explicit_one_then_the_environment_one(
+    variable: str,
+    spelling: str,
+    explicit: tuple[str, bool] | None,
+    environment: tuple[str, bool] | None,
+) -> None:
+    """Mold follows the target Cargo will use, for every flag variable.
+
+    The reference rule: an explicit ``--target`` in any flag variable, in either
+    spelling, wins over ``CARGO_BUILD_TARGET``; with neither, the target is the
+    host's own and `mold` applies on Linux. The Makefile must agree for every
+    combination, whichever variable carries the argument.
+    """
+    overrides: list[str] = []
+    if explicit is not None:
+        overrides.append(f"{variable}={spelling.format(explicit[0])}")
+    if environment is not None:
+        overrides.append(f"CARGO_BUILD_TARGET={environment[0]}")
+    chosen = explicit or environment
+    problems = _development_problems(
+        "Linux",
+        expects_linker=True if chosen is None else chosen[1],
+        overrides=tuple(overrides),
+    )
+    assert problems == [], problems

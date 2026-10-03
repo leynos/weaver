@@ -8,6 +8,12 @@ command-line arguments.
 
 ## Requirements
 
+On Linux, install the `mold` linker before building from source: the workspace
+`.cargo/config.toml` links Linux builds with it, and Cargo applies that
+configuration to a bare `cargo build --release` too, so a build without `mold`
+fails at the link step. Release artefacts from `make release` or CI take
+neither the frontend flag nor `mold`.
+
 Weaver requires Rust 1.89 or newer to build from source because its
 `ortho-config` dependency has the same minimum supported Rust version.
 
