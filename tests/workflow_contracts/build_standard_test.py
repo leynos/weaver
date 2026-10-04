@@ -30,8 +30,6 @@ from pathlib import Path
 
 import pytest
 import tomllib
-from hypothesis import HealthCheck, given, settings
-from hypothesis import strategies as st
 
 ROOT = Path(__file__).resolve().parents[2]
 THREADS_FLAG = "-Zthreads=8"
@@ -251,14 +249,17 @@ def test_development_targets_restate_both_flags_on_linux() -> None:
         )
 
 
-def test_development_targets_keep_the_standard_under_inherited_rustflags() -> None:
+@pytest.mark.parametrize("inherited", [INHERITED, ""])
+def test_development_targets_keep_the_standard_under_inherited_rustflags(
+    inherited: str,
+) -> None:
     """A caller's exported RUSTFLAGS is composed with the standard flags.
 
     setup-rust exports ``RUSTFLAGS`` in CI, so a recipe that assigned instead
     of composing would drop the caller's flags, and one that inherited without
     restating would drop the standard ones.
     """
-    problems = _development_problems("Linux", expects_linker=True, inherited=INHERITED)
+    problems = _development_problems("Linux", expects_linker=True, inherited=inherited)
     assert problems == [], problems
 
 
@@ -291,31 +292,6 @@ def test_development_targets_leave_the_linker_off_a_non_linux_target() -> None:
     assert problems == [], problems
 
 
-@pytest.mark.parametrize(
-    ("flags", "expects_linker"),
-    [
-        ("--target aarch64-apple-darwin", False),
-        ("--target=aarch64-apple-darwin", False),
-        ("--target aarch64-unknown-linux-gnu", True),
-    ],
-)
-def test_an_explicit_cargo_target_decides_the_linker(
-    flags: str, expects_linker: bool
-) -> None:
-    """An explicit ``--target`` in a flag variable beats ``CARGO_BUILD_TARGET``.
-
-    Cargo prefers the argument, so a macOS target reached through
-    ``TEST_FLAGS`` or ``CARGO_FLAGS`` must not be handed `mold`, even though
-    the environment names no target.
-    """
-    problems = _development_problems(
-        "Linux",
-        expects_linker=expects_linker,
-        overrides=(f"TEST_FLAGS={flags}", f"CARGO_FLAGS={flags}"),
-    )
-    assert problems == [], problems
-
-
 #: A marker no recipe adds, to prove the gate recipes keep ``RUST_FLAGS``.
 SENTINEL = ["--cfg", "sentinel_marker"]
 
@@ -332,68 +308,18 @@ def test_gate_targets_keep_the_warning_flags(target: str) -> None:
         assert _contains(flags, shlex.split(INHERITED)), flags
 
 
-@pytest.mark.parametrize("inherited", [None, INHERITED])
+@pytest.mark.parametrize("inherited", [None, "", INHERITED, THREADS_FLAG])
 @pytest.mark.parametrize("target", HELD_OUT_TARGETS)
 def test_coverage_and_release_add_neither_flag(
     target: str, inherited: str | None
 ) -> None:
-    """Release assigns RUSTFLAGS, adding neither standard flag.
+    """Release assigns exactly the caller's RUSTFLAGS, adding neither flag.
 
-    The caller's value is forwarded untouched, so a flag the caller exports
-    survives, and with none the assignment is empty.
+    The value is forwarded untouched, so a flag the caller exports survives,
+    even a standard one, and with none the assignment is empty.
     """
     for flags in _make_rustflags(target, inherited=inherited):
         assert flags is not None, f"`make {target}` takes the configuration's flags"
-        assert THREADS_FLAG not in flags, f"`make {target}` adds {THREADS_FLAG}"
-        assert LINKER_FLAG not in flags, f"`make {target}` adds {LINKER_FLAG}"
-        if inherited is None:
-            assert flags == [], f"`make {target}` assigns {flags} unasked"
-        else:
-            assert _contains(flags, shlex.split(inherited)), (
-                f"`make {target}` drops the caller's RUSTFLAGS: {flags}"
-            )
-
-
-#: Triples with whether `mold` applies to a Linux host building for them.
-TRIPLES = [
-    ("x86_64-unknown-linux-gnu", True),
-    ("aarch64-unknown-linux-musl", True),
-    ("aarch64-apple-darwin", False),
-    ("x86_64-pc-windows-msvc", False),
-]
-
-
-@settings(
-    max_examples=25,
-    deadline=None,
-    suppress_health_check=[HealthCheck.too_slow],
-)
-@given(
-    variable=st.sampled_from(["TEST_FLAGS", "CARGO_FLAGS", "CLIPPY_FLAGS"]),
-    spelling=st.sampled_from(["--target {}", "--target={}"]),
-    explicit=st.one_of(st.none(), st.sampled_from(TRIPLES)),
-    environment=st.one_of(st.none(), st.sampled_from(TRIPLES)),
-)
-def test_the_effective_target_is_the_explicit_one_then_the_environment_one(
-    variable: str,
-    spelling: str,
-    explicit: tuple[str, bool] | None,
-    environment: tuple[str, bool] | None,
-) -> None:
-    """Mold follows the target Cargo will use, for every flag variable.
-
-    An explicit ``--target`` in any flag variable, in either spelling, wins over
-    ``CARGO_BUILD_TARGET``; with neither, the target is the host's own.
-    """
-    overrides: list[str] = []
-    if explicit is not None:
-        overrides.append(f"{variable}={spelling.format(explicit[0])}")
-    if environment is not None:
-        overrides.append(f"CARGO_BUILD_TARGET={environment[0]}")
-    chosen = explicit or environment
-    problems = _development_problems(
-        "Linux",
-        expects_linker=True if chosen is None else chosen[1],
-        overrides=tuple(overrides),
-    )
-    assert problems == [], problems
+        assert flags == shlex.split(inherited or ""), (
+            f"`make {target}` assigns {flags}, not the caller's {inherited!r}"
+        )

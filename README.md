@@ -89,6 +89,9 @@ local builds. The workspace `.cargo/config.toml` uses options that require the
 Nightly toolchain, so stable Rust is not sufficient for local Cargo builds in
 this checkout. To build:
 
+On Linux, install the `mold` linker first: the workspace `.cargo/config.toml`
+links Linux builds with it, and Cargo applies that to a bare release build too.
+
 ```sh
 cargo +nightly-2026-03-26 build --release
 ```

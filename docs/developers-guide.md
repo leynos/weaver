@@ -40,8 +40,8 @@ Development builds follow the estate's Rust build standard, which
 `.cargo/config.toml` sets and Cargo auto-discovers, so a bare `cargo build`
 gets it:
 
-- Cranelift is the development-profile codegen backend. The whole suite passes
-  under it.
+- Cranelift is the development-profile codegen backend. `make test`, which CI
+  runs, exercises the suite under it on the pinned toolchain.
 - Every `rustflags` source enables the parallel `rustc` frontend with
   `-Zthreads=8`.
 - The `cfg(target_os = "linux")` source also links with `mold`. macOS and
@@ -67,7 +67,9 @@ prefers the argument, and otherwise `CARGO_BUILD_TARGET`. The CI job installs
 `tests/workflow_contracts/build_standard_test.py` holds the configuration and
 the Makefile recipes to this, `build_standard_ci_test.py` holds the install
 order and the boundary gate's composed flags, and
-`build_standard_warnings_test.py` holds the default warning policy.
+`build_standard_warnings_test.py` holds the default warning policy, and
+`build_standard_target_test.py` checks each command's target selection against
+its own arguments.
 
 ## Workspace lint policy
 

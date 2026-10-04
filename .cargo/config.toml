@@ -4,7 +4,8 @@
 # is the default for every build, and the mold linker is the default on Linux.
 # Cargo auto-discovers this file, so a bare `cargo build` gets all three.
 # `make release` and coverage assign `RUSTFLAGS`, which displaces every
-# `rustflags` source below, so neither takes the frontend flag or mold.
+# `rustflags` source below, so neither adds the frontend flag or mold (a flag the
+# caller exports still survives).
 # Cargo does not select `rustflags` by profile, so a bare
 # `cargo build --release` takes both; build releases through `make release`.
 #

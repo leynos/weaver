@@ -15,26 +15,29 @@ RUST_FLAGS := -D warnings $(RUST_FLAGS)
 # replaces those sources outright, so the gate targets restate the flags here.
 # The gate targets add them to any inherited `RUSTFLAGS` (setup-rust exports
 # one in CI) instead of replacing it.
-# Coverage and release builds deliberately take neither.
+# `make release` adds neither standard flag (a caller's own flags pass through),
+# and coverage takes them only when its caller leaves `RUSTFLAGS` unset.
 STANDARD_THREADS_FLAG ?= -Zthreads=8
 STANDARD_MOLD_FLAG ?= -Clink-arg=-fuse-ld=mold
 BUILD_HOST_OS := $(shell uname -s)
 # mold is added only when the machine doing the build is Linux (only Make can
-# tell whether it has mold) and the compilation target is Linux too. The target
-# is an explicit `--target` in the flag variables when there is one, since Cargo
-# prefers the argument, and otherwise `CARGO_BUILD_TARGET`, which names the host
-# when unset.
-STANDARD_FLAG_WORDS = $(TEST_FLAGS) $(CARGO_FLAGS) $(CLIPPY_FLAGS)
-STANDARD_FLAG_TARGET = $(lastword $(patsubst --target=%,%,$(filter --target=%,$(STANDARD_FLAG_WORDS))) $(patsubst @%,%,$(filter @%,$(subst --target ,@,$(STANDARD_FLAG_WORDS)))))
-STANDARD_BUILD_TARGET = $(or $(STANDARD_FLAG_TARGET),$(CARGO_BUILD_TARGET))
-STANDARD_TARGET_IS_LINUX = $(if $(STANDARD_BUILD_TARGET),$(or $(findstring -linux-,$(STANDARD_BUILD_TARGET)),$(filter host-tuple,$(STANDARD_BUILD_TARGET))),yes)
-STANDARD_RUSTFLAGS = $(STANDARD_THREADS_FLAG)$(if $(filter Linux,$(BUILD_HOST_OS)),$(if $(STANDARD_TARGET_IS_LINUX), $(STANDARD_MOLD_FLAG)))
-# Release builds take neither flag: assigning `RUSTFLAGS`, even to an empty
-# inherited value, displaces every `rustflags` source in the configuration.
+# tell whether it has mold) and the compilation target of that command is Linux
+# too. Each recipe line resolves its own target from the arguments it passes:
+# an explicit `--target X` or `--target=X` before any standalone `--` wins, since
+# Cargo prefers the argument, and otherwise `CARGO_BUILD_TARGET` applies, which
+# names the host when unset.
+SPACE := $(subst ,, )
+standard_args = $(subst __SP__, ,$(firstword $(subst __SP__--__SP__, ,$(subst $(SPACE),__SP__,$(strip $(1))))))
+standard_target = $(or $(lastword $(patsubst --target=%,%,$(filter --target=%,$(call standard_args,$(1)))) $(patsubst @%,%,$(filter @%,$(subst --target ,@,$(call standard_args,$(1)))))),$(CARGO_BUILD_TARGET))
+standard_is_linux = $(if $(call standard_target,$(1)),$(or $(findstring -linux-,$(call standard_target,$(1))),$(filter host-tuple,$(call standard_target,$(1)))),yes)
+standard_rustflags = $(STANDARD_THREADS_FLAG)$(if $(filter Linux,$(BUILD_HOST_OS)),$(if $(call standard_is_linux,$(1)), $(STANDARD_MOLD_FLAG)))
+# Release builds add neither standard flag: assigning `RUSTFLAGS`, even to an
+# empty inherited value, displaces every `rustflags` source in the
+# configuration, and the caller's own value passes through untouched.
 RELEASE_RUSTFLAGS = RUSTFLAGS="$${RUSTFLAGS-}"
 # Debug builds keep a caller's exported flags and add the standard ones,
 # since an inherited `RUSTFLAGS` would otherwise displace the configuration.
-DEBUG_RUSTFLAGS = RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)"
+DEBUG_RUSTFLAGS = RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(call standard_rustflags,)"
 RUSTDOC_FLAGS ?=
 RUSTDOC_FLAGS := -D warnings $(RUSTDOC_FLAGS)
 CARGO_FLAGS ?= --workspace --all-targets --all-features
@@ -70,8 +73,8 @@ clean: ## Remove build artefacts
 	$(CARGO) clean
 
 test: ## Run tests with warnings treated as errors
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --doc --workspace --all-features
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,$(TEST_FLAGS))" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,)" $(CARGO) test --doc --workspace --all-features
 
 test-workflow-contracts: ## Validate workflow caller and runner-placement contracts
 	uv run --with 'pytest>=8' --with 'pyyaml>=6' --with 'hypothesis>=6' pytest tests/workflow_contracts -q
@@ -80,12 +83,12 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 	$(if $(filter release,$*),$(RELEASE_RUSTFLAGS),$(DEBUG_RUSTFLAGS)) $(CARGO) build $(BUILD_JOBS) $(if $(filter release,$*),--release) --bin $(TARGET)
 
 lint: ## Run Clippy with warnings denied
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
-	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,$(CLIPPY_FLAGS))" $(CARGO) clippy $(CLIPPY_FLAGS)
+	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,$(CARGO_FLAGS))" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: ## Type-check without building
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,$(CARGO_FLAGS))" $(CARGO) check $(CARGO_FLAGS)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
