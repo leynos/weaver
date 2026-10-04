@@ -332,19 +332,26 @@ def test_gate_targets_keep_the_warning_flags(target: str) -> None:
         assert _contains(flags, shlex.split(INHERITED)), flags
 
 
+@pytest.mark.parametrize("inherited", [None, INHERITED])
 @pytest.mark.parametrize("target", HELD_OUT_TARGETS)
-def test_coverage_and_release_take_neither_flag(target: str) -> None:
-    """Coverage measures and release ships, so both stay on default flags.
+def test_coverage_and_release_add_neither_flag(
+    target: str, inherited: str | None
+) -> None:
+    """Release assigns RUSTFLAGS, adding neither standard flag.
 
-    Every command must assign RUSTFLAGS, since only an assignment displaces
-    the configuration's sources.
+    The caller's value is forwarded untouched, so a flag the caller exports
+    survives, and with none the assignment is empty.
     """
-    for flags in _make_rustflags(target):
-        assert flags is not None, (
-            f"`make {target}` runs a command that takes the configuration's flags"
-        )
-        assert THREADS_FLAG not in flags, f"`make {target}` takes {THREADS_FLAG}"
-        assert LINKER_FLAG not in flags, f"`make {target}` takes {LINKER_FLAG}"
+    for flags in _make_rustflags(target, inherited=inherited):
+        assert flags is not None, f"`make {target}` takes the configuration's flags"
+        assert THREADS_FLAG not in flags, f"`make {target}` adds {THREADS_FLAG}"
+        assert LINKER_FLAG not in flags, f"`make {target}` adds {LINKER_FLAG}"
+        if inherited is None:
+            assert flags == [], f"`make {target}` assigns {flags} unasked"
+        else:
+            assert _contains(flags, shlex.split(inherited)), (
+                f"`make {target}` drops the caller's RUSTFLAGS: {flags}"
+            )
 
 
 #: Triples with whether `mold` applies to a Linux host building for them.
@@ -375,10 +382,8 @@ def test_the_effective_target_is_the_explicit_one_then_the_environment_one(
 ) -> None:
     """Mold follows the target Cargo will use, for every flag variable.
 
-    The reference rule: an explicit ``--target`` in any flag variable, in either
-    spelling, wins over ``CARGO_BUILD_TARGET``; with neither, the target is the
-    host's own and `mold` applies on Linux. The Makefile must agree for every
-    combination, whichever variable carries the argument.
+    An explicit ``--target`` in any flag variable, in either spelling, wins over
+    ``CARGO_BUILD_TARGET``; with neither, the target is the host's own.
     """
     overrides: list[str] = []
     if explicit is not None:
