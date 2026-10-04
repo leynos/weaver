@@ -10,6 +10,37 @@ CARGO ?= $(or $(shell command -v cargo 2>/dev/null),$(wildcard $(USER_CARGO)),ca
 BUILD_JOBS ?=
 RUST_FLAGS ?=
 RUST_FLAGS := -D warnings $(RUST_FLAGS)
+# The build standard: every `rustflags` source in `.cargo/config.toml` carries
+# the parallel frontend, and the Linux source adds mold. Assigning `RUSTFLAGS`
+# replaces those sources outright, so the gate targets restate the flags here.
+# The gate targets add them to any inherited `RUSTFLAGS` (setup-rust exports
+# one in CI) instead of replacing it.
+# `make release` adds neither standard flag (a caller's own flags pass through),
+# and coverage takes them only when its caller leaves `RUSTFLAGS` unset.
+STANDARD_THREADS_FLAG ?= -Zthreads=8
+STANDARD_MOLD_FLAG ?= -Clink-arg=-fuse-ld=mold
+BUILD_HOST_OS := $(shell uname -s)
+# mold is added only when the machine doing the build is Linux (only Make can
+# tell whether it has mold) and every compilation target of that command is
+# Linux too. Each recipe line reads its own targets from the arguments it passes:
+# each explicit `--target X` or `--target=X` before any standalone `--` (at the
+# start, the middle or the end) is one target (Cargo builds for all of them),
+# and with none the command takes `CARGO_BUILD_TARGET`, which names the host
+# when unset.
+SPACE := $(subst ,, )
+standard_args = $(filter-out __ARG0__ __ARG1__,$(subst __SP__, ,$(firstword $(subst __SP__--__SP__, ,$(subst $(SPACE),__SP__,__ARG0__ $(strip $(1)) __ARG1__)))))
+standard_targets = $(patsubst --target=%,%,$(filter --target=%,$(subst --target ,--target=,$(call standard_args,$(1)))))
+standard_non_linux = $(foreach target,$(1),$(if $(or $(findstring -linux-,$(target)),$(filter host-tuple,$(target))),,$(target)))
+standard_env_is_linux = $(if $(CARGO_BUILD_TARGET),$(or $(findstring -linux-,$(CARGO_BUILD_TARGET)),$(filter host-tuple,$(CARGO_BUILD_TARGET))),yes)
+standard_is_linux = $(if $(call standard_targets,$(1)),$(if $(strip $(call standard_non_linux,$(call standard_targets,$(1)))),,yes),$(standard_env_is_linux))
+standard_rustflags = $(STANDARD_THREADS_FLAG)$(if $(filter Linux,$(BUILD_HOST_OS)),$(if $(call standard_is_linux,$(1)), $(STANDARD_MOLD_FLAG)))
+# Release builds add neither standard flag: assigning `RUSTFLAGS`, even to an
+# empty inherited value, displaces every `rustflags` source in the
+# configuration, and the caller's own value passes through untouched.
+RELEASE_RUSTFLAGS = RUSTFLAGS="$${RUSTFLAGS-}"
+# Debug builds keep a caller's exported flags and add the standard ones,
+# since an inherited `RUSTFLAGS` would otherwise displace the configuration.
+DEBUG_RUSTFLAGS = RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(call standard_rustflags,)"
 RUSTDOC_FLAGS ?=
 RUSTDOC_FLAGS := -D warnings $(RUSTDOC_FLAGS)
 CARGO_FLAGS ?= --workspace --all-targets --all-features
@@ -45,22 +76,22 @@ clean: ## Remove build artefacts
 	$(CARGO) clean
 
 test: ## Run tests with warnings treated as errors
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test --doc --workspace --all-features
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,$(TEST_FLAGS))" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,)" $(CARGO) test --doc --workspace --all-features
 
 test-workflow-contracts: ## Validate workflow caller and runner-placement contracts
-	uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q
+	uv run --with 'pytest>=8' --with 'pyyaml>=6' --with 'hypothesis>=6' pytest tests/workflow_contracts -q
 
 target/%/$(TARGET): ## Build binary in debug or release mode
-	$(CARGO) build $(BUILD_JOBS) $(if $(filter release,$*),--release) --bin $(TARGET)
+	$(if $(filter release,$*),$(RELEASE_RUSTFLAGS),$(DEBUG_RUSTFLAGS)) $(CARGO) build $(BUILD_JOBS) $(if $(filter release,$*),--release) --bin $(TARGET)
 
 lint: ## Run Clippy with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
-	$(CARGO) clippy $(CLIPPY_FLAGS)
-	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,$(CLIPPY_FLAGS))" $(CARGO) clippy $(CLIPPY_FLAGS)
+	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,$(CARGO_FLAGS))" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: ## Type-check without building
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(call standard_rustflags,$(CARGO_FLAGS))" $(CARGO) check $(CARGO_FLAGS)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all

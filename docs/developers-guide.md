@@ -34,6 +34,55 @@ quoted-source spelling that must remain unchanged.
 
 The workspace targets `ortho_config` v0.9.0 and Rust 1.89.
 
+## The build standard
+
+Development builds follow the estate's Rust build standard, which
+`.cargo/config.toml` sets and Cargo auto-discovers, so a bare `cargo build`
+gets it:
+
+- Cranelift is the development-profile codegen backend. The suite was measured
+  under it on the pinned toolchain; CI's coverage lane builds with LLVM, and
+  its scope is narrower than `make test`: the pinned coverage action defaults
+  `all-features`, `all-targets` and `doctests` to `false`, and this workflow
+  does not override them. A green coverage lane is therefore not evidence that
+  `make test` passes under Cranelift; that comes from `make test` itself.
+- Every `rustflags` source enables the parallel `rustc` frontend with
+  `-Zthreads=8`.
+- The `cfg(target_os = "linux")` source also links with `mold`. macOS and
+  Windows keep their platform linker.
+
+Cargo applies a single `rustflags` source rather than merging them, and an
+assigned `RUSTFLAGS` replaces every source. So each source repeats the frontend
+flag, and the Makefile restates both flags through `standard_rustflags` for the
+targets that assign `RUSTFLAGS` (`test`, every `lint` command, `typecheck`, and
+`build`), adding them to any `RUSTFLAGS` the recipe inherits (setup-rust
+exports one in CI) rather than replacing it. `make release` assigns the
+inherited `RUSTFLAGS`, which is empty when the caller exports none, and so adds
+neither standard flag (it does not remove one the caller exports); a bare
+`cargo build --release` still reads the configuration and takes both, because
+Cargo does not select `rustflags` by profile, so release artefacts come from
+`make release` or CI, whose coverage and release actions run under their own
+`RUSTFLAGS`. The Makefile adds `mold` only when both the host and the
+compilation targets are Linux. Each recipe line reads its own targets from the
+arguments it passes: every explicit `--target X` or `--target=X` before any
+standalone `--` (at the start, the middle or the end of the arguments) is one
+target, because Cargo builds for all of them (Whitaker's own arguments follow
+its `--`, so it reads those), and with none the command takes
+`CARGO_BUILD_TARGET`. A mixed set, such as one Linux and one macOS target, omits
+`mold` for every member, Linux ones included, because one `RUSTFLAGS` value
+serves the whole command. A command that passes no flags, such as the doctests
+or `cargo doc`, uses `CARGO_BUILD_TARGET` alone. The CI job installs `mold`
+before the boundary manifest gate, which composes the same flags onto its
+`RUSTFLAGS`, and `make lint`. `tests/workflow_contracts/build_standard_test.py`
+holds the configuration and the Makefile recipes to this,
+`build_standard_ci_test.py` holds the install order and the boundary gate's
+composed flags, and `build_standard_warnings_test.py` holds the default warning
+policy, and `build_standard_target_test.py` checks each command's target
+selection against its own arguments. Every dry run starts from
+`build_standard_env.py`'s controlled environment, which removes the caller's
+exported targets, flag sets and Make options, and `build_standard_env_test.py`
+holds each helper to it.
+
 ## Workspace lint policy
 
 The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates

@@ -59,10 +59,11 @@ jobs:
 
       - name: Install uv
         if: inputs.platform != 'linux'
-        uses: astral-sh/setup-uv@4cda7d73322c50eac316ad623a716f09a2db2ac7
-        # v3.1.2
+        # The same pin the estate's other consumers use. It runs on Node 24, and
+        # with no Python dependency manifest to key a cache on, caching is off.
+        uses: astral-sh/setup-uv@0e3884b860e20d3f4d5daa2347130beb51ccde47
         with:
-          python-version: '3.11'
+          enable-cache: false
 
       # Ubicloud's cache proxy, published before sccache is configured. See
       # the note in ci.yml; the guard is needed because this lane's runner is
