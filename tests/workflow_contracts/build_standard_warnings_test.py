@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from build_standard_env import controlled_environment
 
 ROOT = Path(__file__).resolve().parents[2]
 DENY = "-D warnings"
@@ -25,6 +26,7 @@ def _dry_run(target: str) -> list[str]:
     result = subprocess.run(
         ["make", "-n", "-B", "BUILD_HOST_OS=Linux", target],
         cwd=ROOT,
+        env=controlled_environment(),
         capture_output=True,
         text=True,
         check=True,

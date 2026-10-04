@@ -11,13 +11,13 @@ Run via ``make test-workflow-contracts``.
 
 from __future__ import annotations
 
-import os
 import re
 import shlex
 import subprocess
 from pathlib import Path
 
 import pytest
+from build_standard_env import controlled_environment
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -32,26 +32,6 @@ TRIPLES = [
 ]
 
 
-def _controlled_environment() -> dict[str, str]:
-    """Return the process environment without anything that selects a target.
-
-    A case that expects no environment target must not receive one the caller
-    exported, so every variable the Makefile reads for the target or the flags
-    is removed; each case sets what it needs on the command line.
-    """
-    dropped = {
-        "CARGO_BUILD_TARGET",
-        "TEST_FLAGS",
-        "CARGO_FLAGS",
-        "CLIPPY_FLAGS",
-        "RUSTFLAGS",
-        "MAKEFLAGS",
-        "MFLAGS",
-        "MAKELEVEL",
-    }
-    return {key: val for key, val in os.environ.items() if key not in dropped}
-
-
 def _commands(target: str, overrides: tuple[str, ...]) -> list[str]:
     """Return the cargo and Whitaker commands ``make -n TARGET`` would run."""
     result = subprocess.run(
@@ -60,7 +40,7 @@ def _commands(target: str, overrides: tuple[str, ...]) -> list[str]:
         capture_output=True,
         text=True,
         check=True,
-        env=_controlled_environment(),
+        env=controlled_environment(),
     )
     lines = result.stdout.replace("\\\n", " ").splitlines()
     return [
@@ -138,6 +118,9 @@ def _problems(overrides: tuple[str, ...], environment: str | None) -> list[str]:
         ((), "aarch64-apple-darwin"),
         (("TEST_FLAGS=--target aarch64-unknown-linux-gnu",), "aarch64-apple-darwin"),
         (("TEST_FLAGS=-p x -- --target aarch64-apple-darwin",), None),
+        (("TEST_FLAGS=-- --target aarch64-apple-darwin",), None),
+        (("TEST_FLAGS=--target aarch64-apple-darwin --",), None),
+        (("TEST_FLAGS=--target aarch64-unknown-linux-gnu -- --target=aarch64-apple-darwin",), None),
         (
             (
                 "TEST_FLAGS=--target aarch64-apple-darwin",
@@ -172,6 +155,9 @@ def _problems(overrides: tuple[str, ...], environment: str | None) -> list[str]:
         "environment: macOS",
         "explicit Linux beats environment macOS",
         "after the cargo separator is ignored",
+        "after a leading separator is ignored",
+        "a trailing separator ends the arguments",
+        "separator in the middle with Linux before and macOS after",
         "conflicting variables each win for their own commands",
         "mixed spellings: macOS then Linux drops mold",
         "mixed spellings: Linux then macOS drops mold",

@@ -41,7 +41,11 @@ Development builds follow the estate's Rust build standard, which
 gets it:
 
 - Cranelift is the development-profile codegen backend. The suite was measured
-  under it on the pinned toolchain; CI's coverage lane builds with LLVM.
+  under it on the pinned toolchain; CI's coverage lane builds with LLVM, and
+  its scope is narrower than `make test`: the pinned coverage action defaults
+  `all-features`, `all-targets` and `doctests` to `false`, and this workflow
+  does not override them. A green coverage lane is therefore not evidence that
+  `make test` passes under Cranelift; that comes from `make test` itself.
 - Every `rustflags` source enables the parallel `rustc` frontend with
   `-Zthreads=8`.
 - The `cfg(target_os = "linux")` source also links with `mold`. macOS and
@@ -61,18 +65,23 @@ Cargo does not select `rustflags` by profile, so release artefacts come from
 `RUSTFLAGS`. The Makefile adds `mold` only when both the host and the
 compilation targets are Linux. Each recipe line reads its own targets from the
 arguments it passes: every explicit `--target X` or `--target=X` before any
-standalone `--` is one target, because Cargo builds for all of them (Whitaker's
-own arguments follow its `--`, so it reads those), and with none the command
-takes `CARGO_BUILD_TARGET`. A command that passes no flags, such as the
-doctests or `cargo doc`, uses `CARGO_BUILD_TARGET` alone. The CI job installs
-`mold` before the boundary manifest gate, which composes the same flags onto its
-`RUSTFLAGS`, and `make lint`.
-`tests/workflow_contracts/build_standard_test.py` holds the configuration and
-the Makefile recipes to this, `build_standard_ci_test.py` holds the install
-order and the boundary gate's composed flags, and
-`build_standard_warnings_test.py` holds the default warning policy, and
-`build_standard_target_test.py` checks each command's target selection against
-its own arguments.
+standalone `--` (at the start, the middle or the end of the arguments) is one
+target, because Cargo builds for all of them (Whitaker's own arguments follow
+its `--`, so it reads those), and with none the command takes
+`CARGO_BUILD_TARGET`. A mixed set, such as one Linux and one macOS target, omits
+`mold` for every member, Linux ones included, because one `RUSTFLAGS` value
+serves the whole command. A command that passes no flags, such as the doctests
+or `cargo doc`, uses `CARGO_BUILD_TARGET` alone. The CI job installs `mold`
+before the boundary manifest gate, which composes the same flags onto its
+`RUSTFLAGS`, and `make lint`. `tests/workflow_contracts/build_standard_test.py`
+holds the configuration and the Makefile recipes to this,
+`build_standard_ci_test.py` holds the install order and the boundary gate's
+composed flags, and `build_standard_warnings_test.py` holds the default warning
+policy, and `build_standard_target_test.py` checks each command's target
+selection against its own arguments. Every dry run starts from
+`build_standard_env.py`'s controlled environment, which removes the caller's
+exported targets, flag sets and Make options, and `build_standard_env_test.py`
+holds each helper to it.
 
 ## Workspace lint policy
 

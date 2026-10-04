@@ -23,11 +23,12 @@ BUILD_HOST_OS := $(shell uname -s)
 # mold is added only when the machine doing the build is Linux (only Make can
 # tell whether it has mold) and every compilation target of that command is
 # Linux too. Each recipe line reads its own targets from the arguments it passes:
-# each explicit `--target X` or `--target=X` before any standalone `--` is one
-# target (Cargo builds for all of them), and with none the command takes
-# `CARGO_BUILD_TARGET`, which names the host when unset.
+# each explicit `--target X` or `--target=X` before any standalone `--` (at the
+# start, the middle or the end) is one target (Cargo builds for all of them),
+# and with none the command takes `CARGO_BUILD_TARGET`, which names the host
+# when unset.
 SPACE := $(subst ,, )
-standard_args = $(subst __SP__, ,$(firstword $(subst __SP__--__SP__, ,$(subst $(SPACE),__SP__,$(strip $(1))))))
+standard_args = $(filter-out __ARG0__ __ARG1__,$(subst __SP__, ,$(firstword $(subst __SP__--__SP__, ,$(subst $(SPACE),__SP__,__ARG0__ $(strip $(1)) __ARG1__)))))
 standard_targets = $(patsubst --target=%,%,$(filter --target=%,$(subst --target ,--target=,$(call standard_args,$(1)))))
 standard_non_linux = $(foreach target,$(1),$(if $(or $(findstring -linux-,$(target)),$(filter host-tuple,$(target))),,$(target)))
 standard_env_is_linux = $(if $(CARGO_BUILD_TARGET),$(or $(findstring -linux-,$(CARGO_BUILD_TARGET)),$(filter host-tuple,$(CARGO_BUILD_TARGET))),yes)

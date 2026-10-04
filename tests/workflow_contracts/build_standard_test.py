@@ -22,7 +22,6 @@ Run via ``make test-workflow-contracts``.
 
 from __future__ import annotations
 
-import os
 import re
 import shlex
 import subprocess
@@ -30,6 +29,7 @@ from pathlib import Path
 
 import pytest
 import tomllib
+from build_standard_env import controlled_environment
 
 ROOT = Path(__file__).resolve().parents[2]
 THREADS_FLAG = "-Zthreads=8"
@@ -85,9 +85,7 @@ def _sources() -> dict[str, list[str]]:
 
 def _expanded(value: str, inherited: str | None) -> list[str]:
     """Expand an assigned value as the recipe's shell would, then split it."""
-    env = {key: val for key, val in os.environ.items() if key != "RUSTFLAGS"}
-    if inherited is not None:
-        env["RUSTFLAGS"] = inherited
+    env = controlled_environment(**({} if inherited is None else {"RUSTFLAGS": inherited}))
     result = subprocess.run(
         ["bash", "-c", f'printf "%s" "{value}"'],
         env=env,
@@ -107,9 +105,7 @@ def _make_rustflags(
     """Return, per cargo or whitaker command ``make -n TARGET`` would run on
     the named host, the ``RUSTFLAGS`` it assigns, or ``None`` when it assigns
     none."""
-    env = {key: val for key, val in os.environ.items() if key != "RUSTFLAGS"}
-    if inherited is not None:
-        env["RUSTFLAGS"] = inherited
+    env = controlled_environment(**({} if inherited is None else {"RUSTFLAGS": inherited}))
     result = subprocess.run(
         ["make", "-n", "-B", f"BUILD_HOST_OS={host}", *overrides, target],
         cwd=ROOT,
