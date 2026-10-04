@@ -60,9 +60,7 @@ jobs:
       - name: Install uv
         if: inputs.platform != 'linux'
         uses: astral-sh/setup-uv@4cda7d73322c50eac316ad623a716f09a2db2ac7
-        # v3.1.2
-        with:
-          python-version: '3.11'
+        # v3.1.2 has no `python-version` input; it was ignored with a warning.
 
       # Ubicloud's cache proxy, published before sccache is configured. See
       # the note in ci.yml; the guard is needed because this lane's runner is
