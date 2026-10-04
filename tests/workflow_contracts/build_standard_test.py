@@ -308,7 +308,10 @@ def test_gate_targets_keep_the_warning_flags(target: str) -> None:
         assert _contains(flags, shlex.split(INHERITED)), flags
 
 
-@pytest.mark.parametrize("inherited", [None, "", INHERITED, THREADS_FLAG])
+@pytest.mark.parametrize(
+    "inherited",
+    [None, "", INHERITED, THREADS_FLAG, LINKER_FLAG, f"{THREADS_FLAG} {LINKER_FLAG}"],
+)
 @pytest.mark.parametrize("target", HELD_OUT_TARGETS)
 def test_coverage_and_release_add_neither_flag(
     target: str, inherited: str | None

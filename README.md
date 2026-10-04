@@ -96,6 +96,9 @@ links Linux builds with it, and Cargo applies that to a bare release build too.
 cargo +nightly-2026-03-26 build --release
 ```
 
+This bare release build takes the configuration's frontend flag and `mold`.
+`make release` instead adds neither, and forwards any `RUSTFLAGS` you export.
+
 To run the test suite:
 
 ```sh

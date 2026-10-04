@@ -28,7 +28,7 @@ BUILD_HOST_OS := $(shell uname -s)
 # names the host when unset.
 SPACE := $(subst ,, )
 standard_args = $(subst __SP__, ,$(firstword $(subst __SP__--__SP__, ,$(subst $(SPACE),__SP__,$(strip $(1))))))
-standard_target = $(or $(lastword $(patsubst --target=%,%,$(filter --target=%,$(call standard_args,$(1)))) $(patsubst @%,%,$(filter @%,$(subst --target ,@,$(call standard_args,$(1)))))),$(CARGO_BUILD_TARGET))
+standard_target = $(or $(lastword $(patsubst --target=%,%,$(filter --target=%,$(subst --target ,--target=,$(call standard_args,$(1)))))),$(CARGO_BUILD_TARGET))
 standard_is_linux = $(if $(call standard_target,$(1)),$(or $(findstring -linux-,$(call standard_target,$(1))),$(filter host-tuple,$(call standard_target,$(1)))),yes)
 standard_rustflags = $(STANDARD_THREADS_FLAG)$(if $(filter Linux,$(BUILD_HOST_OS)),$(if $(call standard_is_linux,$(1)), $(STANDARD_MOLD_FLAG)))
 # Release builds add neither standard flag: assigning `RUSTFLAGS`, even to an

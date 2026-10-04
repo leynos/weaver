@@ -40,8 +40,8 @@ Development builds follow the estate's Rust build standard, which
 `.cargo/config.toml` sets and Cargo auto-discovers, so a bare `cargo build`
 gets it:
 
-- Cranelift is the development-profile codegen backend. `make test`, which CI
-  runs, exercises the suite under it on the pinned toolchain.
+- Cranelift is the development-profile codegen backend. The suite was measured
+  under it on the pinned toolchain; CI's coverage lane builds with LLVM.
 - Every `rustflags` source enables the parallel `rustc` frontend with
   `-Zthreads=8`.
 - The `cfg(target_os = "linux")` source also links with `mold`. macOS and
@@ -49,7 +49,7 @@ gets it:
 
 Cargo applies a single `rustflags` source rather than merging them, and an
 assigned `RUSTFLAGS` replaces every source. So each source repeats the frontend
-flag, and the Makefile restates both flags as `STANDARD_RUSTFLAGS` for the
+flag, and the Makefile restates both flags through `standard_rustflags` for the
 targets that assign `RUSTFLAGS` (`test`, every `lint` command, `typecheck`, and
 `build`), adding them to any `RUSTFLAGS` the recipe inherits (setup-rust
 exports one in CI) rather than replacing it. `make release` assigns the
@@ -59,14 +59,16 @@ neither standard flag (it does not remove one the caller exports); a bare
 Cargo does not select `rustflags` by profile, so release artefacts come from
 `make release` or CI, whose coverage and release actions run under their own
 `RUSTFLAGS`. The Makefile adds `mold` only when both the host and the
-compilation target are Linux. The target is an explicit `--target` in
-`TEST_FLAGS`, `CARGO_FLAGS` or `CLIPPY_FLAGS` when there is one, because Cargo
-prefers the argument, and otherwise `CARGO_BUILD_TARGET`. The CI job installs
-`mold` before the boundary manifest gate, which composes the same flags onto its
-`RUSTFLAGS`, and `make lint`.
-`tests/workflow_contracts/build_standard_test.py` holds the configuration and
-the Makefile recipes to this, `build_standard_ci_test.py` holds the install
-order and the boundary gate's composed flags, and
+compilation target are Linux. Each recipe line resolves its own target from the
+arguments it passes: the last explicit `--target X` or `--target=X` before any
+standalone `--`, because Cargo prefers the argument (Whitaker's own arguments
+follow its `--`, so it reads those), and otherwise `CARGO_BUILD_TARGET`. A
+command that passes no flags, such as the doctests or `cargo doc`, uses
+`CARGO_BUILD_TARGET` alone. The CI job installs `mold` before the boundary
+manifest gate, which composes the same flags onto its `RUSTFLAGS`, and
+`make lint`. `tests/workflow_contracts/build_standard_test.py` holds the
+configuration and the Makefile recipes to this, `build_standard_ci_test.py`
+holds the install order and the boundary gate's composed flags, and
 `build_standard_warnings_test.py` holds the default warning policy, and
 `build_standard_target_test.py` checks each command's target selection against
 its own arguments.

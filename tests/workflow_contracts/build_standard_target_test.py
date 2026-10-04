@@ -48,6 +48,26 @@ def _commands(target: str, overrides: tuple[str, ...]) -> list[str]:
     ]
 
 
+def _command_words(line: str) -> tuple[bool, list[str]]:
+    """Return whether a line runs cargo, and the words after the tool name."""
+    words = shlex.split(line)
+    start = next(
+        i for i, word in enumerate(words) if Path(word).name in {"cargo", "whitaker"}
+    )
+    return Path(words[start]).name == "cargo", words[start + 1 :]
+
+
+def _explicit_targets(args: list[str]) -> list[str]:
+    """Return the ``--target`` values in the order the arguments give them."""
+    targets = []
+    for i, arg in enumerate(args):
+        if arg == "--target" and i + 1 < len(args):
+            targets.append(args[i + 1])
+        elif arg.startswith("--target="):
+            targets.append(arg.removeprefix("--target="))
+    return targets
+
+
 def _effective_target(line: str, environment: str | None) -> str | None:
     """Return the compilation target a command's own arguments select.
 
@@ -55,21 +75,11 @@ def _effective_target(line: str, environment: str | None) -> str | None:
     ``--`` belong to the compiler or test binary and are ignored; for Whitaker,
     ``--`` introduces the cargo arguments, so they count.
     """
-    words = shlex.split(line)
-    start = next(
-        i for i, word in enumerate(words) if Path(word).name in {"cargo", "whitaker"}
-    )
-    is_cargo = Path(words[start]).name == "cargo"
-    chosen: str | None = None
-    args = words[start + 1 :]
-    for i, arg in enumerate(args):
-        if arg == "--" and is_cargo:
-            break
-        if arg == "--target" and i + 1 < len(args):
-            chosen = args[i + 1]
-        elif arg.startswith("--target="):
-            chosen = arg.removeprefix("--target=")
-    return chosen or environment
+    is_cargo, args = _command_words(line)
+    if is_cargo and "--" in args:
+        args = args[: args.index("--")]
+    targets = _explicit_targets(args)
+    return targets[-1] if targets else environment
 
 
 def _expects_mold(target: str | None) -> bool:
@@ -81,7 +91,9 @@ def _problems(overrides: tuple[str, ...], environment: str | None) -> list[str]:
     """Check every command of every development target against its own target."""
     problems = []
     for make_target in TARGETS:
-        for line in _commands(make_target, overrides):
+        commands = _commands(make_target, overrides)
+        assert commands, f"`make {make_target}` runs no cargo or Whitaker command"
+        for line in commands:
             effective = _effective_target(line, environment)
             assigned = re.search(r'(?<![A-Z])RUSTFLAGS="([^"]*)"', line)
             flags = assigned.group(1) if assigned else ""
@@ -104,6 +116,25 @@ def _problems(overrides: tuple[str, ...], environment: str | None) -> list[str]:
         ((), "aarch64-apple-darwin"),
         (("TEST_FLAGS=--target aarch64-unknown-linux-gnu",), "aarch64-apple-darwin"),
         (("TEST_FLAGS=-p x -- --target aarch64-apple-darwin",), None),
+        (
+            (
+                "TEST_FLAGS=--target aarch64-apple-darwin",
+                "CARGO_FLAGS=--target aarch64-unknown-linux-gnu",
+            ),
+            None,
+        ),
+        (
+            (
+                "CARGO_FLAGS=--target=aarch64-apple-darwin --target aarch64-unknown-linux-gnu",
+            ),
+            None,
+        ),
+        (
+            (
+                "CARGO_FLAGS=--target aarch64-unknown-linux-gnu --target=aarch64-apple-darwin",
+            ),
+            None,
+        ),
     ],
     ids=[
         "no target",
@@ -113,6 +144,9 @@ def _problems(overrides: tuple[str, ...], environment: str | None) -> list[str]:
         "environment: macOS",
         "explicit Linux beats environment macOS",
         "after the cargo separator is ignored",
+        "conflicting variables each win for their own commands",
+        "mixed spellings: the later Linux target wins",
+        "mixed spellings: the later macOS target wins",
     ],
 )
 def test_each_command_follows_its_own_target(
@@ -130,21 +164,27 @@ def test_each_command_follows_its_own_target(
     suppress_health_check=[HealthCheck.too_slow],
 )
 @given(
-    variable=st.sampled_from(["TEST_FLAGS", "CARGO_FLAGS", "CLIPPY_FLAGS"]),
-    spelling=st.sampled_from(["--target {}", "--target={}"]),
-    explicit=st.one_of(st.none(), st.sampled_from(TRIPLES)),
+    flags=st.lists(
+        st.tuples(
+            st.sampled_from(["TEST_FLAGS", "CARGO_FLAGS", "CLIPPY_FLAGS"]),
+            st.sampled_from(["--target {}", "--target={}"]),
+            st.sampled_from(TRIPLES),
+        ),
+        max_size=3,
+        unique_by=lambda item: item[0],
+    ),
     environment=st.one_of(st.none(), st.sampled_from(TRIPLES)),
 )
 def test_every_command_resolves_its_target_from_its_own_arguments(
-    variable: str,
-    spelling: str,
-    explicit: tuple[str, bool] | None,
+    flags: list[tuple[str, str, tuple[str, bool]]],
     environment: tuple[str, bool] | None,
 ) -> None:
-    """Whichever variable carries ``--target``, each command is checked alone."""
-    overrides = []
-    if explicit is not None:
-        overrides.append(f"{variable}={spelling.format(explicit[0])}")
+    """Several variables may carry conflicting targets; each command is checked
+    against its own arguments."""
+    overrides = [
+        f"{variable}={spelling.format(triple[0])}"
+        for variable, spelling, triple in flags
+    ]
     env_target = environment[0] if environment else None
     if env_target:
         overrides.append(f"CARGO_BUILD_TARGET={env_target}")
