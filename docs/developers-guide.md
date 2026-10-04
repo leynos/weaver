@@ -65,8 +65,9 @@ prefers the argument, and otherwise `CARGO_BUILD_TARGET`. The CI job installs
 `mold` before the boundary manifest gate, which composes the same flags onto its
 `RUSTFLAGS`, and `make lint`.
 `tests/workflow_contracts/build_standard_test.py` holds the configuration and
-the Makefile recipes to this, and `build_standard_ci_test.py` holds the install
-order and the boundary gate's composed flags.
+the Makefile recipes to this, `build_standard_ci_test.py` holds the install
+order and the boundary gate's composed flags, and
+`build_standard_warnings_test.py` holds the default warning policy.
 
 ## Workspace lint policy
 
