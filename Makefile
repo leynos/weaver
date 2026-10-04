@@ -21,15 +21,17 @@ STANDARD_THREADS_FLAG ?= -Zthreads=8
 STANDARD_MOLD_FLAG ?= -Clink-arg=-fuse-ld=mold
 BUILD_HOST_OS := $(shell uname -s)
 # mold is added only when the machine doing the build is Linux (only Make can
-# tell whether it has mold) and the compilation target of that command is Linux
-# too. Each recipe line resolves its own target from the arguments it passes:
-# an explicit `--target X` or `--target=X` before any standalone `--` wins, since
-# Cargo prefers the argument, and otherwise `CARGO_BUILD_TARGET` applies, which
-# names the host when unset.
+# tell whether it has mold) and every compilation target of that command is
+# Linux too. Each recipe line reads its own targets from the arguments it passes:
+# each explicit `--target X` or `--target=X` before any standalone `--` is one
+# target (Cargo builds for all of them), and with none the command takes
+# `CARGO_BUILD_TARGET`, which names the host when unset.
 SPACE := $(subst ,, )
 standard_args = $(subst __SP__, ,$(firstword $(subst __SP__--__SP__, ,$(subst $(SPACE),__SP__,$(strip $(1))))))
-standard_target = $(or $(lastword $(patsubst --target=%,%,$(filter --target=%,$(subst --target ,--target=,$(call standard_args,$(1)))))),$(CARGO_BUILD_TARGET))
-standard_is_linux = $(if $(call standard_target,$(1)),$(or $(findstring -linux-,$(call standard_target,$(1))),$(filter host-tuple,$(call standard_target,$(1)))),yes)
+standard_targets = $(patsubst --target=%,%,$(filter --target=%,$(subst --target ,--target=,$(call standard_args,$(1)))))
+standard_non_linux = $(foreach target,$(1),$(if $(or $(findstring -linux-,$(target)),$(filter host-tuple,$(target))),,$(target)))
+standard_env_is_linux = $(if $(CARGO_BUILD_TARGET),$(or $(findstring -linux-,$(CARGO_BUILD_TARGET)),$(filter host-tuple,$(CARGO_BUILD_TARGET))),yes)
+standard_is_linux = $(if $(call standard_targets,$(1)),$(if $(strip $(call standard_non_linux,$(call standard_targets,$(1)))),,yes),$(standard_env_is_linux))
 standard_rustflags = $(STANDARD_THREADS_FLAG)$(if $(filter Linux,$(BUILD_HOST_OS)),$(if $(call standard_is_linux,$(1)), $(STANDARD_MOLD_FLAG)))
 # Release builds add neither standard flag: assigning `RUSTFLAGS`, even to an
 # empty inherited value, displaces every `rustflags` source in the

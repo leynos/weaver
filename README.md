@@ -93,11 +93,13 @@ On Linux, install the `mold` linker first: the workspace `.cargo/config.toml`
 links Linux builds with it, and Cargo applies that to a bare release build too.
 
 ```sh
-cargo +nightly-2026-03-26 build --release
+make release
 ```
 
-This bare release build takes the configuration's frontend flag and `mold`.
-`make release` instead adds neither, and forwards any `RUSTFLAGS` you export.
+`make release` adds neither the configuration's frontend flag nor `mold`, and
+forwards any `RUSTFLAGS` you export. The bare equivalent,
+`cargo +nightly-2026-03-26 build --release`, takes both flags, because Cargo
+applies the configuration to every build.
 
 To run the test suite:
 

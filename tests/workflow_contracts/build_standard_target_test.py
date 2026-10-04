@@ -11,6 +11,7 @@ Run via ``make test-workflow-contracts``.
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import subprocess
@@ -31,6 +32,26 @@ TRIPLES = [
 ]
 
 
+def _controlled_environment() -> dict[str, str]:
+    """Return the process environment without anything that selects a target.
+
+    A case that expects no environment target must not receive one the caller
+    exported, so every variable the Makefile reads for the target or the flags
+    is removed; each case sets what it needs on the command line.
+    """
+    dropped = {
+        "CARGO_BUILD_TARGET",
+        "TEST_FLAGS",
+        "CARGO_FLAGS",
+        "CLIPPY_FLAGS",
+        "RUSTFLAGS",
+        "MAKEFLAGS",
+        "MFLAGS",
+        "MAKELEVEL",
+    }
+    return {key: val for key, val in os.environ.items() if key not in dropped}
+
+
 def _commands(target: str, overrides: tuple[str, ...]) -> list[str]:
     """Return the cargo and Whitaker commands ``make -n TARGET`` would run."""
     result = subprocess.run(
@@ -39,6 +60,7 @@ def _commands(target: str, overrides: tuple[str, ...]) -> list[str]:
         capture_output=True,
         text=True,
         check=True,
+        env=_controlled_environment(),
     )
     lines = result.stdout.replace("\\\n", " ").splitlines()
     return [
@@ -68,23 +90,23 @@ def _explicit_targets(args: list[str]) -> list[str]:
     return targets
 
 
-def _effective_target(line: str, environment: str | None) -> str | None:
-    """Return the compilation target a command's own arguments select.
+def _effective_targets(line: str, environment: str | None) -> list[str | None]:
+    """Return the compilation targets a command's own arguments select.
 
-    The last ``--target`` wins, in either spelling. For cargo, arguments after
-    ``--`` belong to the compiler or test binary and are ignored; for Whitaker,
-    ``--`` introduces the cargo arguments, so they count.
+    Each ``--target`` is one target, in either spelling, and Cargo builds for all
+    of them. For cargo, arguments after ``--`` belong to the compiler or test
+    binary and are ignored; for Whitaker, ``--`` introduces the cargo arguments,
+    so they count. With none, the command takes the environment's target.
     """
     is_cargo, args = _command_words(line)
     if is_cargo and "--" in args:
         args = args[: args.index("--")]
-    targets = _explicit_targets(args)
-    return targets[-1] if targets else environment
+    return list(_explicit_targets(args)) or [environment]
 
 
-def _expects_mold(target: str | None) -> bool:
-    """Return whether `mold` applies for a Linux host and this target."""
-    return target is None or "-linux-" in target or target == "host-tuple"
+def _expects_mold(targets: list[str | None]) -> bool:
+    """Return whether `mold` applies for a Linux host: every target is Linux."""
+    return all(t is None or "-linux-" in t or t == "host-tuple" for t in targets)
 
 
 def _problems(overrides: tuple[str, ...], environment: str | None) -> list[str]:
@@ -94,12 +116,12 @@ def _problems(overrides: tuple[str, ...], environment: str | None) -> list[str]:
         commands = _commands(make_target, overrides)
         assert commands, f"`make {make_target}` runs no cargo or Whitaker command"
         for line in commands:
-            effective = _effective_target(line, environment)
+            effective = _effective_targets(line, environment)
             assigned = re.search(r'(?<![A-Z])RUSTFLAGS="([^"]*)"', line)
             flags = assigned.group(1) if assigned else ""
             if (MOLD in flags) != _expects_mold(effective):
                 problems.append(
-                    f"`make {make_target}` on Linux, effective target {effective!r}: "
+                    f"`make {make_target}` on Linux, effective targets {effective!r}: "
                     f"mold {'present' if MOLD in flags else 'absent'} in "
                     f"{flags!r} for `{line}`"
                 )
@@ -135,6 +157,12 @@ def _problems(overrides: tuple[str, ...], environment: str | None) -> list[str]:
             ),
             None,
         ),
+        (
+            (
+                "TEST_FLAGS=--target aarch64-unknown-linux-gnu --target x86_64-unknown-linux-musl",
+            ),
+            None,
+        ),
     ],
     ids=[
         "no target",
@@ -145,8 +173,9 @@ def _problems(overrides: tuple[str, ...], environment: str | None) -> list[str]:
         "explicit Linux beats environment macOS",
         "after the cargo separator is ignored",
         "conflicting variables each win for their own commands",
-        "mixed spellings: the later Linux target wins",
-        "mixed spellings: the later macOS target wins",
+        "mixed spellings: macOS then Linux drops mold",
+        "mixed spellings: Linux then macOS drops mold",
+        "several Linux targets keep mold",
     ],
 )
 def test_each_command_follows_its_own_target(
