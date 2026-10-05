@@ -75,7 +75,7 @@ jobs:
           publish: ${{ inputs.publish }}
       - id: ensure_version
         name: Read package version from Cargo.toml
-        uses: leynos/shared-actions/.github/actions/ensure-cargo-version@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/ensure-cargo-version@7d751eded578e48dacf43ab173d5820e6437c474
         with:
           check-tag: ${{ fromJSON(steps.release_modes.outputs.should-publish) }}
           manifests: crates/weaver-cli/Cargo.toml
