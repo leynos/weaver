@@ -192,7 +192,7 @@ jobs:
           pattern: ${{ needs.metadata.outputs.repo_name }}-*
       - id: upload_assets
         name: Upload artefacts to release
-        uses: leynos/shared-actions/.github/actions/upload-release-assets@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/upload-release-assets@7d751eded578e48dacf43ab173d5820e6437c474
         with:
           release-tag: ${{ github.ref_name }}
           bin-name: weaver
