@@ -92,7 +92,7 @@ jobs:
       # Linux packaging
       - name: Package weaver-cli for Linux
         if: inputs.platform == 'linux'
-        uses: leynos/shared-actions/.github/actions/linux-packages@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/linux-packages@7d751eded578e48dacf43ab173d5820e6437c474
         with:
           project-dir: .
           package-name: weaver-cli
@@ -109,7 +109,7 @@ jobs:
 
       - name: Package weaverd for Linux
         if: inputs.platform == 'linux'
-        uses: leynos/shared-actions/.github/actions/linux-packages@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/linux-packages@7d751eded578e48dacf43ab173d5820e6437c474
         with:
           project-dir: .
           package-name: weaverd
