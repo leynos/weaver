@@ -86,7 +86,7 @@ jobs:
         # as the trunk's and move the ratchet baseline with it. Nothing would
         # report it.
         if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@7d751eded578e48dacf43ab173d5820e6437c474
         with:
           format: lcov
           # Stated rather than left to the action's default, because this
