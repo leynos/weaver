@@ -513,6 +513,13 @@ because PyYAML otherwise keeps the last `runs-on` or `env` and says nothing,
 and reads a `.YML` extension like `.yml`; the runner-placement and concurrency
 readers and their tests read through it.
 
+[`cv005_wiring_test.py`](../tests/workflow_contracts/cv005_wiring_test.py)
+holds the local wiring: the pin is a full commit, the target runs the pinned
+checker with `check --repository .` under Python 3.13, `.github/cv005.toml`
+names this repository, `make all` includes the target, and CI runs it. The
+decision is recorded in
+[ADR 013](adr-013-adopt-the-shared-cv005-contract-library.md).
+
 ## Cancelling superseded pull-request runs
 
 Every push to a pull request starts a fresh run of each gate. The run already

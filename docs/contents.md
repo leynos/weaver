@@ -52,6 +52,10 @@ readers can find the source of truth without scanning the whole tree.
   streams](adr-012-versioned-selector-streams.md)
   - Proposed decision for deterministic selector JSONL, typed stream input,
     source identity, and stale-selector refusal.
+- [Architectural decision record (ADR) 013: Adopt the shared CV-005 contract
+  library](adr-013-adopt-the-shared-cv005-contract-library.md)
+  - Accepted decision to run the pinned shared `cv005-contracts` check instead
+    of a local copy of the CV-005 contract.
 - [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md)
   - Generated matrix classifying every command-contract roadmap task as an
     OrthoConfig consumer, temporary wrapper, pending dependency, or deliberate
