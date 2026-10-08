@@ -343,29 +343,30 @@ run by `make test-workflow-contracts`:
 | `secrets: inherit` on any call                 | forwards the token unnamed, and every other secret |
 | a call to this repository's workflow by `@ref` | runs a revision the contract has not read          |
 
-*Table 3: What the CodeScene placement contract refuses.*
+*Table 3: What the shared CV-005 contract refuses in a pull-request lane.*
 
-The third row is what makes the contract worth having. Deleting the step but
-leaving the token in the job environment looks clean in a diff and leaves the
-hazard in place, so the whole document is walked for the name rather than the
-three scopes that are meant to carry it: a `run` body, an action input, an
+The third row is what makes the shared contract worth having. Deleting the step
+but leaving the token in the job environment looks clean in a diff and leaves
+the hazard in place, so the whole document is walked for the name rather than
+the three scopes that are meant to carry it: a `run` body, an action input, an
 `env` value under any key and a named `secrets:` forwarding are all found. The
 fifth row closes the one route the walk cannot see, since `secrets: inherit`
 names nothing, so it is refused wherever it points, including at a workflow in
 this repository: a called workflow has `GITHUB_TOKEN` without being forwarded
 it, and `release-dry-run.yml` forwards no secret.
 
-A further test guards the other direction. Without it the rule could be
-satisfied by deleting coverage reporting altogether, which is compliance by
-amputation, so the publisher is asserted to exist, to have exactly its reviewed
-triggers, not to be startable by a pull request, and to state `mode: upload`
-rather than inherit it. The trigger set is compared whole: a `pull_request`
-added beside `push` would make the publisher a pull-request lane, and any other
-addition or removal changes what it is for unreviewed. Stating the mode means
-the publisher cannot quietly become the pull-request check gate.
+The shared CV-005 contract also guards the other direction. Without it the rule
+could be satisfied by deleting coverage reporting altogether, which is
+compliance by amputation, so the publisher is asserted to exist, to have
+exactly its reviewed triggers, not to be startable by a pull request, and to
+state `mode: upload` rather than inherit it. The trigger set is compared whole:
+a `pull_request` added beside `push` would make the publisher a pull-request
+lane, and any other addition or removal changes what it is for unreviewed.
+Stating the mode means the publisher cannot quietly become the pull-request
+check gate.
 
-Two further properties of the publisher are asserted, both of which fail
-silently rather than loudly.
+The shared contract asserts two further properties of the publisher, both of
+which fail silently rather than loudly.
 
 The upload step's condition names `github.ref == 'refs/heads/main'` as well as
 the token. `workflow_dispatch` can be run from any branch, and CodeScene
@@ -391,9 +392,9 @@ steps, and a job-scoped token would be readable by the tests that generate
 coverage, which a dispatch can run from any branch before the ref guard is
 reached. The earlier shape, a guard on `env.CS_ACCESS_TOKEN != ''`, passes with
 its binding deleted, and the upload then skips forever with nothing failing.
-The contract pins the command, its lack of a condition and of an `env`, its
-position before the upload, and the input, and refuses the token in any `env`
-on the job.
+The shared contract pins the command, its lack of a condition and of an `env`,
+its position before the upload, and the input, and refuses the token in any
+`env` on the job.
 
 Dependabot's automerge merges with the workflow's `GITHUB_TOKEN`, and a push
 made that way starts no workflow, so an automerged dependency bump never runs
@@ -414,11 +415,6 @@ republishes that commit's coverage but replaces no baseline saved under a
 run-keyed cache key. Cancelling would instead abandon a running upload and its
 baseline write.
 
-Six mutations cover the pair, three each: dropping the ref guard, loosening it
-to a suffix test, dropping the token guard, removing the concurrency block,
-making its group constant, and turning cancellation on. Each fails exactly one
-test.
-
 The upload condition is compared whole rather than searched for parts. A
 containment test accepts this expression, which holds both halves and is true
 on every branch, so it would pass the one expression it exists to refuse:
@@ -438,17 +434,17 @@ protections disagreeing about what the workflow is for.
 ### What must remain
 
 Everything above forbids something, so all of it is satisfied by a repository
-that measures no coverage at all. One test says what must stay: `ci.yml` is
-still started by `pull_request` and still runs `generate-coverage` with
-`with-ratchet` and `publish-artefact: 'false'` (the ratchet reads the report;
-nothing else does). That is where a reviewer's number comes from once the
-CodeScene step is gone.
+that measures no coverage at all. The shared contract says what must stay:
+`ci.yml` is still started by `pull_request` and still runs `generate-coverage`
+with `with-ratchet` and `publish-artefact: 'false'` (the ratchet reads the
+report; nothing else does). That is where a reviewer's number comes from once
+the CodeScene step is gone.
 
 It also requires that step to carry no `if:` at all. Presence is not
 reachability: `if: false` leaves the step in the file, where every other check
 still sees it, and runs it never. A condition here would be a way to switch the
 ratchet off while the diff looks untouched. If one is ever wanted, it is pinned
-in the contract by value.
+in the shared contract by value.
 
 ### The pull-request lane is a closure, not a list
 
@@ -458,10 +454,10 @@ those carrying a pull-request trigger. `release-dry-run.yml` is triggered by
 Reading only the roots would leave both outside every assertion while a pull
 request still runs them.
 
-The contract therefore follows `jobs.<id>.uses`, transitively, with a visited
-set so that two reusable workflows calling each other cannot hang it. A call is
-local when it resolves to a file directly under `.github/workflows/` once its
-prefix is stripped. That is matched by shape rather than by a list of
+The shared contract therefore follows `jobs.<id>.uses`, transitively, with a
+visited set so that two reusable workflows calling each other cannot hang it. A
+call is local when it resolves to a file directly under `.github/workflows/`
+once its prefix is stripped. That is matched by shape rather than by a list of
 spellings, with two prefixes stripped: `./`, the documented form, and `$/`.
 Accepting a spelling GitHub might refuse only widens the set the prohibitions
 run over; missing one GitHub accepts hides a workflow from all of them.
