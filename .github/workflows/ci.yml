@@ -150,4 +150,4 @@ jobs:
       # happens once, on push to main, in coverage-main.yml; the
       # changed-line gate a reviewer sees is CodeScene's own check against
       # that upload and needs nothing from here.
-      # Asserted by tests/workflow_contracts/ci_codescene_placement_test.py.
+      # Asserted by `make test-workflow-contracts`.

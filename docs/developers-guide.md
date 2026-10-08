@@ -331,8 +331,8 @@ merge.
 
 A pull-request lane may still generate coverage, because the ratchet is
 repository-owned and runs offline with no network dependency. What it may not
-do is any of these six, each of which fails
-`tests/workflow_contracts/ci_codescene_placement_test.py`:
+do is any of these six, each of which fails the shared CV-005 contract library,
+run by `make test-workflow-contracts`:
 
 | Forbidden in a pull-request lane               | Why it is read                                     |
 | ---------------------------------------------- | -------------------------------------------------- |
@@ -343,29 +343,30 @@ do is any of these six, each of which fails
 | `secrets: inherit` on any call                 | forwards the token unnamed, and every other secret |
 | a call to this repository's workflow by `@ref` | runs a revision the contract has not read          |
 
-*Table 3: What the CodeScene placement contract refuses.*
+*Table 3: What the shared CV-005 contract refuses in a pull-request lane.*
 
-The third row is what makes the contract worth having. Deleting the step but
-leaving the token in the job environment looks clean in a diff and leaves the
-hazard in place, so the whole document is walked for the name rather than the
-three scopes that are meant to carry it: a `run` body, an action input, an
+The third row is what makes the shared contract worth having. Deleting the step
+but leaving the token in the job environment looks clean in a diff and leaves
+the hazard in place, so the whole document is walked for the name rather than
+the three scopes that are meant to carry it: a `run` body, an action input, an
 `env` value under any key and a named `secrets:` forwarding are all found. The
 fifth row closes the one route the walk cannot see, since `secrets: inherit`
 names nothing, so it is refused wherever it points, including at a workflow in
 this repository: a called workflow has `GITHUB_TOKEN` without being forwarded
 it, and `release-dry-run.yml` forwards no secret.
 
-A further test guards the other direction. Without it the rule could be
-satisfied by deleting coverage reporting altogether, which is compliance by
-amputation, so the publisher is asserted to exist, to have exactly its reviewed
-triggers, not to be startable by a pull request, and to state `mode: upload`
-rather than inherit it. The trigger set is compared whole: a `pull_request`
-added beside `push` would make the publisher a pull-request lane, and any other
-addition or removal changes what it is for unreviewed. Stating the mode means
-the publisher cannot quietly become the pull-request check gate.
+The shared CV-005 contract also guards the other direction. Without it the rule
+could be satisfied by deleting coverage reporting altogether, which is
+compliance by amputation, so the publisher is asserted to exist, to have
+exactly its reviewed triggers, not to be startable by a pull request, and to
+state `mode: upload` rather than inherit it. The trigger set is compared whole:
+a `pull_request` added beside `push` would make the publisher a pull-request
+lane, and any other addition or removal changes what it is for unreviewed.
+Stating the mode means the publisher cannot quietly become the pull-request
+check gate.
 
-Two further properties of the publisher are asserted, both of which fail
-silently rather than loudly.
+The shared contract asserts two further properties of the publisher, both of
+which fail silently rather than loudly.
 
 The upload step's condition names `github.ref == 'refs/heads/main'` as well as
 the token. `workflow_dispatch` can be run from any branch, and CodeScene
@@ -391,9 +392,9 @@ steps, and a job-scoped token would be readable by the tests that generate
 coverage, which a dispatch can run from any branch before the ref guard is
 reached. The earlier shape, a guard on `env.CS_ACCESS_TOKEN != ''`, passes with
 its binding deleted, and the upload then skips forever with nothing failing.
-The contract pins the command, its lack of a condition and of an `env`, its
-position before the upload, and the input, and refuses the token in any `env`
-on the job.
+The shared contract pins the command, its lack of a condition and of an `env`,
+its position before the upload, and the input, and refuses the token in any
+`env` on the job.
 
 Dependabot's automerge merges with the workflow's `GITHUB_TOKEN`, and a push
 made that way starts no workflow, so an automerged dependency bump never runs
@@ -414,11 +415,6 @@ republishes that commit's coverage but replaces no baseline saved under a
 run-keyed cache key. Cancelling would instead abandon a running upload and its
 baseline write.
 
-Six mutations cover the pair, three each: dropping the ref guard, loosening it
-to a suffix test, dropping the token guard, removing the concurrency block,
-making its group constant, and turning cancellation on. Each fails exactly one
-test.
-
 The upload condition is compared whole rather than searched for parts. A
 containment test accepts this expression, which holds both halves and is true
 on every branch, so it would pass the one expression it exists to refuse:
@@ -438,17 +434,17 @@ protections disagreeing about what the workflow is for.
 ### What must remain
 
 Everything above forbids something, so all of it is satisfied by a repository
-that measures no coverage at all. One test says what must stay: `ci.yml` is
-still started by `pull_request` and still runs `generate-coverage` with
-`with-ratchet` and `publish-artefact: 'false'` (the ratchet reads the report;
-nothing else does). That is where a reviewer's number comes from once the
-CodeScene step is gone.
+that measures no coverage at all. The shared contract says what must stay:
+`ci.yml` is still started by `pull_request` and still runs `generate-coverage`
+with `with-ratchet` and `publish-artefact: 'false'` (the ratchet reads the
+report; nothing else does). That is where a reviewer's number comes from once
+the CodeScene step is gone.
 
 It also requires that step to carry no `if:` at all. Presence is not
 reachability: `if: false` leaves the step in the file, where every other check
 still sees it, and runs it never. A condition here would be a way to switch the
 ratchet off while the diff looks untouched. If one is ever wanted, it is pinned
-in the contract by value.
+in the shared contract by value.
 
 ### The pull-request lane is a closure, not a list
 
@@ -458,10 +454,10 @@ those carrying a pull-request trigger. `release-dry-run.yml` is triggered by
 Reading only the roots would leave both outside every assertion while a pull
 request still runs them.
 
-The contract therefore follows `jobs.<id>.uses`, transitively, with a visited
-set so that two reusable workflows calling each other cannot hang it. A call is
-local when it resolves to a file directly under `.github/workflows/` once its
-prefix is stripped. That is matched by shape rather than by a list of
+The shared contract therefore follows `jobs.<id>.uses`, transitively, with a
+visited set so that two reusable workflows calling each other cannot hang it. A
+call is local when it resolves to a file directly under `.github/workflows/`
+once its prefix is stripped. That is matched by shape rather than by a list of
 spellings, with two prefixes stripped: `./`, the documented form, and `$/`.
 Accepting a spelling GitHub might refuse only widens the set the prohibitions
 run over; missing one GitHub accepts hides a workflow from all of them.
@@ -498,35 +494,27 @@ a dispatch is not a pull request, which is why the publisher may carry one.
 
 ### How the readings are proved
 
-The reading machinery lives in
-`tests/workflow_contracts/codescene_placement_reader.py`, and every reader
-takes its documents as an argument. The reviewed values live in
-`codescene_placement_policy.py`, the publisher's clauses in
-`codescene_publisher_test.py`, the classification of `uses:` calls in
-`workflow_calls.py`, and loading in `workflow_loader.py`, which the runner
-placement contract shares. The repository's own workflows are all written the
-one way the first reader understood, so a reading that mishandles another shape
-passes against them either way.
-`tests/workflow_contracts/codescene_placement_reader_test.py` therefore drives
-each reading with constructed trees:
+`make test-workflow-contracts` runs `cv005-contracts check`, the shared
+contract library in `leynos/shared-actions` (`packages/cv005-contracts`), from
+a full commit named by `CV005_CONTRACTS_REF` in the Makefile, and then the
+pytest contracts in `tests/workflow_contracts/`. A fix to the CodeScene rules
+is therefore a pin bump. The target needs `uv`, which fetches the Python 3.13
+the library runs under. The repository's only parameter is `repository` in
+`.github/cv005.toml`. The library's own suite proves each rule refuses the
+shape it exists to refuse, so this repository keeps no copy of the closure over
+local calls, the secret and host readers, the call-by-`@ref` classifier or the
+publisher's clauses. What stays here is `workflow_loader.py`, which loads every
+workflow through a strict `SafeLoader` that refuses a duplicated mapping key,
+because PyYAML otherwise keeps the last `runs-on` or `env` and says nothing,
+and reads a `.YML` extension like `.yml`; the runner-placement and concurrency
+readers and their tests read through it.
 
-- the closure reaches a `workflow_call` probe that curls CodeScene's API with
-  an inherited token, in both local call spellings, and stays out of a reusable
-  workflow nothing calls;
-- a call to this repository by `@ref` is recognized, and kept narrow: a local
-  call, another repository, a repository whose name merely begins the same way
-  and this repository's own actions are not;
-- workflows are loaded through a strict `SafeLoader` that refuses a duplicated
-  mapping key, because PyYAML otherwise keeps the last `runs-on` or `env` and
-  says nothing;
-- `on:` is read as a scalar, a sequence or a mapping, under both the quoted
-  string key and YAML 1.1's boolean `True`; a workflow declaring both is
-  refused, since GitHub merges them; and any other shape is refused rather than
-  read as "no triggers", which would let the workflow escape every clause; and
-- a `.YML` extension is read like `.yml`.
-
-Each reading was mutated alone and restored from a copy while writing the
-contract, and each mutation failed at least one test that names what it broke.
+[`cv005_wiring_test.py`](../tests/workflow_contracts/cv005_wiring_test.py)
+holds the local wiring: the pin is a full commit, the target runs the pinned
+checker with `check --repository .` under Python 3.13, `.github/cv005.toml`
+names this repository, `make all` includes the target, and CI runs it. The
+decision is recorded in
+[ADR 013](adr-013-adopt-the-shared-cv005-contract-library.md).
 
 ## Cancelling superseded pull-request runs
 
