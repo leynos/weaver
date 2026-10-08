@@ -59,6 +59,8 @@ jobs:
       # the note in ci.yml. This lane carries no fork arm, so it is always on
       # Ubicloud, but the guard stays: it is what keeps the step correct if
       # the lane ever gains one.
+        with:
+          persist-credentials: false
       - name: Export Ubicloud cache credentials
         if: runner.environment == 'self-hosted'
         uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
