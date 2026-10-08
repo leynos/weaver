@@ -32,7 +32,19 @@ PIN = re.compile(r"^CV005_CONTRACTS_REF \?= (\S+)$", re.MULTILINE)
 
 
 def _make_n(target: str) -> str:
-    """Return the commands ``make -n TARGET`` would run."""
+    """Return the commands ``make -n TARGET`` would run.
+
+    Returns
+    -------
+    str
+        The dry-run output, one command per line.
+
+    Examples
+    --------
+    ``_make_n("test-workflow-contracts")`` returns the ``uv tool run`` line that
+    runs ``cv005-contracts check --repository .``, followed by the remaining
+    pytest contracts.
+    """
     result = subprocess.run(
         ["make", "-n", target],
         cwd=ROOT,
@@ -44,7 +56,19 @@ def _make_n(target: str) -> str:
 
 
 def _pinned_commit() -> str:
-    """Return the commit ``CV005_CONTRACTS_REF`` names in the Makefile."""
+    """Return the commit ``CV005_CONTRACTS_REF`` names in the Makefile.
+
+    Returns
+    -------
+    str
+        The value assigned to ``CV005_CONTRACTS_REF``.
+
+    Examples
+    --------
+    With ``CV005_CONTRACTS_REF ?= 8897779...`` in the Makefile, this returns the
+    forty-character hash, which the tests then compare with the checker's
+    source.
+    """
     match = PIN.search((ROOT / "Makefile").read_text("utf-8"))
     assert match is not None, "the Makefile must set CV005_CONTRACTS_REF"
     return match[1]
@@ -77,7 +101,10 @@ def test_the_repository_parameter_names_this_repository() -> None:
 
 def test_make_all_includes_the_target() -> None:
     """Run the checker from the comprehensive gate as well as on its own."""
-    assert "cv005-contracts check" in _make_n("all")
+    source = SOURCE.format(ref=_pinned_commit())
+    commands = _make_n("all")
+    assert f"--from '{source}'" in commands, commands
+    assert "cv005-contracts check --repository ." in commands, commands
 
 
 def test_ci_runs_the_target_unconditionally() -> None:
