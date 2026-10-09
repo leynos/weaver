@@ -110,6 +110,51 @@ def test_ci_installs_the_linker_before_gate_targets() -> None:
     assert missing == [], f"jobs run a gate target before installing `mold`: {missing}"
 
 
+def _runs_coverage_before_the_linker(job: dict) -> bool:
+    """Report whether a job runs `generate-coverage` before installing `mold`.
+
+    Coverage builds Rust through the action, not through a gate target, so the
+    ordering check above cannot see it. Its nested cargo runs (the trybuild
+    cases) read `.cargo/config.toml` and link with `mold`.
+    """
+    for step in job.get("steps") or []:
+        if "generate-coverage" in str(step.get("uses", "")):
+            return True
+        if _first_positions(step)[0] is not None:
+            return False
+    return False
+
+
+def test_coverage_jobs_install_the_linker_before_generating_coverage() -> None:
+    """A coverage lane without `mold` fails the trybuild link on the runner."""
+    missing = [
+        name for name, job in _linux_jobs() if _runs_coverage_before_the_linker(job)
+    ]
+    assert missing == [], f"jobs run coverage before installing `mold`: {missing}"
+
+
+def test_the_main_coverage_lane_is_held_to_the_linker_contract() -> None:
+    """The check covers `coverage-main.yml`, so it cannot pass by omission."""
+    names = {
+        name
+        for name, job in _linux_jobs()
+        if any("generate-coverage" in str(s.get("uses", "")) for s in job.get("steps") or [])
+    }
+    assert "coverage-main.yml:coverage-upload" in names
+
+
+def test_the_coverage_ordering_check_reads_each_way_to_install_the_linker() -> None:
+    """Only an install before the coverage step makes the job safe."""
+    coverage: WorkflowStep = {"uses": "o/shared-actions/.github/actions/generate-coverage@x"}
+    rust: WorkflowStep = {"uses": "o/shared-actions/.github/actions/setup-rust@x"}
+    with_input: WorkflowStep = {**rust, "with": {"install-mold": "true"}}
+    apt: WorkflowStep = {"run": "sudo apt-get install -y mold"}
+    assert _runs_coverage_before_the_linker({"steps": [coverage]})
+    assert _runs_coverage_before_the_linker({"steps": [rust, coverage]})
+    assert not _runs_coverage_before_the_linker({"steps": [with_input, coverage]})
+    assert not _runs_coverage_before_the_linker({"steps": [apt, coverage]})
+
+
 def _job_with_step(name: str) -> dict | None:
     """Return the first CI job holding a step called ``name``."""
     for _, job in _linux_jobs():
