@@ -14,7 +14,10 @@ import re
 from pathlib import Path
 from typing import TypedDict
 
+import pytest
 import yaml
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 ROOT = Path(__file__).resolve().parents[2]
 THREADS_FLAG = "-Zthreads=8"
@@ -108,6 +111,89 @@ def test_ci_installs_the_linker_before_gate_targets() -> None:
     """The gate targets restate `mold`, so a Linux job must install it first."""
     missing = _jobs_missing_the_linker()
     assert missing == [], f"jobs run a gate target before installing `mold`: {missing}"
+
+
+COVERAGE_STEP: WorkflowStep = {
+    "uses": "o/shared-actions/.github/actions/generate-coverage@x"
+}
+RUST_STEP: WorkflowStep = {"uses": "o/shared-actions/.github/actions/setup-rust@x"}
+MOLD_RUST_STEP: WorkflowStep = {**RUST_STEP, "with": {"install-mold": "true"}}
+APT_STEP: WorkflowStep = {"run": "sudo apt-get install -y mold"}
+OTHER_STEP: WorkflowStep = {"run": "echo unrelated"}
+
+
+def _runs_coverage_before_the_linker(job: dict[str, list[WorkflowStep]]) -> bool:
+    """Report whether a job runs `generate-coverage` before installing `mold`."""
+    # Coverage builds Rust through the action, not a gate target, so the gate
+    # ordering check cannot see it; its nested cargo runs (the trybuild cases)
+    # read `.cargo/config.toml` and link with `mold`.
+    for step in job.get("steps") or []:
+        if "generate-coverage" in str(step.get("uses", "")):
+            return True
+        if _first_positions(step)[0] is not None:
+            return False
+    return False
+
+
+def _covers(job: dict) -> bool:
+    """Report whether a job has a `generate-coverage` step."""
+    return any(
+        "generate-coverage" in str(step.get("uses", ""))
+        for step in job.get("steps") or []
+    )
+
+
+def test_coverage_jobs_install_the_linker_before_generating_coverage() -> None:
+    """A coverage lane without `mold` fails the trybuild link on the runner."""
+    missing = [
+        name for name, job in _linux_jobs() if _runs_coverage_before_the_linker(job)
+    ]
+    assert missing == [], f"jobs run coverage before installing `mold`: {missing}"
+
+
+def test_the_main_coverage_lane_is_held_to_the_linker_contract() -> None:
+    """The check covers `coverage-main.yml`, so it cannot pass by omission."""
+    names = {name for name, job in _linux_jobs() if _covers(job)}
+    assert "coverage-main.yml:coverage-upload" in names, (
+        f"coverage-main.yml:coverage-upload is not a coverage job; found {names}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("steps", "unsafe", "case"),
+    [
+        ([COVERAGE_STEP], True, "no install at all"),
+        ([RUST_STEP, COVERAGE_STEP], True, "setup-rust without the input"),
+        ([MOLD_RUST_STEP, COVERAGE_STEP], False, "install-mold input"),
+        ([APT_STEP, COVERAGE_STEP], False, "apt install"),
+        ([COVERAGE_STEP, MOLD_RUST_STEP], True, "install after coverage"),
+    ],
+)
+def test_the_coverage_ordering_check_reads_each_way_to_install_the_linker(
+    steps: list[WorkflowStep], unsafe: bool, case: str
+) -> None:
+    """Only an install before the coverage step makes the job safe."""
+    assert _runs_coverage_before_the_linker({"steps": steps}) is unsafe, case
+
+
+@settings(max_examples=200, deadline=None)
+@given(
+    st.lists(
+        st.sampled_from([COVERAGE_STEP, RUST_STEP, MOLD_RUST_STEP, APT_STEP, OTHER_STEP]),
+        max_size=8,
+    )
+)
+def test_the_coverage_ordering_check_matches_a_first_step_oracle(
+    steps: list[WorkflowStep],
+) -> None:
+    """Unsafe exactly when coverage appears and no installer precedes the first."""
+    installers = [MOLD_RUST_STEP, APT_STEP]
+    coverage_at = next((n for n, s in enumerate(steps) if s is COVERAGE_STEP), None)
+    install_at = next((n for n, s in enumerate(steps) if s in installers), None)
+    expected = coverage_at is not None and (
+        install_at is None or coverage_at < install_at
+    )
+    assert _runs_coverage_before_the_linker({"steps": steps}) is expected, steps
 
 
 def _job_with_step(name: str) -> dict | None:
