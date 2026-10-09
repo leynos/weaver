@@ -75,13 +75,15 @@ or `cargo doc`, uses `CARGO_BUILD_TARGET` alone. The CI job installs `mold`
 before the boundary manifest gate, which composes the same flags onto its
 `RUSTFLAGS`, and `make lint`. `tests/workflow_contracts/build_standard_test.py`
 holds the configuration and the Makefile recipes to this,
-`build_standard_ci_test.py` holds the install order and the boundary gate's
-composed flags, and `build_standard_warnings_test.py` holds the default warning
-policy, and `build_standard_target_test.py` checks each command's target
-selection against its own arguments. Every dry run starts from
-`build_standard_env.py`'s controlled environment, which removes the caller's
-exported targets, flag sets and Make options, and `build_standard_env_test.py`
-holds each helper to it.
+`build_standard_ci_test.py` holds the install order (including the coverage
+lane, which `coverage-main.yml:coverage-upload` satisfies with `setup-rust`'s
+`install-mold: 'true'` input before `generate-coverage`, because the trybuild
+cases link scratch crates with `mold`) and the boundary gate's composed flags,
+and `build_standard_warnings_test.py` holds the default warning policy, and
+`build_standard_target_test.py` checks each command's target selection against
+its own arguments. Every dry run starts from `build_standard_env.py`'s
+controlled environment, which removes the caller's exported targets, flag sets
+and Make options, and `build_standard_env_test.py` holds each helper to it.
 
 ## Workspace lint policy
 
