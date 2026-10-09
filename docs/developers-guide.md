@@ -102,9 +102,12 @@ group covers minor and patch updates. Major updates arrive in their own pull
 requests unless they match the unrestricted `rstest-bdd` group, which can group
 them. The `rstest-bdd` crates release in lockstep and one bumped alone does not
 build, so the `cargo` entry also has a narrow `rstest-bdd` group, which must
-precede the catch-all because Dependabot uses the first group that matches.
-Keep the schedule, the single catch-all group and that exception when changing
-`.github/dependabot.yml`.
+precede the catch-all because Dependabot uses the first group that matches. The
+`github-actions` entry also has a narrow `shared-actions` group
+(`leynos/shared-actions*`, no `update-types`) ahead of its catch-all: a bump of
+a shared-actions pin moves one commit SHA to another and has no semver level,
+so the typed catch-all never takes it. Keep the schedule, the single catch-all
+group and these two exceptions when changing `.github/dependabot.yml`.
 
 Dependabot owns the upgrade of GitHub Actions and reusable workflows, including
 calls into `leynos/shared-actions`. Contract tests that assert a caller's exact
