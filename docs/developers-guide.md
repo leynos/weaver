@@ -99,11 +99,12 @@ schedule does not guarantee a pull request each day: cooldown settings can
 delay eligible updates, and the limit of five open pull requests can defer
 additional version-update pull requests. Within each ecosystem, one catch-all
 group covers minor and patch updates. Major updates arrive in their own pull
-requests unless they match the unrestricted `rstest-bdd` group, which can group
-them. The `rstest-bdd` crates release in lockstep and one bumped alone does not
-build, so the `cargo` entry also has a narrow `rstest-bdd` group, which must
-precede the catch-all because Dependabot uses the first group that matches. The
-`github-actions` entry also has a narrow `shared-actions` group
+requests unless they match an unrestricted group, such as the Cargo
+`rstest-bdd` group or the GitHub Actions `shared-actions` group, which can
+group them. The `rstest-bdd` crates release in lockstep and one bumped alone
+does not build, so the `cargo` entry also has a narrow `rstest-bdd` group,
+which must precede the catch-all because Dependabot uses the first group that
+matches. The `github-actions` entry also has a narrow `shared-actions` group
 (`leynos/shared-actions*`, no `update-types`) ahead of its catch-all: a bump of
 a shared-actions pin moves one commit SHA to another and has no semver level,
 so the typed catch-all never takes it. Keep the schedule, the single catch-all
