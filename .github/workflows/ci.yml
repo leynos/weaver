@@ -62,13 +62,13 @@ jobs:
       # resolves to `self-hosted` on Ubicloud.
       - name: Export Ubicloud cache credentials
         if: runner.environment == 'self-hosted'
-        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@cfcc379e29be516160f499864ae82720842359af
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
+        uses: leynos/shared-actions/.github/actions/setup-rust@cfcc379e29be516160f499864ae82720842359af
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@0606ca899ce2995a0c4bc78e660e80832e6e8855
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@cfcc379e29be516160f499864ae82720842359af
         with:
           version: "0.6.1"
 
@@ -133,7 +133,7 @@ jobs:
       - name: Workflow contract tests
         run: make test-workflow-contracts
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@a5765019912a8ab6882b12db049c7cde635f3a85
+        uses: leynos/shared-actions/.github/actions/generate-coverage@cfcc379e29be516160f499864ae82720842359af
         with:
           output-path: lcov.info
           format: lcov

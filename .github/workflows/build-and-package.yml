@@ -71,11 +71,11 @@ jobs:
       # closed by design.
       - name: Export Ubicloud cache credentials
         if: runner.environment == 'self-hosted'
-        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@cfcc379e29be516160f499864ae82720842359af
 
       # Build weaver-cli
       - name: Build weaver-cli release binary
-        uses: leynos/shared-actions/.github/actions/rust-build-release@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/rust-build-release@cfcc379e29be516160f499864ae82720842359af
         with:
           target: ${{ inputs.target }}
           bin-name: weaver
@@ -83,7 +83,7 @@ jobs:
 
       # Build weaverd
       - name: Build weaverd release binary
-        uses: leynos/shared-actions/.github/actions/rust-build-release@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/rust-build-release@cfcc379e29be516160f499864ae82720842359af
         with:
           target: ${{ inputs.target }}
           bin-name: weaverd
@@ -92,7 +92,7 @@ jobs:
       # Linux packaging
       - name: Package weaver-cli for Linux
         if: inputs.platform == 'linux'
-        uses: leynos/shared-actions/.github/actions/linux-packages@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/linux-packages@cfcc379e29be516160f499864ae82720842359af
         with:
           project-dir: .
           package-name: weaver-cli
@@ -109,7 +109,7 @@ jobs:
 
       - name: Package weaverd for Linux
         if: inputs.platform == 'linux'
-        uses: leynos/shared-actions/.github/actions/linux-packages@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/linux-packages@cfcc379e29be516160f499864ae82720842359af
         with:
           project-dir: .
           package-name: weaverd
@@ -154,7 +154,7 @@ jobs:
       - name: Stage weaver-cli artefacts for macOS
         if: inputs.platform == 'macos'
         id: stage-weaver-cli
-        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@cfcc379e29be516160f499864ae82720842359af
         with:
           config-file: .github/release-staging.toml
           target: ${{ steps.macos-target.outputs.target }}
@@ -162,7 +162,7 @@ jobs:
       - name: Build weaver-cli macOS installer package
         if: inputs.platform == 'macos'
         id: package-weaver-cli-macos
-        uses: leynos/shared-actions/.github/actions/macos-package@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/macos-package@cfcc379e29be516160f499864ae82720842359af
         with:
           name: weaver-cli
           identifier: ${{ env.MAC_IDENTIFIER }}.cli
@@ -186,7 +186,7 @@ jobs:
       - name: Stage weaverd artefacts for macOS
         if: inputs.platform == 'macos'
         id: stage-weaverd
-        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@cfcc379e29be516160f499864ae82720842359af
         with:
           config-file: .github/release-staging-weaverd.toml
           target: ${{ steps.macos-target.outputs.target }}
@@ -194,7 +194,7 @@ jobs:
       - name: Build weaverd macOS installer package
         if: inputs.platform == 'macos'
         id: package-weaverd-macos
-        uses: leynos/shared-actions/.github/actions/macos-package@6b5cdc2d4c0bb72cafd5a66d24d248ac25827db9
+        uses: leynos/shared-actions/.github/actions/macos-package@cfcc379e29be516160f499864ae82720842359af
         with:
           name: weaverd
           identifier: ${{ env.MAC_IDENTIFIER }}.daemon
