@@ -9,7 +9,9 @@ use std::{
 
 /// Stream types accepted by the daemon listener.
 pub enum ConnectionStream {
+    /// A connection accepted on a TCP socket.
     Tcp(TcpStream),
+    /// A connection accepted on a Unix domain socket.
     #[cfg(unix)]
     Unix(UnixStream),
 }

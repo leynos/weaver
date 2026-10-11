@@ -20,9 +20,17 @@ pub use preparation::SocketPreparationError;
 #[serde(tag = "transport", rename_all = "snake_case")]
 pub enum SocketEndpoint {
     /// Unix domain socket endpoint.
-    Unix { path: Utf8PathBuf },
+    Unix {
+        /// Filesystem path of the socket.
+        path: Utf8PathBuf,
+    },
     /// TCP socket endpoint.
-    Tcp { host: String, port: u16 },
+    Tcp {
+        /// Host name or address to bind or connect to.
+        host: String,
+        /// TCP port.
+        port: u16,
+    },
 }
 
 impl SocketEndpoint {
