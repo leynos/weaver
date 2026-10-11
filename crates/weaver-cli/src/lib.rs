@@ -113,6 +113,7 @@ impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
     ///
     /// ```
     /// use std::io::Cursor;
+    ///
     /// use weaver_cli::IoStreams;
     ///
     /// let mut stdin = Cursor::new(Vec::<u8>::new());
