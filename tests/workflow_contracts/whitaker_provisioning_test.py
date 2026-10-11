@@ -58,18 +58,28 @@ def _provisions_before_lint(workflow: Document) -> bool:
     return install_at is not None and lint_at is not None and install_at < lint_at
 
 
+def _step_scopes(step: dict) -> typ.Iterator[object]:
+    """Yield a step's ``env`` mapping and ``run`` text."""
+    yield step.get("env", {})
+    yield step.get("run", "")
+
+
+def _job_scopes(job: dict) -> typ.Iterator[object]:
+    """Yield a job's ``env`` mapping and every scope of its steps."""
+    yield job.get("env", {})
+    for step in job.get("steps", []):
+        yield from _step_scopes(step)
+
+
 def _scopes(workflow: Document) -> typ.Iterator[object]:
     """Yield every place a Whitaker install or suite pin could be written.
 
     That is the workflow's and each job's ``env`` mapping, and each step's
     ``env`` mapping and ``run`` text.
     """
-    yield workflow.get("env") or {}
-    for job in typ.cast("dict", workflow.get("jobs") or {}).values():
-        yield job.get("env") or {}
-        for step in job.get("steps") or []:
-            yield step.get("env") or {}
-            yield step.get("run") or ""
+    yield workflow.get("env", {})
+    for job in typ.cast("dict", workflow.get("jobs", {})).values():
+        yield from _job_scopes(job)
 
 
 def _installs_by_hand(workflow: Document) -> bool:
