@@ -666,8 +666,13 @@ the suite to a revision: an earlier revision of this workflow cloned the
 Whitaker source at a fixed `WHITAKER_REV` and ran
 `whitaker-installer --build-only --no-update`. The step is therefore not
 reproducible to a lint-suite revision; the pinned action revision and the
-installer version are what stay fixed. The workflow-contract tests do not
-assert this step, so changing the action pin is an ordinary reviewed diff.
+installer version are what stay fixed.
+`tests/workflow_contracts/ whitaker_provisioning_test.py` asserts this step:
+the action at the pinned revision, unconditionally, with `cranelift: true`,
+before `make lint`, and no `whitaker-installer` use or `WHITAKER_REV` in any
+`env` or `run` text. Changing the action pin therefore also means changing
+`PINNED_REVISION` in that test, to a revision that concordat's QG-002 rule
+lists.
 
 See the [Whitaker user's guide](whitaker-users-guide.md) for day-to-day usage
 of the installed lints.
