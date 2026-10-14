@@ -64,6 +64,8 @@ EXPECTED_FORK_FALLBACK: typ.Final = {
 #: reads as a decision, and it moves when somebody re-enables it and can watch
 #: it run.
 EXPECTED_LITERAL_LABEL: typ.Final = {
+    # Disposable, owner-only native caller experiment; never a production lane.
+    ("macos-sandbox-caller-boundary-diagnostic.yml", "observe"): MACOS_LABEL,
     ("ci.yml", "build-test"): SANDBOX_COMPATIBLE_LINUX,
     ("coverage-main.yml", "coverage-upload"): SANDBOX_COMPATIBLE_LINUX,
     ("release.yml", "release"): UBICLOUD_SMALL,
@@ -112,6 +114,7 @@ DELEGATED_JOBS: typ.Final = {
 #: a ``uses:`` job may not declare a ceiling, and the single
 #: ``build-and-package.yml`` entry here is the one that bounds all three.
 EXPECTED_CEILING_MINUTES: typ.Final = {
+    ("macos-sandbox-caller-boundary-diagnostic.yml", "observe"): 15,
     ("ci.yml", "build-test"): 30,
     ("coverage-main.yml", "coverage-upload"): 20,
     ("release.yml", "metadata"): 10,

@@ -1,0 +1,104 @@
+name: Disposable macOS sandbox caller boundary
+
+'on':
+  push:
+    branches: [diagnostic-macos-sandbox-caller-boundary-oct14]
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    if: >-
+      github.repository == 'leynos/weaver' && github.actor == 'leynos'
+      && github.event_name == 'push' && github.event.deleted == false
+      && github.ref == 'refs/heads/diagnostic-macos-sandbox-caller-boundary-oct14'
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: leynos/shared-actions/.github/actions/setup-rust@cfcc379e29be516160f499864ae82720842359af
+      - name: Record runner and immutable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_LOG_DIR="$RUNNER_TEMP/macos-sandbox-caller-boundary"
+          printf 'RUN_LOG_DIR=%s\n' "$RUN_LOG_DIR" >> "$GITHUB_ENV"
+          mkdir -p "$RUN_LOG_DIR"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          {
+            git rev-parse HEAD
+            git rev-parse HEAD^
+            sw_vers
+            uname -m
+            rustup run nightly-2026-03-26 rustc -vV
+            cargo +nightly-2026-03-26 --version
+            python3 --version
+            printf 'ImageVersion=%s\n' "${ImageVersion:-unavailable}"
+          } > "$RUN_LOG_DIR/runner.txt" 2>&1
+      - name: Validate controller contracts before compilation or activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python3 -m unittest discover -s tests/diagnostics \
+            -p 'macos_caller_boundary*_test.py' -v \
+            2>&1 | tee "$RUN_LOG_DIR/controller-contracts.out"
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          printf 'unittest=%s tee=%s\n' "${statuses[0]}" "${statuses[1]}" > "$RUN_LOG_DIR/controller-contracts.status"
+          if [ "${statuses[0]}" -ne 0 ]; then exit "${statuses[0]}"; fi
+          exit "${statuses[1]}"
+      - name: Reject ambient development routing before compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/macos-sandbox-caller-boundary.py \
+            --check-routing-only --output-dir "$RUN_LOG_DIR/observation"
+      - name: Build verification probe with the non-development backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec 3> >(tee "$RUN_LOG_DIR/build.stderr" >&2)
+          stderr_tee_pid=$!
+          set +e
+          cargo +nightly-2026-03-26 test --locked -p weaver-sandbox \
+            --test sandbox_macos_caller_probe --no-run --message-format=json -vv \
+            2>&3 \
+            | tee "$RUN_LOG_DIR/build.jsonl"
+          statuses=("${PIPESTATUS[@]}")
+          exec 3>&-
+          wait "$stderr_tee_pid"
+          stderr_status=$?
+          set -e
+          printf 'cargo=%s stdout_tee=%s stderr_tee=%s\n' \
+            "${statuses[0]}" "${statuses[1]}" "$stderr_status" > "$RUN_LOG_DIR/build.status"
+          if [ "${statuses[0]}" -ne 0 ]; then exit "${statuses[0]}"; fi
+          if [ "${statuses[1]}" -ne 0 ]; then exit "${statuses[1]}"; fi
+          exit "$stderr_status"
+      - name: Observe exactly two fresh callers
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python3 tools/diagnostics/macos-sandbox-caller-boundary.py \
+            --cargo-artifact-log "$RUN_LOG_DIR/build.jsonl" \
+            --output-dir "$RUN_LOG_DIR/observation" \
+            2>&1 | tee "$RUN_LOG_DIR/controller.out"
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          printf 'controller=%s tee=%s\n' "${statuses[0]}" "${statuses[1]}" > "$RUN_LOG_DIR/controller.status"
+          if [ "${statuses[0]}" -ne 0 ]; then exit "${statuses[0]}"; fi
+          exit "${statuses[1]}"
+      - name: Retain diagnostic evidence even for a finding
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: macos-sandbox-caller-boundary
+          path: ${{ runner.temp }}/macos-sandbox-caller-boundary
+          if-no-files-found: error
+          retention-days: 7

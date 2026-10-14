@@ -26,3 +26,8 @@ harness = false
 name = "sandbox_behaviour_child"
 path = "tests/sandbox_behaviour_child.rs"
 harness = false
+
+[[test]]
+name = "sandbox_macos_caller_probe"
+path = "tests/sandbox_macos_caller_probe.rs"
+harness = false

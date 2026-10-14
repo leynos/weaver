@@ -1992,3 +1992,32 @@ For launch failures, guidance can tell the operator where to inspect runtime
 artefacts even when the daemon process never starts. For startup failures,
 guidance derives `runtime_dir.join("weaverd.health")` and points directly at
 the health snapshot that should explain why readiness was not reached.
+
+### Disposable macOS caller-boundary diagnostic
+
+The `diagnostic-macos-sandbox-caller-boundary-oct14` branch contains an
+unmerged, temporary experiment. Its harness-free Rust test, Python controller,
+and private support, fixed-protocol and dependency-metadata modules are
+diagnostic helpers, used only together by the matching branch-push workflow.
+They are not reusable sandbox or process-supervision interfaces. Only a
+disposable initial-thread caller activates Birdcage; the controller owns
+fixtures, bounded observation and session cleanup. A caller blocks before
+activation until that controller verifies session ownership and sends its
+admission byte; target mode uses a separate release handshake. Exit 10 reports
+the predicted caller restriction, 0 falsifies that prediction, and 20 means
+inconclusive, and 77 means unsupported. None approves an architecture. The
+branch must never be merged or scheduled. Run only its named diagnostic
+preparation commands; the registered harness-free target is not an ordinary
+workspace test. Preparation requires Python 3.11 or later for `tomllib`. Its
+named controller contracts use only Python’s standard library, exercise
+classification and preactivation cleanup, and run before Cargo preparation. The
+fixed-protocol and dependency-metadata helpers may be imported only by this
+controller and those contracts. These preparation tests are separate from the
+two actual caller observations and never invoke Birdcage. Dependency metadata
+distinguishes loose files from logical system install names. Cache-eligible
+names remain availability-unverified until the ordinary spawn control
+successfully loads the executable; no runtime grant is expanded.
+
+The private `macos_caller_boundary_cargo` module frames bounded Cargo command
+records only for the support module’s routing checks and their preparation
+contracts; it is not a general command runner or reusable Cargo parser.
