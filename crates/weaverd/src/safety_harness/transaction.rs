@@ -67,9 +67,17 @@ impl TransactionOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContentChange {
     /// Write the full content to the target path (create or replace).
-    Write { path: PathBuf, content: String },
+    Write {
+        /// Path to create or replace.
+        path: PathBuf,
+        /// Full new content of the file.
+        content: String,
+    },
     /// Delete the target path.
-    Delete { path: PathBuf },
+    Delete {
+        /// Path to delete.
+        path: PathBuf,
+    },
 }
 
 impl ContentChange {
