@@ -61,13 +61,13 @@ jobs:
       # resolves to `self-hosted` on Ubicloud.
       - name: Export Ubicloud cache credentials
         if: runner.environment == 'self-hosted'
-        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@e693d81d176d2305e2b736a0be0f9038085dec7f
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/setup-rust@e693d81d176d2305e2b736a0be0f9038085dec7f
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@e693d81d176d2305e2b736a0be0f9038085dec7f
         with:
           version: "0.6.1"
 
@@ -117,7 +117,7 @@ jobs:
           RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }$STANDARD_RUSTFLAGS"
           cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
       - name: Install Whitaker
-        uses: leynos/shared-actions/.github/actions/install-whitaker@6cec89bac47a21cf756d68d638a9a510998e57f8
+        uses: leynos/shared-actions/.github/actions/install-whitaker@e693d81d176d2305e2b736a0be0f9038085dec7f
         with:
           cranelift: true
       - name: Lint
@@ -125,7 +125,7 @@ jobs:
       - name: Workflow contract tests
         run: make test-workflow-contracts
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/generate-coverage@e693d81d176d2305e2b736a0be0f9038085dec7f
         with:
           output-path: lcov.info
           format: lcov
