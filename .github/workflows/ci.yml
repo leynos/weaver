@@ -154,3 +154,12 @@ jobs:
       - name: Report resource sampler
         if: always()
         run: ./scripts/ci-resource-sampler.sh report
+      - name: Disk breakdown
+        if: always()
+        run: |
+          df -h / "${RUNNER_TEMP}" "${GITHUB_WORKSPACE}" || true
+          du -xsh "${GITHUB_WORKSPACE}" "${GITHUB_WORKSPACE}/target" ~/.cargo ~/.rustup ~/.cache ~/.local /tmp /opt/hostedtoolcache "${RUNNER_TEMP}" 2>/dev/null || true
+          echo '--- target subdirs'; du -xh --max-depth=2 "${GITHUB_WORKSPACE}/target" 2>/dev/null | sort -rh | head -25 || true
+          echo '--- ~/.cargo'; du -xh --max-depth=2 ~/.cargo 2>/dev/null | sort -rh | head -10 || true
+          echo '--- /home/runner'; du -xh --max-depth=2 /home/runner 2>/dev/null | sort -rh | head -15 || true
+          echo '--- / top'; sudo du -xh --max-depth=2 / 2>/dev/null | sort -rh | head -25 || true
