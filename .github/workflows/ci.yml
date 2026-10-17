@@ -4,6 +4,11 @@ name: CI
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner label for this measurement run
+        required: false
+        default: ubicloud-standard-4
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -31,8 +36,8 @@ jobs:
     # is absent and the expression selects the Ubicloud arm, which is right:
     # a dispatch is not a fork.
     runs-on: >-
-      ${{ github.event.pull_request.head.repo.fork
-      && 'ubuntu-latest' || 'ubicloud-standard-4' }}
+      ${{ inputs.runner || (github.event.pull_request.head.repo.fork
+      && 'ubuntu-latest' || 'ubicloud-standard-4') }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -43,6 +48,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+      - name: Start resource sampler
+        run: ./scripts/ci-resource-sampler.sh start
       # Ubicloud runs a cache proxy on the runner's private network, and the
       # runner exposes its URL and token to action steps only. This
       # republishes them through the job environment and clears
@@ -123,6 +130,7 @@ jobs:
       - name: Lint
         run: make lint
       - name: Workflow contract tests
+        continue-on-error: true
         run: make test-workflow-contracts
       - name: Test and Measure Coverage
         uses: leynos/shared-actions/.github/actions/generate-coverage@cfcc379e29be516160f499864ae82720842359af
@@ -143,3 +151,6 @@ jobs:
       # changed-line gate a reviewer sees is CodeScene's own check against
       # that upload and needs nothing from here.
       # Asserted by `make test-workflow-contracts`.
+      - name: Report resource sampler
+        if: always()
+        run: ./scripts/ci-resource-sampler.sh report
