@@ -59,7 +59,7 @@ def test_cargo_detector_agrees_with_shell_token_reference(
     )
     assert _matches_source_build(script, CARGO_INSTALL) is _reference_cargo_install(
         script
-    )
+    ), f"Cargo detector disagreed with the reference for {script!r}"
 
 
 @given(git_gap=WORD_GAP, clone_gap=WORD_GAP, path_gap=URL_GAP)
@@ -73,7 +73,7 @@ def test_whitaker_detector_agrees_with_shell_token_reference(
     )
     assert _matches_source_build(script, WHITAKER_CLONE) is _reference_whitaker_clone(
         script
-    )
+    ), f"Whitaker detector disagreed with the reference for {script!r}"
 
 
 @given(gap=WORD_GAP, command=st.sampled_from(("cargo build", "git status")))
@@ -84,7 +84,7 @@ def test_source_build_detectors_reject_unrelated_shell_commands(
     script = f"{command}{gap}https://github.com/leynos/whitaker"
     assert _matches_source_build(script, CARGO_INSTALL) is _reference_cargo_install(
         script
-    )
+    ), f"Cargo detector disagreed with the reference for {script!r}"
     assert _matches_source_build(script, WHITAKER_CLONE) is _reference_whitaker_clone(
         script
-    )
+    ), f"Whitaker detector disagreed with the reference for {script!r}"
