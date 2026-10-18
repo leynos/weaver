@@ -668,11 +668,11 @@ instead of compiling them on every run:
   its pinned checksum and installs Nixie 1.1.0 on Python 3.14, which that
   release requires.
 
-Until September 2026 both tools were compiled on every run. `cargo install
-merman-cli` built Merman from crates.io, a median 2.6 minutes, and the former
-Whitaker step built its installer, cloned the source and compiled the lint
-suite with Cranelift, a median 1.9 minutes: about a third of `build-test`'s
-13-minute median on a paid runner.
+Until September 2026 both tools were compiled on every run.
+`cargo install merman-cli` built Merman from crates.io, a median 2.6 minutes,
+and the former Whitaker step built its installer, cloned the source and
+compiled the lint suite with Cranelift, a median 1.9 minutes: about a third of
+`build-test`'s 13-minute median on a paid runner.
 
 Prebuilt Whitaker libraries are published for the rolling suite tip. A new
 Whitaker lint can therefore fail `make lint` without a Weaver change; the fix
@@ -686,8 +686,13 @@ returning: no workflow may run `cargo install` or clone Whitaker, and the
 Cranelift input and ordering in place.
 
 The source-build matchers collapse only Bash backslash-newline pairs before
-matching, preserving ordinary newlines as command boundaries. Bounded Hypothesis
-properties compare both detectors with a reference model.
+matching, preserving ordinary newlines as command boundaries. Bounded
+Hypothesis properties compare both detectors with a reference model.
+
+`make test-workflow-contracts` runs the shared CV-005 check and invokes
+`pytest tests/workflow_contracts -q` through `uv`, with `pytest>=8`,
+`pyyaml>=6` and `hypothesis>=6`. Hypothesis generates the cases used by the
+source-build properties.
 
 ## Adding or renaming public commands
 

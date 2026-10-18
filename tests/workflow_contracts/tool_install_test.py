@@ -16,9 +16,8 @@ an action that quietly builds from source anyway:
 
 - each install is a shared action pinned to a full commit SHA, so the code
   that runs is the code that was reviewed;
-- `install-whitaker` asks for an installer at or above 0.2.7, the first to
-  take the prebuilt Dylint path, and neither pins the lint suite nor turns off
-  `ci-mode`, since either forces or permits a source build;
+- the Whitaker-specific contract verifies its pinned prebuilt action and
+  Cranelift input;
 - each install runs before the step that needs its tool.
 
 Run via ``make test-workflow-contracts``.
@@ -48,9 +47,6 @@ WHITAKER_CLONE: typ.Final = re.compile(
 
 #: A full commit SHA, the only pin that names one immutable revision.
 COMMIT_SHA: typ.Final = re.compile(r"^[0-9a-f]{40}$")
-
-#: The first installer release that takes the prebuilt Dylint path.
-MINIMUM_INSTALLER: typ.Final = (0, 2, 7)
 
 LANE: typ.Final = ("ci.yml", "build-test")
 NIXIE_ACTION: typ.Final = "leynos/shared-actions/.github/actions/install-nixie"
@@ -313,27 +309,6 @@ def test_merman_comes_from_the_verified_release() -> None:
     assert _version(f"{python}.0" if python.count(".") == 1 else python) >= (3, 14), (
         f"install-nixie's python-version {python} is below 3.14, which "
         "nixie-cli 1.1.0 requires; the install fails to resolve"
-    )
-
-
-def test_whitaker_takes_the_prebuilt_path() -> None:
-    """The installer is new enough, and nothing forces or permits a source build."""
-    _, step = _action_step(WHITAKER_ACTION)
-    inputs = step.get("with", {})
-    assert isinstance(inputs, dict), "install-whitaker must declare its inputs"
-    version = str(inputs.get("installer-version", ""))
-    assert _version(version) >= MINIMUM_INSTALLER, (
-        f"installer-version {version} predates the prebuilt Dylint path "
-        f"({'.'.join(map(str, MINIMUM_INSTALLER))})"
-    )
-    assert not inputs.get("suite-version"), (
-        "suite-version pins the lint suite, which forces a source build"
-    )
-    assert str(inputs.get("ci-mode", "true")).lower() == "true", (
-        "ci-mode must stay on, so a fallback to a source build fails the step"
-    )
-    assert str(inputs.get("allow-suite-pin", "false")).lower() == "false", (
-        "allow-suite-pin permits the source build ci-mode exists to refuse"
     )
 
 

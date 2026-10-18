@@ -1,4 +1,10 @@
-"""Property contracts for workflow source-build shell matching."""
+"""Property-test source-build detection against independent shell references.
+
+Hypothesis generates bounded shell command gaps and toolchain prefixes for the
+Merman install and Whitaker clone patterns. Each property compares the
+production matcher in ``tool_install_test`` with an independent reference
+detector, checking continuation handling and command boundaries.
+"""
 
 from __future__ import annotations
 
