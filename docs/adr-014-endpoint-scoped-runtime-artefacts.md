@@ -81,7 +81,7 @@ identifier in each filename.
 The daemon opens the lock file through its capability directory and holds an
 exclusive file lock on that handle for its lifetime. Unix uses `flock`, except
 Solaris, where `fcntl` locking is paired with a process-local guard because
-those locks do not exclude threads in the same process. After daemonisation,
+those locks do not exclude threads in the same process. After daemonization,
 the child reacquires the process-associated lock before publishing its PID; the
 parent retains the lock until it exits, so this handoff cannot open a gap.
 Windows uses `LockFileEx` on the same capability-opened handle. The lock file
