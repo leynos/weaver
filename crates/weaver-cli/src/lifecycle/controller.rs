@@ -101,8 +101,8 @@ impl SystemLifecycle {
         wait_for_shutdown(&paths, context.config.daemon_socket())?;
         output.stdout_line(format_args!("daemon pid {pid} stopped cleanly"))?;
         output.stderr_line(format_args!(
-            "removed runtime artefacts from {}",
-            paths.runtime_dir().display()
+            "retained persistent runtime lock at {}",
+            paths.lock_path().display()
         ))?;
         Ok(ExitCode::SUCCESS)
     }
@@ -151,8 +151,10 @@ impl SystemLifecycle {
     ) -> Result<(), LifecycleError> {
         output.stdout_line(format_args!(
             concat!(
-                "daemon socket {} is listening but runtime files are missing; consider ",
-                "'weaver daemon stop' or removing {}"
+                "daemon socket {} is listening but endpoint-scoped runtime files are missing \
+                 under ",
+                "{}; if this daemon predates endpoint-scoped filenames, stop it with the previous ",
+                "version or its known PID before upgrading"
             ),
             runtime.endpoint,
             runtime.paths.runtime_dir().display()
@@ -222,5 +224,36 @@ impl SystemLifecycle {
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
         self.report_degraded_status(RuntimeProbe { reachable, pid }, runtime, output)?;
         Ok(ExitCode::SUCCESS)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for lifecycle status reporting.
+
+    use weaver_config::Config;
+
+    use super::*;
+
+    #[test]
+    fn status_guides_operators_away_from_unverified_legacy_processes() {
+        let config = Config::default();
+        let paths = RuntimePaths::from_config_readonly(&config)
+            .expect("default runtime paths should derive without filesystem access");
+        let runtime = RuntimeStatusContext {
+            paths: &paths,
+            endpoint: config.daemon_socket(),
+        };
+        let lifecycle = SystemLifecycle;
+        let mut output = LifecycleOutput::new(Vec::new(), Vec::new());
+
+        lifecycle
+            .report_socket_without_pid(runtime, &mut output)
+            .expect("status message should be written");
+
+        let stdout = String::from_utf8(output.stdout).expect("status output should be UTF-8");
+        assert!(stdout.contains("endpoint-scoped runtime files are missing"));
+        assert!(stdout.contains("stop it with the previous version or its known PID"));
+        assert!(!stdout.contains("removing"));
     }
 }

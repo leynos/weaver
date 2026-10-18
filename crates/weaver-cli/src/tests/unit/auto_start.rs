@@ -80,6 +80,22 @@ fn auto_start_failure_paths(
         stderr_text.contains(expected_substring),
         "expected stderr to contain {expected_substring:?}, got: {stderr_text:?}"
     );
+    if daemon_binary == "/bin/false" {
+        let health_path = RuntimePaths::from_config_readonly(&config)
+            .expect("runtime paths should derive")
+            .health_path()
+            .display()
+            .to_string();
+        assert!(
+            stderr_text.contains(&format!("Check health snapshot at {health_path}")),
+            concat!(
+                "startup guidance should use endpoint health path ",
+                "{0:?}; got: {1:?}"
+            ),
+            health_path,
+            stderr_text
+        );
+    }
 }
 
 /// Verifies that missing daemon binary provides actionable guidance.

@@ -3521,6 +3521,7 @@ dependencies = [
  "weaver-plugins",
  "weaver-syntax",
  "weaver-test-macros",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
