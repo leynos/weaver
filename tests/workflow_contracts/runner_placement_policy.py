@@ -96,7 +96,9 @@ DELEGATED_JOBS: typ.Final = {
 
 #: Ceilings, pinned by value rather than bounded, because a ceiling can drift
 #: to a number nobody chose while every inequality still holds. Measurements
-#: are from the last green run of each workflow on 2026-09-16.
+#: are from the last green run of each workflow on 2026-09-16. The 2026-10-18
+#: PR run was still compiling `make lint` dependencies when the build-test
+#: ceiling expired, so allow 60 min until a new green run measures the lane.
 #:
 #: ``build-test`` 938 s, ``coverage-upload`` 174 s, ``metadata`` 14 s, and
 #: ``build-and-package``'s single job 343 s on its slowest leg. ``release`` is
@@ -107,7 +109,7 @@ DELEGATED_JOBS: typ.Final = {
 #: a ``uses:`` job may not declare a ceiling, and the single
 #: ``build-and-package.yml`` entry here is the one that bounds all three.
 EXPECTED_CEILING_MINUTES: typ.Final = {
-    ("ci.yml", "build-test"): 30,
+    ("ci.yml", "build-test"): 60,
     ("coverage-main.yml", "coverage-upload"): 20,
     ("release.yml", "metadata"): 10,
     ("release.yml", "release"): 15,

@@ -211,7 +211,7 @@ minutes are free.
 
 | Workflow                | Job               | Trigger                | Runner                | Ceiling  |
 | ----------------------- | ----------------- | ---------------------- | --------------------- | -------- |
-| `ci.yml`                | `build-test`      | pull request, dispatch | `ubicloud-standard-4` | 30 min   |
+| `ci.yml`                | `build-test`      | pull request, dispatch | `ubicloud-standard-4` | 60 min   |
 | `coverage-main.yml`     | `coverage-upload` | push, dispatch         | `ubicloud-standard-2` | 20 min   |
 | `release.yml`           | `metadata`        | tag push, dry run      | `ubicloud-standard-2` | 10 min   |
 | `release.yml`           | `release`         | tag push               | `ubicloud-standard-2` | 15 min   |
