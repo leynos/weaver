@@ -195,15 +195,26 @@ the socket.
 
 `weaverd` backgrounds itself using `daemonize-me` and manages runtime artefacts
 under the same directory as the Unix socket (for example
-`$XDG_RUNTIME_DIR/weaver`). Launching the daemon creates a lock file
+`$XDG_RUNTIME_DIR/weaver`). The default endpoint uses a lock file
 (`weaverd.lock`), a PID file (`weaverd.pid`), and a health snapshot
-(`weaverd.health`). PID and health files are written atomically, so observers
-never see a partially written payload. Attempts to start a second copy while
-one is running fail fast with an "already running" error that reports the
-existing PID. When the original launch is still initializing and has not yet
-published a PID, the second invocation now reports "launch already in progress"
-instead of removing the lock. If the daemon exited uncleanly, the new instance
-removes the stale files before continuing.
+(`weaverd.health`). A non-default endpoint uses the same suffixes with a stable
+SHA-256-derived endpoint identifier in the filename, for example
+`weaverd-<endpoint-hash>.pid`. PID and health files are written atomically, so
+observers never see a partially written payload. Attempts to start a second
+copy while one is running fail fast with an "already running" error that
+reports the existing PID. When the original launch is still initializing and
+has not yet published a PID, the second invocation reports "launch already in
+progress" instead of removing the lock. If the daemon exited uncleanly, the new
+instance removes stale PID and health files before continuing. The lock file
+remains after shutdown so that a later launch can reclaim it without an
+unlink-and-recreate race.
+
+When upgrading from a version that used shared runtime filenames, stop any
+running daemon with a non-default endpoint before upgrading. Those older PID
+and health files did not record their endpoint, so the current CLI cannot
+safely determine which daemon owns them and will not use them to signal a
+process. Stop the daemon with the previous version or its known PID, then
+upgrade and start it again.
 
 The daemon now binds a socket listener as part of startup. It binds to the
 configured `--daemon-socket` endpoint and accepts multiple client connections
@@ -241,12 +252,13 @@ daemon protocol. Example:
 {"status":"ready","pid":12345,"timestamp":1713356400}
 ```
 
-The `status` transitions through `starting`, `ready`, and `stopping` before the
-files are removed on shutdown. Sending `SIGTERM`, `SIGINT`, `SIGQUIT`, or
-`SIGHUP` prompts the daemon to log the request and complete its shutdown
-sequence within a ten-second budget. For interactive debugging or CI jobs, set
-`WEAVER_FOREGROUND=1` to keep the daemon attached to the terminal while
-preserving the same lock, PID, and health semantics.
+The `status` transitions through `starting`, `ready`, and `stopping`. Shutdown
+removes the PID and health files but retains the persistent lock file for safe
+reuse. Sending `SIGTERM`, `SIGINT`, `SIGQUIT`, or `SIGHUP` prompts the daemon
+to log the request and complete its shutdown sequence within a ten-second
+budget. For interactive debugging or CI jobs, set `WEAVER_FOREGROUND=1` to keep
+the daemon attached to the terminal while preserving the same lock, PID, and
+health semantics.
 
 ## Sandbox defaults
 
@@ -272,16 +284,16 @@ therefore honour the configuration flags supplied to the CLI, including
   `weaverd` binary (the path can be overridden via `WEAVERD_BIN`), and waits
   for the health snapshot to report `ready`. The command refuses to start when
   the socket already accepts connections and prints the runtime directory that
-  now holds the lock, PID, and health files.
-- `weaver daemon stop` reads the PID file, sends `SIGTERM`, and waits for the
-  runtime artefacts and socket to disappear. If the socket is reachable but the
-  PID file is missing, the command surfaces an error rather than blindly
-  killing a process. Successful stops report the PID that was terminated and
-  confirm the runtime directory was cleaned up.
-- `weaver daemon status` inspects the JSON health snapshot when present, falling
-  back to the PID file and socket reachability. When no runtime artefacts exist
-  the command prints a short reminder that `daemon start` can be used to launch
-  a new instance.
+  now holds the endpoint-scoped lock, PID, and health files.
+- `weaver daemon stop` reads the endpoint-scoped PID file, sends `SIGTERM`, and
+  waits for the PID file and socket to disappear. If the socket is reachable
+  but the PID file is missing, the command surfaces an error rather than
+  blindly killing a process. Successful stops report the PID that was
+  terminated and note that the persistent lock file remains in place.
+- `weaver daemon status` inspects the endpoint-scoped JSON health snapshot when
+  present, falling back to the endpoint-scoped PID file and socket
+  reachability. When no runtime artefacts exist the command prints a short
+  reminder that `daemon start` can be used to launch a new instance.
 
 Lifecycle commands never contact the daemon's JSONL transport. They operate on
 shared runtime files from `weaver-config`, so the CLI and daemon use the same
@@ -328,8 +340,8 @@ Next command:
 ```
 
 For other startup failures, the CLI suggests checking daemon logs, shows the
-`weaverd.health` path when available, and suggests running in the foreground to
-see startup output:
+endpoint-scoped health path when available, and suggests running in the
+foreground to see startup output. The example below uses the default endpoint:
 
 ```text
 error: daemon exited before reporting ready (status: Some(1))
@@ -610,7 +622,7 @@ daemon ready (pid 12345) on unix:///tmp/weaver/uid-1000/weaverd.sock
 runtime artefacts stored under /tmp/weaver/uid-1000
 ```
 
-Example JSON output written by the daemon health snapshot file
+Example JSON output written by the default endpoint's health snapshot file
 (`weaverd.health`):
 
 ```json

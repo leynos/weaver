@@ -1460,11 +1460,11 @@ including Unix sockets that share a parent directory. This singleton process is
 intended to host several isolated workspaces; it is not evidence that the
 daemon owns only its bootstrap directory. The default endpoint retains the
 `weaverd.lock`, `weaverd.pid`, and `weaverd.health` artefact names; non-default
-endpoints derive all three names from a deterministic, filesystem-safe endpoint
-identifier. A dedicated `ProcessGuard` claims the resulting lock file under the
-runtime directory before any work begins. The guard holds an advisory exclusive
-ownership lock on that persistent file, so a live owner cannot race a second
-daemon. If a pre-existing lock is actively owned, acquisition returns
+endpoints derive all three names from a deterministic, filesystem-safe SHA-256
+endpoint identifier. A dedicated `ProcessGuard` claims the resulting lock file
+under the runtime directory before any work begins. The guard holds an advisory
+exclusive ownership lock on that persistent file, so a live owner cannot race a
+second daemon. If a pre-existing lock is actively owned, acquisition returns
 `LaunchError::StartupInProgress`; if it is not locked, the guard reclaims stale
 PID and health state and reuses the same lock inode. Clean shutdown retains the
 lock file and removes only the PID and health files, avoiding
@@ -1477,7 +1477,17 @@ the launch to abort. Successful launches then background the daemon via
 artefacts are written atomically via a temporary file and rename, so readers
 never observe a truncated payload. The snapshot records the lifecycle state
 (`starting`, `ready`, `stopping`), the PID, and a UNIX timestamp, so external
-probes can consume the same readiness signal as the CLI.
+probes can consume the same readiness signal as the CLI. The endpoint-scoped
+naming and upgrade boundary are recorded in
+[ADR 014](adr-014-endpoint-scoped-runtime-artefacts.md). A daemon started by an
+older version with a non-default endpoint must be stopped before upgrading:
+legacy runtime files contain no endpoint identity, so the new CLI refuses to
+infer ownership from a reachable socket or shared PID file.
+
+The private runtime lock module keeps platform details at the `ProcessGuard`
+boundary: Unix uses `flock`, Solaris uses `fcntl` with a process-local guard
+and reacquires the lock in the daemon child after `fork`, and Windows uses
+`LockFileEx` on the capability-opened file handle.
 
 The daemon now binds a socket listener as part of startup. The listener binds
 to the configured `SocketEndpoint`, switches into a non-blocking accept loop,

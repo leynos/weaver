@@ -56,6 +56,7 @@ fn assert_three_part_output(
 struct StartupGuidanceExpectation {
     problem: &'static str,
     alternatives: &'static str,
+    advice: &'static str,
     socket_hint: Option<&'static str>,
 }
 
@@ -97,6 +98,11 @@ fn assert_startup_guidance_template(
         output.contains(expected.alternatives),
         "expected alternatives text '{}' not found in output:\n{output}",
         expected.alternatives
+    );
+    ensure!(
+        output.contains(expected.advice),
+        "expected startup advice '{}' not found in output:\n{output}",
+        expected.advice
     );
     ensure!(
         output.contains(&expected_socket_hint),
@@ -184,11 +190,13 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     LifecycleError::StartupFailed {
         exit_status: Some(17),
         runtime_dir: "/tmp/test/runtime".into(),
+        health_path: "/tmp/test/runtime/weaverd-custom.health".into(),
     },
     StartupGuidanceExpectation {
         problem: "daemon exited before reporting ready (status: Some(17))",
         alternatives: "The daemon started but failed to become ready.",
-        socket_hint: Some("  - Check health snapshot at /tmp/test/runtime/weaverd.health"),
+        advice: "  - Check the daemon logs for errors",
+        socket_hint: Some("  - Check health snapshot at /tmp/test/runtime/weaverd-custom.health"),
     }
 )]
 #[case(
@@ -199,6 +207,7 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     StartupGuidanceExpectation {
         problem: "timed out waiting for daemon to become ready",
         alternatives: "The daemon did not report ready within the timeout period.",
+        advice: "  - Check if the daemon is stuck or slow to start",
         socket_hint: Some("  - Check health snapshot at /tmp/test/weaverd.health"),
     }
 )]
@@ -209,6 +218,7 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     StartupGuidanceExpectation {
         problem: "daemon reported 'stopping' before reaching ready",
         alternatives: "The daemon started but shut down before becoming ready.",
+        advice: "  - Check the health snapshot for shutdown reason",
         socket_hint: Some("  - Check health snapshot at /tmp/test/weaverd.health"),
     }
 )]

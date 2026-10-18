@@ -11,15 +11,18 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-#[cfg(unix)]
-use cap_std::fs::OpenOptionsExt;
-use cap_std::fs::{Dir, File, OpenOptions};
+use cap_std::fs::Dir;
 use nix::{errno::Errno, sys::signal::kill, unistd::Pid};
 use serde::Serialize;
 use tracing::{info, warn};
 use weaver_config::RuntimePaths;
 
 use super::{PROCESS_TARGET, errors::LaunchError, files::atomic_write};
+
+mod lock;
+use self::lock::{LockFile, acquire_lock};
+#[cfg(test)]
+use self::lock::{acquire_process_lock, lock_file};
 
 #[cfg(test)]
 static HEALTH_EVENTS: OnceLock<Mutex<HashMap<PathBuf, Vec<&'static str>>>> = OnceLock::new();
@@ -28,7 +31,7 @@ static HEALTH_EVENTS: OnceLock<Mutex<HashMap<PathBuf, Vec<&'static str>>>> = Onc
 pub(super) struct ProcessGuard {
     paths: RuntimePaths,
     runtime_dir: Dir,
-    _lock: File,
+    _lock: LockFile,
     pid: Option<u32>,
 }
 
@@ -41,6 +44,11 @@ impl ProcessGuard {
             _lock: lock,
             pid: None,
         })
+    }
+
+    #[cfg(target_os = "solaris")]
+    pub(super) fn after_daemonize(&self) -> Result<(), LaunchError> {
+        self._lock.after_daemonize(&self.paths)
     }
 
     pub(super) fn write_pid(&mut self, pid: u32) -> Result<(), LaunchError> {
@@ -99,12 +107,11 @@ impl ProcessGuard {
 
     pub(super) fn paths(&self) -> &RuntimePaths { &self.paths }
 
+    #[cfg(test)]
+    fn terminate_before_pid_write(self) { drop(self); }
+
     fn cleanup(&self) {
-        for path in [
-            self.paths.lock_path(),
-            self.paths.pid_path(),
-            self.paths.health_path(),
-        ] {
+        for path in [self.paths.pid_path(), self.paths.health_path()] {
             remove_runtime_file(&self.runtime_dir, path);
         }
     }
@@ -171,84 +178,6 @@ impl<'a> HealthSnapshot<'a> {
             timestamp,
         })
     }
-}
-
-fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        options.mode(0o600);
-    }
-    let filename = runtime_filename(paths.lock_path())?;
-    match dir.open_with(filename, &options) {
-        Ok(file) => {
-            info!(
-                target: PROCESS_TARGET,
-                file = %paths.lock_path().display(),
-                "acquired daemon lock"
-            );
-            Ok(file)
-        }
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-            handle_existing_lock(dir, paths)
-        }
-        Err(source) => Err(LaunchError::LockCreate {
-            path: paths.lock_path().to_path_buf(),
-            source,
-        }),
-    }
-}
-
-fn handle_existing_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
-    if !runtime_file_exists(dir, paths.pid_path())? {
-        info!(
-            target: PROCESS_TARGET,
-            lock = %paths.lock_path().display(),
-            "refusing to start: launch already in progress",
-        );
-        return Err(LaunchError::StartupInProgress {
-            lock: paths.lock_path().to_path_buf(),
-            pid: paths.pid_path().to_path_buf(),
-        });
-    }
-
-    match read_pid(dir, paths.pid_path()) {
-        Some(0) => {
-            warn!(
-                target: PROCESS_TARGET,
-                "existing daemon recorded zero pid; cleaning stale files",
-            );
-        }
-        Some(pid) => match check_process(pid)? {
-            true => {
-                info!(
-                    target: PROCESS_TARGET,
-                    pid,
-                    "refusing to start: existing daemon alive",
-                );
-                return Err(LaunchError::AlreadyRunning { pid });
-            }
-            false => {
-                warn!(
-                    target: PROCESS_TARGET,
-                    pid,
-                    "existing daemon not detected; cleaning stale files",
-                );
-            }
-        },
-        None => {
-            warn!(
-                target: PROCESS_TARGET,
-                "pid file unreadable; cleaning stale files",
-            );
-        }
-    }
-
-    remove_file(dir, paths.lock_path())?;
-    remove_file(dir, paths.pid_path())?;
-    remove_file(dir, paths.health_path())?;
-    acquire_lock(dir, paths)
 }
 
 fn read_pid(dir: &Dir, path: &Path) -> Option<u32> {

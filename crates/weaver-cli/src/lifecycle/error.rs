@@ -61,6 +61,7 @@ pub enum LifecycleError {
     StartupFailed {
         exit_status: Option<i32>,
         runtime_dir: PathBuf,
+        health_path: PathBuf,
     },
     #[error("daemon reported 'stopping' before reaching ready; check health snapshot at {path:?}")]
     StartupAborted { path: PathBuf },
@@ -102,8 +103,10 @@ pub enum LifecycleError {
         "{}",
         format_args!(
             concat!(
-                "daemon socket {endpoint} is reachable but pid file {path:?} is missing; inspect the ",
-                "runtime directory before retrying"
+                "daemon socket {endpoint} is reachable but endpoint-scoped PID file {path:?} is ",
+                "missing; refusing to signal an unverified process. If this daemon predates ",
+                "endpoint-scoped filenames, stop it with the previous version or its known PID ",
+                "before upgrading"
             ),
             endpoint = endpoint,
             path = path
@@ -152,4 +155,23 @@ pub enum LifecycleError {
         )
     )]
     InvalidSystemClock { time: SystemTime },
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for lifecycle error messages.
+
+    use super::*;
+
+    #[test]
+    fn missing_pid_with_socket_explains_legacy_upgrade_handling() {
+        let error = LifecycleError::MissingPidWithSocket {
+            path: PathBuf::from("/run/weaver/weaverd-abc.pid"),
+            endpoint: "unix:///run/weaver/custom.sock".to_owned(),
+        };
+        let message = error.to_string();
+
+        assert!(message.contains("refusing to signal an unverified process"));
+        assert!(message.contains("stop it with the previous version or its known PID"));
+    }
 }

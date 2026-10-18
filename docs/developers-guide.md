@@ -1993,6 +1993,39 @@ fixed order:
 4. Return an invalid-arguments error when neither `--position` nor `offset=`
    is available.
 
+## Runtime paths and process supervision
+
+`RuntimePaths` in `weaver-config` gives the CLI and daemon one canonical set of
+runtime artefact paths for a configured endpoint. Unix socket endpoints use the
+socket's parent directory. TCP endpoints use the per-user runtime directory:
+the platform runtime directory on Unix, with a per-user temporary directory
+fallback, and the temporary directory on non-Unix platforms.
+
+The default endpoint retains the legacy names `weaverd.lock`, `weaverd.pid`, and
+`weaverd.health`. Other endpoints use those prefixes with a SHA-256 identifier
+derived from the complete endpoint, including its transport and, for TCP, host
+and port. This keeps artefacts for distinct endpoints separate without putting
+endpoint text in filenames. `RuntimePaths::from_config` derives the paths and
+creates the runtime directory; use `RuntimePaths::from_config_readonly` when
+paths are needed without filesystem changes. The public accessors expose the
+runtime directory, each full artefact path, and each artefact filename.
+
+`ProcessGuard` owns the daemon's runtime lock for the guard's lifetime. It
+opens the persistent lock file relative to the capability-opened runtime
+directory, then locks that same open file: supported Unix targets use `flock`,
+Solaris uses `fcntl` plus a process-local guard, and Windows uses `LockFileEx`.
+The lock file remains in place during normal cleanup so another process cannot
+race by locking a different inode. On Solaris, the child reacquires the
+process-associated lock after daemonization; the parent's lock holds until the
+parent exits.
+
+When startup finds a lock file without a live daemon PID, it takes the lock and
+removes stale PID and health files before proceeding. On normal guard cleanup,
+the PID and health files are removed while the persistent lock file is
+retained. The `sha2` dependency derives endpoint identifiers, `rustix` provides
+Unix file-lock operations, and `windows-sys` exposes the Windows `LockFileEx`
+and `UnlockFileEx` APIs.
+
 ## Dispatch lifecycle observability internals
 
 This section documents the dispatch and startup-observability helpers added for
@@ -2024,9 +2057,9 @@ while lifecycle monitoring owns the runtime files that explain daemon readiness.
 - `endpoint: impl Into<String>` records the socket or TCP endpoint handling
   the request. Structured dispatch events include this value for operator
   correlation.
-- `runtime_dir: PathBuf` records the daemon runtime directory. Structured
-  dispatch events derive the `weaverd.health` health-snapshot path from it, so
-  logs and CLI guidance point at the same runtime artefacts.
+- `runtime_paths: RuntimePaths` supplies the selected runtime directory and
+  endpoint-scoped health-snapshot path, so logs and CLI guidance point at the
+  same runtime artefacts.
 
 The connection flow is:
 
@@ -2071,12 +2104,12 @@ metadata, and five optional sensitive request fields:
 - `full_payload`
 
 `serialize_structured_event` always includes `event`, `endpoint`,
-`runtime_dir`, and the derived `weaverd.health` path, then extends the payload
-with metadata. If any sensitive field is present, the serializer writes the
-field with the `"<redacted>"` marker rather than the original content. That
-keeps structured logs useful for diagnosing dispatch failures without exposing
-patch contents, request bodies, source text, environment values, or complete
-payloads.
+`runtime_dir`, and the endpoint-scoped health path supplied by `RuntimePaths`,
+then extends the payload with metadata. If any sensitive field is present, the
+serializer writes the field with the `"<redacted>"` marker rather than the
+original content. That keeps structured logs useful for diagnosing dispatch
+failures without exposing patch contents, request bodies, source text,
+environment values, or complete payloads.
 
 `emit_structured_event` formats the event as JSON and logs it to
 `DISPATCH_TARGET`. It uses `tracing::error!` when `is_error` is true and
@@ -2107,9 +2140,9 @@ non-empty content to the caller-provided parse closure.
 
 The concrete readers have these return semantics:
 
-- `read_health` returns `Ok(Some(HealthSnapshot))` when `weaverd.health` is
-  present and valid JSON, `Ok(None)` when the file is missing or empty,
-  `Err(LifecycleError::ReadHealth { .. })` when reading fails, and
+- `read_health` returns `Ok(Some(HealthSnapshot))` when the configured health
+  snapshot is present and valid JSON, `Ok(None)` when the file is missing or
+  empty, `Err(LifecycleError::ReadHealth { .. })` when reading fails, and
   `Err(LifecycleError::ParseHealth { .. })` when JSON parsing fails.
 - `read_pid` returns `Ok(Some(u32))` when the PID file is present and contains
   a valid integer, `Ok(None)` when it is missing or empty,
@@ -2119,13 +2152,18 @@ The concrete readers have these return semantics:
 ### `runtime_dir` in lifecycle errors
 
 `LifecycleError::LaunchDaemon` and `LifecycleError::StartupFailed` both carry
-`runtime_dir: PathBuf`. The CLI keeps this path with the error because startup
-guidance is produced after the lower-level lifecycle operation has already
-failed. Carrying the runtime directory in the error lets actionable guidance
-derive the same `weaverd.health` path that monitoring uses and surface runtime
-artefact inspection as a next diagnostic step.
+`runtime_dir: PathBuf`. `StartupFailed` also carries the endpoint-scoped
+`health_path: PathBuf` supplied by `RuntimePaths`. The CLI keeps these paths
+with the errors because startup guidance is produced after the lower-level
+lifecycle operation has already failed.
 
 For launch failures, guidance can tell the operator where to inspect runtime
 artefacts even when the daemon process never starts. For startup failures,
-guidance derives `runtime_dir.join("weaverd.health")` and points directly at
-the health snapshot that should explain why readiness was not reached.
+guidance uses the endpoint-scoped health path and points directly at the health
+snapshot that should explain why readiness was not reached.
+
+`startup_readiness_guidance` keeps the shared alternatives layout for
+`StartupFailed`, `StartupTimeout`, and `StartupAborted`. It is private to
+`actionable_guidance.rs` and should remain limited to those lifecycle variants.
+Other modules use `write_startup_guidance`, so the constructor's details and
+operator-facing wording stay owned by the CLI renderer.
