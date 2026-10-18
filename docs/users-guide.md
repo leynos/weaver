@@ -252,12 +252,13 @@ daemon protocol. Example:
 {"status":"ready","pid":12345,"timestamp":1713356400}
 ```
 
-The `status` transitions through `starting`, `ready`, and `stopping` before the
-files are removed on shutdown. Sending `SIGTERM`, `SIGINT`, `SIGQUIT`, or
-`SIGHUP` prompts the daemon to log the request and complete its shutdown
-sequence within a ten-second budget. For interactive debugging or CI jobs, set
-`WEAVER_FOREGROUND=1` to keep the daemon attached to the terminal while
-preserving the same lock, PID, and health semantics.
+The `status` transitions through `starting`, `ready`, and `stopping`. Shutdown
+removes the PID and health files but retains the persistent lock file for safe
+reuse. Sending `SIGTERM`, `SIGINT`, `SIGQUIT`, or `SIGHUP` prompts the daemon
+to log the request and complete its shutdown sequence within a ten-second
+budget. For interactive debugging or CI jobs, set `WEAVER_FOREGROUND=1` to keep
+the daemon attached to the terminal while preserving the same lock, PID, and
+health semantics.
 
 ## Sandbox defaults
 
