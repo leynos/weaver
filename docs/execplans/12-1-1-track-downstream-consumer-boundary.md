@@ -869,7 +869,7 @@ Stage D enforces the matrix at CI time.
      manifest_path: docs/orthoconfig-consumer-boundary.toml
      details: <one-sentence diagnosis>
      remediation: <one-sentence fix step>
-     see: docs/developers-guide.md#tracking-the-orthoconfig-consumer-boundary
+     see: docs/developers-guide.md#12-adding-or-renaming-public-commands
    ```
 
    Concrete examples that the test must produce verbatim:
@@ -880,7 +880,7 @@ Stage D enforces the matrix at CI time.
      manifest_path: docs/orthoconfig-consumer-boundary.toml
      details: managed_tasks lists "13.2.4" but no [[task]] row matches.
      remediation: add a [[task]] row for "13.2.4" with the matching state.
-     see: docs/developers-guide.md#tracking-the-orthoconfig-consumer-boundary
+     see: docs/developers-guide.md#12-adding-or-renaming-public-commands
    ```
 
    ```plaintext
@@ -889,7 +889,7 @@ Stage D enforces the matrix at CI time.
      manifest_path: docs/orthoconfig-consumer-boundary.toml
      details: state = "consumes" but shipped_in is empty.
      remediation: set shipped_in to the OrthoConfig release tag, or change state to "wraps" or "pending".
-     see: docs/developers-guide.md#tracking-the-orthoconfig-consumer-boundary
+     see: docs/developers-guide.md#12-adding-or-renaming-public-commands
    ```
 
    The integration test produces these strings through a small helper.

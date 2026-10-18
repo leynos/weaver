@@ -5,7 +5,7 @@ configuration framework internals, and implementation details that contributors
 need but operators do not. For user-facing behaviour see the
 [user's guide](users-guide.md).
 
-## Spelling policy
+## 1 Spelling policy
 
 `make spelling` is the canonical en-GB-oxendict gate. It runs the shared
 [`typos-config-builder`](https://github.com/leynos/typos-config-builder) gate,
@@ -30,11 +30,11 @@ runs before Typos. Correct genuine maintained prose when it reports a phrase.
 Use inline or fenced code only for literal API, identifier, fixture, or
 quoted-source spelling that must remain unchanged.
 
-## Workspace baseline
+## 2 Workspace baseline
 
 The workspace targets `ortho_config` v0.9.0 and Rust 1.89.
 
-## The build standard
+## 3 The build standard
 
 Development builds follow the estate's Rust build standard, which
 `.cargo/config.toml` sets and Cargo auto-discovers, so a bare `cargo build`
@@ -85,14 +85,14 @@ its own arguments. Every dry run starts from `build_standard_env.py`'s
 controlled environment, which removes the caller's exported targets, flag sets
 and Make options, and `build_standard_env_test.py` holds each helper to it.
 
-## Workspace lint policy
+## 4 Workspace lint policy
 
 The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates
 that opt into `[lints] workspace = true` must therefore document their private
 items as well as their public API. The existing `missing_docs` rustc lint
 continues to deny undocumented public items.
 
-## Workflow pins and Dependabot
+## 5 Workflow pins and Dependabot
 
 Dependabot checks both ecosystems (`github-actions` and `cargo`) daily. The
 schedule does not guarantee a pull request each day: cooldown settings can
@@ -143,7 +143,7 @@ If a workflow's behaviour genuinely depends on a feature only present from a
 particular commit onwards, express that as a comment or a changelog note, not
 as a test assertion on the SHA string.
 
-## Mutation-testing workflow contract tests
+## 6 Mutation-testing workflow contract tests
 
 This repository runs scheduled, informational mutation testing through a thin
 caller workflow,
@@ -164,9 +164,9 @@ in that control to exercise a feature branch.
 
 The caller passes a small set of configuration inputs, each carrying intent:
 
-- `paths` — the change-detection globs that decide whether a scheduled run has
-  anything to mutate; here `crates/`, because every workspace crate lives under
-  that directory and there is no root `src/`.
+- `paths` — comma-separated change-detection path prefixes used to match files
+  under those directories; here `crates/`, because every workspace crate lives
+  under that directory and there is no root `src/`.
 - `exclude-globs` — test infrastructure whose surviving mutants are noise
   rather than genuine test gaps: the end-to-end harness crate (`weaver-e2e`),
   the proc-macro fixture helpers (`weaver-test-macros`), and the feature-gated
@@ -201,7 +201,7 @@ than letting the breakage surface only in a scheduled run. Run it locally with
 - the triggers keep the daily schedule and a plain `workflow_dispatch` with
   no legacy branch input.
 
-## GitHub Actions runner placement
+## 7 GitHub Actions runner placement
 
 Each lane sits where the kind of work decides. Every Linux lane runs on
 Ubicloud, at a size its own workload decides. What stays GitHub-hosted is the
@@ -225,7 +225,7 @@ minutes are free.
 `mutation-testing.yml`, `dependabot-automerge.yml`, and `release-dry-run.yml`
 declare no runner and pass none, so their callees place them.
 
-### Why these lanes, and what the measurements were
+### 7.1 Why these lanes, and what the measurements were
 
 Queue against work, from the last green run of each workflow on 2026-09-16:
 
@@ -256,7 +256,7 @@ to speed up, and no way to observe that a move worked. Moving it would be a
 change to dead code. The contract pins it where it is, so staying put reads as
 a decision, and it moves when somebody re-enables the leg and can watch it run.
 
-### Sizes
+### 7.2 Sizes
 
 `ubicloud-standard-4` for anything that compiles the workspace, and
 `ubicloud-standard-2` for the rest. Ubicloud's four vCPU are 1.5 to 2 times
@@ -275,7 +275,7 @@ stay under half the kill. Nobody waits on this lane, so the smaller shape is
 worth the slower run. Should the margin close, the remedy is
 `ubicloud-standard-4`, not a longer deadline for the test.
 
-### The fork fallback
+### 7.3 The fork fallback
 
 A pull request from a fork cannot obtain an Ubicloud runner, so every lane that
 meets forks falls back to a GitHub-hosted runner for forks only:
@@ -302,7 +302,7 @@ For `build-linux` the expression goes in the caller's `with:` block rather than
 on a `runs-on` line, because `build-and-package.yml` takes its runner as a
 `workflow_call` input.
 
-### Ceilings
+### 7.4 Ceilings
 
 A per-minute runner bills until something stops it, so GitHub's six-hour
 default is the expensive failure mode. A ceiling close to the measured work is
@@ -318,7 +318,7 @@ rejects `timeout-minutes` on a job with `uses:`. What bounds them is
 `build-and-package.yml`'s own ceiling, one number for all three platforms
 because there is one job there and not three, sized for the slowest leg.
 
-### The contract
+### 7.5 The contract
 
 `tests/workflow_contracts/ci_runner_placement_test.py` holds all of the above,
 beside two modules it imports: `runner_placement_policy.py` for the reviewed
@@ -340,7 +340,7 @@ than as a list someone remembers to update. A label registered and used nowhere
 silently permits a runner family nobody reviewed for whatever lane adopts it
 next.
 
-#### Every form of `runs-on`, or a refusal
+#### 7.5.1 Every form of `runs-on`, or a refusal
 
 GitHub accepts `runs-on` in three forms: a scalar label or expression, a
 sequence of labels a runner must all carry, and a mapping with `group` and
@@ -377,7 +377,7 @@ reader-level tests point the reader at a temporary tree and registry, each
 declaring a key twice, and require the refusal, so a reader reverted to
 `yaml.safe_load` fails them.
 
-## Where CodeScene may appear
+## 8 Where CodeScene may appear
 
 The CodeScene command-line tool is installed from a URL at job time and is not
 pinned to a version this repository chose: the shared action selects the
@@ -495,7 +495,7 @@ step's ref guard would still refuse the upload from elsewhere, but an
 unrestricted trigger burns a runner on every branch push and leaves the two
 protections disagreeing about what the workflow is for.
 
-### What must remain
+### 8.1 What must remain
 
 Everything above forbids something, so all of it is satisfied by a repository
 that measures no coverage at all. The shared contract says what must stay:
@@ -510,7 +510,7 @@ still sees it, and runs it never. A condition here would be a way to switch the
 ratchet off while the diff looks untouched. If one is ever wanted, it is pinned
 in the shared contract by value.
 
-### The pull-request lane is a closure, not a list
+### 8.2 The pull-request lane is a closure, not a list
 
 The prohibitions apply to every workflow a pull request can reach, not only to
 those carrying a pull-request trigger. `release-dry-run.yml` is triggered by
@@ -556,7 +556,7 @@ with the repository's secrets. A review, a review comment or a comment on the
 pull request each start a workflow for it. `workflow_dispatch` does not count:
 a dispatch is not a pull request, which is why the publisher may carry one.
 
-### How the readings are proved
+### 8.3 How the readings are proved
 
 `make test-workflow-contracts` runs `cv005-contracts check`, the shared
 contract library in `leynos/shared-actions` (`packages/cv005-contracts`), from
@@ -580,7 +580,7 @@ names this repository, `make all` includes the target, and CI runs it. The
 decision is recorded in
 [ADR 013](adr-013-adopt-the-shared-cv005-contract-library.md).
 
-## Cancelling superseded pull-request runs
+## 9 Cancelling superseded pull-request runs
 
 Every push to a pull request starts a fresh run of each gate. The run already
 in flight is answering a question about a commit nobody will merge, and left
@@ -619,7 +619,7 @@ repository to carry a token, and the one here, `dependabot-automerge.yml`,
 merges Dependabot pull requests rather than building, so cancelling it
 mid-flight is a hazard with no minutes to win.
 
-### The cancellation contract
+### 9.1 The cancellation contract
 
 `ci.yml` and `release-dry-run.yml` carry the block above. The dry run calls
 `release.yml` through `workflow_call`, and a called workflow evaluates its own
@@ -656,7 +656,7 @@ number, a constant group, a `head_ref` group, a `format()` group, the block
 removed, the trigger renamed to `pull_request_target`, a duplicated block, and
 an unquoted `on:` beside the quoted one each fail it.
 
-## The Ubicloud cache proxy
+## 10 The Ubicloud cache proxy
 
 Ubicloud runs a cache proxy on the runner's private network, and the runner
 exposes its URL and token to action steps only. A `run:` step, such as the one
@@ -708,7 +708,7 @@ each of the three lanes, widening the guard to always, swapping it for a label
 test, and moving the step after the Rust setup. Four more repin it to `@main`,
 to a short SHA, to an upper-case SHA and to a SHA with a suffix.
 
-## CI tool installs: Whitaker and Merman
+## 11 CI tool installs: Whitaker and Merman
 
 CI installs its linting and rendering tools through pinned shared actions
 instead of compiling them on every run:
@@ -752,7 +752,7 @@ Hypothesis properties compare both detectors with a reference model.
 `pyyaml>=6` and `hypothesis>=6`. Hypothesis generates the cases used by the
 source-build properties.
 
-## Adding or renaming public commands
+## 12 Adding or renaming public commands
 
 ADR 007 makes the 0.1.0 public command surface resource-first and generated
 from OrthoConfig-backed command metadata plus Weaver-owned semantic adapters.
@@ -792,7 +792,7 @@ of truth first, regenerate the Markdown matrix with the command above, and rerun
 `cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture`
 locally when you need the same visible failure output that CI reports.
 
-### `weaver-docs-gate` boundary API
+### 12.1 `weaver-docs-gate` boundary API
 
 The private `weaver-docs-gate` workspace member owns the generated OrthoConfig
 consumer boundary matrix and the referential-integrity checks that keep
@@ -887,13 +887,13 @@ Sections below that document `observe`, `act`, `verify`, or `act refactor`
 describe the current prototype implementation. They are useful for maintaining
 shipped code, but they do not define the 0.1.0 public command contract.
 
-## Sempai overview
+## 13 Sempai overview
 
 Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule YAML,
 normalizes supported search syntax into a canonical formula model, and prepares
 per-language query plans for later execution.
 
-## Sempai query pipeline (prototype archive milestone 4.1.5)
+## 14 Sempai query pipeline (prototype archive milestone 4.1.5)
 
 - Canonical model (`sempai_core::formula`):
   - `Formula` enum: `Atom`, `Not`, `Inside`, `Anywhere`, `And`, `Or`
@@ -928,7 +928,7 @@ The Sempai implementation keeps the raw and semantic boundaries explicit:
   dispatch, while `crates/weaver-plugin-rope/src/rename.rs` contains the
   focused path and patch helpers used by the rename operation.
 
-### Constraint boundary and validation passes
+### 14.1 Constraint boundary and validation passes
 
 `crates/sempai/src/normalize_constraints.rs` is the serialization boundary for
 rule `where` clauses. It receives raw YAML-backed JSON values from the parser
@@ -954,7 +954,7 @@ Engine validation runs in two stages after normalization:
   payload semantics; it is currently a placeholder pending execution-layer
   context, including issue `#152`.
 
-### Sempai test-support ownership and capture lifecycle
+### 14.2 Sempai test-support ownership and capture lifecycle
 
 `crates/sempai/src/tests/engine_test_support.rs` owns the `pub(super)` engine
 fixtures used by Sempai's engine and integration test modules. The helpers are
@@ -972,9 +972,9 @@ hold the guard across the engine operation, inspect its snapshot before the
 guard is dropped, and must not expose this state to production code or other
 test crates.
 
-## Configuration framework internals
+## 15 Configuration framework internals
 
-### `ortho_config` v0.9.0 integration
+### 15.1 `ortho_config` v0.9.0 integration
 
 `weaver_config::Config` declares its discovery policy inline through the
 `#[ortho_config(discovery(...))]` attribute. The app name, dotfile, project
@@ -997,7 +997,7 @@ duplicate capability directives there. This keeps the invariant consistent for
 both generated production loading and `Config::merge_from_layers` policy tests;
 CLI and daemon adapters must not repeat the normalization.
 
-### Configuration test boundary
+### 15.2 Configuration test boundary
 
 Configuration policy tests use `ortho_config::MergeComposer` to create owned
 defaults, file, environment, and CLI layers. The helper belongs only in tests:
@@ -1010,7 +1010,7 @@ selection. It does not model `WEAVER_*` configuration-value merging, so do not
 use it in place of declarative layers or child-process tests. Direct
 `std::env::set_var` and `std::env::remove_var` are forbidden in Weaver tests.
 
-### Dependency-graph resolution
+### 15.3 Dependency-graph resolution
 
 The loader uses a dependency-graph model for layered configuration sources.
 Sources are merged in precedence order: built-in defaults are overridden by
@@ -1019,7 +1019,7 @@ turn overridden by CLI flags. When multiple configuration files are discovered,
 they are merged in the order `--config-path` first, then XDG locations in
 standard search order. Later sources override earlier ones field-by-field.
 
-### TOML parsing semantics
+### 15.4 TOML parsing semantics
 
 All configuration inputs are parsed per TOML v1 rules. Anchors and tags are not
 applicable (those are YAML concepts); TOML scalars are strongly typed and
@@ -1027,7 +1027,7 @@ preserve their declared type without implicit coercion. Boolean values must be
 `true` or `false` (the string `"yes"` is rejected as an invalid boolean, as
 shown in the user-facing error example).
 
-## Card extraction cache internals
+## 16 Card extraction cache internals
 
 The `observe get-card` path is optimized around two shared resources in
 `crates/weaver-cards/`:
@@ -1041,7 +1041,7 @@ The `observe get-card` path is optimized around two shared resources in
 constructs one extractor and reuses it across requests so cards and parsers
 stay warm across repeated lookups.
 
-### `CardCache` design
+### 16.1 `CardCache` design
 
 `CardCache` wraps `lru::LruCache<CardCacheKey, Arc<SymbolCard>>` behind a
 `Mutex`. The cached payload is stored as `Arc<SymbolCard>` so a cache hit can
@@ -1089,7 +1089,7 @@ if let Some(card) = cache.get_shared(&key) {
 degrade into surprising behaviour, so callers must choose an explicit positive
 bound.
 
-### `CardCacheKey` composition
+### 16.2 `CardCacheKey` composition
 
 `CardCacheKey` combines the pieces of state that make one extraction result
 meaningfully different from another:
@@ -1136,7 +1136,7 @@ The path component is matched by exact `PathBuf` equality. Relative paths,
 symlinked paths, and canonicalized paths do not collapse to one cache entry
 unless the caller normalizes them before building the key.
 
-### `ParserRegistry` pooling pattern
+### 16.3 `ParserRegistry` pooling pattern
 
 Tree-sitter parser construction is not free, so `ParserRegistry` keeps one
 `Parser` per `SupportedLanguage` in a shared map:
@@ -1182,7 +1182,7 @@ Language Server Protocol (LSP). Tree-sitter extraction remains the baseline
 syntax pass, while LSP enrichment is added later by `weaverd` when a request
 asks for semantic detail and a backend is available.
 
-### Cache invalidation strategies
+### 16.4 Cache invalidation strategies
 
 The cache uses two invalidation paths, each for a different event:
 
@@ -1222,7 +1222,7 @@ Because invalidation is exact-path based, callers that want symlink and
 relative-path stability should normalize paths at the boundary where requests
 enter the cacheable extraction flow.
 
-### `TreeSitterCardExtractor` integration
+### 16.5 `TreeSitterCardExtractor` integration
 
 `TreeSitterCardExtractor` is the orchestrator that ties cache keys, parser
 pooling, and language-specific extraction together.
@@ -1269,7 +1269,7 @@ The plain `extract(...)` method remains available for callers that want an owned
 shared resources and `extract_shared(...)` so cache hits do not pay for extra
 deep clones.
 
-## Graph-slice request parsing architecture
+## 17 Graph-slice request parsing architecture
 
 The `observe graph-slice` request parsing pipeline lives in
 `crates/weaver-cards/src/graph_slice/` and is split across three internal
@@ -1283,7 +1283,7 @@ modules:
 - `parse_helpers.rs` — value-level parsing functions that validate and
   convert raw string arguments into typed values.
 
-### `RequestBuilder` accumulator pattern
+### 17.1 `RequestBuilder` accumulator pattern
 
 `RequestBuilder` is a private struct with `Option<T>` fields for every flag.
 The parse flow is:
@@ -1303,14 +1303,14 @@ The parse flow is:
 Unknown flags return `GraphSliceError::UnknownFlag`. Bare positional tokens
 return `GraphSliceError::UnknownArgument`.
 
-### `Flag` enum
+### 17.2 `Flag` enum
 
 `Flag` identifies which CLI flag is being processed. It implements `Display` to
 produce the `--flag-name` string for error messages and `Into<String>` for
 `GraphSliceError` construction. The enum lives in `parse.rs` with
 `pub(in crate::graph_slice)` visibility so `parse_helpers.rs` can reference it.
 
-### `parse_helpers` module
+### 17.3 `parse_helpers` module
 
 `parse_helpers.rs` contains pure parsing functions that accept a `RawValue` (a
 flag–value pair) and return a typed result or `GraphSliceError`. The key
@@ -1332,18 +1332,18 @@ Each helper produces a `GraphSliceError::InvalidValue` with the originating
 flag name and a descriptive message on failure, so callers do not need to
 format error context themselves.
 
-## Graph-slice handler architecture
+## 18 Graph-slice handler architecture
 
 The `observe graph-slice` command handler lives in
 `crates/weaverd/src/dispatch/observe/graph_slice.rs`. It is the sole
 implementation of the stable same-file slice contract.
 
-### Entry point
+### 18.1 Entry point
 
 `handle(request, writer, backends)` is the public entry point wired by the
 router. It delegates to `build_response` which owns all domain logic.
 
-### Same-file discovery
+### 18.2 Same-file discovery
 
 `discover_same_file_cards(request, document, entry_symbol_id, backends)` drives
 sibling discovery:
@@ -1357,7 +1357,7 @@ sibling discovery:
 3. Candidates matching the entry symbol ID are filtered out; remaining cards
    are deduplicated by `symbol_id` using a `BTreeMap`.
 
-### Budget and spillover
+### 18.3 Budget and spillover
 
 `apply_card_budget(entry_card, sibling_cards, max_cards)` partitions the sorted
 sibling list into an included set (up to `max_cards − 1` siblings plus the
@@ -1366,26 +1366,26 @@ entry card) and a `SliceSpillover` frontier. The `apply_card_budget` branch for
 rejects `--max-cards 0` before dispatch, so callers cannot reach the zero-budget
 `SliceSpillover` path through the CLI.
 
-### Enrichment ordering
+### 18.4 Enrichment ordering
 
 LSP semantic enrichment is applied **after** budget truncation so that only
 cards included in the response pay the enrichment cost. The entry card is
 enriched before discovery; included sibling cards are enriched immediately after
 `apply_card_budget` returns.
 
-### Error mapping
+### 18.5 Error mapping
 
 `map_extraction_error` converts `CardExtractionError` variants into structured
 `GraphSliceResponse::Refusal` payloads. IO failures reading the source file are
 mapped to `DispatchError::invalid_arguments` because the caller is responsible
 for supplying a valid URI pointing to a readable file.
 
-### Stable card ordering
+### 18.6 Stable card ordering
 
 `stable_card_order` imposes a deterministic total order over `SymbolCard`
 values so that slice responses are reproducible regardless of extraction order.
 
-## E2E test support for graph-slice
+## 19 E2E test support for graph-slice
 
 The end-to-end graph-slice test harness lives in
 `crates/weaver-e2e/tests/graph_slice_snapshots.rs`. Shared daemon and
@@ -1395,7 +1395,7 @@ command-specific request builders live in sibling files (`graph_slice.rs`,
 uses. `GraphSliceRequest<'a>` and `run_graph_slice` live in
 `crates/weaver-e2e/tests/test_support/graph_slice.rs`.
 
-### `run_cli`
+### 19.1 `run_cli`
 
 `run_cli(command, cli_args)` (`test_support/mod.rs`) is the shared primitive
 that both `run_graph_slice` and `run_get_card` build on. It resolves the
@@ -1404,7 +1404,7 @@ that both `run_graph_slice` and `run_get_card` build on. It resolves the
 callers render it themselves, with the ephemeral daemon endpoint and any
 temporary fixture path already replaced by stable placeholders.
 
-### Resolving the `weaver` binary
+### 19.2 Resolving the `weaver` binary
 
 `run_cli` locates the CLI binary via `resolve_or_build_weaver_binary_path()` in
 `crates/weaver-e2e/tests/support/weaver_binary.rs`. This resolver exists because
@@ -1425,13 +1425,13 @@ wrapper of the same name, `resolve_or_build_weaver_binary_path`, adapting the
 `Result<&'static Path, &'static str>` return type to `io::Result<PathBuf>` for
 callers in that module.
 
-### `GraphSliceRequest`
+### 19.3 `GraphSliceRequest`
 
 `GraphSliceRequest<'a>` carries the parameters for one
 `weaver observe graph-slice` CLI invocation: `uri`, `line`, `column`,
 `entry_detail`, `node_detail`, and an optional `max_cards` budget.
 
-### `run_graph_slice`
+### 19.4 `run_graph_slice`
 
 `run_graph_slice(daemon, request)` invokes the CLI via the test daemon socket
 and returns a `Transcript` containing `stdout` (the JSONL response envelope) and
@@ -1442,25 +1442,25 @@ placeholders. Deriving the display form from the real arguments keeps the
 snapshot's command string and the arguments actually passed to the CLI from
 drifting apart.
 
-### `fixture_uri`
+### 19.5 `fixture_uri`
 
 `fixture_uri(temp_dir, case)` materializes a `CardFixtureCase` source file into
 `temp_dir` and returns its `file://` URI so that snapshot tests operate on a
 real filesystem path.
 
-### `assert_named_snapshot`
+### 19.6 `assert_named_snapshot`
 
 `assert_named_snapshot(name, content)` wraps `insta::assert_snapshot!` with an
 explicit snapshot name, storing results under
 `crates/weaver-e2e/tests/snapshots/<name>.snap`.
 
-### Fixture batteries
+### 19.7 Fixture batteries
 
 `crates/weaver-e2e/src/graph_slice_fixtures/` re-exports `PYTHON_CASES` (20
 entries) and `RUST_CASES` (20 entries) from the shared `card_fixtures`
 catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
 
-### Snapshot test structure
+### 19.8 Snapshot test structure
 
 `graph_slice_snapshots.rs` contains four `#[rstest]` tests:
 
@@ -1476,9 +1476,9 @@ catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
   an out-of-range position and asserts
   `refusal.reason == "position_out_of_range"`.
 
-## Public API additions in prototype archive milestone 7.2.1
+## 20 Public API additions in prototype archive milestone 7.2.1
 
-### `handle` signature — `FusionBackends` parameter
+### 20.1 `handle` signature — `FusionBackends` parameter
 
 `handle(request, writer, backends)` now accepts
 `&mut FusionBackends<SemanticBackendProvider>` as a third argument (wired by
@@ -1486,7 +1486,7 @@ the router from `BackendManager`). This parameter provides access to the card
 extractor and LSP enrichment backend. It is consumed by `build_response` and
 passed through to `discover_same_file_cards` and `enrich_card_if_requested`.
 
-### Trait derivations enabling deterministic ordering
+### 20.2 Trait derivations enabling deterministic ordering
 
 Two enums gained `PartialOrd` and `Ord` so that `stable_card_order` can sort
 cards without a custom comparator:
@@ -1502,7 +1502,7 @@ The derived order follows Rust's default discriminant ordering (declaration
 order in the `enum`). Tests in each crate's `ordering_tests` module lock this
 contract.
 
-### `schema_version` field on `GraphSliceResponse` variants
+### 20.3 `schema_version` field on `GraphSliceResponse` variants
 
 Both `GraphSliceResponse::Success` and `GraphSliceResponse::Refusal` now carry a
 `schema_version: String` field set to `"graph_slice.v1"`. All constructors
@@ -1510,7 +1510,7 @@ Both `GraphSliceResponse::Success` and `GraphSliceResponse::Refusal` now carry a
 in `crates/weaver-cards/tests/features/graph_slice_schema.feature` assert its
 presence.
 
-### `TestDaemon` API changes
+### 20.4 `TestDaemon` API changes
 
 `TestDaemon::join(mut self)` now takes ownership of the optional
 `join_handle: Option<thread::JoinHandle<()>>`, joins the daemon thread, and
@@ -1522,7 +1522,7 @@ the thread finishes.
 `thread::JoinHandle<()>`) to allow the join to consume the handle via
 `Option::take`.
 
-### `test_support` command-specific modules
+### 20.5 `test_support` command-specific modules
 
 Get-card and graph-slice each have their own request builders, kept apart from
 the shared `test_support/mod.rs` plumbing:
@@ -1545,9 +1545,9 @@ That inner `pub` lets sibling modules within the crate construct and read them
 with plain struct literals, without needing accessor methods — it does not
 widen visibility beyond the crate boundary set by the struct itself.
 
-## CLI help and preflight internals
+## 21 CLI help and preflight internals
 
-### 2.1 CLI help rendering architecture
+### 21.1 CLI help rendering architecture
 
 The runtime parser strips `--config-path`, `--daemon-socket`, `--log-filter`,
 `--log-format`, `--capability-overrides`, and `--locale` from `argv` before it
@@ -1594,7 +1594,7 @@ and its router definition are all compiled only with the `test-support` feature.
 compare the CLI's discoverability catalogue with daemon routing; production
 dependencies must not enable it.
 
-### 2.2 Augmented command pattern
+### 21.2 Augmented command pattern
 
 The CLI deliberately uses two clap command shapes:
 
@@ -1611,7 +1611,7 @@ owned argument IDs, long names, and value names, so help construction does not
 leak process-lifetime allocations. The augmented command remains cached once
 per process.
 
-### 2.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
+### 21.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
 
 `handle_preflight` runs after `argv` splitting and before configuration
 loading. At that point, the CLI has enough information to reject certain
@@ -1634,7 +1634,7 @@ There are two preflight paths:
 This boundary exists specifically to keep operator guidance local, immediate,
 and side effect free.
 
-### 2.4 `Locale` type (`crates/weaver-config/src/locale.rs`)
+### 21.4 `Locale` type (`crates/weaver-config/src/locale.rs`)
 
 `Locale` is a small newtype around `ortho_config::LanguageIdentifier`. It
 accepts only well-formed BCP 47 language tags, so invalid locale strings are
@@ -1653,7 +1653,7 @@ formatted. The current `Locale` type exists, so the configuration contract is
 real now, and the later localization bootstrap can reuse the validated domain
 value.
 
-### 2.5 Daemon command execution glue (`crates/weaver-cli/src/runner_glue.rs`)
+### 21.5 Daemon command execution glue (`crates/weaver-cli/src/runner_glue.rs`)
 
 `runner_glue` extracts the daemon transport path from `lib.rs` so the top-level
 runtime stays small enough to scan. Its two `pub(crate)` entry points are:
@@ -1677,7 +1677,7 @@ tolerates socket-bind lag after daemon startup, and `write_error_and_fail`, a
 small helper that writes a display message to `stderr` and returns
 `ExitCode::FAILURE`.
 
-### 2.6 CLI BDD output expectations
+### 21.6 CLI BDD output expectations
 
 `crates/weaver-cli/src/tests/behaviour.rs` keeps `OutputStream` and
 `OutputCheck` private to the feature-bound CLI BDD steps. `OutputStream`
@@ -1686,9 +1686,9 @@ stream with the unchanged `OutputAssertion` comparison kind before
 `assert_output` reads the selected stream. Do not promote these types to shared
 test support unless a second CLI BDD module needs this exact contract.
 
-## Test infrastructure for rename-symbol coverage
+## 22 Test infrastructure for rename-symbol coverage
 
-### `test-support` feature (`weaver-plugins`)
+### 22.1 `test-support` feature (`weaver-plugins`)
 
 The `weaver-plugins` crate exposes shared contract fixtures behind the
 `test-support` Cargo feature. Activate it in a crate's `[dev-dependencies]` to
@@ -1746,7 +1746,7 @@ fn fixture_satisfies_contract() -> Result<()> {
 Prefer `.expect("valid_request fixture should exist")` in place of `?` when the
 surrounding test function does not return a `Result`.
 
-### `FakeDaemon` (`weaver-e2e/tests/test_support/daemon_harness.rs`)
+### 22.2 `FakeDaemon` (`weaver-e2e/tests/test_support/daemon_harness.rs`)
 
 `FakeDaemon` is a lightweight in-process TCP server used by end-to-end snapshot
 tests. It binds an ephemeral port, records incoming JSON request payloads, and
@@ -1766,7 +1766,7 @@ Pass `endpoint()` to the `--daemon-socket` flag of the `weaver` binary under
 test. Call `join()` after the CLI exits to assert that the background thread
 did not panic.
 
-### Request-routing helpers (`weaver-e2e/tests/test_support/refactor_routing.rs`)
+### 22.3 Request-routing helpers (`weaver-e2e/tests/test_support/refactor_routing.rs`)
 
 `refactor_routing` provides the routing logic used inside `FakeDaemon` to
 produce capability-resolution payloads:
@@ -1805,14 +1805,14 @@ let file = argument_value(&arguments, "--file").expect("refactor requests need -
 let payload = automatic_resolution_payload(std::path::Path::new(file));
 ```
 
-### `refactor_helpers` (`weaverd/src/dispatch/act/refactor/refactor_helpers.rs`)
+### 22.4 `refactor_helpers` (`weaverd/src/dispatch/act/refactor/refactor_helpers.rs`)
 
 `refactor_helpers` is a `#[cfg(test)]` support module for the daemon-side
 `act refactor` tests. It is split into small inline modules and then
 re-exported at the top-level so sibling test modules can import a compact test
 API instead of reaching into several implementation details.
 
-#### Sharing strategy and lint compliance
+#### 22.4.1 Sharing strategy and lint compliance
 
 The original sharing strategy had each test file use
 `#[path = "refactor_helpers.rs"]` to re-include the helper source. That made
@@ -1892,7 +1892,7 @@ then call `handle(...)` to assert on exit status, stderr, and any preserved
 workspace content. Tests that need fixture content or diff payloads layer in the
 `content` helpers instead of hand-writing patch strings.
 
-### `requirements` (`weaverd/src/dispatch/act/refactor/requirements.rs`)
+### 22.5 `requirements` (`weaverd/src/dispatch/act/refactor/requirements.rs`)
 
 `requirements` is the single source of truth for the operator-facing contract of
 `act refactor`. It is a non-test module consumed by both the argument-parsing
@@ -1937,7 +1937,7 @@ readable after automated wrapping:
   provider/refactoring or the `<plugin>` / `<operation>` placeholders. Called
   by the argument-builder when one or more required flags are absent.
 
-## `weaver-lsp-host` BDD world rebuild guarantee
+## 23 `weaver-lsp-host` BDD world rebuild guarantee
 
 `crates/weaver-lsp-host/src/tests/support/world.rs` defines `TestWorld`, the
 BDD fixture that owns the `LspHost` under test plus its registered stub
@@ -1964,7 +1964,7 @@ This guarantee is specific to `TestWorld::rebuild_host`; other crates
 (`weaverd`, `weaver-sandbox`, `weaver-cli`) have their own internal
 `TestWorld`-style harnesses that are not covered by this section.
 
-## Act-refactor position parsing and byte-offset conversion
+## 24 Act-refactor position parsing and byte-offset conversion
 
 The daemon-side `act refactor` implementation accepts user-facing source
 positions and converts them into the internal plugin contract shape before
@@ -1974,7 +1974,7 @@ in the earlier
 section; the production conversion path lives in the daemon modules described
 below.
 
-### `positions` (`weaverd/src/dispatch/act/refactor/positions.rs`)
+### 24.1 `positions` (`weaverd/src/dispatch/act/refactor/positions.rs`)
 
 `crates/weaverd/src/dispatch/act/refactor/positions.rs` owns parsing and
 conversion for human source positions.
@@ -1997,7 +1997,7 @@ positions. A column equal to `visible_line.chars().count() + 1` maps to
 `visible_line.len()`, which is the byte offset immediately after the visible
 line content and before any line ending.
 
-### `metrics` (`weaverd/src/dispatch/act/refactor/metrics.rs`)
+### 24.2 `metrics` (`weaverd/src/dispatch/act/refactor/metrics.rs`)
 
 `crates/weaverd/src/dispatch/act/refactor/metrics.rs` defines
 `PositionMetrics`, the trait used to record parse and conversion failures.
@@ -2013,7 +2013,7 @@ counter when `line_col_to_byte_offset` fails.
 Crate-visible accessors expose the current process-local counts. Exporter
 integration remains pending RFC 0001 and issue `#122`.
 
-### `arguments` (`weaverd/src/dispatch/act/refactor/arguments.rs`)
+### 24.3 `arguments` (`weaverd/src/dispatch/act/refactor/arguments.rs`)
 
 `RefactorArgs` carries the optional `position: Option<LineCol>` field alongside
 `provider`, `refactoring`, `file`, and trailing `KEY=VALUE` arguments. The
@@ -2028,7 +2028,7 @@ rejects requests that provide both `--position` and deprecated trailing
 `offset=` before request building begins. The byte-offset conversion happens
 later, after request building has loaded the target file content.
 
-### `request_building` (`weaverd/src/dispatch/act/refactor/request_building.rs`)
+### 24.4 `request_building` (`weaverd/src/dispatch/act/refactor/request_building.rs`)
 
 `CapabilityMappingContext` carries the data needed to translate user-facing
 arguments into the plugin contract: `capability`, `file_path`, `file_content`,
@@ -2051,14 +2051,14 @@ fixed order:
 4. Return an invalid-arguments error when neither `--position` nor `offset=`
    is available.
 
-## Dispatch lifecycle observability internals
+## 25 Dispatch lifecycle observability internals
 
 This section documents the dispatch and startup-observability helpers added for
 daemon request handling and CLI lifecycle guidance. The pieces are
 intentionally small: dispatch owns request telemetry at the daemon boundary,
 while lifecycle monitoring owns the runtime files that explain daemon readiness.
 
-### `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
+### 25.1 `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
 
 `crates/weaverd/src/dispatch/handler/` is split into three modules:
 
@@ -2103,7 +2103,7 @@ large context object through parse and validation helpers, or lose the
 distinction between client disconnects, read failures, malformed JSON, invalid
 commands, and oversized requests.
 
-### Structured dispatch events
+### 25.2 Structured dispatch events
 
 `StructuredEventMetadata` carries optional domain, operation, size, and
 maximum-size fields for structured dispatch logs. Its constructors and builder
@@ -2142,7 +2142,7 @@ payloads.
 and serialized payload under the same target so downstream tracing filters can
 collect dispatch telemetry consistently.
 
-### `monitoring_readers` (`weaver-cli/src/lifecycle/monitoring_readers.rs`)
+### 25.3 `monitoring_readers` (`weaver-cli/src/lifecycle/monitoring_readers.rs`)
 
 `monitoring_readers` centralizes runtime-file reads for daemon lifecycle
 monitoring. It exists so health and PID files share the same missing-file,
@@ -2174,7 +2174,7 @@ The concrete readers have these return semantics:
   `Err(LifecycleError::ReadPid { .. })` when reading fails, and
   `Err(LifecycleError::ParsePid { .. })` when integer parsing fails.
 
-### `runtime_dir` in lifecycle errors
+### 25.4 `runtime_dir` in lifecycle errors
 
 `LifecycleError::LaunchDaemon` and `LifecycleError::StartupFailed` both carry
 `runtime_dir: PathBuf`. The CLI keeps this path with the error because startup
