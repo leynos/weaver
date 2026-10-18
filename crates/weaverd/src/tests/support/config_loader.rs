@@ -2,7 +2,7 @@
 use std::{
     ffi::OsString,
     path::PathBuf,
-    sync::{Arc, Mutex, PoisonError},
+    sync::{Arc, Mutex},
 };
 
 use camino::Utf8PathBuf;

@@ -2111,3 +2111,9 @@ For launch failures, guidance can tell the operator where to inspect runtime
 artefacts even when the daemon process never starts. For startup failures,
 guidance uses the endpoint-scoped health path and points directly at the health
 snapshot that should explain why readiness was not reached.
+
+`startup_readiness_guidance` keeps the shared alternatives layout for
+`StartupFailed`, `StartupTimeout`, and `StartupAborted`. It is private to
+`actionable_guidance.rs` and should remain limited to those lifecycle variants.
+Other modules use `write_startup_guidance`, so the constructor's details and
+operator-facing wording stay owned by the CLI renderer.
