@@ -33,7 +33,9 @@ jobs:
     runs-on: >-
       ${{ github.event.pull_request.head.repo.fork
       && 'ubuntu-latest' || 'ubicloud-standard-4' }}
-    timeout-minutes: 30
+    # A PR run exceeded the previous ceiling while `make lint` was still
+    # compiling workspace dependencies. Allow for lint, tests, and coverage.
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
