@@ -47,6 +47,8 @@ weaver-test-macros = { path = "../weaver-test-macros" }
 insta = { workspace = true }
 proptest = { workspace = true }
 clap_mangen = "0.3"
+toml = { workspace = true }
+trybuild = { workspace = true }
 
 [lints.rust]
 missing_docs = "deny"
