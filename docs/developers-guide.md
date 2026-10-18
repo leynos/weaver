@@ -650,32 +650,49 @@ each of the three lanes, widening the guard to always, swapping it for a label
 test, and moving the step after the Rust setup. Four more repin it to `@main`,
 to a short SHA, to an upper-case SHA and to a SHA with a suffix.
 
-## Whitaker CI setup
+## CI tool installs: Whitaker and Merman
 
-CI installs Whitaker, Weaver's external lint engine, through the shared
-`leynos/shared-actions/.github/actions/install-whitaker` action, pinned to a
-full commit SHA in `.github/workflows/ci.yml`. The `Install Whitaker` step
-passes `cranelift: true`, so the lint libraries are built for the Cranelift
-backend, and nothing else.
+CI installs its linting and rendering tools through pinned shared actions
+instead of compiling them on every run:
 
-The action owns the rest. It installs a digest-verified, prebuilt
-`whitaker-installer` (0.2.9 or later), never builds the installer from source,
-and passes `--no-source-fallback`. Whitaker's lint suite is a rolling release
-that every consumer takes from the default branch tip, so Weaver no longer pins
-the suite to a revision: an earlier revision of this workflow cloned the
-Whitaker source at a fixed `WHITAKER_REV` and ran
-`whitaker-installer --build-only --no-update`. The step is therefore not
-reproducible to a lint-suite revision; the pinned action revision and the
-installer version are what stay fixed.
-`tests/workflow_contracts/ whitaker_provisioning_test.py` asserts this step:
-the action at the pinned revision, unconditionally, with `cranelift: true`,
-before `make lint`, and no `whitaker-installer` use or `WHITAKER_REV` in any
-`env` or `run` text. Changing the action pin therefore also means changing
-`PINNED_REVISION` in that test, to a revision that concordat's QG-002 rule
-lists.
+- **Whitaker**, Weaver's external lint engine, comes from the
+  `install-whitaker` action, pinned to a full commit SHA in
+  `.github/workflows/ci.yml`. Its `cranelift: true` input provisions the
+  backend used by Weaver's development profile. The action installs a
+  digest-verified prebuilt installer and rolling lint suite, and fails in
+  `ci-mode` rather than falling back to a source build. The suite follows
+  Whitaker's default branch tip; the action revision and installer version are
+  pinned, but the suite itself is not.
+- **Merman**, the Mermaid renderer used by `make nixie`, comes from
+  `install-nixie`. The action verifies Merman 0.7.0's release archive against
+  its pinned checksum and installs Nixie 1.1.0 on Python 3.14, which that
+  release requires.
 
-See the [Whitaker user's guide](whitaker-users-guide.md) for day-to-day usage
-of the installed lints.
+Until September 2026 both tools were compiled on every run.
+`cargo install merman-cli` built Merman from crates.io, a median 2.6 minutes,
+and the former Whitaker step built its installer, cloned the source and
+compiled the lint suite with Cranelift, a median 1.9 minutes: about a third of
+`build-test`'s 13-minute median on a paid runner.
+
+Prebuilt Whitaker libraries are published for the rolling suite tip. A new
+Whitaker lint can therefore fail `make lint` without a Weaver change; the fix
+belongs in the code it flags or upstream in Whitaker, rather than in a pinned
+suite revision.
+
+`tests/workflow_contracts/tool_install_test.py` prevents source installs from
+returning: no workflow may run `cargo install` or clone Whitaker, and the
+`build-test` job must provision Merman before `make nixie`. The separate
+`whitaker_provisioning_test.py` contract holds the current Whitaker action,
+Cranelift input and ordering in place.
+
+The source-build matchers collapse only Bash backslash-newline pairs before
+matching, preserving ordinary newlines as command boundaries. Bounded
+Hypothesis properties compare both detectors with a reference model.
+
+`make test-workflow-contracts` runs the shared CV-005 check and invokes
+`pytest tests/workflow_contracts -q` through `uv`, with `pytest>=8`,
+`pyyaml>=6` and `hypothesis>=6`. Hypothesis generates the cases used by the
+source-build properties.
 
 ## Adding or renaming public commands
 
