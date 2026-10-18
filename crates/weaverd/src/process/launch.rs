@@ -121,6 +121,8 @@ where
         env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
     if matches!(mode, LaunchMode::Background) {
         daemonizer.daemonize(guard.paths())?;
+        #[cfg(target_os = "solaris")]
+        guard.after_daemonize()?;
     }
     let pid = std::process::id();
     guard.write_pid(pid)?;

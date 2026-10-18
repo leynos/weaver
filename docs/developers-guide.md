@@ -2130,14 +2130,47 @@ fixed order:
 4. Return an invalid-arguments error when neither `--position` nor `offset=`
    is available.
 
-## 25 Dispatch lifecycle observability internals
+## 25 Runtime paths and process supervision
+
+`RuntimePaths` in `weaver-config` gives the CLI and daemon one canonical set of
+runtime artefact paths for a configured endpoint. Unix socket endpoints use the
+socket's parent directory. TCP endpoints use the per-user runtime directory:
+the platform runtime directory on Unix, with a per-user temporary directory
+fallback, and the temporary directory on non-Unix platforms.
+
+The default endpoint retains the legacy names `weaverd.lock`, `weaverd.pid`, and
+`weaverd.health`. Other endpoints use those prefixes with a SHA-256 identifier
+derived from the complete endpoint, including its transport and, for TCP, host
+and port. This keeps artefacts for distinct endpoints separate without putting
+endpoint text in filenames. `RuntimePaths::from_config` derives the paths and
+creates the runtime directory; use `RuntimePaths::from_config_readonly` when
+paths are needed without filesystem changes. The public accessors expose the
+runtime directory, each full artefact path, and each artefact filename.
+
+`ProcessGuard` owns the daemon's runtime lock for the guard's lifetime. It
+opens the persistent lock file relative to the capability-opened runtime
+directory, then locks that same open file: supported Unix targets use `flock`,
+Solaris uses `fcntl` plus a process-local guard, and Windows uses `LockFileEx`.
+The lock file remains in place during normal cleanup so another process cannot
+race by locking a different inode. On Solaris, the child reacquires the
+process-associated lock after daemonization; the parent's lock holds until the
+parent exits.
+
+When startup finds a lock file without a live daemon PID, it takes the lock and
+removes stale PID and health files before proceeding. On normal guard cleanup,
+the PID and health files are removed while the persistent lock file is
+retained. The `sha2` dependency derives endpoint identifiers, `rustix` provides
+Unix file-lock operations, and `windows-sys` exposes the Windows `LockFileEx`
+and `UnlockFileEx` APIs.
+
+## 26 Dispatch lifecycle observability internals
 
 This section documents the dispatch and startup-observability helpers added for
 daemon request handling and CLI lifecycle guidance. The pieces are
 intentionally small: dispatch owns request telemetry at the daemon boundary,
 while lifecycle monitoring owns the runtime files that explain daemon readiness.
 
-### 25.1 `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
+### 26.1 `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
 
 `crates/weaverd/src/dispatch/handler/` is split into three modules:
 
@@ -2182,7 +2215,7 @@ large context object through parse and validation helpers, or lose the
 distinction between client disconnects, read failures, malformed JSON, invalid
 commands, and oversized requests.
 
-### 25.2 Structured dispatch events
+### 26.2 Structured dispatch events
 
 `StructuredEventMetadata` carries optional domain, operation, size, and
 maximum-size fields for structured dispatch logs. Its constructors and builder
@@ -2221,7 +2254,7 @@ environment values, or complete payloads.
 and serialized payload under the same target so downstream tracing filters can
 collect dispatch telemetry consistently.
 
-### 25.3 `monitoring_readers` (`weaver-cli/src/lifecycle/monitoring_readers.rs`)
+### 26.3 `monitoring_readers` (`weaver-cli/src/lifecycle/monitoring_readers.rs`)
 
 `monitoring_readers` centralizes runtime-file reads for daemon lifecycle
 monitoring. It exists so health and PID files share the same missing-file,
@@ -2253,7 +2286,7 @@ The concrete readers have these return semantics:
   `Err(LifecycleError::ReadPid { .. })` when reading fails, and
   `Err(LifecycleError::ParsePid { .. })` when integer parsing fails.
 
-### 25.4 `runtime_dir` in lifecycle errors
+### 26.4 `runtime_dir` in lifecycle errors
 
 `LifecycleError::LaunchDaemon` and `LifecycleError::StartupFailed` both carry
 `runtime_dir: PathBuf`. `StartupFailed` also carries the endpoint-scoped

@@ -56,18 +56,54 @@ impl RuntimePaths {
     pub fn lock_path(&self) -> &Path { self.lock_path.as_path() }
 
     /// Filename of the lock file within the runtime directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use weaver_config::{Config, RuntimePaths};
+    ///
+    /// let paths = RuntimePaths::from_config_readonly(&Config::default())?;
+    /// assert_eq!(paths.lock_file_name(), Path::new("weaverd.lock"));
+    /// # Ok::<(), weaver_config::RuntimePathsError>(())
+    /// ```
     pub fn lock_file_name(&self) -> &Path { self.lock_file_name.as_path() }
 
     /// Path to the PID file.
     pub fn pid_path(&self) -> &Path { self.pid_path.as_path() }
 
     /// Filename of the PID file within the runtime directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use weaver_config::{Config, RuntimePaths};
+    ///
+    /// let paths = RuntimePaths::from_config_readonly(&Config::default())?;
+    /// assert_eq!(paths.pid_file_name(), Path::new("weaverd.pid"));
+    /// # Ok::<(), weaver_config::RuntimePathsError>(())
+    /// ```
     pub fn pid_file_name(&self) -> &Path { self.pid_file_name.as_path() }
 
     /// Path to the health snapshot.
     pub fn health_path(&self) -> &Path { self.health_path.as_path() }
 
     /// Filename of the health snapshot within the runtime directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use weaver_config::{Config, RuntimePaths};
+    ///
+    /// let paths = RuntimePaths::from_config_readonly(&Config::default())?;
+    /// assert_eq!(paths.health_file_name(), Path::new("weaverd.health"));
+    /// # Ok::<(), weaver_config::RuntimePathsError>(())
+    /// ```
     pub fn health_file_name(&self) -> &Path { self.health_file_name.as_path() }
 }
 
@@ -193,6 +229,8 @@ pub enum RuntimePathsError {
 mod tests {
     //! Unit tests for runtime path derivation from configuration.
 
+    use proptest::prelude::*;
+
     use super::*;
     use crate::Config;
 
@@ -250,6 +288,39 @@ mod tests {
         Ok(())
     }
 
+    proptest! {
+        #[test]
+        fn unix_endpoint_runtime_paths_are_deterministic_and_contained(segment in any::<u32>()) {
+            let endpoint = SocketEndpoint::unix(format!("/tmp/weaver/socket-{segment}.sock"));
+            let first = runtime_paths(endpoint.clone())
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+            let second = runtime_paths(endpoint)
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+
+            prop_assert_eq!(first.lock_path(), second.lock_path());
+            prop_assert_eq!(first.pid_path(), second.pid_path());
+            prop_assert_eq!(first.health_path(), second.health_path());
+            assert_runtime_paths_are_contained(&first);
+        }
+
+        #[test]
+        fn tcp_endpoint_runtime_paths_are_deterministic_and_contained(
+            host_suffix in "[a-z]{1,12}",
+            port in any::<u16>(),
+        ) {
+            let endpoint = SocketEndpoint::tcp(format!("host-{host_suffix}.example"), port);
+            let first = runtime_paths(endpoint.clone())
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+            let second = runtime_paths(endpoint)
+                .map_err(|error| TestCaseError::fail(error.to_string()))?;
+
+            prop_assert_eq!(first.lock_path(), second.lock_path());
+            prop_assert_eq!(first.pid_path(), second.pid_path());
+            prop_assert_eq!(first.health_path(), second.health_path());
+            assert_runtime_paths_are_contained(&first);
+        }
+    }
+
     #[test]
     fn derives_paths_for_tcp_socket() {
         let config = Config {
@@ -298,5 +369,17 @@ mod tests {
         assert_ne!(first.lock_path(), second.lock_path());
         assert_ne!(first.pid_path(), second.pid_path());
         assert_ne!(first.health_path(), second.health_path());
+    }
+
+    fn assert_runtime_paths_are_contained(paths: &RuntimePaths) {
+        for (name, path, suffix) in [
+            (paths.lock_file_name(), paths.lock_path(), ".lock"),
+            (paths.pid_file_name(), paths.pid_path(), ".pid"),
+            (paths.health_file_name(), paths.health_path(), ".health"),
+        ] {
+            assert_eq!(name.components().count(), 1);
+            assert!(name.to_string_lossy().ends_with(suffix));
+            assert!(path.starts_with(paths.runtime_dir()));
+        }
     }
 }
