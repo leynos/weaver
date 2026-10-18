@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use cap_std::fs::OpenOptions;
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_config::{Config, SocketEndpoint};
@@ -96,6 +97,58 @@ fn missing_pid_file_refuses_reacquire() -> Result<(), String> {
             );
             Ok(())
         }
+        other => Err(format!("expected startup-in-progress error, got {other:?}")),
+    }
+}
+
+#[test]
+#[cfg(not(target_os = "solaris"))]
+fn new_lock_race_reports_startup_in_progress() -> Result<(), String> {
+    let (_dir, paths) = build_paths()?;
+    let runtime_dir = open_runtime_dir(&paths)?;
+    let filename = runtime_filename(paths.lock_path()).map_err(|error| error.to_string())?;
+    let mut create_new = OpenOptions::new();
+    create_new.write(true).create_new(true);
+    let first_file = runtime_dir
+        .open_with(filename, &create_new)
+        .map_err(|error| format!("first launch should create the lock: {error}"))?;
+
+    let mut open_existing = OpenOptions::new();
+    open_existing.write(true);
+    let second_file = runtime_dir
+        .open_with(filename, &open_existing)
+        .map_err(|error| format!("second launch should open the lock: {error}"))?;
+    let second_process_lock = acquire_process_lock(&paths)
+        .map_err(|error| format!("second launch should reserve its process lock: {error}"))?;
+    let _second_lock = lock_file(second_file, &paths, second_process_lock)
+        .map_err(|error| format!("second launch should acquire the new lock: {error}"))?;
+
+    let first_process_lock = acquire_process_lock(&paths)
+        .map_err(|error| format!("first launch should reserve its process lock: {error}"))?;
+    match lock_file(first_file, &paths, first_process_lock) {
+        Err(LaunchError::StartupInProgress { lock, pid }) => {
+            assert_eq!(lock, paths.lock_path());
+            assert_eq!(pid, paths.pid_path());
+            Ok(())
+        }
+        other => Err(format!("expected startup-in-progress error, got {other:?}")),
+    }
+}
+
+#[test]
+#[cfg(target_os = "solaris")]
+fn same_process_startup_race_reports_startup_in_progress() -> Result<(), String> {
+    let (_dir, paths) = build_paths()?;
+    let first_runtime_dir = open_runtime_dir(&paths)?;
+    let _first_lock = ProcessGuard::acquire(first_runtime_dir, paths.clone())
+        .map_err(|error| format!("first launch should acquire its lock: {error}"))?;
+    _first_lock
+        .after_daemonize()
+        .map_err(|error| format!("daemon child should own the lock: {error}"))?;
+
+    let second_runtime_dir = open_runtime_dir(&paths)?;
+    match ProcessGuard::acquire(second_runtime_dir, paths.clone()) {
+        Err(LaunchError::StartupInProgress { .. }) => Ok(()),
         other => Err(format!("expected startup-in-progress error, got {other:?}")),
     }
 }
