@@ -46,7 +46,7 @@ impl TestConfigLoader {
         let config = self
             .load()
             .map_err(|error| format!("load test configuration: {error}"))?;
-        RuntimePaths::from_config(&config)
+        RuntimePaths::from_config_readonly(&config)
             .map_err(|error| format!("derive test runtime paths: {error}"))
     }
 
