@@ -30,8 +30,12 @@ jobs:
     # a green run would not show it. On a `workflow_dispatch` the fork field
     # is absent and the expression selects the Ubicloud arm, which is right:
     # a dispatch is not a fork.
+    # Dependabot pull requests run on the hosted pool too (free on a public
+    # repository). The author is tested, not the actor, which changes when
+    # someone else pushes to the branch.
     runs-on: >-
-      ${{ github.event.pull_request.head.repo.fork
+      ${{ (github.event.pull_request.head.repo.fork
+      || github.event.pull_request.user.login == 'dependabot[bot]')
       && 'ubuntu-latest' || 'ubicloud-standard-4' }}
     # A PR run exceeded the previous ceiling while `make lint` was still
     # compiling workspace dependencies. Allow for lint, tests, and coverage.

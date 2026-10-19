@@ -49,12 +49,13 @@ ACTIONLINT_CONFIG: typ.Final = REPO_ROOT / ".github" / "actionlint.yaml"
 #: The input name a reusable-workflow caller uses to place its callee.
 RUNNER_INPUT: typ.Final = "runner"
 
-#: One fork-fallback expression, anchored end to end. ``[^'\n]`` in the arms
-#: and ``\S`` in the guard keep a value carrying an embedded line break from
-#: matching here as well, so the line-break failure is reported by its own
+#: One fork-fallback expression, anchored end to end. ``[^'\n]`` in the arms,
+#: and the guard's single-line forms (a bare context or one parenthesized
+#: condition), keep a value carrying an embedded line break from matching here
+#: as well, so the line-break failure is reported by its own
 #: test rather than arriving as a confusing "expression not recognized".
 RUNNER_EXPRESSION: typ.Final = re.compile(
-    r"^\$\{\{ (?P<guard>\S+)"
+    r"^\$\{\{ (?P<guard>\([^\n]*?\)|\S+)"
     r" && '(?P<fork_arm>[^'\n]*)'"
     r" \|\| '(?P<default_arm>[^'\n]*)' \}\}$"
 )

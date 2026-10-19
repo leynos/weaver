@@ -278,13 +278,22 @@ worth the slower run. Should the margin close, the remedy is
 ### 7.3 The fork fallback
 
 A pull request from a fork cannot obtain an Ubicloud runner, so every lane that
-meets forks falls back to a GitHub-hosted runner for forks only:
+meets forks falls back to a GitHub-hosted runner for forks and for pull
+requests Dependabot opened, and for nothing else. Hosted minutes cost nothing
+on a public repository and Dependabot opens many pull requests, which therefore
+build cold on the hosted pool. The guard tests the pull request's author, not
+`github.actor`, because the actor is whoever triggered the run, so a person
+pushing to a Dependabot branch would flip the runner:
 
 ```yaml
 runs-on: >-
-  ${{ github.event.pull_request.head.repo.fork
+  ${{ (github.event.pull_request.head.repo.fork
+  || github.event.pull_request.user.login == 'dependabot[bot]')
   && 'ubuntu-latest' || 'ubicloud-standard-4' }}
 ```
+
+The shared build job takes its runner from its caller's `runner` input, which
+carries the same expression.
 
 The continuation line sits at the same indent as the line above it. A
 more-indented continuation in a folded scalar keeps its line break, putting a
@@ -326,14 +335,14 @@ decisions and the reason for each, and `runner_placement_reader.py` for the
 machinery that derives facts from the workflow tree.
 
 It reads every runner declaration from the parsed document and fails on an
-embedded line break; compares each fork guard and both arms against exact
-strings; pins placement by `(workflow, job id)` coordinate and compares that
-set against the tree in both directions; reads `runner` inputs as placements,
-not just `runs-on` lines; pins each ceiling by value and separately walks the
-tree for any unbounded Ubicloud lane; asserts that delegating jobs declare
-neither a runner nor a ceiling; checks the reviewed tables are total against
-each other; and compares `.github/actionlint.yaml` against the labels in use in
-both directions.
+embedded line break; compares each guard (the fork test or the Dependabot
+author test) and both arms against exact strings; pins placement by
+`(workflow, job id)` coordinate and compares that set against the tree in both
+directions; reads `runner` inputs as placements, not just `runs-on` lines; pins
+each ceiling by value and separately walks the tree for any unbounded Ubicloud
+lane; asserts that delegating jobs declare neither a runner nor a ceiling;
+checks the reviewed tables are total against each other; and compares
+`.github/actionlint.yaml` against the labels in use in both directions.
 
 That last comparison is why the registry exists as a checked artefact rather
 than as a list someone remembers to update. A label registered and used nowhere
