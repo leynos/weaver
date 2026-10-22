@@ -716,7 +716,7 @@ command-contract tasks are tracked in the
 This step answers whether provider-hidden actuators can mutate safely from both
 direct references and Sempai streams. It migrates prototype archive work 5.2.1
 through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 0001, ADR 0004, and ADR
-012. Boundary classifications for these tasks are tracked in the
+0012. Boundary classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 16.2.1. Implement `weaver symbols rename` for position references.
@@ -1039,7 +1039,7 @@ capability discoverability.
 This step answers whether Rope, rust-analyzer, `srgn`, `jedi`, static analysis,
 and future providers can share one public capability contract. It migrates
 prototype archive work 5.5.1, 5.6.1, and 5.8.1. See ADR 0001, ADR 0004, and ADR
-006.
+0006.
 
 - [ ] 18.1.1. Add `srgn` or equivalent as an actuator or selector provider
       behind manifests.
@@ -1096,7 +1096,7 @@ formal verification, output delivery, feedback, profiles, and jobs.
 
 This step answers whether profiles, jobs, and delivery reduce repeated agent
 turns without making human usage worse. It migrates the product intent of ADR
-007 compounding primitives and prototype archive work 6.2.1. See
+0007 compounding primitives and prototype archive work 6.2.1. See
 `docs/weaver-design.md` §§2.1.5-2.1.6. Boundary classifications for these tasks
 are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).

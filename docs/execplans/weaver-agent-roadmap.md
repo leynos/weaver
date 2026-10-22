@@ -182,7 +182,7 @@ teams a sequenced build plan.
 - [x] (2026-05-09) Inspected `docs/weaver-design.md`, `docs/roadmap.md`,
       `docs/users-guide.md`, `docs/ui-gap-analysis.md`,
       `docs/repository-layout.md`, `docs/contents.md`, and `README.md`.
-- [x] (2026-05-09) Inspected ADRs 0001, 004, and 006 to verify that the
+- [x] (2026-05-09) Inspected ADRs 0001, 0004, and 0006 to verify that the
       capability-first plugin model already supports a provider-hidden public
       command surface.
 - [x] (2026-05-09) Used a read-only wyvern agent to inventory current
