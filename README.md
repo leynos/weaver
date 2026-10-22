@@ -30,9 +30,9 @@ repository already contains the CLI/daemon architecture, shared configuration,
 Language Server Protocol (LSP) hosting, Tree-sitter syntax support, graph and
 card foundations, plugin infrastructure, sandboxing, and write-operation safety
 harness work. The public command surface is now being reset around
-[ADR 007](docs/adr-007-agent-native-command-surface.md), which makes the 0.1.0
-target human-friendly and agent-native without preserving compatibility with
-the prototype `observe` / `act` / `verify` grammar.
+[ADR 0007](docs/adrs/adr-0007-agent-native-command-surface.md), which makes the
+0.1.0 target human-friendly and agent-native without preserving compatibility
+with the prototype `observe` / `act` / `verify` grammar.
 
 Check the [roadmap](docs/roadmap.md) for the current build sequence and the
 [user's guide](docs/users-guide.md) for the split between current prototype

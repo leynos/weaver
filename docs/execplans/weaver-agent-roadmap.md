@@ -154,7 +154,7 @@ teams a sequenced build plan.
 
 - Risk: Weaver may duplicate OrthoConfig's planned generic CLI contract work,
   creating two divergent schema and policy systems. Severity: high. Likelihood:
-  medium. Mitigation: make OrthoConfig task dependencies explicit in ADR 007,
+  medium. Mitigation: make OrthoConfig task dependencies explicit in ADR 0007,
   `docs/weaver-design.md`, and `docs/roadmap.md`; define only Weaver-owned
   adapters and semantic capability metadata locally.
 
@@ -182,7 +182,7 @@ teams a sequenced build plan.
 - [x] (2026-05-09) Inspected `docs/weaver-design.md`, `docs/roadmap.md`,
       `docs/users-guide.md`, `docs/ui-gap-analysis.md`,
       `docs/repository-layout.md`, `docs/contents.md`, and `README.md`.
-- [x] (2026-05-09) Inspected ADRs 001, 004, and 006 to verify that the
+- [x] (2026-05-09) Inspected ADRs 0001, 004, and 006 to verify that the
       capability-first plugin model already supports a provider-hidden public
       command surface.
 - [x] (2026-05-09) Used a read-only wyvern agent to inventory current
@@ -203,18 +203,18 @@ teams a sequenced build plan.
       `make test`.
 - [x] (2026-05-11) Treated the active implementation instruction as approval
       to begin executing the documentation overhaul.
-- [x] (2026-05-11) Completed Milestone 1 by adding ADR 007 and indexing it in
+- [x] (2026-05-11) Completed Milestone 1 by adding ADR 0007 and indexing it in
       `docs/contents.md`.
 - [x] (2026-05-11) Ran Milestone 1 gates: `make fmt`,
       `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
       `make test`.
 - [x] (2026-05-11) Ran `coderabbit review --agent --base-commit HEAD~1
-      --type committed` for the ADR 007 milestone; CodeRabbit completed with
+      --type committed` for the ADR 0007 milestone; CodeRabbit completed with
       zero findings.
 - [x] (2026-05-11) Started Milestone 2 by rewriting the design document's
       executive summary, Weaver philosophy, client-daemon command surface,
       selector pipeline, renderer, introspection, state, two-way I/O, and
-      capability-provider sections around ADR 007.
+      capability-provider sections around ADR 0007.
 - [x] (2026-05-11) Ran the Milestone 2 design-surface gates: `make fmt`,
       `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
       `make test`.
@@ -231,7 +231,7 @@ teams a sequenced build plan.
       `https://github.com/leynos/weaver.git`.
 - [x] (2026-05-12) Closed the remaining Milestone 2 ambiguity by marking
       `act apply-patch` and the old design-roadmap section as current or
-      historical context superseded by ADR 007 for the 0.1.0 public grammar.
+      historical context superseded by ADR 0007 for the 0.1.0 public grammar.
 - [x] (2026-05-12) Completed Milestone 3 by rewriting `docs/roadmap.md`
       around the 0.1.0 command-surface reset, explicit OrthoConfig
       dependencies, resource-first command slices, selector-driven mutation,
@@ -241,7 +241,7 @@ teams a sequenced build plan.
       `make test`.
 - [x] (2026-05-12) Completed Milestone 4 by replacing
       `docs/ui-gap-analysis.md` with an agent-native, human-friendly gap
-      matrix that maps current prototype evidence to ADR 007, the new design,
+      matrix that maps current prototype evidence to ADR 0007, the new design,
       the reordered roadmap, OrthoConfig dependencies, selector composition,
       and capability-routed provider gaps.
 - [x] (2026-05-12) Started Milestone 5 by adding a 0.1.0 target
@@ -251,7 +251,7 @@ teams a sequenced build plan.
 - [x] (2026-05-12) Continued Milestone 5 by updating `README.md` and
       `docs/repository-layout.md` so the public summary and planned-component
       ownership reflect the current workspace, completed safety foundation,
-      ADR 007, the resource-first reset, and OrthoConfig dependency boundaries.
+      ADR 0007, the resource-first reset, and OrthoConfig dependency boundaries.
 - [x] (2026-05-12) Completed Milestone 5 by adding contributor-facing guidance
       to `docs/developers-guide.md` for adding or renaming public commands
       through OrthoConfig-backed metadata, Weaver semantic adapters,
@@ -290,7 +290,7 @@ teams a sequenced build plan.
       foundation, migrated live scope, conditional validation work, or
       superseded prototype grammar.
 - [x] (2026-05-13) Defined the temporary-adapter removal policy for roadmap
-      item `13.1.3` by adding an ADR 007 removal table for each local
+      item `13.1.3` by adding an ADR 0007 removal table for each local
       command-surface helper and mirroring the OrthoConfig replacement tasks in
       `crates/weaver-cli/src/command_surface.rs`.
 - [x] (2026-05-13) Corrected the live roadmap to stop conflating
@@ -330,7 +330,7 @@ teams a sequenced build plan.
   `docs/repository-layout.md` and the completed roadmap entries, so the public
   narrative already needs trust repair independent of the agent-native reset.
 
-- Discovery: ADR 001, ADR 004, and ADR 006 already justify the desired plugin
+- Discovery: ADR 0001, ADR 0004, and ADR 0006 already justify the desired plugin
   model. The planned work should refine and generalize those decisions rather
   than reversing them.
 
@@ -363,7 +363,7 @@ teams a sequenced build plan.
   current-state evidence, but its recommended remedies would have preserved too
   much of the superseded `observe` / `act` / `verify` grammar if followed
   literally. The revised gap analysis must therefore retain those observations
-  as historical evidence while pointing implementation at ADR 007 and the new
+  as historical evidence while pointing implementation at ADR 0007 and the new
   roadmap phases.
 
 - Discovery: the archived roadmap work maps more cleanly to product loops than
@@ -471,7 +471,7 @@ teams a sequenced build plan.
   makes the migration auditable and keeps superseded prototype spellings from
   re-entering the implementation backlog. Date: 2026-05-13.
 
-- Decision: record temporary adapter retirement in both ADR 007 and the code
+- Decision: record temporary adapter retirement in both ADR 0007 and the code
   comments on the local helpers. Rationale: `13.1.3` is a policy task, but the
   policy must be visible at the maintenance point so future implementers do not
   treat `command_surface.rs` as permanent generic infrastructure. Date:
@@ -506,7 +506,7 @@ teams a sequenced build plan.
 
 The files most likely to be edited when this plan is approved are:
 
-- `docs/adr-007-agent-native-command-surface.md`, a new ADR to record the
+- `docs/adrs/adr-0007-agent-native-command-surface.md`, a new ADR to record the
   reset decision.
 - `docs/weaver-design.md`, the primary architecture and product rationale.
 - `docs/roadmap.md`, the implementation sequence that must be reordered around
@@ -524,18 +524,18 @@ The files most likely to be edited when this plan is approved are:
 - `docs/contents.md`, the documentation index.
 - `README.md`, the public summary that must stop contradicting implemented
   safety and workspace status.
-- ADR 001, ADR 004, and ADR 006 if the new ADR needs cross-links or wording
+- ADR 0001, ADR 0004, and ADR 0006 if the new ADR needs cross-links or wording
   that clarifies provider-hidden capability routing.
 
 The current source material to preserve includes these existing decisions:
 
-- ADR 001 says user intent should be represented by stable capability IDs,
+- ADR 0001 says user intent should be represented by stable capability IDs,
   provider choice should be resolved internally, provider internals should stay
   out of normal workflows, and final edits should flow through the safety
   harness.
-- ADR 004 says provider routing must be deterministic and refusal diagnostics
+- ADR 0004 says provider routing must be deterministic and refusal diagnostics
   must be stable and machine-readable.
-- ADR 006 says plugins use one-shot JSONL execution with broker ownership and
+- ADR 0006 says plugins use one-shot JSONL execution with broker ownership and
   do not own final commit behaviour.
 - `docs/weaver-design.md` already separates stable daemon reason codes from
   localized CLI prose.
@@ -746,7 +746,7 @@ internals ahead of time.
 
 ### Milestone 1: Record the reset as a new ADR
 
-Create `docs/adr-007-agent-native-command-surface.md`.
+Create `docs/adrs/adr-0007-agent-native-command-surface.md`.
 
 The ADR must decide that Weaver's 0.1.0 command surface is generated from one
 schema-backed command contract. The ADR must state that Weaver depends on
@@ -795,12 +795,12 @@ superseded with rationale.
 
 Success criteria:
 
-- ADR 007 defines the dual-renderer command contract.
-- ADR 007 defines capability, perceptor, actuator, and provider.
-- ADR 007 links ADR 001, ADR 004, and ADR 006 as supporting decisions.
-- ADR 007 links the OrthoConfig roadmap tasks that Weaver depends on and does
+- ADR 0007 defines the dual-renderer command contract.
+- ADR 0007 defines capability, perceptor, actuator, and provider.
+- ADR 0007 links ADR 0001, ADR 0004, and ADR 0006 as supporting decisions.
+- ADR 0007 links the OrthoConfig roadmap tasks that Weaver depends on and does
   not claim ownership of those reusable contracts.
-- ADR 007 contains no compatibility promise for the prototype grammar.
+- ADR 0007 contains no compatibility promise for the prototype grammar.
 
 ### Milestone 2: Rewrite the design around the new command contract
 
@@ -832,7 +832,7 @@ Add a section named `Agent-native command surface`. It must specify:
 - The mechanical rule that adding or renaming a Weaver command requires one
   application schema or OrthoConfig metadata change, and CI fails on drift.
 - The fallback rule that any local generic command-contract code is temporary
-  unless ADR 007 records why an OrthoConfig dependency cannot satisfy it.
+  unless ADR 0007 records why an OrthoConfig dependency cannot satisfy it.
 
 Add a section named `Selector and pipeline contract`. It must define:
 
@@ -884,7 +884,7 @@ version, schema version, commands, flags, enum values, output schemas, error
 taxonomy, installed capabilities, provider summaries, profiles, jobs, delivery
 schemes, feedback state, and skill paths. The design must call out its
 dependency on OrthoConfig 6.2.3 for public command naming and must not add a
-public `agent-context` alias before 0.1.0 unless ADR 007 records the reason.
+public `agent-context` alias before 0.1.0 unless ADR 0007 records the reason.
 `capabilities list` returns Weaver runtime capability availability.
 `skill-path` returns the directory containing workflow `SKILL.md` manifests,
 with validation delegated to OrthoConfig 6.3 where possible.
@@ -923,7 +923,7 @@ payloads, safety checks, webhook payload shape, and how delivered artefacts
 relate to code-edit transactions.
 
 Add a section named `Capability-routed perceptors and actuators`. It must
-generalize ADR 001, ADR 004, and ADR 006:
+generalize ADR 0001, ADR 0004, and ADR 0006:
 
 - public commands map to capability IDs,
 - provider manifests declare capability support,
@@ -996,7 +996,7 @@ surface instead of repeatedly redesigning command grammar.
 
 This phase must contain review-sized tasks for:
 
-- ADR 007 acceptance,
+- ADR 0007 acceptance,
 - OrthoConfig dependency mapping and adapter policy,
 - Weaver semantic command-surface adapter design,
 - vocabulary linting via OrthoConfig policy where available,
@@ -1018,7 +1018,7 @@ This phase must contain review-sized tasks for:
 Tasks in this foundational phase must distinguish reusable OrthoConfig work
 from Weaver work. For example, Weaver may configure or consume vocabulary
 policy and renderer metadata, but it should not implement a second generic
-policy engine unless ADR 007 records a temporary adapter with a removal path.
+policy engine unless ADR 0007 records a temporary adapter with a removal path.
 
 The next phase should deliver a useful vertical slice under the new grammar,
 not another layer. Candidate phase:
@@ -1192,7 +1192,7 @@ Add planned components for:
 
 Update `docs/contents.md`.
 
-Add ADR 007 and any new design or skills documents.
+Add ADR 0007 and any new design or skills documents.
 
 Success criteria:
 
@@ -1235,11 +1235,11 @@ Success criteria:
 
 When this plan is approved, execute it in small commits.
 
-1. Create ADR 007 and update `docs/contents.md`.
+1. Create ADR 0007 and update `docs/contents.md`.
 2. Rewrite the command-surface and renderer sections of
    `docs/weaver-design.md`.
 3. Rewrite the capability and plugin sections of `docs/weaver-design.md`, then
-   cross-link ADR 001, ADR 004, and ADR 006.
+   cross-link ADR 0001, ADR 0004, and ADR 0006.
 4. Rewrite `docs/roadmap.md` so the command-surface reset precedes additional
    command growth.
 5. Rewrite `docs/ui-gap-analysis.md` into the agent-native audit.
@@ -1279,7 +1279,7 @@ record the blocker and log path before committing.
 ## Outcomes & Retrospective
 
 The documentation overhaul is complete. The branch now records Weaver's
-human-friendly, agent-native 0.1.0 command-surface reset in ADR 007,
+human-friendly, agent-native 0.1.0 command-surface reset in ADR 0007,
 `docs/weaver-design.md`, `docs/roadmap.md`, `docs/ui-gap-analysis.md`,
 `docs/users-guide.md`, `docs/developers-guide.md`, `README.md`,
 `docs/repository-layout.md`, and `docs/contents.md`.
@@ -1294,7 +1294,7 @@ command-contract work inside Weaver.
 Existing completed and planned Weaver roadmap work was not erased. Completed
 safety, atomic edit, capability-routing, card, graph, help, and configuration
 work is preserved in `docs/archive/prototype-roadmap.md` as historical
-foundation. Relevant future work is migrated under the ADR 007 command grammar
+foundation. Relevant future work is migrated under the ADR 0007 command grammar
 in live roadmap phases `12` through `20`, while historical ExecPlans keep their
 original archive task numbers.
 

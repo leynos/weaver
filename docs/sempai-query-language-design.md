@@ -3,12 +3,13 @@
 > **Status and precedence:** The language, parser, and engine architecture
 > described here remains the current proposed design. The prototype public CLI
 > and JSONL command/protocol sections are historical and superseded for
-> user-facing use by [RFC 0003](rfcs/0003-sempai-query-to-selector.md),
-> [ADR 011](adr-011-sempai-query-input-syntax.md), and
-> [ADR 012](adr-012-versioned-selector-streams.md). The current resource-first
-> contract is `weaver symbols list` with `--query`, `--expr`, or `--rule`,
-> emitting completed selector streams. The prototype examples below are
-> retained as non-authoritative historical material.
+> user-facing use by
+> [RFC 0003](rfcs/rfc-0003-sempai-query-to-selector-vertical-slice.md),
+> [ADR 0011](adrs/adr-0011-sempai-query-input-syntax.md), and
+> [ADR 0012](adrs/adr-0012-versioned-selector-streams.md). The current
+> resource-first contract is `weaver symbols list` with `--query`, `--expr`, or
+> `--rule`, emitting completed selector streams. The prototype examples below
+> are retained as non-authoritative historical material.
 
 This document specifies the implementation design for Sempai: a Semgrep-
 compatible query parser and Tree-sitter-backed query engine for feature

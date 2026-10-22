@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 009: Workspace-scoped language-server lifecycle
+# Architectural decision record (ADR) 0009: Workspace-scoped language-server lifecycle
 
 ## Status
 
@@ -22,8 +22,8 @@ Rustup also resolves toolchains from directory-sensitive overrides. A process
 being alive is therefore insufficient evidence that it is correct for the next
 request.
 
-[RFC 0002](rfcs/0002-multi-workspace-daemon.md) contains the full proposal,
-prior art, and migration analysis.
+[RFC 0002](../rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md)
+contains the full proposal, prior art, and migration analysis.
 
 ## Decision drivers
 

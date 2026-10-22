@@ -26,10 +26,10 @@ also excludes concurrency-heavy Rust patterns, which further supports keeping
 the initial proof effort inside bounded, deterministic control-plane logic
 rather than the daemon's general async orchestration.[^6]
 
-The forward roadmap now reserves task numbers `12` through `20` for the ADR 007
-command-surface build. Older Weaver roadmap references in this document, such as
-`6.1.4`, `7.2.5`, or `8.3.4`, point to the prototype roadmap archive unless
-they are part of the local formal-verification rollout checklist below.
+The forward roadmap now reserves task numbers `12` through `20` for the ADR
+0007 command-surface build. Older Weaver roadmap references in this document,
+such as `6.1.4`, `7.2.5`, or `8.3.4`, point to the prototype roadmap archive
+unless they are part of the local formal-verification rollout checklist below.
 
 ## Current state
 
@@ -123,16 +123,16 @@ The first practical harnesses should check:
 
 The next highest-return target is capability-first plugin selection and
 orchestration correctness
-[ADR 001](adr-001-plugin-capability-model-and-act-extricate.md), not plugin
-semantic correctness. The design and roadmap already claim that
+[ADR 0001](adrs/adr-0001-plugin-capability-model-and-act-extricate.md), not
+plugin semantic correctness. The design and roadmap already claim that
 `weaver-plugins` owns the broker and protocol
-[ADR 006](adr-006-plugin-execution-and-orchestration-strategy.md), uses
+[ADR 0006](adrs/adr-0006-plugin-execution-and-orchestration-strategy.md), uses
 one-shot JSON Lines (JSONL) payloads
-[ADR 006](adr-006-plugin-execution-and-orchestration-strategy.md), routes
-successful plugin output back through the transaction path
-[ADR 004](adr-004-plugin-routing-refusal-semantics.md), and requires
+[ADR 0006](adrs/adr-0006-plugin-execution-and-orchestration-strategy.md),
+routes successful plugin output back through the transaction path
+[ADR 0004](adrs/adr-0004-plugin-routing-refusal-semantics.md), and requires
 deterministic refusal diagnostics and rollback guarantees
-[ADR 004](adr-004-plugin-routing-refusal-semantics.md).
+[ADR 0004](adrs/adr-0004-plugin-routing-refusal-semantics.md).
 
 The first Kani obligations in this area should cover:
 
@@ -190,7 +190,7 @@ the documentation should define:
 ### Trust boundary
 
 The verified kernel should be called out explicitly
-[ADR 005](adr-005-verification-trust-boundary.md):
+[ADR 0005](adrs/adr-0005-verification-trust-boundary.md):
 
 - transaction ordering,
 - path policy,
@@ -199,7 +199,7 @@ The verified kernel should be called out explicitly
 - bounded graph or matching counters.
 
 Trusted or unverified components should also be named explicitly
-[ADR 005](adr-005-verification-trust-boundary.md):
+[ADR 0005](adrs/adr-0005-verification-trust-boundary.md):
 
 - parser correctness,
 - Language Server Protocol (LSP) server correctness,
@@ -381,7 +381,7 @@ That layering keeps the assurance story honest and maintainable.
           definition, and the harness comments can refer to it without
           inference.
   - [ ] 3.0.3. Define the trust boundary between verified orchestration and
-        trusted external tools [ADR 005](adr-005-verification-trust-boundary.md).
+        trusted external tools [ADR 0005](adrs/adr-0005-verification-trust-boundary.md).
         Requires 3.0.2.
     - [ ] Enumerate the verified kernel and unverified dependencies.
     - [ ] Acceptance criteria: the docs explicitly classify at least five
@@ -396,17 +396,18 @@ That layering keeps the assurance story honest and maintainable.
           proof modules stay outside Cargo, and the initial proof tree contains
           at least three proof modules.
   - [ ] 4.0.2. Prove the transaction-gating model
-        [ADR 005](adr-005-verification-trust-boundary.md). Requires 4.0.1 and
-        3.0.1.
+        [ADR 0005](adrs/adr-0005-verification-trust-boundary.md).
+        Requires 4.0.1 and 3.0.1.
     - [ ] Prove commit requires both locks.
     - [ ] Prove rollback restoration over a modelled workspace map.
     - [ ] Acceptance criteria: at least two lemmas are machine-checked and
           named in the proof module, and the proof script documents the model
           assumptions.
   - [ ] 4.0.3. Prove capability-resolution soundness over an abstract
-        resolver [ADR 001](adr-001-plugin-capability-model-and-act-extricate.md)
-        [ADR 004](adr-004-plugin-routing-refusal-semantics.md). Requires 4.0.1
-        and 3.0.3.
+        resolver. See
+        [ADR 0001](adrs/adr-0001-plugin-capability-model-and-act-extricate.md)
+        and [ADR 0004](adrs/adr-0004-plugin-routing-refusal-semantics.md).
+        Requires 4.0.1 and 3.0.3.
     - [ ] Successful resolution satisfies language, capability, and policy
           predicates.
     - [ ] Refusal occurs instead of silent fallback when no provider qualifies.
@@ -442,8 +443,9 @@ That layering keeps the assurance story honest and maintainable.
 The most coherent plan for Weaver is:
 
 - Kani first on the Double-Lock transaction kernel, `act apply-patch`, and
-  capability-aware routing
-  [ADR 001](adr-001-plugin-capability-model-and-act-extricate.md) [ADR 004](adr-004-plugin-routing-refusal-semantics.md),
+  capability-aware routing, per
+  [ADR 0001](adrs/adr-0001-plugin-capability-model-and-act-extricate.md) and
+  [ADR 0004](adrs/adr-0004-plugin-routing-refusal-semantics.md),
 - Verus second on a tiny proof-only model of transactional and routing
   invariants, and
 - later Kani harnesses that verify graph-construction invariants and

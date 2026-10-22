@@ -16,11 +16,11 @@ This document targets software engineers implementing the Rust
 The design covers request contract changes, rust-analyzer Language Server
 Protocol (LSP) orchestration, edit-planning strategy, semantic verification,
 and test strategy. It aligns with
-[ADR 001](adr-001-plugin-capability-model-and-act-extricate.md).
+[ADR 0001](adrs/adr-0001-plugin-capability-model-and-act-extricate.md).
 
-## Relationship to ADR 001 provider model
+## Relationship to ADR 0001 provider model
 
-ADR 001 defines Rust extrication as a built-in provider responsibility in the
+ADR 0001 defines Rust extrication as a built-in provider responsibility in the
 daemon capability resolver. This document specifies a plugin-backed execution
 path that the built-in provider can delegate to during rollout.
 

@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 003: Semgrep-compatible query engine strategy
+# Architectural decision record (ADR) 0003: Semgrep-compatible query engine strategy
 
 ## Status
 
@@ -10,7 +10,7 @@ Proposed
 
 ## Context and problem statement
 
-ADR 002 proposes a Semgrep-style query surface for feature extraction in
+ADR 0002 proposes a Semgrep-style query surface for feature extraction in
 Weaver. The next decision is execution strategy: whether to implement matching
 fully in-house, adopt an existing Rust matcher as the primary engine, or use a
 hybrid approach.
@@ -30,7 +30,7 @@ maintaining predictable behaviour in daemon workflows.
 
 ### Functional requirements
 
-- Execute the Semgrep-style subset selected by ADR 002.
+- Execute the Semgrep-style subset selected by ADR 0002.
 - Provide deterministic capture behaviour for extraction pipelines.
 - Support clear diagnostics when a rule cannot be executed as written.
 

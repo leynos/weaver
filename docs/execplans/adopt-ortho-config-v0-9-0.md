@@ -85,7 +85,7 @@ Observable success means all of the following are true:
 9. Do not adopt optional v0.9.0 metrics, agent-context commands, dependency
    aliases, or recursive subcommand documentation merely because the release
    provides them. Each requires a present Weaver consumer and must remain
-   within ADR 007 and the OrthoConfig consumer-boundary matrix.
+   within ADR 0007 and the OrthoConfig consumer-boundary matrix.
 10. Use Red-Green-Refactor for behavioural changes. An expected focused red
     check may fail within a milestone, but the milestone is not complete until
     the focused checks are green and all four required Make gates pass.
@@ -117,7 +117,7 @@ Observable success means all of the following are true:
   required beyond the v0.9.0 default features, stop and explain why. The planned
   `googletest = "0.14.3"` and `pretty_assertions = "1.4.1"` development
   dependencies are within tolerance.
-- Upstream contracts: if the v0.9.0 audit proves that an ADR 007 temporary
+- Upstream contracts: if the v0.9.0 audit proves that an ADR 0007 temporary
   adapter's full removal gate is satisfied and replacing it would exceed this
   dependency migration, stop and propose a separately reviewable follow-up.
 - Size: if the migration needs more than 12 non-generated files or 500 net
@@ -157,7 +157,7 @@ Observable success means all of the following are true:
 
 - Risk: v0.9.0's optional recursive documentation and agent-context types may
   look like permission to broaden the migration into roadmap work governed by
-  ADR 007. Severity: high. Likelihood: medium. Mitigation: audit the boundary
+  ADR 0007. Severity: high. Likelihood: medium. Mitigation: audit the boundary
   matrix, update only release evidence that is actually consumed, and leave
   command-surface replacement to a separate plan unless every existing removal
   condition is demonstrably met and the user approves the expansion.
@@ -464,11 +464,12 @@ Observable success means all of the following are true:
   2026-08-12, Codex.
 
 - Decision: do not create a new ADR for the dependency bump or test-harness
-  correction. Rationale: ADR 007 already governs the durable Weaver/OrthoConfig
-  ownership boundary. The selected changes are narrow and reversible. Record
-  them in `docs/weaver-design.md` and `docs/developers-guide.md`; create a new
-  ADR only if implementation requires a new public contract, port, or permanent
-  divergence. Date/Author: 2026-08-12, Codex.
+  correction. Rationale: ADR 0007 already governs the durable
+  Weaver/OrthoConfig ownership boundary. The selected changes are narrow and
+  reversible. Record them in `docs/weaver-design.md` and
+  `docs/developers-guide.md`; create a new ADR only if implementation requires
+  a new public contract, port, or permanent divergence. Date/Author:
+  2026-08-12, Codex.
 
 - Decision: cover the generated capability-override merge invariant with a
   Proptest, while adding no Kani or Verus artefact. Rationale: the `post_merge`
@@ -608,7 +609,7 @@ cases. It does not mutate the process environment.
 The active documentation sources are `docs/weaver-design.md` for architecture
 and design decisions, `docs/developers-guide.md` for internal configuration and
 test practices, `docs/users-guide.md` for operator-visible behaviour, and
-`docs/contents.md` for discovery. ADR 007 and
+`docs/contents.md` for discovery. ADR 0007 and
 `docs/orthoconfig-consumer-boundary.toml` govern the division between reusable
 OrthoConfig command-contract machinery and Weaver-specific semantic adapters.
 `docs/orthoconfig-consumer-boundary.md` is generated from the TOML manifest.
@@ -791,7 +792,7 @@ Update `docs/weaver-design.md` configuration sections to say v0.9.0 and Rust
 record the accepted migration decisions in its design decision log. State that
 Weaver retains its existing policy and adapter boundaries, and that optional
 agent-context, recursive command-metadata, localization, metrics, and YAML work
-remains governed by ADR 007 and roadmap-specific removal gates.
+remains governed by ADR 0007 and roadmap-specific removal gates.
 
 Update `docs/developers-guide.md` workspace baseline and configuration
 internals. Document the test boundary: `MergeComposer` exercises source-layer

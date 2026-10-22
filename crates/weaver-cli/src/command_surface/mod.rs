@@ -11,7 +11,7 @@
 //! capability/provenance metadata once those contracts can carry the
 //! Weaver-specific fields below. Replace the read-only catalogue and lookup
 //! helpers with the OrthoConfig 6.1 generated command registry, and use
-//! OrthoConfig 6.2/6.3 output for context and skill surfaces. ADR 007 records
+//! OrthoConfig 6.2/6.3 output for context and skill surfaces. ADR 0007 records
 //! the same policy for reviewers.
 
 /// A public selector form accepted by a command-surface record.

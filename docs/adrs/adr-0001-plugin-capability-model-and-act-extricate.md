@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 001: Plugin capability model and act extricate
+# Architectural decision record (ADR) 0001: Plugin capability model and act extricate
 
 ## Status
 

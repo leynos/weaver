@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 007: Agent-native command surface
+# Architectural decision record (ADR) 0007: Agent-native command surface
 
 ## Status
 
@@ -160,9 +160,9 @@ Help and the generated manual page consume the same projected command.
 
 Every live roadmap task that touches the command contract must be classified in
 the OrthoConfig consumer boundary matrix at
-[`docs/orthoconfig-consumer-boundary.md`](orthoconfig-consumer-boundary.md).
+[`docs/orthoconfig-consumer-boundary.md`](../orthoconfig-consumer-boundary.md).
 The machine-readable source of truth is
-[`docs/orthoconfig-consumer-boundary.toml`](orthoconfig-consumer-boundary.toml).
+[`docs/orthoconfig-consumer-boundary.toml`](../orthoconfig-consumer-boundary.toml).
 The matrix complements the dependency table and removal policy above; it does
 not replace either one.
 
@@ -176,7 +176,7 @@ The matrix uses these columns:
 - `Shipped in` names the OrthoConfig release tag or pinned commit SHA that
   landed the contract for `consumes` rows.
 - `Removal gate or divergence` records either the replacement condition for a
-  temporary wrapper or the ADR 007 section that owns a deliberate divergence.
+  temporary wrapper or the ADR 0007 section that owns a deliberate divergence.
 - `Next review by` records the next review date for unresolved upstream
   contracts.
 - `Last reviewed` records the last date the row was checked.
@@ -194,7 +194,7 @@ The four boundary states have fixed evidence requirements:
   date. This state exists so `wraps` remains reserved for contracts whose
   upstream shape is already committed.
 - `divergent` means Weaver deliberately keeps a different contract. The row
-  must point to the ADR 007 section that explains the divergence.
+  must point to the ADR 0007 section that explains the divergence.
 
 The matrix may display the states with symbols for scanning, but the textual
 state is the contract. Reviewers should treat the TOML row as the authority and
@@ -338,16 +338,16 @@ rationale.
 
 ## Relationship to previous ADRs
 
-ADR 001 already establishes the capability-first plugin direction: user intent
+ADR 0001 already establishes the capability-first plugin direction: user intent
 is represented by stable capability IDs, provider choice is resolved
 internally, and final edits flow through the safety harness. This ADR
 generalizes that model from `act extricate` into the whole 0.1.0 public surface.
 
-ADR 004 already requires deterministic routing and structured refusal
+ADR 0004 already requires deterministic routing and structured refusal
 diagnostics. This ADR makes those properties part of the generated public
 command contract and the machine renderer.
 
-ADR 006 already keeps plugin execution one-shot and broker-owned. This ADR
+ADR 0006 already keeps plugin execution one-shot and broker-owned. This ADR
 preserves that boundary while separating internal JSONL plugin transport from
 public `--json` command output.
 

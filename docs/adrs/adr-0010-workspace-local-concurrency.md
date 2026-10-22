@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 010: Workspace-local concurrency
+# Architectural decision record (ADR) 0010: Workspace-local concurrency
 
 ## Status
 
@@ -21,8 +21,8 @@ the state being protected. Mutation verification adds a stricter constraint: a
 shared LSP session's `didChange` state is visible to every request using that
 session, so read-only work must not observe staged mutation content.
 
-[RFC 0002](rfcs/0002-multi-workspace-daemon.md) contains the full proposal and
-rollout plan.
+[RFC 0002](../rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md)
+contains the full proposal and rollout plan.
 
 ## Decision drivers
 

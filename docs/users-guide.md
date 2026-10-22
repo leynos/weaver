@@ -24,8 +24,9 @@ the toolchain setup.
 ## 0.1.0 command-surface target
 
 Weaver is pre-0.1.0, so the current public command grammar is not a
-compatibility promise. [ADR 007](adr-007-agent-native-command-surface.md) and
-the [roadmap](roadmap.md) reset the future public interface around a
+compatibility promise.
+[ADR 0007](adrs/adr-0007-agent-native-command-surface.md) and the
+[roadmap](roadmap.md) reset the future public interface around a
 human-friendly, agent-native command contract.
 
 The 0.1.0 target keeps the human terminal experience first-class while making

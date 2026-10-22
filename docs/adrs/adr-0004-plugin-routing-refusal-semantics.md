@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 004: Plugin routing and refusal semantics
+# Architectural decision record (ADR) 0004: Plugin routing and refusal semantics
 
 ## Status
 

@@ -12,7 +12,7 @@ are defined in
 [sempai-query-language-design.md](sempai-query-language-design.md).
 Documentation conventions are defined in
 [documentation-style-guide.md](documentation-style-guide.md) and `AGENTS.md`.
-ADR 007 defines the pre-0.1.0 command-surface reset and the boundary between
+ADR 0007 defines the pre-0.1.0 command-surface reset and the boundary between
 Weaver-owned semantic code-editing behaviour and reusable command-contract
 machinery that Weaver consumes from OrthoConfig.
 
@@ -53,6 +53,7 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 │   ├── weaver-test-macros/
 │   └── weaverd/
 ├── docs/
+│   ├── adrs/
 │   ├── archive/
 │   ├── execplans/
 │   ├── rfcs/
@@ -103,6 +104,7 @@ _Table 1: Implemented crate boundaries and responsibilities._
 | `docs/`                            | Design docs, architectural decision records (ADRs), roadmap, migration guides, and reference material | Implemented |
 | `docs/contents.md`                 | Canonical documentation index                                                                         | Implemented |
 | `docs/repository-layout.md`        | Canonical repository tree and ownership map                                                           | Implemented |
+| `docs/adrs/`                       | Architectural decision records (ADRs) and their rationale                                             | Implemented |
 | `docs/execplans/`                  | Living execution plans for scoped delivery work                                                       | Implemented |
 | `docs/rfcs/`                       | Requests for Comments for proposed design changes                                                     | Implemented |
 | `docs/archive/`                    | Historical reference material that is no longer active guidance                                       | Implemented |
@@ -119,8 +121,8 @@ _Table 2: Implemented shared directories and their roles._
 
 Planned components are listed in `docs/roadmap.md` and are not yet fully
 implemented in this repository snapshot. The 0.1.0 command-surface reset means
-planned public commands should use the resource-first grammar from ADR 007 even
-when older designs mention `observe`, `act`, or `verify`.
+planned public commands should use the resource-first grammar from ADR 0007
+even when older designs mention `observe`, `act`, or `verify`.
 
 | Planned component                                                          | Intended location                                                          | Roadmap reference                                         |
 | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------- |

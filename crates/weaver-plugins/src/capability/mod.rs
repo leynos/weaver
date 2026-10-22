@@ -48,7 +48,7 @@ use crate::{
 ///
 /// Capability IDs are stable identifiers used for routing, manifest
 /// declarations, and contract lookup. The set is defined by
-/// Architecture Decision Record (ADR) 001 and extended only through
+/// Architecture Decision Record (ADR) 0001 and extended only through
 /// architectural review.
 ///
 /// # Example
