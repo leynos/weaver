@@ -84,5 +84,5 @@ fn compile_yaml_invokes_validate_constraints_for_where_clauses() {
     let formula = plans.first().expect("should have one plan").formula();
 
     assert_eq!(validate_constraints_call_count(), 1);
-    assert!(!formula.where_clauses.is_empty());
+    assert_ne!(formula.where_clauses.len(), 0);
 }
