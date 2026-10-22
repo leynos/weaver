@@ -155,7 +155,7 @@ Observable behaviour after this change:
 ## Decision log
 
 - Decision: Use an enum for `CapabilityId` rather than a string-backed
-  newtype. Rationale: Architecture Decision Record (ADR) 001 defines exactly
+  newtype. Rationale: Architecture Decision Record (ADR) 0001 defines exactly
   five first-party capability IDs (`rename-symbol`, `extricate-symbol`,
   `extract-method`, `replace-body`, `extract-predicate`). An enum provides
   compile-time exhaustiveness checking, reliable `match` coverage, and prevents
@@ -273,9 +273,9 @@ add a `capabilities` field.
 variants. Only `Actuator` plugins can declare actuator capabilities like
 `rename-symbol`.
 
-### ADR 001 context
+### ADR 0001 context
 
-`docs/adr-001-plugin-capability-model-and-act-extricate.md` defines the
+`docs/adrs/adr-0001-plugin-capability-model-and-act-extricate.md` defines the
 capability model that motivates this work. It establishes five stable
 capability IDs: `rename-symbol`, `extricate-symbol`, `extract-method`,
 `replace-body`, `extract-predicate`. It mandates capability-first routing where
@@ -296,7 +296,7 @@ Create the `capability/` module directory with four files:
 
 1. `crates/weaver-plugins/src/capability/mod.rs` — Module-level doc comment
    explaining the capability contract system. `CapabilityId` enum with five
-   variants matching ADR 001, serialized as kebab-case. `ContractVersion`
+   variants matching ADR 0001, serialized as kebab-case. `ContractVersion`
    struct with `major` and `minor` fields and `is_compatible_with()` method.
    `CapabilityContract` trait defining the validation interface. Re-exports for
    public API.

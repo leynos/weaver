@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 008: Workspace-scoped daemon tenancy
+# Architectural decision record (ADR) 0008: Workspace-scoped daemon tenancy
 
 ## Status
 
@@ -19,8 +19,8 @@ The daemon needs a tenancy boundary that supports several repositories without
 turning a local process into a multi-user service. That boundary must precede
 routing, cache access, language-server selection, and filesystem mutation.
 
-[RFC 0002](rfcs/0002-multi-workspace-daemon.md) contains the full proposal and
-migration analysis.
+[RFC 0002](../rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md)
+contains the full proposal and migration analysis.
 
 ## Decision drivers
 

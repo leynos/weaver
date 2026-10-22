@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 005: Verification trust boundary for Weaver
+# Architectural decision record (ADR) 0005: Verification trust boundary for Weaver
 
 ## Status
 

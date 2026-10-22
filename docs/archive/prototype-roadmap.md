@@ -1,6 +1,6 @@
 # Prototype roadmap archive
 
-This archive preserves the pre-ADR-007 Weaver roadmap ledger. Its phase, step,
+This archive preserves the pre-ADR-0007 Weaver roadmap ledger. Its phase, step,
 and task numbers remain in the overall roadmap sequence as historical numbers
 `1` through `11`, so existing ExecPlans and completed implementation records
 remain uniquely addressable. The live forward roadmap starts at phase `12` in
@@ -723,9 +723,9 @@ new* *capabilities and specialist providers.*
 ### 5.3. Deliver capability-first `act extricate`
 
 *Outcome: Implement the cross-language `extricate-symbol` capability model,*
-*command contract, and plugin-selection foundation defined in* *
-`docs/adr-001-plugin-capability-model-and-act-extricate.md`, including initial*
-*Python delivery and shared failure semantics.*
+*command contract, and plugin-selection foundation defined in*
+*`docs/adrs/adr-0001-plugin-capability-model-and-act-extricate.md`, including*
+*initial Python delivery and shared failure semantics.*
 
 - [ ] 5.3.1. Add capability ID scaffolding and resolver policy for actuator
     capabilities (`rename-symbol`, `extricate-symbol`, `extract-method`,
@@ -1696,6 +1696,6 @@ This is a key Weaver differentiator.[^7][^8]*
 [^3]: [`weaver-design.md`](weaver-design.md)
 [^4]: [`ui-gap-analysis.md`](ui-gap-analysis.md)
 [^5]: [`users-guide.md`](users-guide.md)
-[^6]: [`adr-001-plugin-capability-model-and-act-extricate.md`](adr-001-plugin-capability-model-and-act-extricate.md)
+[^6]: [`adrs/adr-0001-plugin-capability-model-and-act-extricate.md`](../adrs/adr-0001-plugin-capability-model-and-act-extricate.md)
 [^7]: [`weaver-design.md`](weaver-design.md) §5.1 and §6.1
 [^8]: [`formal-verification-methods-in-weaver.md`](formal-verification-methods-in-weaver.md)

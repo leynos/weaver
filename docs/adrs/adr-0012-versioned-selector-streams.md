@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 012: Versioned selector streams
+# Architectural decision record (ADR) 0012: Versioned selector streams
 
 ## Status
 
@@ -10,7 +10,7 @@ Proposed.
 
 ## Context and problem statement
 
-ADR 007 requires observe-style resource commands to compose with mutation
+ADR 0007 requires observe-style resource commands to compose with mutation
 commands through ordinary UNIX pipelines. A source range by itself is not a
 safe cross-process selector. Files may change after a query, record order may
 vary, capture text may be truncated, and a consumer cannot infer which backend
@@ -27,8 +27,8 @@ requires complete buffering, while opaque daemon handles cannot be inspected,
 filtered, persisted, or replayed. An untyped `--from-stdin` flag does not tell
 the command contract which schema owns standard input.
 
-[RFC 0003](rfcs/0003-sempai-query-to-selector.md) contains the complete
-query-to-actuation proposal.
+[RFC 0003](../rfcs/rfc-0003-sempai-query-to-selector-vertical-slice.md)
+contains the complete query-to-actuation proposal.
 
 ## Decision drivers
 
@@ -42,7 +42,7 @@ query-to-actuation proposal.
 - Define deterministic record ordering.
 - Keep zero-, one-, and many-match mutation policy explicit.
 - Avoid invented probabilistic confidence values.
-- Preserve ADR 007's universal `--json` switch.
+- Preserve ADR 0007's universal `--json` switch.
 
 ## Options considered
 
@@ -269,9 +269,9 @@ This rule leaves later patch, regex replacement, and Language Server Protocol
 (LSP) operations free to consume the same selector protocol without each
 inventing a different standard-input switch.
 
-## Relationship to ADR 007
+## Relationship to ADR 0007
 
-This ADR refines ADR 007's selector and pipeline contract:
+This ADR refines ADR 0007's selector and pipeline contract:
 
 - multi-record `--json` results use completed JSONL selector streams;
 - typed selector input is `--selectors <path|->`;

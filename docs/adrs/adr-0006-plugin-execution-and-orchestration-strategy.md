@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 006: Plugin execution and orchestration strategy
+# Architectural decision record (ADR) 0006: Plugin execution and orchestration strategy
 
 ## Status
 

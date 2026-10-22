@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 011: Sempai query input syntax
+# Architectural decision record (ADR) 0011: Sempai query input syntax
 
 ## Status
 
@@ -10,7 +10,7 @@ Proposed.
 
 ## Context and problem statement
 
-ADR 007 makes Sempai one-liners first-class selectors under the noun-verb
+ADR 0007 makes Sempai one-liners first-class selectors under the noun-verb
 `weaver symbols list` command. The Sempai technical design currently presents
 the rich expression form as the ordinary one-liner:
 
@@ -32,15 +32,15 @@ backwards compatibility depend on heuristics.
 File and standard-input forms also need explicit ownership so multiline and
 heredoc input do not become a second parser path.
 
-[RFC 0003](rfcs/0003-sempai-query-to-selector.md) contains the complete
-vertical-slice proposal.
+[RFC 0003](../rfcs/rfc-0003-sempai-query-to-selector-vertical-slice.md)
+contains the complete vertical-slice proposal.
 
 ## Decision drivers
 
 - Keep the common positive query concise.
 - Preserve an explicit rich expression language.
 - Avoid syntax auto-detection.
-- Keep noun-verb command grammar from ADR 007.
+- Keep noun-verb command grammar from ADR 0007.
 - Make argument, file, and standard-input sources equivalent.
 - Give parser diagnostics an unambiguous source kind.
 - Preserve YAML rule-file interoperability.
@@ -67,7 +67,7 @@ Use one `--query` flag and infer the grammar from prefixes or parse success.
 ### Option D: Use `--pattern` for bare patterns and `--query` for expressions
 
 This is explicit, but it makes the temporary structural-search noun the
-shortest path and weakens ADR 007's decision that Sempai query is the public
+shortest path and weakens ADR 0007's decision that Sempai query is the public
 selector abstraction.
 
 | Topic                        | Option A | Option B | Option C  | Option D |
@@ -143,9 +143,9 @@ The parser does not interpret shell quoting, variable expansion, command
 substitution, or heredoc delimiters. The shell removes those before Weaver
 receives the resulting bytes.
 
-## Relationship to ADR 007
+## Relationship to ADR 0007
 
-This ADR refines the Sempai selector form described by ADR 007. It does not
+This ADR refines the Sempai selector form described by ADR 0007. It does not
 change the resource-first command path, universal `--json`, or capability-first
 provider model.
 

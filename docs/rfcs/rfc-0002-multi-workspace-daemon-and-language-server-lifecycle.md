@@ -23,12 +23,12 @@ the executable.
 
 The proposal is split into three decisions:
 
-- [ADR 008](../adr-008-workspace-scoped-daemon-tenancy.md) defines workspace
-  identity and daemon tenancy;
-- [ADR 009](../adr-009-workspace-scoped-language-server-lifecycle.md) defines
-  language-server execution identity and lifecycle; and
-- [ADR 010](../adr-010-workspace-local-concurrency.md) defines concurrency,
-  mutation isolation, and overload behaviour.
+- [ADR 0008](../adrs/adr-0008-workspace-scoped-daemon-tenancy.md) defines
+  workspace identity and daemon tenancy;
+- [ADR 0009](../adrs/adr-0009-workspace-scoped-language-server-lifecycle.md)
+  defines language-server execution identity and lifecycle; and
+- [ADR 0010](../adrs/adr-0010-workspace-local-concurrency.md) defines
+  concurrency, mutation isolation, and overload behaviour.
 
 ## 2. Problem
 
@@ -495,8 +495,8 @@ be staged, so each pull request has an observable compatibility boundary.
 
 ### 8.1. Stage one: ratify contracts
 
-Accept or revise this RFC and ADRs 008-010. Fix the request, error, lifecycle,
-and configuration vocabulary before implementation.
+Accept or revise this RFC and ADRs 0008-0010. Fix the request, error,
+lifecycle, and configuration vocabulary before implementation.
 
 ### 8.2. Stage two: carry workspace identity
 

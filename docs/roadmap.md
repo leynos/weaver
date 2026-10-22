@@ -1,20 +1,21 @@
 # Weaver roadmap
 
 This roadmap translates `docs/weaver-design.md`,
-`docs/adr-007-agent-native-command-surface.md`,
-`docs/adr-008-workspace-scoped-daemon-tenancy.md`,
-`docs/adr-009-workspace-scoped-language-server-lifecycle.md`,
-`docs/adr-010-workspace-local-concurrency.md`,
-`docs/adr-011-sempai-query-input-syntax.md`,
-`docs/adr-012-versioned-selector-streams.md`,
+`docs/adrs/adr-0007-agent-native-command-surface.md`,
+`docs/adrs/adr-0008-workspace-scoped-daemon-tenancy.md`,
+`docs/adrs/adr-0009-workspace-scoped-language-server-lifecycle.md`,
+`docs/adrs/adr-0010-workspace-local-concurrency.md`,
+`docs/adrs/adr-0011-sempai-query-input-syntax.md`,
+`docs/adrs/adr-0012-versioned-selector-streams.md`,
 `docs/sempai-query-language-design.md`,
-`docs/jacquard-card-first-symbol-graph-design.md`, `docs/rfcs/0001-o11y.md`,
-`docs/rfcs/0002-multi-workspace-daemon.md`,
-`docs/rfcs/0003-sempai-query-to-selector.md`, and the existing ADR set into an
-outcome-oriented delivery sequence. It does not promise dates. Phases carry
-testable product ideas, steps validate or falsify those ideas, and tasks are
-review-sized execution units with explicit dependencies and observable success
-criteria.
+`docs/jacquard-card-first-symbol-graph-design.md`,
+`docs/rfcs/rfc-0001-local-daemon-observability.md`,
+`docs/rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md`,
+`docs/rfcs/rfc-0003-sempai-query-to-selector-vertical-slice.md`, and the
+existing ADR set into an outcome-oriented delivery sequence. It does not
+promise dates. Phases carry testable product ideas, steps validate or falsify
+those ideas, and tasks are review-sized execution units with explicit
+dependencies and observable success criteria.
 
 The current forward plan is the source of truth for future work. The historical
 ledger in [`docs/archive/prototype-roadmap.md`](archive/prototype-roadmap.md)
@@ -46,13 +47,13 @@ from rediscovering the same dependency and migration questions.
 
 This step answers which generic command-contract pieces come from OrthoConfig
 and which temporary Weaver adapters are allowed. Its outcome informs every
-command-surface and renderer task. See ADR 007 and the OrthoConfig roadmap.
+command-surface and renderer task. See ADR 0007 and the OrthoConfig roadmap.
 Boundary classifications for this step are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [x] 12.1.1. Track the downstream consumer boundary.
   - Depends on OrthoConfig 5.2.3.
-  - Implemented by ADR 007 boundary vocabulary,
+  - Implemented by ADR 0007 boundary vocabulary,
     `docs/orthoconfig-consumer-boundary.toml`,
     `docs/orthoconfig-consumer-boundary.md`, and the
     `weaver-docs-gate` manifest tests.
@@ -66,7 +67,7 @@ Boundary classifications for this step are tracked in the
     adds example CLI error-path tests, property tests for date/evidence
     invariants, and trybuild public API checks.
   - Success: every command-contract task says whether it consumes OrthoConfig,
-    wraps it temporarily, or records a deliberate divergence in ADR 007.
+    wraps it temporarily, or records a deliberate divergence in ADR 0007.
 - [x] 12.1.2. Consume recursive command metadata.
   - Depends on OrthoConfig 6.1.1 and 6.1.2.
   - Success: generated help and the manual page converge on the OrthoConfig
@@ -120,17 +121,17 @@ This step answers whether one per-user daemon can safely amortize backend cost
 across several repositories before product slices depend on that service. It
 implements the boundaries proposed by:
 
-- [RFC 0002](rfcs/0002-multi-workspace-daemon.md);
-- [ADR 008](adr-008-workspace-scoped-daemon-tenancy.md);
-- [ADR 009](adr-009-workspace-scoped-language-server-lifecycle.md); and
-- [ADR 010](adr-010-workspace-local-concurrency.md).
+- [RFC 0002](rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md);
+- [ADR 0008](adrs/adr-0008-workspace-scoped-daemon-tenancy.md);
+- [ADR 0009](adrs/adr-0009-workspace-scoped-language-server-lifecycle.md); and
+- [ADR 0010](adrs/adr-0010-workspace-local-concurrency.md).
 
 The work remains internal to the daemon protocol and runtime; it does not add
 an OrthoConfig command-contract consumer.
 
 - [ ] 12.3.1. Ratify the multi-workspace daemon contracts.
   - Requires 12.2.3.
-  - Success: RFC 0002 and ADRs 008 through 010 are accepted or revised with no
+  - Success: RFC 0002 and ADRs 0008 through 0010 are accepted or revised with no
     unresolved contradiction between workspace identity, language-server
     lifecycle, mutation isolation, and bounded admission.
 - [ ] 12.3.2. Carry canonical workspace identity across the daemon protocol.
@@ -182,14 +183,14 @@ introspection, and agent-grade CLI hardening into one acceptance surface.
 ### 13.1. Ratify the reset boundary and command-surface adapter
 
 This step answers whether Weaver-specific semantic metadata can sit on top of
-OrthoConfig command contracts without duplicating them. See ADR 007 and
+OrthoConfig command contracts without duplicating them. See ADR 0007 and
 `docs/weaver-design.md` §§2.1.1-2.1.4. Boundary classifications for these tasks
 are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
-- [x] 13.1.1. Record the agent-native command-surface reset as ADR 007.
+- [x] 13.1.1. Record the agent-native command-surface reset as ADR 0007.
   - Records the forward OrthoConfig dependency boundary that 12.1 validates.
-  - Success: ADR 007 defines the dual renderer contract, capability routing,
+  - Success: ADR 0007 defines the dual renderer contract, capability routing,
     OrthoConfig dependencies, and lack of compatibility promise for the
     prototype grammar.
 - [x] 13.1.2. Implement the Weaver command-surface adapter for one read-only
@@ -203,7 +204,7 @@ are tracked in the
 - [x] 13.1.3. Define the temporary-adapter removal policy.
   - Requires 13.1.2.
   - Success: every local generic helper names the OrthoConfig task expected to
-    replace it or records a permanent divergence in ADR 007.
+    replace it or records a permanent divergence in ADR 0007.
 
 ### 13.2. Prove the dual renderer on a real command
 
@@ -271,12 +272,12 @@ endpoint or distributed tracing backend. It converts RFC 0001 into bounded
 local signals that support later read, mutation, and workflow slices. See RFC
 0001:
 
-- [Observability primitives](rfcs/0001-o11y.md#observability-primitives)
-- [Failure modes that warrant actionable signals](rfcs/0001-o11y.md#failure-modes-that-warrant-actionable-signals)
-- [Delivery mechanisms](rfcs/0001-o11y.md#delivery-mechanisms)
-- [RequestTooLarge rejection](rfcs/0001-o11y.md#requesttoolarge-rejection)
-- [Health snapshot](rfcs/0001-o11y.md#health-snapshot)
-- [Acceptance criteria](rfcs/0001-o11y.md#acceptance-criteria)
+- [Observability primitives](rfcs/rfc-0001-local-daemon-observability.md#observability-primitives)
+- [Failure modes that warrant actionable signals](rfcs/rfc-0001-local-daemon-observability.md#failure-modes-that-warrant-actionable-signals)
+- [Delivery mechanisms](rfcs/rfc-0001-local-daemon-observability.md#delivery-mechanisms)
+- [RequestTooLarge rejection](rfcs/rfc-0001-local-daemon-observability.md#requesttoolarge-rejection)
+- [Health snapshot](rfcs/rfc-0001-local-daemon-observability.md#health-snapshot)
+- [Acceptance criteria](rfcs/rfc-0001-local-daemon-observability.md#acceptance-criteria)
 
 <!-- Separate the reference list above from the task checklist below. -->
 
@@ -400,9 +401,9 @@ This phase validates Sempai as a composable selector engine. It pulls the
 smallest executable path ahead of the full backend while preserving the full
 parser, matcher, language, and compatibility scope as the replacement path. It
 implements
-[RFC 0003](rfcs/0003-sempai-query-to-selector.md), [ADR 011](adr-011-sempai-query-input-syntax.md),
-and [ADR 012](adr-012-versioned-selector-streams.md), and migrates archive
-work from Sempai DSL parsing, Tree-sitter execution, query routing,
+[RFC 0003](rfcs/rfc-0003-sempai-query-to-selector-vertical-slice.md), [ADR 0011](adrs/adr-0011-sempai-query-input-syntax.md),
+and [ADR 0012](adrs/adr-0012-versioned-selector-streams.md), and migrates
+archive work from Sempai DSL parsing, Tree-sitter execution, query routing,
 symbol-first cards, and the Sempai-to-Jacquard vertical slice.
 
 ### 15.1. Prove minimal query compilation and honest recovery
@@ -512,7 +513,7 @@ This step answers whether Sempai can expose one useful query through Weaver's
 resource-first command surface before the full matcher lands, then replace its
 compatibility executor without changing the user pipe. It preserves prototype
 archive work 4.3.1 through 4.3.9 under the new public command shape. See RFC
-0003, ADRs 011-012, and `docs/weaver-design.md` §2.1.2. Boundary
+0003, ADRs 0011-0012, and `docs/weaver-design.md` §2.1.2. Boundary
 classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
@@ -526,7 +527,7 @@ classifications for these tasks are tracked in the
 - [ ] 15.3.2. Add `weaver symbols list --query` with `--lang`, `--uri`, and
       explicit query-source inputs.
   - Requires 15.3.1 and phase 13.
-  - Success: the CLI implements ADR 011 with mutually exclusive
+  - Success: the CLI implements ADR 0011 with mutually exclusive
     `--query|--query-file|--expr|--expr-file|--rule|--rule-file` inputs,
     accepts `-` on file forms for standard input, enumerates invalid
     combinations, and keeps `weaver observe query` as archive provenance only.
@@ -586,7 +587,7 @@ classifications for these tasks are tracked in the
 
 This step answers whether completed versioned selector streams can feed product
 commands rather than remaining terminal search output. It migrates prototype
-archive work 9.1.4 through 9.3.2 and 11.2.1. See RFC 0003 §§6.7-6.8, ADR 012,
+archive work 9.1.4 through 9.3.2 and 11.2.1. See RFC 0003 §§6.7-6.8, ADR 0012,
 and `docs/weaver-design.md` §2.1.2.
 
 - [ ] 15.4.1. Allow `cards get` and one-hop relation summaries to consume
@@ -714,8 +715,8 @@ command-contract tasks are tracked in the
 
 This step answers whether provider-hidden actuators can mutate safely from both
 direct references and Sempai streams. It migrates prototype archive work 5.2.1
-through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001, ADR 004, and ADR
-012. Boundary classifications for these tasks are tracked in the
+through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 0001, ADR 0004, and ADR
+0012. Boundary classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 16.2.1. Implement `weaver symbols rename` for position references.
@@ -747,7 +748,7 @@ through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001, ADR 004, and ADR
 This step answers whether symbol relocation can be expressed as one stable
 capability and public command before Weaver invests in Rust-specific
 orchestration. It migrates prototype archive work 5.3.1 through 5.3.6 under the
-canonical public command `weaver symbols move`. See ADR 001 and ADR 004.
+canonical public command `weaver symbols move`. See ADR 0001 and ADR 0004.
 `extract-method`, `replace-body`, and `extract-predicate` may be declared as
 distinct capability IDs, but this step does not implement those operations.
 
@@ -1037,8 +1038,8 @@ capability discoverability.
 
 This step answers whether Rope, rust-analyzer, `srgn`, `jedi`, static analysis,
 and future providers can share one public capability contract. It migrates
-prototype archive work 5.5.1, 5.6.1, and 5.8.1. See ADR 001, ADR 004, and ADR
-006.
+prototype archive work 5.5.1, 5.6.1, and 5.8.1. See ADR 0001, ADR 0004, and ADR
+0006.
 
 - [ ] 18.1.1. Add `srgn` or equivalent as an actuator or selector provider
       behind manifests.
@@ -1095,7 +1096,7 @@ formal verification, output delivery, feedback, profiles, and jobs.
 
 This step answers whether profiles, jobs, and delivery reduce repeated agent
 turns without making human usage worse. It migrates the product intent of ADR
-007 compounding primitives and prototype archive work 6.2.1. See
+0007 compounding primitives and prototype archive work 6.2.1. See
 `docs/weaver-design.md` §§2.1.5-2.1.6. Boundary classifications for these tasks
 are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
@@ -1147,7 +1148,7 @@ these tasks are tracked in the
 
 This step answers whether formal and property-based checks catch regressions in
 Weaver-owned invariants. It migrates prototype archive work 8.1.1 through
-8.6.3. See `docs/formal-verification-methods-in-weaver.md` and ADR 005.
+8.6.3. See `docs/formal-verification-methods-in-weaver.md` and ADR 0005.
 
 - [ ] 19.3.1. Add pinned Kani and Verus tooling plus explicit formal targets.
   - Requires 16.1.1.
@@ -1183,7 +1184,7 @@ the core Weaver promise.
 ### 20.1. Evaluate generated integrations
 
 This step answers whether external integration surfaces are wrappers over the
-same command metadata or a distracting second product. See ADR 007 and
+same command metadata or a distracting second product. See ADR 0007 and
 OrthoConfig 10.1. Boundary classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
@@ -1230,12 +1231,12 @@ explicit. Boundary classifications for these tasks are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md). See
 RFC 0001:
 
-- [Open questions](rfcs/0001-o11y.md#open-questions)
-- [Local request correlation](rfcs/0001-o11y.md#local-request-correlation)
-- [status expansion](rfcs/0001-o11y.md#deferred-path-status-subcommand-expansion)
-- [diagnostics artefact](rfcs/0001-o11y.md#option-d-dedicated-diagnostics-artefact)
-- [metrics endpoint](rfcs/0001-o11y.md#deferred-path-optional-metrics-endpoint)
-- [options considered](rfcs/0001-o11y.md#options-considered)
+- [Open questions](rfcs/rfc-0001-local-daemon-observability.md#open-questions)
+- [Local request correlation](rfcs/rfc-0001-local-daemon-observability.md#local-request-correlation)
+- [status expansion](rfcs/rfc-0001-local-daemon-observability.md#deferred-path-status-subcommand-expansion)
+- [diagnostics artefact](rfcs/rfc-0001-local-daemon-observability.md#option-d-dedicated-diagnostics-artefact)
+- [metrics endpoint](rfcs/rfc-0001-local-daemon-observability.md#deferred-path-optional-metrics-endpoint)
+- [options considered](rfcs/rfc-0001-local-daemon-observability.md#options-considered)
 
 <!-- Separate the reference list above from the task checklist below. -->
 
@@ -1274,5 +1275,5 @@ RFC 0001:
 Historical prototype roadmap entries live in
 [`docs/archive/prototype-roadmap.md`](archive/prototype-roadmap.md). Those
 entries keep numbers `1` through `11`; this live roadmap reserves numbers `12`
-through `20` for the forward ADR 007 build sequence. The archive is not an
+through `20` for the forward ADR 0007 build sequence. The archive is not an
 active implementation backlog.

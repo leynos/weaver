@@ -20,7 +20,7 @@ use weaver_docs_gate::{
     render_matrix,
 };
 
-const ADR_007: &str = "docs/adr-007-agent-native-command-surface.md";
+const ADR_007: &str = "docs/adrs/adr-0007-agent-native-command-surface.md";
 const MANIFEST: &str = "docs/orthoconfig-consumer-boundary.toml";
 const MANIFEST_BUILD_DATE: Date = date!(2026 - 06 - 21);
 const MATRIX: &str = "docs/orthoconfig-consumer-boundary.md";
@@ -93,7 +93,7 @@ fn boundary_state_rows_have_required_evidence() -> TestResult {
     Ok(())
 }
 
-/// Prove divergent rows link to existing ADR 007 sections.
+/// Prove divergent rows link to existing ADR 0007 sections.
 #[test]
 fn divergent_rows_reference_existing_adr_007_anchors() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
@@ -151,7 +151,7 @@ fn validate_manifest_registry(manifest: &BoundaryManifest) -> TestResult {
     ensure_unique(&managed_ids, FieldName::ManagedTasks)
 }
 
-/// Validate that a divergent row links to an existing ADR 007 anchor.
+/// Validate that a divergent row links to an existing ADR 0007 anchor.
 fn validate_divergent_adr_anchor(task: &BoundaryTask, anchors: &BTreeSet<String>) -> TestResult {
     let anchor = task
         .adr_anchor
@@ -160,7 +160,7 @@ fn validate_divergent_adr_anchor(task: &BoundaryTask, anchors: &BTreeSet<String>
     ensure(
         anchors.contains(anchor),
         format!(
-            "task {} references missing ADR 007 anchor {anchor}",
+            "task {} references missing ADR 0007 anchor {anchor}",
             task.id
         ),
     )

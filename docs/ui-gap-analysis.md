@@ -2,7 +2,7 @@
 
 This document audits the gap between Weaver's current pre-0.1.0 command-line
 interface and the target human-friendly, agent-native command contract defined
-by [ADR 007](adr-007-agent-native-command-surface.md), the
+by [ADR 0007](adrs/adr-0007-agent-native-command-surface.md), the
 [design document](weaver-design.md), and the [roadmap](roadmap.md).
 
 The previous version of this document focused on discoverability defects in the
@@ -32,7 +32,7 @@ reset:
 - The top-level machine-output control is `--output auto|human|json`, while
   the target contract requires one canonical `--json` switch.
 - Some operation documentation still references operation-local formatting
-  flags or provider-first workflows, both of which are superseded by ADR 007.
+  flags or provider-first workflows, both of which are superseded by ADR 0007.
 - Unknown-domain, unknown-operation, missing-argument, and missing-provider
   paths have improved in recent roadmap work, but the current surface does not
   yet provide universal enum enumeration, stable exit classes, or structured
@@ -76,7 +76,7 @@ Roadmap owner: `roadmap.md` 13.2.2.
 
 ### Errors that teach and enumerate
 
-Current status: ADR 004 and prior roadmap work define stable routing refusals
+Current status: ADR 0004 and prior roadmap work define stable routing refusals
 and better alternatives for some errors.
 
 Shortfall: enumeration is not universal across enums, registries, providers,
@@ -145,7 +145,7 @@ Roadmap owner: `roadmap.md` 13.3.
 
 ### Async-aware execution
 
-Current status: ADR 006 defines broker-owned plugin execution, but it
+Current status: ADR 0006 defines broker-owned plugin execution, but it
 deliberately keeps one-shot JSONL execution narrow.
 
 Shortfall: no public `--wait` contract or durable jobs ledger exists for
@@ -240,10 +240,10 @@ on OrthoConfig; Weaver owns the semantic editing and safety integration.
 
 Weaver's existing ADRs already point in the correct direction:
 
-- ADR 001 says user intent is represented by stable capability IDs and provider
+- ADR 0001 says user intent is represented by stable capability IDs and provider
   selection is internal.
-- ADR 004 requires deterministic routing and stable refusal diagnostics.
-- ADR 006 keeps plugin execution broker-owned and prevents plugins from owning
+- ADR 0004 requires deterministic routing and stable refusal diagnostics.
+- ADR 0006 keeps plugin execution broker-owned and prevents plugins from owning
   final commit behaviour.
 
 The gap is that the ordinary public surface and some current documentation
@@ -315,7 +315,7 @@ grammar:
 - Root `--capabilities` reported overrides rather than the full runtime
   capability picture.
 
-ADR 007 and `roadmap.md` supersede the specific remedies that would merely
+ADR 0007 and `roadmap.md` supersede the specific remedies that would merely
 patch those behaviours in place. The durable remedies are generated command
 metadata, resource-first commands, human and machine renderers, structured
 introspection, capability-routed providers, and drift gates.

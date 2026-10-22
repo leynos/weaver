@@ -227,7 +227,7 @@ preferred build path. The live command framework is documented in:
   `13.3.3`, and `13.3.4`;
 - `docs/archive/prototype-roadmap.md`, whose relevance matrix marks archive
   step `3.2` as migrated;
-- `docs/adr-007-agent-native-command-surface.md`, which defines the reset
+- `docs/adrs/adr-0007-agent-native-command-surface.md`, which defines the reset
   toward one command contract with human and JSON renderers; and
 - `docs/ui-gap-analysis.md`, which treats prototype gaps as evidence for the
   reset rather than as independent old-grammar patches.

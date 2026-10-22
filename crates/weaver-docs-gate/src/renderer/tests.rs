@@ -57,7 +57,7 @@ fn snapshots_rendered_matrix_shape() {
 
     The matrix tracks every live Weaver command-contract roadmap task that consumes
     OrthoConfig, wraps it temporarily, waits on upstream shape, or deliberately
-    diverges under ADR 007.
+    diverges under ADR 0007.
 
     ## Phase 12
 

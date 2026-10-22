@@ -15,32 +15,32 @@ Weaver consumes generic command-contract machinery from OrthoConfig and owns
 only Weaver-specific semantic code-edit metadata (capabilities, routing,
 selectors, safety). Today that split is captured in two places: the OrthoConfig
 dependency table and the temporary-adapter removal policy in
-`docs/adr-007-agent-native-command-surface.md`. Neither place can answer the
-question "for every command-contract task in the live Weaver roadmap, what is
-its relationship to OrthoConfig?" — there is no single matrix, no machine
+`docs/adrs/adr-0007-agent-native-command-surface.md`. Neither place can answer
+the question "for every command-contract task in the live Weaver roadmap, what
+is its relationship to OrthoConfig?" — there is no single matrix, no machine
 check, and no fixed vocabulary.
 
 Roadmap item 12.1.1 closes that gap. The success criterion in `docs/roadmap.md`
 line 46 is:
 
 > Success: every command-contract task says whether it consumes OrthoConfig,
-> wraps it temporarily, or records a deliberate divergence in ADR 007.
+> wraps it temporarily, or records a deliberate divergence in ADR 0007.
 
 After this change a contributor can open the roadmap, follow a back-link to a
 single boundary matrix, and read for every command-contract task: the
 classification state (`consumes`, `wraps`, or `divergent`), the upstream
-OrthoConfig task it pairs with, and either the removal gate or the ADR 007
+OrthoConfig task it pairs with, and either the removal gate or the ADR 0007
 divergence section that governs it. A test in the workspace fails when a new
 command-contract task lands without a matrix entry, when a matrix entry
 references a missing roadmap task, when a `wraps` entry has no removal gate, or
-when a `divergent` entry has no ADR 007 anchor.
+when a `divergent` entry has no ADR 0007 anchor.
 
 Observable behaviour after this change:
 
 - `docs/orthoconfig-consumer-boundary.md` exists and lists every Weaver
   command-contract task with its classification state and upstream pairing.
-- `docs/adr-007-agent-native-command-surface.md` defines the three states in a
-  dedicated "Boundary classification" section and back-links to the matrix.
+- `docs/adrs/adr-0007-agent-native-command-surface.md` defines the three states
+  in a dedicated "Boundary classification" section and back-links to the matrix.
 - `docs/roadmap.md` carries an inline back-link near each command-contract task
   group to the matrix entry.
 - `docs/developers-guide.md` documents the workflow for adding a new
@@ -76,7 +76,7 @@ boundary becomes review-only again.
    dependency, but 5.2.3 itself is documentation-only and can be tracked
    independently. The matrix must rely on already-published OrthoConfig
    decisions (the OrthoConfig `§2.1` consumer-boundary statement and
-   OrthoConfig ADR-003 schema ownership) rather than the unshipped bullets of
+   OrthoConfig ADR-0003 schema ownership) rather than the unshipped bullets of
    5.2.3. The matrix is forward-compatible with 5.2.3 once it lands.
 2. **No new product runtime crate dependencies.** Documentation and tests use
    workspace dependencies (`camino`, `serde`, `toml`, `rstest`,
@@ -93,7 +93,7 @@ boundary becomes review-only again.
 4. **No new commands, schemas, or runtime crates.** This task does not extend
    `crates/weaver-cli/src/command_surface.rs` types nor introduce a new
    adapter. Its job is to classify, not to refactor.
-5. **No removal of ADR 007 content.** The existing OrthoConfig dependency
+5. **No removal of ADR 0007 content.** The existing OrthoConfig dependency
    table and temporary-adapter removal policy stay where they are. The new
    "Boundary classification" section sits alongside them and the matrix doc
    references both.
@@ -120,14 +120,14 @@ boundary becomes review-only again.
   growth beyond it is not.
 - **Roadmap renames.** If classifying the existing tasks requires renumbering
   a roadmap entry or moving a task between phases, stop and escalate.
-- **ADR 007 rewrites.** If the boundary classification cannot fit alongside
+- **ADR 0007 rewrites.** If the boundary classification cannot fit alongside
   the existing OrthoConfig dependency table and temporary-adapter removal
   policy without rewriting either, stop and escalate.
 - **Dependencies.** If the test gate requires a new external crate
   dependency, stop and escalate.
 - **Divergent classifications.** If two or more command-contract tasks must
-  be classified `divergent` without an existing ADR 007 anchor, stop and open a
-  follow-up ADR-007 amendment before continuing.
+  be classified `divergent` without an existing ADR 0007 anchor, stop and open
+  a follow-up ADR-0007 amendment before continuing.
 - **Iterations.** If the test gate fails after three attempts at adjustment,
   stop and escalate.
 - **Time.** If any single stage (A through E) takes more than four working
@@ -181,7 +181,7 @@ boundary becomes review-only again.
   decided". Severity: medium. Likelihood: low (now that `pending` exists).
   Mitigation: every `divergent` row must carry an `adr_anchor` field pointing
   to a specific section heading in
-  `docs/adr-007-agent-native-command-surface.md` and the test asserts the
+  `docs/adrs/adr-0007-agent-native-command-surface.md` and the test asserts the
   anchor exists. Anchors may be shared by multiple rows (many-to-one), but the
   anchor itself must be present.
 - Risk: Wafflecat's lighter alternative (inline roadmap annotations with a
@@ -200,7 +200,7 @@ state, not the intended sequence.
 - [ ] 2026-06-14T02:44:33Z: Execution approved by the user and started on
       branch `12-1-1-track-downstream-consumer-boundary`.
 - [x] 2026-06-14T02:44:33Z: Stage A ratified the boundary vocabulary and
-      matrix columns in ADR 007. Validation passed with
+      matrix columns in ADR 0007. Validation passed with
       `make markdownlint` (`Summary: 0 error(s)`) and `make nixie`
       (`All diagrams validated successfully!`). Logs:
       `/tmp/markdownlint-weaver-12-1-1-track-downstream-consumer-boundary.out`
@@ -218,14 +218,14 @@ state, not the intended sequence.
       repeat CodeRabbit review completed with `findings: 0`.
 - [x] 2026-06-14T04:52:00Z: Stage C cross-linked the generated matrix from
       `docs/contents.md`, `docs/developers-guide.md`, and every
-      manifest-managed roadmap task group. ADR 007 already linked both the
+      manifest-managed roadmap task group. ADR 0007 already linked both the
       matrix and the TOML source of truth from Stage A. Validation passed with
       `make fmt`, `make markdownlint`, `make nixie`, and CodeRabbit
       `findings: 0`.
 - [x] 2026-06-14T05:36:00Z: Stage D added
       `crates/weaver-docs-gate/tests/boundary_manifest.rs`, covering
       manifest registry order, roadmap task references, state-specific
-      evidence fields, ADR 007 divergence anchors, and byte-for-byte matrix
+      evidence fields, ADR 0007 divergence anchors, and byte-for-byte matrix
       regeneration. Validation passed with `cargo test -p weaver-docs-gate`,
       `make fmt`, `make check-fmt`, `make lint`, `make test`,
       `make markdownlint`, and `make nixie`. The first CodeRabbit pass found
@@ -278,7 +278,7 @@ state, not the intended sequence.
       deserialize directly from the TOML manifest, including snake-case enum
       spellings and empty-string-as-absent optional evidence fields. Property
       coverage now also exercises generated manifest registry symmetry,
-      arbitrary state/evidence task rows, generated ADR 007 anchor sets, and
+      arbitrary state/evidence task rows, generated ADR 0007 anchor sets, and
       Markdown heading-anchor shape. Validation passed with
       `cargo test -p weaver-docs-gate`, `make markdownlint`, `make nixie`,
       `make check-fmt`, `make lint`, and `make test`.
@@ -420,8 +420,8 @@ Recorded for any decision that future work must respect.
   is the source of truth and the renderer is deterministic; a second snapshot
   review layer would duplicate the equality check without adding signal.
   Date/Author: 2026-06-07, Logisphere review by Dinolump.
-- Decision: do not generate the OrthoConfig dependency table in ADR 007
-  from the manifest. Rationale: ADR 007 is a stable, human-readable
+- Decision: do not generate the OrthoConfig dependency table in ADR 0007
+  from the manifest. Rationale: ADR 0007 is a stable, human-readable
   architectural record. The manifest is the per-task index that points back to
   the ADR; a cycle would couple them too tightly. Date/Author: 2026-06-07,
   planning.
@@ -454,7 +454,7 @@ Recorded for any decision that future work must respect.
 ## Outcomes & retrospective
 
 Roadmap 12.1.1 is complete. The branch added the OrthoConfig consumer boundary
-vocabulary to ADR 007, introduced the TOML boundary manifest and generated
+vocabulary to ADR 0007, introduced the TOML boundary manifest and generated
 Markdown matrix, linked the matrix from the roadmap and contributor
 documentation, documented user-facing temporary wrapper and pending-contract
 states, and added the `weaver-docs-gate` parser, renderer, regenerator, and
@@ -512,8 +512,8 @@ A novice opening this plan needs the following landmarks before reading the
 ### Repository landmarks
 
 - `docs/roadmap.md` — the live forward roadmap. Tasks 12 through 20 belong to
-  the post-ADR-007 grammar. Task 12.1.1 lives at lines 38 to 47.
-- `docs/adr-007-agent-native-command-surface.md` — the ADR that introduced
+  the post-ADR-0007 grammar. Task 12.1.1 lives at lines 38 to 47.
+- `docs/adrs/adr-0007-agent-native-command-surface.md` — the ADR that introduced
   the agent-native command surface, the OrthoConfig dependency table (lines 104
   to 122), and the temporary-adapter removal policy (lines 129 to 147).
 - `crates/weaver-cli/src/command_surface.rs` — the only current temporary
@@ -551,8 +551,8 @@ A novice opening this plan needs the following landmarks before reading the
   semantic execution, capability routing, providers, sandboxing, Double-Lock
   safety, edits, jobs, and provider-specific idempotency.
 - OrthoConfig
-  `docs/adr-003-define-schema-ownership-for-agent-native-contracts.md`: defines
-  the three contract crates and the schema-version constants
+  `docs/adrs/adr-0003-define-schema-ownership-for-agent-native-contracts.md`:
+  defines the three contract crates and the schema-version constants
   (`ORTHO_AGENT_CONTEXT_SCHEMA_VERSION`, `ORTHO_POLICY_REPORT_SCHEMA_VERSION`).
 
 ### Terms of art
@@ -587,11 +587,11 @@ A novice opening this plan needs the following landmarks before reading the
   - `divergent` means the Weaver task deliberately deviates from an
     OrthoConfig contract. The row carries a non-empty `adr_anchor`
     pointing to a heading slug in
-    `docs/adr-007-agent-native-command-surface.md`.
+    `docs/adrs/adr-0007-agent-native-command-surface.md`.
 - **Removal gate.** The condition under which a `wraps` row must be
   retired: usually "the upstream OrthoConfig task is implemented" or a
   composite of several upstream tasks. The gate text matches the language
-  already used in the ADR 007 removal policy.
+  already used in the ADR 0007 removal policy.
 - **`managed_tasks` registry.** A top-level array in the manifest listing
   every Weaver roadmap task ID whose body sits inside the boundary surface. The
   registry is the candidate set; the gate fails when a registry entry has no
@@ -619,10 +619,10 @@ must pass before the next stage starts.
 
 Stage A is documentation-led. No code lands.
 
-1. Open `docs/adr-007-agent-native-command-surface.md` and add a new section
-   titled "Boundary classification" before "Consequences". The section defines
-   the four states (`consumes`, `wraps`, `pending`, `divergent`), the evidence
-   each state requires, and the location of the matrix
+1. Open `docs/adrs/adr-0007-agent-native-command-surface.md` and add a new
+   section titled "Boundary classification" before "Consequences". The section
+   defines the four states (`consumes`, `wraps`, `pending`, `divergent`), the
+   evidence each state requires, and the location of the matrix
    (`docs/orthoconfig-consumer-boundary.md`). It does not duplicate the
    existing "OrthoConfig dependencies" or "Temporary adapter removal policy"
    sections; it points at them. It states explicitly that `pending` exists to
@@ -638,7 +638,7 @@ Stage A is documentation-led. No code lands.
    do not modify the style guide.
 
 Validation: `make markdownlint` passes, `make nixie` passes, and the new
-section in ADR 007 reads as a self-contained explanation that a contributor
+section in ADR 0007 reads as a self-contained explanation that a contributor
 without prior context can use to classify a new task.
 
 ### Stage B: produce the boundary manifest, generator, and matrix doc
@@ -691,7 +691,7 @@ human-readable matrix from it.
      `next_review_by` is non-empty (ISO-8601 date); `adr_anchor` may be
      empty.
    - `divergent` — `adr_anchor` is non-empty and names a stable heading
-     slug in `docs/adr-007-agent-native-command-surface.md` (anchors may
+     slug in `docs/adrs/adr-0007-agent-native-command-surface.md` (anchors may
      be shared by multiple rows); `shipped_in` and `removal_gate` are
      empty.
 
@@ -700,7 +700,7 @@ human-readable matrix from it.
    `delivery`, `feedback`, `execution_ledger`. The test gate rejects unknown
    roles.
 2. Populate the manifest with the candidate set derived from
-   `docs/roadmap.md` and ADR 007. Use the topic-keyword scan described in the
+   `docs/roadmap.md` and ADR 0007. Use the topic-keyword scan described in the
    Risks section. At minimum the seed set must include:
    - 12.1.1 through 12.1.5;
    - 13.1.1, 13.1.2, 13.1.3, 13.2.1, 13.2.2, 13.2.3, 13.3.1, 13.3.2,
@@ -714,10 +714,10 @@ human-readable matrix from it.
    - 20.1.1, 20.1.2, 20.3.3.
 
    Each row carries its classification, upstream pairing, and (where
-   applicable) removal gate language derived from ADR 007's existing table.
+   applicable) removal gate language derived from ADR 0007's existing table.
    Tasks classified `consumes` must reference an upstream that has already
    shipped; tasks classified `wraps` must reference a removal gate; tasks
-   classified `divergent` must reference an ADR 007 anchor.
+   classified `divergent` must reference an ADR 0007 anchor.
 3. Create a new tiny workspace member at `crates/weaver-docs-gate` that
    exposes the manifest parser and the matrix renderer to the test harness:
 
@@ -761,12 +761,12 @@ crate compiles). `make markdownlint` and `make nixie` pass. The generated
 matrix matches the committed `docs/orthoconfig-consumer-boundary.md` byte for
 byte.
 
-### Stage C: cross-link the matrix from ADR 007, the roadmap, and the developers' guide
+### Stage C: cross-link the matrix from ADR 0007, the roadmap, and the developers' guide
 
 Stage C adds the back-links and a contributor workflow that prevents silent
 drift.
 
-1. In `docs/adr-007-agent-native-command-surface.md`, finish the
+1. In `docs/adrs/adr-0007-agent-native-command-surface.md`, finish the
    "Boundary classification" section by linking to the matrix and the manifest.
    The existing OrthoConfig dependency table stays as-is.
 2. In `docs/roadmap.md`, immediately under the "12.1.1" item, add a single
@@ -789,7 +789,7 @@ drift.
      row from `wraps` or `pending` to `consumes`, set `shipped_in` to
      the OrthoConfig release tag (or short commit SHA), and drop the
      removal gate or review date.
-   - For a `divergent` row, capture the rationale in a named ADR 007
+   - For a `divergent` row, capture the rationale in a named ADR 0007
      section anchor and reference it in the manifest. Anchors may be
      shared by multiple rows.
    - Run the quarterly cross-repo reconciliation step (a short
@@ -837,7 +837,7 @@ Stage D enforces the matrix at CI time.
    - **`divergent` evidence.** Rows with `state = "divergent"` carry a
      non-empty `adr_anchor`, an empty `shipped_in`, and an empty
      `removal_gate`; the anchor occurs as a heading slug in
-     `docs/adr-007-agent-native-command-surface.md`.
+     `docs/adrs/adr-0007-agent-native-command-surface.md`.
    - **Registry symmetry.** Every ID in `managed_tasks` has a matching
      `[[task]]` row; every `[[task]]` row's `id` appears in
      `managed_tasks`; every `managed_tasks` ID appears as a task
@@ -926,11 +926,11 @@ repository root.
 ### Stage A commands
 
 ```sh
-${EDITOR:-vi} docs/adr-007-agent-native-command-surface.md
+${EDITOR:-vi} docs/adrs/adr-0007-agent-native-command-surface.md
 make markdownlint 2>&1 | tee /tmp/markdownlint-weaver-12-1-1-track-downstream-consumer-boundary.out
 make nixie 2>&1 | tee /tmp/nixie-weaver-12-1-1-track-downstream-consumer-boundary.out
-git add docs/adr-007-agent-native-command-surface.md
-git commit -m "Add OrthoConfig boundary classification section to ADR 007"
+git add docs/adrs/adr-0007-agent-native-command-surface.md
+git commit -m "Add OrthoConfig boundary classification section to ADR 0007"
 ```
 
 ### Stage B commands
@@ -1003,7 +1003,7 @@ Quality criteria define what "done" means.
   `boundary-gate: registry-symmetry` diagnostic naming the missing task. A
   `wraps` row without a removal gate, a `consumes` row without `shipped_in`, a
   `pending` row whose `next_review_by` is more than 270 days in the past, or a
-  `divergent` row without an ADR 007 anchor each fail the same test with the
+  `divergent` row without an ADR 0007 anchor each fail the same test with the
   matching diagnostic shape from Stage D. The generated matrix Markdown matches
   the committed copy.
 - **Tests.** `cargo test --workspace` passes including the new
@@ -1016,7 +1016,7 @@ Quality criteria define what "done" means.
   attributes beyond what existing files use.
 - **Documentation.** `docs/contents.md` lists the new boundary matrix;
   `docs/users-guide.md` mentions provisional contracts where users may notice
-  them; `docs/developers-guide.md` carries the contributor workflow; ADR 007
+  them; `docs/developers-guide.md` carries the contributor workflow; ADR 0007
   carries the boundary classification section.
 - **CodeRabbit.** `coderabbit review --agent` raises no outstanding
   concerns at completion.
@@ -1122,7 +1122,7 @@ flowchart TD
     Classify -- consumes --> Shipped[shipped_in: OrthoConfig release]
     Classify -- wraps --> Gate[removal_gate text]
     Classify -- pending --> Review[next_review_by date]
-    Classify -- divergent --> Anchor[ADR 007 anchor]
+    Classify -- divergent --> Anchor[ADR 0007 anchor]
     Shipped --> Matrix[docs/orthoconfig-consumer-boundary.md]
     Gate --> Matrix
     Review --> Matrix
@@ -1191,7 +1191,7 @@ Skills:
 - `execplans` — to keep this plan a living document.
 - `hexagonal-architecture` — to interpret the boundary as a dependency-rule
   artefact, not a runtime port.
-- `arch-decision-records` — to amend ADR 007 cleanly when a `divergent`
+- `arch-decision-records` — to amend ADR 0007 cleanly when a `divergent`
   row needs an anchor.
 - `rust-unit-testing` — for the `rstest` parameterization and the
   `pretty_assertions`/`googletest` shape of the gate. The plan intentionally
@@ -1206,7 +1206,7 @@ Skills:
 Documents:
 
 - `docs/roadmap.md`
-- `docs/adr-007-agent-native-command-surface.md`
+- `docs/adrs/adr-0007-agent-native-command-surface.md`
 - `docs/documentation-style-guide.md`
 - `docs/developers-guide.md`
 - `docs/users-guide.md`
@@ -1222,7 +1222,7 @@ Upstream references (read-only context):
 - OrthoConfig roadmap, task 5.2.3 (in the OrthoConfig repository).
 - OrthoConfig `docs/agent-native-cli-design.md` §2.1.
 - OrthoConfig
-  `docs/adr-003-define-schema-ownership-for-agent-native-contracts.md`.
+  `docs/adrs/adr-0003-define-schema-ownership-for-agent-native-contracts.md`.
 
 Prior art consulted for the gate design:
 

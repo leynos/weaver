@@ -25,7 +25,7 @@ struct MatrixRow {
     upstream: String,
     /// Commit hash the divergence or wrapper shipped in, or `n/a`.
     shipped_in: String,
-    /// Removal gate text, or an ADR 007 divergence link, or `n/a`.
+    /// Removal gate text, or an ADR 0007 divergence link, or `n/a`.
     gate_or_divergence: String,
     /// Next scheduled review date, or `n/a` if none is set.
     next_review_by: String,
@@ -134,7 +134,7 @@ pub fn render_matrix(manifest: &BoundaryManifest) -> String {
         "that consumes\n",
         "OrthoConfig, wraps it temporarily, waits on upstream shape, or ",
         "deliberately\n",
-        "diverges under ADR 007.\n\n",
+        "diverges under ADR 0007.\n\n",
     ));
 
     for (table_number, (phase, rows)) in grouped_rows(manifest).into_iter().enumerate() {
@@ -279,7 +279,7 @@ fn gate_or_divergence(task: &BoundaryTask) -> String {
 
     task.adr_anchor.as_deref().map_or_else(
         || NA.into(),
-        |anchor| format!("[ADR 007](adr-007-agent-native-command-surface.md#{anchor})"),
+        |anchor| format!("[ADR 0007](adrs/adr-0007-agent-native-command-surface.md#{anchor})"),
     )
 }
 

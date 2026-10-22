@@ -181,7 +181,7 @@ pub struct BoundaryTask {
     /// Replacement condition for temporary wrappers.
     #[serde(deserialize_with = "empty_string_as_none")]
     pub removal_gate: Option<String>,
-    /// ADR 007 heading slug for deliberate divergences.
+    /// ADR 0007 heading slug for deliberate divergences.
     #[serde(deserialize_with = "empty_string_as_none")]
     pub adr_anchor: Option<String>,
     /// ISO-8601 review date for pending contracts.

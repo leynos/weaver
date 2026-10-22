@@ -40,11 +40,11 @@ as `--selectors -`; they do not depend on hidden daemon state.
 
 Two architectural decisions refine the public command contract:
 
-- [ADR 011](../adr-011-sempai-query-input-syntax.md) defines `--query`,
+- [ADR 0011](../adrs/adr-0011-sempai-query-input-syntax.md) defines `--query`,
   `--expr`, their file forms, and YAML rule inputs; and
-- [ADR 012](../adr-012-versioned-selector-streams.md) defines completed selector
-  JSONL, standard-input ownership, deterministic ordering, and stale-source
-  refusal.
+- [ADR 0012](../adrs/adr-0012-versioned-selector-streams.md) defines completed
+  selector JSONL, standard-input ownership, deterministic ordering, and
+  stale-source refusal.
 
 ## 2. Problem
 
@@ -104,7 +104,7 @@ The current implementation has the following relevant properties:
 - The current one-liner design calls for Logos tokenization, a recovering
   Chumsky parser, Pratt precedence, labelled productions, and delimiter-based
   recovery, but the `sempai-dsl` crate does not yet exist.
-- ADR 007 already establishes noun-verb commands, universal `--json`, selector
+- ADR 0007 already establishes noun-verb commands, universal `--json`, selector
   pipelines, and capability-first actuation.
 
 These foundations should be composed before Sempai grows another horizontal
@@ -547,8 +547,8 @@ Observable result: a library caller compiles and executes a positive query.
 
 ### 7.2. Plateau B: public selector stream
 
-- Add the ADR 011 input flags to `weaver symbols list`.
-- Add ADR 012 selector and completion schemas.
+- Add the ADR 0011 input flags to `weaver symbols list`.
+- Add ADR 0012 selector and completion schemas.
 - Include source identity, stream identity, sequence, and provider provenance.
 - Add human diagnostics and stable machine diagnostics.
 - Prove zero, one, many, malformed, unsupported, bounded, and truncated cases.
@@ -603,21 +603,21 @@ This makes the word query maximally general, but it forces nested quotation on
 the common positive-pattern case and makes the recovering Pratt parser a
 prerequisite for the smallest useful query.
 
-Rejected by ADR 011.
+Rejected by ADR 0011.
 
 ### 8.4. Auto-detect bare patterns and rich expressions
 
 Auto-detection saves one flag but creates ambiguous error ownership and risks a
 future expression keyword changing the interpretation of an existing pattern.
 
-Rejected by ADR 011.
+Rejected by ADR 0011.
 
 ### 8.5. Emit one JSON array
 
 An array makes completion obvious but prevents natural streaming, increases
 peak memory, and makes ordinary line-oriented filters clumsier.
 
-Rejected by ADR 012.
+Rejected by ADR 0012.
 
 ### 8.6. Emit unframed JSONL selectors
 
@@ -625,7 +625,7 @@ This is the simplest line protocol but cannot distinguish successful
 end-of-stream from a producer which failed after emitting a valid prefix. Shell
 `pipefail` does not expose the upstream status to the actuator process.
 
-Rejected by ADR 012.
+Rejected by ADR 0012.
 
 ### 8.7. Keep selectors in daemon memory
 
@@ -633,7 +633,7 @@ Opaque handles can be compact, but they do not survive process restart, cannot
 be inspected or filtered, and couple a consumer to the producer's daemon
 session.
 
-Rejected by ADR 012.
+Rejected by ADR 0012.
 
 ## 9. Risks and mitigations
 

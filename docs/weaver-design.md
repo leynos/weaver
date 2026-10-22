@@ -94,7 +94,7 @@ weaver context --json
 ```
 
 The historical `observe` / `act` / `verify` domain grammar is useful prototype
-evidence, but it is superseded by ADR 007 for the 0.1.0 target. The future
+evidence, but it is superseded by ADR 0007 for the 0.1.0 target. The future
 public surface describes resources, selectors, and capabilities directly.
 Observe-style resource commands emit selector records that act-style mutation
 commands can consume directly or after ordinary UNIX filtering:
@@ -403,7 +403,7 @@ operation result schemas.
 
 #### 2.1.1. Agent-native command surface
 
-ADR 007 defines the 0.1.0 command surface as a generated or validated contract
+ADR 0007 defines the 0.1.0 command surface as a generated or validated contract
 with two first-class renderers. Weaver depends on OrthoConfig for reusable
 documentation intermediate representation, agent-context, policy, renderer,
 profile, delivery, feedback, and execution-ledger contracts where the
@@ -645,7 +645,7 @@ reader abandons the session after ten consecutive blank lines and treats the
 absence of a terminating `exit` message as a failure. This ensures operators do
 not mistake a partial or stalled response for a successful execution.
 
-The prototype capability probe is exposed as `weaver --capabilities`. ADR 007
+The prototype capability probe is exposed as `weaver --capabilities`. ADR 0007
 supersedes that root flag for the 0.1.0 target. Runtime capability availability
 moves to `weaver capabilities list --json`, while full command and workflow
 introspection moves to `weaver context --json`.
@@ -854,7 +854,7 @@ hierarchy edges, structural matches, rewrite results, and verification failures
 surfaced by the safety harness.
 
 The current prototype CLI exposes an `--output` flag with `auto`, `human`, and
-`json` values. ADR 007 supersedes that public target. The 0.1.0 design keeps
+`json` values. ADR 0007 supersedes that public target. The 0.1.0 design keeps
 the human context-block requirement but replaces `--output json` with universal
 `--json`, `--plain`, `--color`, `--no-pager`, and `--width` controls. The human
 renderer follows `miette`-style ASCII output even when a direct `miette`
@@ -978,10 +978,11 @@ The current implementation still captures one startup directory and retains it
 as the request handler's workspace root. Until the workspace request contract
 and registry land, separate configured sockets remain the only safe way to run
 one daemon against each repository.
-[RFC 0002](rfcs/0002-multi-workspace-daemon.md) defines the migration from that
-implementation to the target per-user, multi-workspace service.
-[ADR 008](adr-008-workspace-scoped-daemon-tenancy.md) records the proposed
-tenancy boundary.
+[RFC 0002](rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md)
+defines the migration from that implementation to the target per-user,
+multi-workspace service.
+[ADR 0008](adrs/adr-0008-workspace-scoped-daemon-tenancy.md) records the
+proposed tenancy boundary.
 
 The workspace key must be resolved before capability selection, cache lookup,
 language-server leasing, plugin execution, or mutation. Workspace-sensitive
@@ -1584,7 +1585,7 @@ Admission is bounded at daemon, workspace, and server scopes. Whenever the
 transport can respond, saturation must produce a structured, retryable result
 and must not silently drop the request; queue wait, execution time, rejection,
 restart, and eviction remain separate observability events governed by
-[RFC 0001](rfcs/0001-o11y.md). [ADR 010](adr-010-workspace-local-concurrency.md)
+[RFC 0001](rfcs/rfc-0001-local-daemon-observability.md). [ADR 0010](adrs/adr-0010-workspace-local-concurrency.md)
 records the proposed concurrency boundary.
 
 ## 3. Core Components: A Technical Deep Dive
@@ -1686,9 +1687,10 @@ server before a replacement receives work.
 
 Health checks, bounded restart backoff, circuit breaking, process budgets, and
 idle eviction complete the lifecycle contract.
-[ADR 009](adr-009-workspace-scoped-language-server-lifecycle.md) records the
-proposed decision, and [RFC 0002](rfcs/0002-multi-workspace-daemon.md) defines
-its migration and verification requirements.
+[ADR 0009](adrs/adr-0009-workspace-scoped-language-server-lifecycle.md) records
+the proposed decision, and
+[RFC 0002](rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md)
+defines its migration and verification requirements.
 
 ### 3.2. The Syntactic Scaffolding: Precision and Safety with Tree-sitter
 
@@ -2175,13 +2177,13 @@ cost.
 Content digests and workspace revision checks remain the final commit guard;
 the mutation lease does not replace stale-base refusal. Disconnect and timeout
 handling must cancel queued work without abandoning a live commit or leaking a
-server lease. [ADR 010](adr-010-workspace-local-concurrency.md) records this
-proposed coordination model.
+server lease. [ADR 0010](adrs/adr-0010-workspace-local-concurrency.md) records
+this proposed coordination model.
 
 ### 4.3. The current `act apply-patch` command and target patch surface
 
 This section records the implemented prototype patch path and the safety
-properties it proves. ADR 007 supersedes the public `act apply-patch` spelling
+properties it proves. ADR 0007 supersedes the public `act apply-patch` spelling
 for the 0.1.0 target; the future resource-first surface is
 `weaver patches apply`, backed by the same safety-locked transaction model.
 
@@ -2792,12 +2794,12 @@ using other `weaver` commands.
 
 ## 7. Historical Development Roadmap Context (v4)
 
-This section records the roadmap context that preceded ADR 007. It remains
+This section records the roadmap context that preceded ADR 0007. It remains
 useful as history and as evidence for completed foundation work, but
-`docs/roadmap.md` and ADR 007 supersede any future public command grammar here.
-Prototype names such as `observe`, `act`, and `verify` in this section should
-be read as historical planning language until they are migrated under the
-resource-first 0.1.0 command contract.
+`docs/roadmap.md` and ADR 0007 supersede any future public command grammar
+here. Prototype names such as `observe`, `act`, and `verify` in this section
+should be read as historical planning language until they are migrated under
+the resource-first 0.1.0 command contract.
 
 The historical plan organized `Weaver` in a series of phased milestones. It
 prioritized the establishment of core safety features early in the development
@@ -2989,7 +2991,7 @@ owner of configuration policy; the existing CLI and daemon `ConfigLoader` seams
 remain the only adapter boundaries. The new `post_merge_hook` keeps
 capability-directive normalization invariant whether configuration comes from
 the generated loader or declarative test layers. Optional OrthoConfig command,
-agent-context, metrics, and YAML capabilities remain governed by ADR 007 and
+agent-context, metrics, and YAML capabilities remain governed by ADR 0007 and
 are not consumed by this migration.
 
 #### 2025-11-12: Adopt `rstest-bdd` 0.1.0 for scenario tests

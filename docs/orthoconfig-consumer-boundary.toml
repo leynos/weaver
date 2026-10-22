@@ -85,7 +85,7 @@ last_reviewed = "2026-06-14"
 
 [[task]]
 id = "13.1.1"
-gist = "Record the agent-native command-surface reset as ADR 007."
+gist = "Record the agent-native command-surface reset as ADR 0007."
 state = "divergent"
 upstream = [{ task = "OrthoConfig 5.2.3", role = "boundary" }]
 shipped_in = ""
@@ -118,7 +118,7 @@ upstream = [
   { task = "OrthoConfig 7.2.7", role = "capability_provenance" },
 ]
 shipped_in = ""
-removal_gate = "Retire local generic helpers once their named OrthoConfig replacements are available, unless ADR 007 records a permanent divergence."
+removal_gate = "Retire local generic helpers once their named OrthoConfig replacements are available, unless ADR 0007 records a permanent divergence."
 adr_anchor = ""
 next_review_by = ""
 last_reviewed = "2026-06-14"

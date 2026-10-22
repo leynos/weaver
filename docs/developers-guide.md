@@ -578,7 +578,7 @@ holds the local wiring: the pin is a full commit, the target runs the pinned
 checker with `check --repository .` under Python 3.13, `.github/cv005.toml`
 names this repository, `make all` includes the target, and CI runs it. The
 decision is recorded in
-[ADR 013](adr-013-adopt-the-shared-cv005-contract-library.md).
+[ADR 0013](adrs/adr-0013-adopt-the-shared-cv005-contract-library.md).
 
 ## 9 Cancelling superseded pull-request runs
 
@@ -754,7 +754,7 @@ source-build properties.
 
 ## 12 Adding or renaming public commands
 
-ADR 007 makes the 0.1.0 public command surface resource-first and generated
+ADR 0007 makes the 0.1.0 public command surface resource-first and generated
 from OrthoConfig-backed command metadata plus Weaver-owned semantic adapters.
 Do not add new public command grammar by hand in `clap`, daemon routing, manual
 pages, help text, and docs independently.
@@ -774,7 +774,7 @@ Use `consumes` only when the upstream OrthoConfig contract has shipped and the
 row can name the release or pinned SHA in `shipped_in`. Use `wraps` for a
 temporary Weaver adapter with a concrete removal gate, `pending` for an
 upstream contract that is not decided or shipped yet, and `divergent` only when
-ADR 007 records the deliberate Weaver-owned divergence.
+ADR 0007 records the deliberate Weaver-owned divergence.
 
 The CI workflow runs the boundary manifest gate as a named
 `Boundary manifest gate` step before the wider coverage action. A failed

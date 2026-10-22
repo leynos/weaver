@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 002: Query language for feature extraction in Weaver
+# Architectural decision record (ADR) 0002: Query language for feature extraction in Weaver
 
 ## Status
 

@@ -178,7 +178,7 @@ Stop and escalate rather than improvising when any of these is reached.
       section names every structured path and its long flags, so both runtime
       help and the `clap_mangen` page expose `definitions get --uri <URI>
       --position <LINE:COLUMN>` and daemon lifecycle paths.
-- [x] Stage E: boundary manifest, ADR 007, and user- and developer-facing
+- [x] Stage E: boundary manifest, ADR 0007, and user- and developer-facing
       documentation. Completed 2026-08-22: the regenerated boundary matrix,
       ADR, design, developer guide, user guide, and roadmap now describe the
       recursive projection and its remaining wrapper boundary. Final full-gate
@@ -420,7 +420,7 @@ Recorded during planning; keep appending during implementation.
 - Decision: model the free-text `observe`/`act`/`verify` passthrough as a
   single node with the operation catalogue as its value hints, rather than as
   fourteen peer commands. Rationale: roadmap 12.2.3 marks those spellings
-  provenance-only, and ADR 007 resets the surface to resource-first. Promoting
+  provenance-only, and ADR 0007 resets the surface to resource-first. Promoting
   them to peers would entrench a superseded grammar in the very structure meant
   to outlive it. Keeping them as one node's value hints keeps help truthful
   about what the binary accepts while letting the node delete itself when the
@@ -436,7 +436,7 @@ Recorded during planning; keep appending during implementation.
   input, shell completions and `weaver skill-path` — all `weaver` CLI surfaces
   — and never mentions `weaverd`. The only task that proposed retiring
   `clap_mangen` is archive 3.2.6, whose migration destination is 13.2/13.3 and
-  which likewise concerns the CLI. Record it in ADR 007 as a permanent
+  which likewise concerns the CLI. Record it in ADR 0007 as a permanent
   divergence, stating the reopening condition: if `weaverd` ever gains a parsed
   argument surface, its manual page must be generated from the same metadata as
   the CLI's. Date/Author: 2026-08-21, planning agent.
@@ -492,7 +492,7 @@ The files that matter for this task:
 - `crates/weaver-cli/src/help.rs` — builds an augmented `clap::Command` used
   for both runtime help and manual-page generation. It already consumes
   OrthoConfig's flat field metadata via `Config::get_doc_metadata().fields`.
-- `crates/weaver-cli/src/command_surface/mod.rs` — the ADR 007 temporary
+- `crates/weaver-cli/src/command_surface/mod.rs` — the ADR 0007 temporary
   adapter holding Weaver's semantic command records.
 - `crates/weaver-cli/src/discoverability.rs` — `DOMAIN_OPERATIONS`, the domain
   and operation catalogue used for `after_help` and guidance.
@@ -510,11 +510,12 @@ Upstream artefacts governing this work:
 - `docs/roadmap.md` section 12.1.2 (the success criterion, quoted verbatim in
   `Purpose / big picture`), plus sections 12.1.3, 13.3.1 and 13.3.3, which
   bound this task's scope.
-- `docs/adr-007-agent-native-command-surface.md` — Weaver's ADR on the
+- `docs/adrs/adr-0007-agent-native-command-surface.md` — Weaver's ADR on the
   agent-native command surface, including the boundary-state vocabulary and the
   removal policy for `command_surface/mod.rs`. Note that OrthoConfig upstream
-  also numbers an ADR 007, on downstream context-command naming; the two are
-  unrelated and prose must say which is meant.
+  also has its own ADR 0007, `adr-0007-downstream-context-command-naming.md`,
+  on downstream context-command naming; the two are unrelated and prose must
+  say which is meant.
 - `docs/weaver-design.md` — the design document this plan must keep truthful.
 - Upstream OrthoConfig roadmap items 6.1.1 and 6.1.2, both complete and
   available at the pinned OrthoConfig Git revision.
@@ -522,8 +523,8 @@ Upstream artefacts governing this work:
 Trace links:
 
 ```plaintext
-ROADMAP-12.1.2 -> ADR007-boundary -> EP-M2 -> tests::command_ir::projection_matches_derive
-ROADMAP-12.1.2 -> ADR007-removal  -> EP-M5 -> docs-gate::boundary_manifest
+ROADMAP-12.1.2 -> ADR-0007-boundary -> EP-M2 -> tests::command_ir::projection_matches_derive
+ROADMAP-12.1.2 -> ADR-0007-removal  -> EP-M5 -> docs-gate::boundary_manifest
 ROADMAP-12.1.2 -> criterion-help  -> EP-M3 -> tests::command_ir::every_node_appears_in_help
 ROADMAP-12.1.2 -> criterion-man   -> EP-M3 -> tests::man_page::contains_every_resource_path
 ```
@@ -782,7 +783,7 @@ against the tolerance on snapshot churn; `cargo test --workspace` passes.
 Update the boundary manifest row for 12.1.2 — keeping `state = "wraps"`,
 narrowing `removal_gate`, refreshing `last_reviewed` — and regenerate the
 Markdown matrix with the example binary. Amend
-`docs/adr-007-agent-native-command-surface.md` to record the derive-shape
+`docs/adrs/adr-0007-agent-native-command-surface.md` to record the derive-shape
 divergence and the `agent_context` finding. Update `docs/users-guide.md` only
 if observable help text changes, `docs/developers-guide.md` with the convention
 that command metadata is added in one place, and `docs/weaver-design.md` where
@@ -975,7 +976,7 @@ flowchart TD
     C -.->|roadmap 13.3.3| G["shell completion<br/>(not built here)"]
     C -.->|roadmap 13.3.1| H["weaver context --json<br/>(not built here)"]
     A --> I["capability_id, provider_policy<br/>no upstream home"]
-    I -.->|divergence, ADR 007| J["boundary row stays 'wraps'"]
+    I -.->|divergence, ADR 0007| J["boundary row stays 'wraps'"]
 ```
 
 *Figure 1: Command metadata ownership and deferred rendering boundaries.*
@@ -1004,7 +1005,7 @@ Skills to load:
 - `rust-router` first, then the smallest useful follow-on. `rust-unit-testing`
   for the fixture and assertion work, `proptest` for obligation INV-1,
   `arch-crate-design` only if the tolerance on crate creation is reached, and
-  `arch-decision-records` for the ADR 007 amendment.
+  `arch-decision-records` for the ADR 0007 amendment.
 - `leta` for code navigation; prefer it over text search when a symbol name is
   known.
 - `hexagonal-architecture` to keep the domain tree free of `clap` and
@@ -1016,8 +1017,8 @@ Documents to read before starting:
 
 - `AGENTS.md` — the binding rules.
 - `docs/roadmap.md` sections 12.1 and 13.3 — the scope boundary.
-- `docs/adr-007-agent-native-command-surface.md` — the boundary vocabulary and
-  the removal policy for `command_surface/mod.rs`.
+- `docs/adrs/adr-0007-agent-native-command-surface.md` — the boundary
+  vocabulary and the removal policy for `command_surface/mod.rs`.
 - `docs/ortho-config-users-guide.md` — the consumer-facing guide to the
   dependency.
 - `docs/rust-testing-with-rstest-fixtures.md` and
