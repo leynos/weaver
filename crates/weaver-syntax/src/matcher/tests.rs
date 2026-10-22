@@ -171,7 +171,7 @@ fn empty_multiple_metavariable_has_anchored_byte_range(rust_parser: Result<Parse
     .expect("anchored pattern should compile against parsed source");
     let m = first_rust_match(&pattern, &source).expect("pattern should match the source");
     let nodes = extract_multiple_capture(&m, "BODY").expect("BODY should capture multiple nodes");
-    assert!(nodes.text().trim().is_empty());
+    assert_eq!(nodes.text().trim().len(), 0);
 
     let brace_anchor = source
         .source()

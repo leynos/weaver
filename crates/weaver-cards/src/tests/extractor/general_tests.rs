@@ -86,13 +86,7 @@ fn member_assignments_do_not_create_synthetic_locals() {
     })
     .expect("TypeScript card extraction should succeed");
 
-    assert!(
-        card.structure
-            .as_ref()
-            .expect("structure")
-            .locals
-            .is_empty()
-    );
+    assert_eq!(card.structure.as_ref().expect("structure").locals.len(), 0);
 }
 
 #[test]
