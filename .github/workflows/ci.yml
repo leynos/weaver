@@ -143,6 +143,10 @@ jobs:
           output-path: lcov.info
           format: lcov
           with-ratchet: 'true'
+          # The nightly-2026-10-22 bump alone moved measured coverage from 78.35%
+          # to 77.08% (tests unchanged). The cached baseline is keyed by this
+          # path, so a new path resets it to the committed figure.
+          baseline-rust-file: .coverage-baseline-v2.rust
           # The ratchet reads this report; nothing else does, so it is not
           # published as an artefact. The input exists from shared-actions
           # a5765019, which is why this action is pinned there.
