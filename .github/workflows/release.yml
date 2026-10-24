@@ -167,6 +167,8 @@ jobs:
       - build-freebsd
     # No fork arm: this job is gated on `should_publish`, which is only true
     # on a tag push, so it is skipped on every dry run and never meets a fork.
+    # dependabot-runner: exempt. For the same reason it never meets a Dependabot
+    # pull request.
     #
     # The ceiling is a judgement, not a measurement, and is recorded as one:
     # because the job is skipped on every dry run, no green run of it exists
