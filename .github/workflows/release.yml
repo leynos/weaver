@@ -51,8 +51,12 @@ jobs:
     # request, so it does meet forks. The continuation line sits at the SAME
     # indent as the line above it; a more-indented continuation in a folded
     # scalar keeps its line break and puts a newline inside the expression.
+    # Dependabot pull requests run on the hosted pool too (free on a public
+    # repository). The author is tested, not the actor, which changes when
+    # someone else pushes to the branch.
     runs-on: >-
-      ${{ github.event.pull_request.head.repo.fork
+      ${{ (github.event.pull_request.head.repo.fork
+      || github.event.pull_request.user.login == 'dependabot[bot]')
       && 'ubuntu-latest' || 'ubicloud-standard-2' }}
     timeout-minutes: 10
     outputs:
@@ -102,7 +106,8 @@ jobs:
       # continuation sits at the same indent as the line above it for the same
       # folded-scalar reason as everywhere else.
       runner: >-
-        ${{ github.event.pull_request.head.repo.fork
+        ${{ (github.event.pull_request.head.repo.fork
+        || github.event.pull_request.user.login == 'dependabot[bot]')
         && 'ubuntu-latest' || 'ubicloud-standard-4' }}
       target: ${{ matrix.target }}
       version: ${{ needs.metadata.outputs.version }}

@@ -34,6 +34,17 @@ MACOS_LABEL: typ.Final = "macos-15"
 #: the same shape that selects the wrong runner on every fork pull request.
 FORK_GUARD: typ.Final = "github.event.pull_request.head.repo.fork"
 
+#: The pull request's author, not ``github.actor``: the actor is whoever
+#: triggered the run, so a person pushing to a Dependabot branch would flip the
+#: runner. Hosted minutes cost nothing on a public repository, so Dependabot's
+#: pull requests take the fork arm too.
+DEPENDABOT_GUARD: typ.Final = (
+    "github.event.pull_request.user.login == 'dependabot[bot]'"
+)
+
+#: The exact guard every fork-fallback lane branches on.
+HOSTED_GUARD: typ.Final = f"({FORK_GUARD} || {DEPENDABOT_GUARD})"
+
 #: Lanes that meet forks and therefore carry the fallback, with the label the
 #: non-fork arm must select. Every one of these serves pull requests: the two
 #: release jobs do so because ``release-dry-run.yml`` calls ``release.yml`` on
