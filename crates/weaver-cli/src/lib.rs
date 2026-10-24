@@ -104,6 +104,23 @@ pub struct IoStreams<'a, R: Read, W: Write, E: Write> {
     stdout_is_terminal: bool,
 }
 impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
+    /// Bundles the standard streams.
+    ///
+    /// `stdout_is_terminal` records whether standard output is attached to a
+    /// terminal, which callers use to decide how to render output.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io::Cursor;
+    ///
+    /// use weaver_cli::IoStreams;
+    ///
+    /// let mut stdin = Cursor::new(Vec::<u8>::new());
+    /// let mut stdout = Vec::new();
+    /// let mut stderr = Vec::new();
+    /// let _streams = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    /// ```
     pub fn new(
         stdin: &'a mut R,
         stdout: &'a mut W,
