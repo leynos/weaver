@@ -231,5 +231,5 @@ fn budget_default_values() {
 fn spillover_empty_is_not_truncated() {
     let spillover = SliceSpillover::empty();
     assert!(!spillover.truncated);
-    assert!(spillover.frontier.is_empty());
+    assert_eq!(spillover.frontier.len(), 0);
 }

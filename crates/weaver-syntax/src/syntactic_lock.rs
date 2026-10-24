@@ -288,12 +288,12 @@ mod tests {
         let content = "fn test() {\n    let x = \n}";
 
         let failures = lock.validate_file(&path, content).expect("validate");
-        assert!(!failures.is_empty());
+        assert_ne!(failures.len(), 0);
 
         let first = failures.first().expect("failure");
         assert!(first.line >= 1);
         assert!(first.column >= 1);
-        assert!(!first.message.is_empty());
+        assert_ne!(first.message.len(), 0);
     }
 
     #[test]
@@ -311,7 +311,7 @@ mod tests {
         let failures = lock.validate_files(file_refs).expect("validate");
 
         // Should have failures only from invalid.rs
-        assert!(!failures.is_empty());
+        assert_ne!(failures.len(), 0);
         assert!(
             failures
                 .iter()
@@ -342,7 +342,7 @@ mod tests {
         };
 
         let failures = lock.validate_owned_file(file).expect("validate");
-        assert!(failures.is_empty());
+        assert_eq!(failures.len(), 0);
     }
 
     #[test]
@@ -360,7 +360,7 @@ mod tests {
         ];
 
         let failures = lock.validate_owned_files(files).expect("validate");
-        assert!(!failures.is_empty());
+        assert_ne!(failures.len(), 0);
         assert!(failures.iter().any(|f| f.path.ends_with("broken.rs")));
     }
 }

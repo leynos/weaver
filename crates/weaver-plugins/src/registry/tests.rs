@@ -137,7 +137,7 @@ fn find_for_language_returns_empty_for_unknown(
 ) {
     let registry = populated_registry.expect("populated registry should build");
     let results = registry.find_for_language("haskell");
-    assert!(results.is_empty());
+    assert_eq!(results.len(), 0);
 }
 
 #[rstest]
@@ -208,7 +208,7 @@ fn find_for_capability_returns_empty_for_unused(
 ) {
     let registry = capability_registry.expect("capability registry should build");
     let results = registry.find_for_capability(CapabilityId::ExtractMethod);
-    assert!(results.is_empty());
+    assert_eq!(results.len(), 0);
 }
 
 #[rstest]
@@ -228,7 +228,7 @@ fn find_for_language_and_capability_returns_empty_on_mismatch(
     let registry = capability_registry.expect("capability registry should build");
     let results =
         registry.find_for_language_and_capability("python", CapabilityId::ExtricateSymbol);
-    assert!(results.is_empty());
+    assert_eq!(results.len(), 0);
 }
 
 #[rstest]
