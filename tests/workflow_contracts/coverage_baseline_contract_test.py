@@ -18,6 +18,7 @@ Run via ``make test-workflow-contracts``.
 
 from __future__ import annotations
 
+import re
 import typing as typ
 from pathlib import Path
 
@@ -144,14 +145,11 @@ def test_the_committed_baseline_holds_one_percentage() -> None:
     lines = path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1, f"{BASELINE_FILE} should hold one line; found {len(lines)}"
     line = lines[0]
-    try:
-        value = float(line)
-    except ValueError:
-        pytest.fail(f"{BASELINE_FILE} should hold a number, got {line!r}")
-    decimals = line.partition(".")[2]
-    assert len(decimals) <= 1, (
-        f"{BASELINE_FILE} should carry at most one decimal place, got {line!r}"
+    assert re.fullmatch(r"\d{1,3}(\.\d)?", line), (
+        f"{BASELINE_FILE} should be a plain number with at most one decimal "
+        f"place, got {line!r}"
     )
+    value = float(line)
     assert 0 <= value <= 100, (
         f"{BASELINE_FILE} should hold a percentage from 0 to 100, got {line!r}"
     )
