@@ -241,7 +241,7 @@ mod tests {
         let result = parser.parse(source).expect("parse");
 
         assert!(result.has_errors());
-        assert!(!result.errors().is_empty());
+        assert_ne!(result.errors().len(), 0);
     }
 
     #[test]
@@ -250,7 +250,7 @@ mod tests {
         let result = parser.parse("fn test() {\n    let x = \n}").expect("parse");
 
         let errors = result.errors();
-        assert!(!errors.is_empty());
+        assert_ne!(errors.len(), 0);
 
         let first_error = errors.first().expect("has error");
         assert!(first_error.line >= 1);

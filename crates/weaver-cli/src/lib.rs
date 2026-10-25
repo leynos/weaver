@@ -289,7 +289,6 @@ where
 }
 
 /// Runs the CLI using the provided arguments and IO handles.
-#[must_use]
 pub fn run<'a, I, R, W, E>(args: I, io: &'a mut IoStreams<'a, R, W, E>) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
@@ -300,7 +299,6 @@ where
     run_with_loader(args, io, &OrthoConfigLoader)
 }
 /// Runs the CLI with a custom configuration loader.
-#[must_use]
 pub(crate) fn run_with_loader<'a, I, R, W, E, L>(
     args: I,
     io: &'a mut IoStreams<'a, R, W, E>,

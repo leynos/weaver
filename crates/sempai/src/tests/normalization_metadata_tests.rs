@@ -21,7 +21,7 @@ use super::normalization_test_support::{
 use crate::normalize::normalize_search_principal;
 
 fn assert_empty_metadata(formula: &Decorated<Formula>) {
-    assert!(formula.where_clauses.is_empty());
+    assert_eq!(formula.where_clauses.len(), 0);
     assert!(formula.as_name.is_none());
     assert!(formula.fix.is_none());
 }
