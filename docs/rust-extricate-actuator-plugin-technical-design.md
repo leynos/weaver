@@ -87,10 +87,13 @@ These behaviours directly affect payload and transaction handling:
 - transaction validation should treat parser and discovery failures as hard
   preconditions, not recoverable warnings.
 
-Authoritative runbook:
-[Migration guide: Weaver adoption of v0.10.0](ortho-config-v0-10-0-migration-guide.md).
-The earlier [v0.9.0 migration guide](ortho-config-v0-9-0-migration-guide.md)
-remains the historical record for that release, especially its sections:
+Authoritative Weaver adoption runbook:
+[Weaver's OrthoConfig v0.10.0 adoption runbook](execplans/issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0.md).
+The
+[published OrthoConfig v0.10.0 migration guide](ortho-config-v0-10-0-migration-guide.md)
+documents the upstream package changes separately. The earlier
+[v0.9.0 migration guide](ortho-config-v0-9-0-migration-guide.md) remains the
+historical record for that release, especially its sections:
 
 - [Required migration steps](ortho-config-v0-9-0-migration-guide.md#required-migration-steps)
 - [New declarative merge helpers](ortho-config-v0-9-0-migration-guide.md#2-new-declarative-merge-helpers)

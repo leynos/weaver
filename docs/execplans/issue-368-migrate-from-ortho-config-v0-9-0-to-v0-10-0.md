@@ -405,9 +405,15 @@ pinned-Nightly release all-target suite (1,562 passed, 4 ignored) passed.
 `make test` again stopped on the same eight Cranelift aborts, with 552 passed,
 4 skipped, and 1,002 not run. CodeRabbit reviewed the earlier source candidate
 `b76ea992` and found the missing `behaviour` and `profiles` comparisons. The
-fix addresses that finding. A follow-up review request for `0e16d97` was
-rate-limited; the user-directed 63-minute cooldown is in progress, so the fix's
-fresh CodeRabbit verdict remains pending.
+fix addresses that finding. The follow-up review was rate-limited, then
+completed on `243d3c2` after the user-directed 63-minute cooldown. It found a
+mislabelled link in the technical design: the “Weaver adoption” label pointed
+to the imported upstream guide instead of the Weaver ExecPlan. The link now
+points to the ExecPlan, with the upstream guide retained as a separate
+reference; the imported copy remains unchanged. The final documentation gates
+passed: 103 files formatted, 103 Markdown files with zero errors, all diagrams
+valid, and 48 docs-gate tests passed. Cargo and Markdownlint reported only the
+existing workspace warnings and colour-variable warning.
 
 Follow-up gate and review logs:
 
@@ -421,6 +427,11 @@ Follow-up gate and review logs:
 /tmp/test-release-all-targets-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
 /tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-after-mapenv.out
 /tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
+/tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-review.out
+/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-exact.out
+/tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-exact.out
+/tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-exact.out
+/tmp/test-docs-gate-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-exact.out
 ```
 
 The required focused and full validation log paths follow:
