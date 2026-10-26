@@ -99,7 +99,8 @@ readers can find the source of truth without scanning the whole tree.
 - [Ortho-config user's guide](ortho-config-users-guide.md)
   - Operational guide for configuration layering and ortho-config usage.
 - [Ortho-config v0.9.0 migration guide](ortho-config-v0-9-0-migration-guide.md)
-  - Current Weaver adoption notes for the published ortho-config release.
+  - Historical Weaver adoption notes for the published ortho-config v0.9.0
+    release.
 - [Ortho-config v0.10.0 migration guide](ortho-config-v0-10-0-migration-guide.md)
   - Published OrthoConfig v0.10.0 migration guide.
 - [Ortho-config v0.10.0 migration ExecPlan][issue-368-execplan]

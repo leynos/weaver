@@ -14,10 +14,11 @@ configuration to a bare `cargo build --release` too, so a build without `mold`
 fails at the link step. Release artefacts from `make release` or CI add neither
 the frontend flag nor `mold`, though a flag the caller exports survives.
 
-Weaver requires Rust 1.89 or newer to build from source because its
-`ortho-config` dependency has the same minimum supported Rust version. The
-repository's own checkout additionally needs the pinned Nightly toolchain
-(`nightly-2026-03-26`): its `.cargo/config.toml` uses Nightly-only options, so
+Weaver's workspace targets require Rust 1.90 or newer because the `tree-sitter`
+0.27 dependency sets that minimum. The separately consumable `weaver-config`
+library retains its Rust 1.89 minimum, matching its runtime dependency graph.
+The repository's own checkout additionally needs the pinned Nightly toolchain
+(`nightly-2026-10-26`): its `.cargo/config.toml` uses Nightly-only options, so
 stable Rust is not sufficient for local Cargo builds there. The README lists
 the toolchain setup.
 
@@ -93,6 +94,10 @@ order:
 Each successive layer overrides earlier sources. This guarantees that a
 parameter passed through the CLI is honoured even when a configuration file or
 environment variable also supplies the same field.
+
+An explicit CLI value wins even when it repeats the built-in default. For
+example, `--locale en-US` overrides a locale from an environment variable or
+configuration file.
 
 ### CLI flags
 

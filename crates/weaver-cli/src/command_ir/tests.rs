@@ -1,9 +1,14 @@
 //! Tests for the recursive command-metadata projection.
 
+use std::sync::Arc;
+
 use ortho_config::{
     FluentLocalizer,
     Localizer,
+    MapEnv,
     OrthoConfig,
+    SharedEnvSource,
+    SharedScanEnvSource,
     docs::{
         DocMetadata,
         EnvMetadata,
@@ -105,21 +110,28 @@ fn derived_field(long: &'static str, value_name: Option<&'static str>) -> Option
         value_name,
         required: true,
         help_id: if long == "uri" {
-            "weaver.fields.uri.help"
+            "weaver-args-uri-help"
         } else {
-            "weaver.fields.force.help"
+            "weaver-args-force-help"
         },
         help: "derived fixture fallback",
     });
-    field.long_help_id = Some(format!("weaver.fields.{long}.long_help"));
+    field.long_help_id = Some(format!("weaver-args-{long}-long_help"));
     field.value = Some(if value_name.is_some() {
         ValueType::String
     } else {
         ValueType::Bool
     });
+    let is_boolean = value_name.is_none();
     field.required = true;
     let cli = field.cli.as_mut()?;
     cli.short = long.chars().next();
+    cli.value_optional = is_boolean;
+    if is_boolean {
+        cli.value_name = Some("BOOL".to_owned());
+        cli.takes_value = true;
+        cli.possible_values = vec!["true".to_owned(), "false".to_owned()];
+    }
     field.env = Some(EnvMetadata {
         var_name: format!("WEAVER_{}", long.to_ascii_uppercase()),
     });
@@ -130,8 +142,42 @@ fn derived_field(long: &'static str, value_name: Option<&'static str>) -> Option
 }
 
 #[test]
-fn projection_requires_the_reviewed_upstream_schema_version() {
-    assert_eq!(ORTHO_DOCS_IR_VERSION, "1.1");
+fn projection_uses_the_installed_ortho_docs_ir_version() {
+    let metadata = project(command_tree::root()).expect("built-in command tree should be bounded");
+
+    assert_eq!(metadata.ir_version, ORTHO_DOCS_IR_VERSION);
+}
+
+#[test]
+fn boolean_cli_value_accepts_attached_false_over_environment_true() {
+    let environment = Arc::new(MapEnv::new().with_var("WEAVER_FORCE", "true"));
+    let discovery: SharedEnvSource = environment.clone();
+    let merge: SharedScanEnvSource = environment;
+    let config = DerivedFixture::load_from_iter_with_sources(
+        ["fixture", "--uri", "file:///fixture.rs", "--force=false"],
+        discovery,
+        merge,
+    )
+    .expect("an attached false value should override environment true");
+
+    assert!(!config.force);
+}
+
+#[test]
+fn boolean_cli_value_rejects_space_separated_false() {
+    let environment = Arc::new(MapEnv::new());
+    let discovery: SharedEnvSource = environment.clone();
+    let merge: SharedScanEnvSource = environment;
+    let result = DerivedFixture::load_from_iter_with_sources(
+        ["fixture", "--uri", "file:///fixture.rs", "--force", "false"],
+        discovery,
+        merge,
+    );
+
+    assert!(
+        result.is_err(),
+        "a boolean value must stay attached to its flag"
+    );
 }
 
 #[test]

@@ -63,10 +63,13 @@ Because plugin execution is sandboxed, the plugin cannot assume unrestricted
 filesystem access. The daemon must provide all file payloads required for
 analysis and patch generation.
 
-## ortho_config v0.9.0 impacts
+## ortho_config v0.10.0 impacts
 
-The Rust extricate flow inherits Weaver's current `ortho_config` v0.9.0
-behaviour model:
+The Rust extricate flow inherits Weaver's current `ortho_config` v0.10.0
+behaviour model. Explicit CLI values win over environment and file values even
+when they repeat a clap default, and boolean flags accept attached values such
+as `--flag=false`. The migration retains the existing fail-fast discovery and
+configuration error handling:
 
 - dependency-graph updates in v0.9.0 align parser features with the runtime and
   macro contract,
@@ -85,8 +88,9 @@ These behaviours directly affect payload and transaction handling:
   preconditions, not recoverable warnings.
 
 Authoritative runbook:
-[Migration guide: Weaver adoption of v0.9.0](ortho-config-v0-9-0-migration-guide.md),
-especially sections:
+[Migration guide: Weaver adoption of v0.10.0](ortho-config-v0-10-0-migration-guide.md).
+The earlier [v0.9.0 migration guide](ortho-config-v0-9-0-migration-guide.md)
+remains the historical record for that release, especially its sections:
 
 - [Required migration steps](ortho-config-v0-9-0-migration-guide.md#required-migration-steps)
 - [New declarative merge helpers](ortho-config-v0-9-0-migration-guide.md#2-new-declarative-merge-helpers)

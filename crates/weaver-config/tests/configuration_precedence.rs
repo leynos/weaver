@@ -3,17 +3,11 @@
 
 #![cfg(feature = "cli")]
 
-use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    env,
-    ffi::OsString,
-    path::Path,
-    sync::{Mutex, MutexGuard},
-};
+use std::{cell::RefCell, collections::BTreeMap, ffi::OsString, sync::Arc};
 
 use cap_std::fs::Dir;
 use googletest::prelude::*;
+use ortho_config::{MapEnv, OrthoConfig, SharedEnvSource, SharedScanEnvSource};
 use pretty_assertions::assert_eq;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -29,22 +23,10 @@ use weaver_config::{
 };
 use weaver_test_macros::allow_fixture_expansion_lints;
 
-const CONFIG_PATH_ENV: &str = "WEAVER_CONFIG_PATH";
 const LOCALE_ENV: &str = "WEAVER_LOCALE";
 const SOCKET_ENV: &str = "WEAVER_DAEMON_SOCKET";
 const CAPABILITY_OVERRIDES_ENV: &str = "WEAVER_CAPABILITY_OVERRIDES";
 const CONFIG_FILE_NAME: &str = "weaver.toml";
-const DISCOVERY_VARIABLES: &[&str] = &[
-    "HOME",
-    "USERPROFILE",
-    "APPDATA",
-    "LOCALAPPDATA",
-    "XDG_CONFIG_HOME",
-    "XDG_CONFIG_DIRS",
-];
-
-static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
-
 type HarnessState = Result<Harness, String>;
 
 struct Harness {
@@ -115,14 +97,24 @@ impl Harness {
             return Ok(());
         }
         let config_path = self.write_file()?;
-        let environment = self.environment.borrow().clone();
-        let _scope =
-            IsolatedEnvironment::new(&self.temp_dir, config_path.as_deref(), &environment)?;
-        let arguments = std::iter::once(OsString::from("weaver"))
-            .chain(self.cli.borrow().iter().cloned())
-            .collect::<Vec<_>>();
+        let environment = self
+            .environment
+            .borrow()
+            .iter()
+            .fold(MapEnv::new(), |source, (key, value)| {
+                source.with_var(*key, value.clone())
+            });
+        let environment = Arc::new(environment);
+        let discovery: SharedEnvSource = environment.clone();
+        let merge: SharedScanEnvSource = environment;
+        let mut arguments = vec![OsString::from("weaver")];
+        if let Some(path) = config_path {
+            arguments.extend([OsString::from("--config-path"), path.into_os_string()]);
+        }
+        arguments.extend(self.cli.borrow().iter().cloned());
         self.resolved.replace(Some(
-            Config::load_from_iter(arguments).map_err(|error| error.to_string()),
+            Config::load_from_iter_with_sources(arguments, discovery, merge)
+                .map_err(|error| error.to_string()),
         ));
         Ok(())
     }
@@ -139,73 +131,6 @@ impl Harness {
         match self.config() {
             Ok(config) => Err(format!("configuration should fail, got {config:?}")),
             Err(error) => Ok(error),
-        }
-    }
-}
-
-struct IsolatedEnvironment {
-    _lock: MutexGuard<'static, ()>,
-    previous: BTreeMap<OsString, Option<OsString>>,
-}
-
-impl IsolatedEnvironment {
-    fn new(
-        temp_dir: &TempDir,
-        config_path: Option<&Path>,
-        overrides: &BTreeMap<&'static str, String>,
-    ) -> Result<Self, String> {
-        let lock = ENVIRONMENT_LOCK
-            .lock()
-            .map_err(|error| format!("lock configuration environment: {error}"))?;
-        let mut previous = DISCOVERY_VARIABLES
-            .iter()
-            .map(|key| (OsString::from(key), env::var_os(key)))
-            .collect::<BTreeMap<_, _>>();
-        previous.extend(
-            env::vars_os()
-                .filter(|(key, _)| key.to_string_lossy().starts_with("WEAVER_"))
-                .map(|(key, value)| (key, Some(value))),
-        );
-
-        // SAFETY: this guard serialises every mutation in this test binary and
-        // restores the complete captured configuration environment on drop.
-        unsafe {
-            for key in previous.keys() {
-                env::remove_var(key);
-            }
-            env::set_var("HOME", temp_dir.path());
-            env::set_var("USERPROFILE", temp_dir.path());
-            env::set_var("APPDATA", temp_dir.path());
-            env::set_var("LOCALAPPDATA", temp_dir.path());
-            env::set_var("XDG_CONFIG_HOME", temp_dir.path().join("xdg-home"));
-            env::set_var("XDG_CONFIG_DIRS", temp_dir.path().join("xdg-dirs"));
-            if let Some(path) = config_path {
-                env::set_var(CONFIG_PATH_ENV, path);
-            }
-            for (key, value) in overrides {
-                env::set_var(key, value);
-            }
-        }
-        Ok(Self {
-            _lock: lock,
-            previous,
-        })
-    }
-}
-
-impl Drop for IsolatedEnvironment {
-    fn drop(&mut self) {
-        // SAFETY: `new` captured these values while holding the matching lock;
-        // restoring them prevents test configuration from leaking to callers.
-        unsafe {
-            for key in self.previous.keys() {
-                env::remove_var(key);
-            }
-            for (key, value) in &self.previous {
-                if let Some(value) = value {
-                    env::set_var(key, value);
-                }
-            }
         }
     }
 }

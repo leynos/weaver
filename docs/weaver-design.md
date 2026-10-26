@@ -951,14 +951,12 @@ and message IDs. The router, contextual-help renderer, `weaver help` topics,
 and test fixtures should all read from that catalogue so adding an operation
 updates validation, localization, and help output in one place.
 
-To take advantage of `ortho_config` v0.9.0 beyond runtime help, `weaver-config`
-should annotate config-backed fields with stable documentation IDs and expose
-`OrthoConfigDocs` metadata. Once the schema-backed operation-help work in the
-roadmap lands, `cargo orthohelp` can render localized intermediate
-representation (IR) files and manpages from the same Fluent catalogues,
-removing the current drift risk between clap-generated roff output and runtime
-help text. The packaging contract should still guarantee an `en-US` manpage,
-while allowing distributors to ship additional locales as optional artefacts.
+`weaver-config` annotates config-backed fields with stable documentation IDs
+and exposes `OrthoConfigDocs` metadata; shared CLI help consumes OrthoConfig's
+command metadata and projects the command tree into documentation IR 2.0. The
+separate `cargo orthohelp` installation and packaging workflow is not adopted.
+Runtime help continues to use Weaver's Fluent catalogues and shared help
+renderer.
 
 #### 2.1.12. Workspace identity and daemon tenancy
 
@@ -1371,19 +1369,22 @@ Configuration is layered with `ortho-config`, producing the precedence order
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
 
-The workspace targets `ortho_config` v0.9.0 and Rust 1.89. The `ortho_config`
-v0.9.0 release lets `weaver_config::Config` retain its discovery policy inline
-through the `#[ortho_config(discovery(...))]` attribute. The app name, dotfile,
-project file, and `--config-path` flag are all defined next to the struct, so
-every consumer shares the same generated loader without bespoke builders.
+The workspace targets `ortho_config` v0.10.0 and Rust 1.90. The `weaver-config`
+library retains a Rust 1.89 minimum because its runtime dependency graph
+supports that floor. The workspace application floor is Rust 1.90 because
+`tree-sitter` 0.27.1 requires it. The OrthoConfig v0.9.0 release introduced
+inline discovery policy through the `#[ortho_config(discovery(...))]`
+attribute. The app name, dotfile, project file, and `--config-path` flag are
+all defined next to the struct, so every consumer shares the same generated
+loader without bespoke builders.
 
-The `ortho_config` v0.9.0 loader preserves the stricter discovery and parsing
+The `ortho_config` v0.10.0 loader preserves the stricter discovery and parsing
 model adopted in earlier releases: if any discovered configuration file fails
 to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
 Both the CLI and daemon bubble that error to the user instead of quietly
 falling back to defaults, making misconfigurations immediately visible.
 
-`ortho_config` v0.9.0 also resolves layered and overriding configuration
+`ortho_config` v0.10.0 also resolves layered and overriding configuration
 sources through its dependency-graph model, so the effective merge order remains
 `defaults < files < environment < CLI` even when multiple discovered files and
 overrides participate in the same load. Later sources shadow earlier values
@@ -1395,6 +1396,10 @@ string forms, table and dotted-key merging semantics, and the explicit typing
 rules for arrays and inline tables. TOML does not provide YAML anchors or
 aliases, and it does not perform implicit `yes` or `no` boolean conversion, so
 authored configuration must use TOML's explicit value syntax.
+
+An explicit CLI value now wins even when it equals the clap default. Optional
+boolean values use an attached spelling such as `--force=false`; the spaced form
+`--force false` is rejected.
 
 The daemon transport defaults to a Unix domain socket placed under
 `$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent,

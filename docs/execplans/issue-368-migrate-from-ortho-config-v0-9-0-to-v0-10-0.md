@@ -74,8 +74,9 @@ The actual clean source checkout before this task was
 `origin/main`. The only pre-implementation worktree changes are the two
 imported documents. The compiler reports
 `rustc 1.101.0-nightly (76456a688bc0ed897fa23a677d4ddb5b3fdb575a 2026-10-25)`,
-LLVM 23.1.4, from the repository pin `nightly-2026-10-26`. The workspace
-already declares Rust 1.89.0, which is the v0.10.0 floor.
+LLVM 23.1.4, from the repository pin `nightly-2026-10-26`. The pre-migration
+workspace declared Rust 1.89.0, matching the v0.10.0 floor; later graph checks
+showed that the application runtime graph needs a higher floor.
 
 There is one Cargo workspace, one maintained `Cargo.lock`, and no independent
 standalone manifest or submodule. The workspace dependency
@@ -102,13 +103,13 @@ do build metadata literals and must follow the v0.10.0 metadata shape.
 | Explicit CLI value equal to a default now wins                        | Applicable: preserve the layer order and add a regression where CLI repeats `en-US` while lower layers differ                          | BDD test in `configuration_precedence.feature`                                             |
 | Fluent identifiers and documentation IR 2.0                           | Applicable: re-key field-help identifiers and compare projected IR with `ORTHO_DOCS_IR_VERSION`                                        | Help/localization tests and command IR tests                                               |
 | `AgentContext.profiles` uses `ProfilesDeclaration`                    | Inapplicable: no Weaver `AgentContext` literal                                                                                         | Repository symbol and literal inventory                                                    |
-| `DocMetadata` adds `profiles`                                         | Applicable: name `profiles: None` in the library-side projection literals                                                              | Command IR construction and canonical projection tests                                     |
+| `DocMetadata` adds behaviour and profiles fields                      | Applicable: name `behaviour: None` and `profiles: None` to preserve absent declarations                                                | Command IR construction and canonical projection tests                                     |
 | Boolean flags accept `--flag=false`; spaced false remains invalid     | Applicable to the derived boolean test fixture and metadata projection; no production OrthoConfig bool flag needs a user-facing change | Help parser tests for attached false and rejected spaced false                             |
 | Named profiles                                                        | Not adopted: no product requirement; would add a new configuration tier and reserve names                                              | Keep the existing precedence contract                                                      |
 | Stacked discovery scopes                                              | Not adopted: first-wins discovery is part of current behaviour                                                                         | Leave `configuration_failfast.rs` unchanged                                                |
 | Injected environment sources with `MapEnv`                            | Adopt for the precedence test harness because v0.10.0 exposes source-aware loaders                                                     | No process environment mutation in the touched test; source-layer and discovery tests pass |
 | Infer string defaults with `cli_default_as_absent`                    | Not applicable: Weaver has no derived field that duplicates a clap string default                                                      | Field-attribute inventory                                                                  |
-| Agent-native behaviour metadata and policy checks                     | Not adopted: no `cargo-orthohelp` consumer or package policy table                                                                     | Manifest, build-script, and CI inventory                                                   |
+| Agent-native behaviour metadata and policy checks                     | Not adopted as a capability; keep the required `behaviour: None` IR field to preserve the absent declaration                           | Manifest, build-script, and CI inventory                                                   |
 | Cargo external-subcommand helper                                      | Not adopted: Weaver does not provide a Cargo external subcommand                                                                       | CLI entry-point inventory                                                                  |
 | Standalone `ortho_l10n` runtime                                       | Not adopted: localization is used through the `ortho_config` facade                                                                    | Existing `FluentLocalizer` imports and dependency inventory                                |
 | `cargo-orthohelp` stdout, policy report, and bridge build environment | Inapplicable: Weaver does not install or invoke that tool                                                                              | CI, Makefile, build-script, and metadata inventory                                         |
@@ -303,14 +304,134 @@ available at:
 /tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-8.out
 ```
 
+## Implementation and candidate validation
+
+The inherited workspace dependency and lockfile now resolve OrthoConfig v0.10.0
+for `weaver-config`, `weaverd`, `weaver-cli`, and the CLI build dependency. The
+lockfile contains the matching v0.10.0 macro and l10n packages. Default
+features remain enabled, including `serde_json`.
+
+| Constraint                     | Before                            | After                             |
+| ------------------------------ | --------------------------------- | --------------------------------- |
+| Workspace declaration          | `ortho_config = "0.9.0"` (caret)  | `ortho_config = "0.10.0"` (caret) |
+| Resolved `ortho_config`        | 0.9.0                             | 0.10.0                            |
+| Resolved `ortho_config_macros` | 0.9.0                             | 0.10.0                            |
+| Resolved `ortho_l10n`          | Not present as a separate package | 0.10.0                            |
+
+`cargo tree --locked -i ortho_config` shows a single resolved version shared by
+every inherited consumer. `cargo tree --locked -e features -i ortho_config`
+confirms the default, `serde_json`, and `toml` features remain active. The
+remaining `figment` and `xdg` dependencies come through `ortho_config`, with
+`uncased` below `figment`. `fluent-bundle` remains through `ortho_l10n` and the
+existing `rstest-bdd`/`i18n-embed` test path; Weaver has no direct
+`fluent-bundle` dependency to remove.
+
+The application workspace declares Rust 1.90 because `tree-sitter` 0.27.1
+requires it. The separately consumable `weaver-config` package declares Rust
+1.89; its runtime library check passes at that floor. The stricter
+`weaver-config --all-targets` check is not supported at 1.89 because its
+test-only `weaver-test-macros` package declares the workspace's 1.90 floor. The
+all-target test graph also includes test-only `serial_test` 4.0.1, which
+requires Rust 1.93.1. The root pin remains `nightly-2026-10-26` (Rust
+1.101.0-nightly, LLVM 23.1.4) and already supplies the required compiler and
+components; the
+[pinned CI setup action](https://github.com/leynos/shared-actions/blob/cfcc379e29be516160f499864ae82720842359af/.github/actions/setup-rust/action.yml)
+reads this repository toolchain file. No dated-nightly or CI pin change was
+needed. The lockfile's targeted update adds `ortho_l10n` and `syn` 3.0.9 and
+removes obsolete `dirs` 5, `dirs-sys` 0.4, Redox 0.4, and Windows 0.48
+packages; the remaining graph changes are required by the published release.
+
+The v0.10.0 source changes re-key field-help identifiers to the generated
+hyphenated IDs, add the new documentation metadata fields and optional-value
+metadata to IR projections, compare projected IR to the installed version
+constant, and render optional boolean values as `--flag[=<BOOL>]`. The config
+precedence integration test now uses `MapEnv` and source-aware loading rather
+than process environment mutation. Its BDD scenario verifies that an explicit
+CLI `en-US` overrides file and environment values even though it repeats the
+built-in default. The untouched fail-fast discovery test still passes.
+
+| Gate or focused validation                                                   | Result                                                                                                             |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `make check-fmt`                                                             | Passed; 103 files unchanged.                                                                                       |
+| `make typecheck`                                                             | Passed; existing manifest warnings remain.                                                                         |
+| `make lint`                                                                  | Passed, including Clippy, Rustdoc, and Whitaker; existing warnings remain.                                         |
+| `make test`                                                                  | Failed after fail-fast: 559 passed, 8 failed, 4 skipped, 995 not run.                                              |
+| `make markdownlint`                                                          | Passed; 103 files, zero errors.                                                                                    |
+| `make nixie`                                                                 | Passed; all diagrams validated.                                                                                    |
+| `make test-workflow-contracts`                                               | Passed; 271 tests.                                                                                                 |
+| `cargo test -p weaver-docs-gate`                                             | Passed; 36 tests and 12 doctests.                                                                                  |
+| `cargo test -p weaver-cli --lib`                                             | Passed; 200 tests, 3 ignored.                                                                                      |
+| `cargo test -p weaver-config --features cli --lib`                           | Passed; 37 tests.                                                                                                  |
+| `cargo test -p weaver-config --features cli --test configuration_precedence` | Passed; 1 test.                                                                                                    |
+| `cargo test -p weaver-config --features cli --test configuration_failfast`   | Passed; 2 tests.                                                                                                   |
+| Rust 1.90 release workspace check, all features                              | Passed; validates the application runtime floor.                                                                   |
+| Rust 1.93.1 release workspace check, all targets and features                | Passed; validates the all-target test graph.                                                                       |
+| Rust 1.93.1 stable release all-target tests                                  | 1,555 passed, 7 trybuild cases failed across 3 targets, 4 ignored; nested rustc receives repository `-Zthreads=8`. |
+| Pinned Nightly release all-target tests, all features                        | Passed; 1,562 tests, 4 ignored.                                                                                    |
+| Pinned Nightly release workspace doctests                                    | Passed; 93 tests, 9 ignored.                                                                                       |
+
+After the final plan edits, `make fmt` and a sequential post-format check
+passed. The Markdown, diagram, and documentation-gate checks were rerun; the
+only output beyond passing results was the existing Cargo workspace lint
+inheritance and unused-dependency warnings, plus the Node colour warning. Final
+post-format logs:
+
+```plaintext
+/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-doc-freeze.out
+/tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-doc-freeze.out
+/tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-doc-freeze.out
+/tmp/cargo-test-docs-gate-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-doc-freeze.out
+```
+
+The 8 canonical `make test` failures are the same `weaver-cards` Cranelift
+aborts present in the baseline: `llvm.x86.sse2.pmulhu.w is not yet supported`.
+The 1,562 executable-test inventory is four greater than the baseline's 1,558;
+the four skipped tests are unchanged. The release-profile run on the pinned
+Nightly uses LLVM and passes the full all-target suite. The stable 1.93.1 full
+test run is supplemental only: its three trybuild failures come from
+Nightly-only flags inherited by nested compilations, while the stable
+all-target compile check passes.
+
+The required focused and full validation log paths follow:
+
+```plaintext
+/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/typecheck-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/lint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/test-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/test-workflow-contracts-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/cargo-test-docs-gate-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/test-weaver-cli-lib-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-3.out
+/tmp/test-weaver-config-lib-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368.out
+/tmp/test-configuration-precedence-cli-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-2.out
+/tmp/cargo-test-weaver-config-failfast-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/msrv-1.89-weaver-config-runtime-issue-368.out
+/tmp/msrv-1.90.0-workspace-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/msrv-1.93.1-test-graph-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/test-1.93.1-stable-release-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/test-nightly-release-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+/tmp/doc-test-nightly-release-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
+```
+
 ## Decision log
 
 - **2026-10-26 — Import immutable documentation first.** The upstream tag and
   peeled commit match the values supplied in issue #368. Both imported files
   match the SHA-256 values above. No upstream version discrepancy was found.
-- **2026-10-26 — Keep the Rust floor at 1.89.0 unless dependency resolution
-  proves it insufficient.** The workspace already declares the v0.10.0 minimum;
-  no automatic MSRV bump is justified by the version alone.
+- **2026-10-26 — Set compiler floors from the resolved package graph.** The
+  `weaver-config` runtime graph compiles on Rust 1.89.0, matching OrthoConfig
+  v0.10.0, so that published library retains its explicit 1.89 floor. The
+  workspace application graph includes `tree-sitter` 0.27.1, which requires
+  Rust 1.90, so the workspace floor is raised to 1.90. The all-target test
+  graph also includes test-only `serial_test` 4.0.1, which requires Rust
+  1.93.1. The test-only `weaver-test-macros` crate also follows the workspace
+  floor, so `weaver-config` all-target checks need Rust 1.90 even though its
+  runtime library check passes on 1.89. CI and local repository builds use the
+  pinned Nightly 2026-10-26 toolchain, which the pinned CI setup action reads
+  from `rust-toolchain.toml`; that existing dated pin already provides the
+  required components.
 - **2026-10-26 — Preserve the baseline Cranelift failure as separate evidence.**
   The workspace's configured development backend fails in unrelated
   `weaver-cards` tests before migration. Do not suppress, skip, or attribute
@@ -348,10 +469,13 @@ available at:
 - [x] Review exact candidate `e66076b`; fix the inaccurate local contents
   description and persist its reported validation results. Preserve the
   imported guide wording under the explicit byte-identity requirement.
-- [ ] Gate and commit the review follow-up, then request CodeRabbit review again
+- [x] Gate and commit the review follow-up, then request CodeRabbit review again
   before source changes.
-- [ ] Complete EP-M2 through EP-M5 with focused tests, sequential gates,
-  CodeRabbit review, SSH push, and draft PR readback.
+- [x] Complete EP-M2 dependency alignment and compiler-floor verification.
+- [x] Complete EP-M3 source changes and focused regression coverage.
+- [x] Complete EP-M4 active documentation, full validation, and final
+  post-format documentation gates.
+- [ ] Complete EP-M5 CodeRabbit review, SSH push, and draft PR readback.
 
 ## Acceptance criteria
 

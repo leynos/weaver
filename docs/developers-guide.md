@@ -32,7 +32,13 @@ quoted-source spelling that must remain unchanged.
 
 ## 2 Workspace baseline
 
-The workspace targets `ortho_config` v0.9.0 and Rust 1.89.
+The workspace targets `ortho_config` v0.10.0 and Rust 1.90. The `weaver-config`
+library retains a Rust 1.89 minimum: its runtime dependency graph passes a Rust
+1.89.0 check. Its test targets use the internal `weaver-test-macros` package,
+which follows the workspace's Rust 1.90 floor. The workspace floor follows
+`tree-sitter` 0.27.1, which requires Rust 1.90. Test-only `serial_test` 4.0.1
+requires Rust 1.93.1; `rust-toolchain.toml` pins Nightly 2026-10-26 for
+repository builds and full-suite tests.
 
 ## 3 The build standard
 
@@ -983,14 +989,14 @@ test crates.
 
 ## 15 Configuration framework internals
 
-### 15.1 `ortho_config` v0.9.0 integration
+### 15.1 `ortho_config` v0.10.0 integration
 
 `weaver_config::Config` declares its discovery policy inline through the
 `#[ortho_config(discovery(...))]` attribute. The app name, dotfile, project
 file, and `--config-path` flag are all defined next to the struct, so every
 consumer shares the same generated loader without bespoke builders.
 
-The `ortho_config` v0.9.0 loader preserves the stricter discovery and parsing
+The `ortho_config` v0.10.0 loader preserves the stricter discovery and parsing
 model adopted in earlier releases: if any discovered configuration file fails
 to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
 Both the CLI and daemon bubble that error to the user instead of quietly
@@ -1000,6 +1006,10 @@ Configuration is layered with `ortho_config`, producing the precedence order
 `defaults < files < environment < CLI`. File discovery honours `--config-path`
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
+
+An explicit CLI value takes precedence even when it equals the clap default.
+Boolean options accept an attached value such as `--force=false`; the
+space-separated form `--force false` is rejected.
 
 `Config` enables OrthoConfig's `post_merge_hook` and owns the normalization of
 duplicate capability directives there. This keeps the invariant consistent for
@@ -1014,10 +1024,10 @@ it exercises the `weaver-config` domain merge policy without changing the test
 process environment. Binary-level tests use `assert_cmd` with `env_clear()` and
 child-only `.env(...)` values to prove the real CLI environment adapter.
 
-`MapEnv` is limited to OrthoConfig discovery inputs, such as home or XDG path
-selection. It does not model `WEAVER_*` configuration-value merging, so do not
-use it in place of declarative layers or child-process tests. Direct
-`std::env::set_var` and `std::env::remove_var` are forbidden in Weaver tests.
+OrthoConfig v0.10.0's `_with_sources` loaders accept `MapEnv` and explicit file
+sources for tests that exercise discovery and merging. Pass `--config-path`
+when a test needs to control a configuration file. Direct `std::env::set_var`
+and `std::env::remove_var` are forbidden in Weaver tests.
 
 ### 15.3 Dependency-graph resolution
 

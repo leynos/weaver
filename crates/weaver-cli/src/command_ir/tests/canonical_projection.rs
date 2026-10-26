@@ -81,6 +81,8 @@ fn command(
         sections: canonical_sections(),
         fields,
         subcommands,
+        behaviour: None,
+        profiles: None,
         windows: None,
     }
 }
@@ -100,6 +102,7 @@ fn field(name: &str, help_id: &str, value_name: &str) -> FieldMetadata {
             value_name: Some(value_name.to_owned()),
             multiple: false,
             takes_value: true,
+            value_optional: false,
             possible_values: Vec::new(),
             hide_in_help: false,
         }),

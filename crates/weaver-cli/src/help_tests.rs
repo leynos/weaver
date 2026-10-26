@@ -30,6 +30,7 @@ fn cli_metadata(takes_value: bool) -> CliMetadata {
         value_name: Some("VALUE".to_string()),
         multiple: false,
         takes_value,
+        value_optional: false,
         possible_values: Vec::new(),
         hide_in_help: false,
     }
@@ -118,7 +119,7 @@ fn config_field_arg_uses_value_shape_without_enum_validation() {
 #[test]
 fn config_field_arg_uses_help_id_metadata_for_help_text() {
     let mut field = field_metadata(Some(cli_metadata(true)));
-    field.help_id = "weaver.fields.locale.help".to_string();
+    field.help_id = "weaver-args-locale-help".to_string();
     let arg = config_field_arg(&field).expect("arg should be visible");
     let mut command = Command::new("test").arg(arg);
 
@@ -138,6 +139,7 @@ fn apply_arg_shape_supports_append_and_boolean_flags() {
         short: None,
         help: "Appends example values",
         takes_value: true,
+        value_optional: false,
         multiple: true,
         value_name: Some("VALUE".to_owned()),
     };
@@ -158,6 +160,7 @@ fn apply_arg_shape_supports_append_and_boolean_flags() {
         short: None,
         help: "Enables the example switch",
         takes_value: false,
+        value_optional: false,
         multiple: false,
         value_name: None,
     };
@@ -173,6 +176,7 @@ fn apply_arg_shape_supports_append_and_boolean_flags() {
         short: None,
         help: "Enables the example switch",
         takes_value: false,
+        value_optional: false,
         multiple: false,
         value_name: None,
     };
@@ -181,6 +185,57 @@ fn apply_arg_shape_supports_append_and_boolean_flags() {
         .try_get_matches_from(["test", "--switch-field", "value"])
         .expect_err("switch flag should reject a value");
     assert_eq!(error.kind(), ErrorKind::UnknownArgument);
+}
+
+#[test]
+fn optional_value_flags_accept_attached_values_and_render_them_as_optional() {
+    let switch = ConfigFieldArgMetadata {
+        name: "optional_switch".to_owned(),
+        long: "optional-switch".to_owned(),
+        short: None,
+        help: "Enables the optional example switch",
+        takes_value: true,
+        value_optional: true,
+        multiple: false,
+        value_name: Some("BOOL".to_owned()),
+    };
+    let arg = config_arg_from_metadata(switch);
+    let rendered = Command::new("test")
+        .arg(arg.clone())
+        .render_help()
+        .to_string();
+
+    assert!(rendered.contains("--optional-switch[=<BOOL>]"));
+
+    let matches = Command::new("test")
+        .arg(arg.clone())
+        .try_get_matches_from(["test", "--optional-switch=false"])
+        .expect("an attached boolean value should parse");
+    assert_eq!(
+        matches
+            .get_one::<String>("optional_switch")
+            .map(String::as_str),
+        Some("false")
+    );
+
+    let matches = Command::new("test")
+        .arg(arg.clone())
+        .try_get_matches_from(["test", "--optional-switch"])
+        .expect("an omitted optional value should mean true");
+    assert_eq!(
+        matches
+            .get_one::<String>("optional_switch")
+            .map(String::as_str),
+        Some("true")
+    );
+
+    assert!(
+        Command::new("test")
+            .arg(arg)
+            .try_get_matches_from(["test", "--optional-switch", "false"])
+            .is_err(),
+        "an optional value must remain attached to its flag"
+    );
 }
 
 #[test]

@@ -2,7 +2,7 @@
 name = "weaver-config"
 edition.workspace = true
 version.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 
 [lib]
 doctest = false
