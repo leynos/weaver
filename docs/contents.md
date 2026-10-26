@@ -101,7 +101,7 @@ readers can find the source of truth without scanning the whole tree.
 - [Ortho-config v0.9.0 migration guide](ortho-config-v0-9-0-migration-guide.md)
   - Current Weaver adoption notes for the published ortho-config release.
 - [Ortho-config v0.10.0 migration guide](ortho-config-v0-10-0-migration-guide.md)
-  - Current Weaver adoption notes for the published ortho-config release.
+  - Published OrthoConfig v0.10.0 migration guide.
 - [Ortho-config v0.10.0 migration ExecPlan][issue-368-execplan]
   - Living provenance, applicability, implementation, and validation record.
 - [Ortho-config v0.8.0 migration guide](ortho-config-v0-8-0-migration-guide.md)

@@ -209,6 +209,24 @@ were not run after nextest fail-fast. The doctest recipe did not run. This is a
 pre-existing backend limitation, not evidence of an OrthoConfig regression. The
 exact baseline logs are under `/tmp/`:
 
+The durable baseline record is:
+
+| Gate                           | Result                                                                             |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| `make check-fmt`               | Passed; 102 files unchanged.                                                       |
+| `make typecheck`               | Passed in 6m 27s; existing manifest and unused-dependency warnings noted above.    |
+| `make lint`                    | Passed in 13m 35s; existing manifest and unused-dependency warnings noted above.   |
+| `make test`                    | Failed (exit 100): 531 passed, 8 failed, 4 skipped; 1,019 not run after fail-fast. |
+| `make markdownlint`            | Passed; 102 Markdown files, zero errors.                                           |
+| `make nixie`                   | Passed; all diagrams validated.                                                    |
+| `make test-workflow-contracts` | Passed; 271 tests.                                                                 |
+
+The eight test aborts were the seven `weaver-cards` graph-slice snapshot tests
+and one graph-slice behaviour test. Each hit the unsupported
+`llvm.x86.sse2.pmulhu.w` intrinsic in the configured Cranelift backend. The
+doctest recipe did not run. This record is retained here; the following log
+paths are supplementary and may not persist beyond the work environment:
+
 ```plaintext
 /tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0.out
 /tmp/typecheck-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0.out
@@ -222,7 +240,10 @@ exact baseline logs are under `/tmp/`:
 The documentation/provenance milestone then passed `make check-fmt`,
 `make markdownlint`, and `make nixie` sequentially. Both imported guide hashes
 still match the immutable source commit and `git diff --check` is clean. These
-logs are the evidence for the current plan and index edits:
+durable results for the final docs-only candidate were: format check passed
+with 103 files unchanged; Markdown lint passed with 103 files and zero errors;
+all Mermaid diagrams validated; both source hashes matched; and
+`git diff --check` passed. The log paths below are supplementary evidence:
 
 ```plaintext
 /tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-2.out
@@ -254,6 +275,34 @@ After recording those results in this plan, the final candidate also passed
 /tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-6.out
 ```
 
+CodeRabbit completed review of `e66076bcab8b48f81eefac0b91e700eacd77fbb2` with
+exit 0 in 458 seconds and reported five minor findings. The contents entry
+incorrectly described the imported guide as Weaver adoption notes; this plan
+update corrects it to “Published OrthoConfig v0.10.0 migration guide.” The plan
+now records the baseline and documentation gate outcomes above, so they remain
+available if temporary logs disappear. Three wording findings targeted the
+byte-identical upstream guide copies (“the derive” → “the derive macro” and “If
+application source imports” → “If the application source imports”). Those edits
+are intentionally not applied because the user requires the imported text to
+remain byte-for-byte intact. The verified SHA-256 values remain the integrity
+check. Review output is supplementary at:
+
+```plaintext
+/tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-5.out
+```
+
+After correcting the local index entry and recording these dispositions,
+`make check-fmt` passed with 103 files unchanged, `make markdownlint` passed
+with 103 files and zero errors, and `make nixie` validated all diagrams. Both
+imported guide hashes and `git diff --check` passed. The per-gate output is
+available at:
+
+```plaintext
+/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-8.out
+/tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-8.out
+/tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-8.out
+```
+
 ## Decision log
 
 - **2026-10-26 — Import immutable documentation first.** The upstream tag and
@@ -272,6 +321,11 @@ After recording those results in this plan, the final candidate also passed
   not rewrite them because the user requires byte-identical upstream copies and
   explicitly permits a documented link map. Expand the map above to name each
   source link, immutable upstream target, and local reading target.
+- **2026-10-26 — Keep imported guide wording immutable.** CodeRabbit identified
+  grammar and terminology edits within the two v0.10.0 upstream copies. Do not
+  make them because the required SHA-256 provenance depends on byte-identical
+  imports. Correct local descriptions and persist the gate evidence in this
+  plan instead.
 
 ## Progress
 
@@ -291,8 +345,11 @@ After recording those results in this plan, the final candidate also passed
   findings against the user's byte-identity and mapping requirements.
 - [x] Clarify the upstream-link map without editing imported files, fix the
   spelling findings, and pass the documentation gates again.
-- [ ] Commit the plan correction and request CodeRabbit review; clear any
-  remaining concerns before source changes.
+- [x] Review exact candidate `e66076b`; fix the inaccurate local contents
+  description and persist its reported validation results. Preserve the
+  imported guide wording under the explicit byte-identity requirement.
+- [ ] Gate and commit the review follow-up, then request CodeRabbit review again
+  before source changes.
 - [ ] Complete EP-M2 through EP-M5 with focused tests, sequential gates,
   CodeRabbit review, SSH push, and draft PR readback.
 
