@@ -413,7 +413,10 @@ points to the ExecPlan, with the upstream guide retained as a separate
 reference; the imported copy remains unchanged. The final documentation gates
 passed: 103 files formatted, 103 Markdown files with zero errors, all diagrams
 valid, and 48 docs-gate tests passed. Cargo and Markdownlint reported only the
-existing workspace warnings and colour-variable warning.
+existing workspace warnings and colour-variable warning. The repair is
+committed as `eb09136`. CodeRabbit's follow-up request for that head was
+rate-limited with a 6-minute service wait. The user-directed randomized
+90-minute cooldown is in progress; a fresh verdict remains pending.
 
 Follow-up gate and review logs:
 
@@ -428,10 +431,11 @@ Follow-up gate and review logs:
 /tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-after-mapenv.out
 /tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
 /tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-review.out
-/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-exact.out
-/tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-exact.out
-/tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-exact.out
-/tmp/test-docs-gate-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-exact.out
+/tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-doc-link-fix.out
+/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-eb09136-docs.out
+/tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-eb09136-docs.out
+/tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-eb09136-docs.out
+/tmp/test-docs-gate-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-eb09136-docs.out
 ```
 
 The required focused and full validation log paths follow:
