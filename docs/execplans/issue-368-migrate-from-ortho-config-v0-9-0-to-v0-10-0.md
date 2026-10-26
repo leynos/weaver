@@ -41,16 +41,27 @@ implementation.
 The local v0.10.0 guide replaces the previously imported OrthoConfig user's
 guide. The v0.6.0, v0.8.0, and v0.9.0 migration guides remain historical files.
 Local adoption notes belong in this plan and other Weaver documentation, never
-inside either upstream copy. Relative links in the imported files retain their
-upstream text; their targets map as follows:
+inside either upstream copy. Their relative links remain byte-for-byte as
+published. Markdown resolves those links against the local paths, so some
+targets collide with Weaver files or are absent. The following map is the
+authoritative way to locate the upstream target or its local imported copy; it
+does not rewrite the source links.
 
-| Upstream target                                                                                                                      | Local or immutable target                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| `users-guide.md`                                                                                                                     | `docs/ortho-config-users-guide.md`                                                       |
-| `v0-9-0-migration-guide.md`                                                                                                          | `docs/ortho-config-v0-9-0-migration-guide.md`                                            |
-| `README.md`, `CHANGELOG.md`, `examples/hello_world/`                                                                                 | Same paths at commit `38812c563e3953a490e3efc202609f37e21a0517` in `leynos/ortho-config` |
-| `ortho_l10n/README.md`                                                                                                               | Same path at that commit                                                                 |
-| `docs/adrs/adr-0004-cargo-external-subcommand-entry-point.md`, `docs/cargo-orthohelp-design.md`, `docs/cargo-orthohelp-api-guide.md` | Same paths at that commit                                                                |
+| Imported source                                | Literal relative target                                     | Upstream target at the pinned commit                          | Local mapped target                                                      |
+| ---------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `docs/ortho-config-v0-10-0-migration-guide.md` | `users-guide.md#<anchor>`                                   | `docs/users-guide.md#<anchor>`                                | `docs/ortho-config-users-guide.md#<anchor>`                              |
+| `docs/ortho-config-users-guide.md`             | `v0-10-0-migration-guide.md#<anchor>`                       | `docs/v0-10-0-migration-guide.md#<anchor>`                    | `docs/ortho-config-v0-10-0-migration-guide.md#<anchor>`                  |
+| `docs/ortho-config-users-guide.md`             | `v0-9-0-migration-guide.md#<anchor>`                        | `docs/v0-9-0-migration-guide.md#<anchor>`                     | `docs/ortho-config-v0-9-0-migration-guide.md#<anchor>`                   |
+| `docs/ortho-config-v0-10-0-migration-guide.md` | `../README.md`, `../CHANGELOG.md`                           | Root `README.md` and `CHANGELOG.md`                           | Same upstream paths at commit `38812c563e3953a490e3efc202609f37e21a0517` |
+| `docs/ortho-config-v0-10-0-migration-guide.md` | `../examples/hello_world/`, `../ortho_l10n/README.md`       | Same paths in the upstream repository                         | Same upstream paths at the pinned commit                                 |
+| `docs/ortho-config-v0-10-0-migration-guide.md` | `adrs/adr-0004-cargo-external-subcommand-entry-point.md`    | `docs/adrs/adr-0004-cargo-external-subcommand-entry-point.md` | Same upstream path at the pinned commit                                  |
+| `docs/ortho-config-v0-10-0-migration-guide.md` | `cargo-orthohelp-design.md`, `cargo-orthohelp-api-guide.md` | Same paths under upstream `docs/`                             | Same upstream paths at the pinned commit                                 |
+| Either imported guide                          | `#<anchor>`                                                 | Anchor in the current upstream page                           | Same anchor in the byte-identical local copy                             |
+
+The first row is the important path collision: the literal local link resolves
+to Weaver's `docs/users-guide.md`, not the OrthoConfig guide. Do not rewrite
+the imported link to hide that fact; use the explicit mapping above when
+following the upstream document.
 
 The guides describe v0.10.0 only. Planned or “not yet available” items are not
 available APIs and are excluded from this migration.
@@ -94,14 +105,14 @@ do build metadata literals and must follow the v0.10.0 metadata shape.
 | `DocMetadata` adds `profiles`                                         | Applicable: name `profiles: None` in the library-side projection literals                                                              | Command IR construction and canonical projection tests                                     |
 | Boolean flags accept `--flag=false`; spaced false remains invalid     | Applicable to the derived boolean test fixture and metadata projection; no production OrthoConfig bool flag needs a user-facing change | Help parser tests for attached false and rejected spaced false                             |
 | Named profiles                                                        | Not adopted: no product requirement; would add a new configuration tier and reserve names                                              | Keep the existing precedence contract                                                      |
-| Stacked discovery scopes                                              | Not adopted: first-wins discovery is part of current behavior                                                                          | Leave `configuration_failfast.rs` unchanged                                                |
+| Stacked discovery scopes                                              | Not adopted: first-wins discovery is part of current behaviour                                                                         | Leave `configuration_failfast.rs` unchanged                                                |
 | Injected environment sources with `MapEnv`                            | Adopt for the precedence test harness because v0.10.0 exposes source-aware loaders                                                     | No process environment mutation in the touched test; source-layer and discovery tests pass |
 | Infer string defaults with `cli_default_as_absent`                    | Not applicable: Weaver has no derived field that duplicates a clap string default                                                      | Field-attribute inventory                                                                  |
 | Agent-native behaviour metadata and policy checks                     | Not adopted: no `cargo-orthohelp` consumer or package policy table                                                                     | Manifest, build-script, and CI inventory                                                   |
 | Cargo external-subcommand helper                                      | Not adopted: Weaver does not provide a Cargo external subcommand                                                                       | CLI entry-point inventory                                                                  |
 | Standalone `ortho_l10n` runtime                                       | Not adopted: localization is used through the `ortho_config` facade                                                                    | Existing `FluentLocalizer` imports and dependency inventory                                |
 | `cargo-orthohelp` stdout, policy report, and bridge build environment | Inapplicable: Weaver does not install or invoke that tool                                                                              | CI, Makefile, build-script, and metadata inventory                                         |
-| Missing, malformed, and unreadable files remain distinct              | Preserve existing fail-fast behavior; do not change the dedicated fail-fast test                                                       | `configuration_failfast.rs` remains byte-for-byte unchanged and passes                     |
+| Missing, malformed, and unreadable files remain distinct              | Preserve existing fail-fast behaviour; do not change the dedicated fail-fast test                                                      | `configuration_failfast.rs` remains byte-for-byte unchanged and passes                     |
 | Keep default features, including `serde_json`                         | Required: retain default features; do not add `default-features = false`                                                               | Manifest and resolved feature graph inspection                                             |
 
 ## Constraints and tolerances
@@ -219,6 +230,30 @@ logs are the evidence for the current plan and index edits:
 /tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-2.out
 ```
 
+CodeRabbit reviewed the documentation commit at
+`32fb1c8080573c3046d2923fed2ca340a4238118` and reported two minor findings
+about those relative links. The source files remain exact upstream copies; the
+plan now maps each affected literal link and its local reading target. The
+first docs-only recheck caught two American spellings in the new prose; after
+correcting them, all documentation gates passed again and both imported hashes
+still match:
+
+```plaintext
+/tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-3.out
+/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-5.out
+/tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-5.out
+/tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-5.out
+```
+
+After recording those results in this plan, the final candidate also passed
+`make check-fmt`, `make markdownlint`, and `make nixie` sequentially:
+
+```plaintext
+/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-6.out
+/tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-6.out
+/tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-6.out
+```
+
 ## Decision log
 
 - **2026-10-26 — Import immutable documentation first.** The upstream tag and
@@ -232,6 +267,11 @@ logs are the evidence for the current plan and index edits:
   `weaver-cards` tests before migration. Do not suppress, skip, or attribute
   those failures to OrthoConfig. Investigate supported compiler/backend choices
   and keep the plan's validation result explicit.
+- **2026-10-26 — Preserve upstream relative-link text.** CodeRabbit found that
+  three imported guide links resolve differently under Weaver's local paths. Do
+  not rewrite them because the user requires byte-identical upstream copies and
+  explicitly permits a documented link map. Expand the map above to name each
+  source link, immutable upstream target, and local reading target.
 
 ## Progress
 
@@ -247,8 +287,12 @@ logs are the evidence for the current plan and index edits:
 - [x] Capture the sequential pre-edit baseline and record its Cranelift test
   failure, skips, and not-run count.
 - [x] Complete EP-M1 documentation, provenance, and sequential docs gates.
-- [ ] Commit EP-M1 and request CodeRabbit review; clear concerns before source
-  changes.
+- [x] Run CodeRabbit on the documentation commit; review the two relative-link
+  findings against the user's byte-identity and mapping requirements.
+- [x] Clarify the upstream-link map without editing imported files, fix the
+  spelling findings, and pass the documentation gates again.
+- [ ] Commit the plan correction and request CodeRabbit review; clear any
+  remaining concerns before source changes.
 - [ ] Complete EP-M2 through EP-M5 with focused tests, sequential gates,
   CodeRabbit review, SSH push, and draft PR readback.
 
