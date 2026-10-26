@@ -100,6 +100,10 @@ readers can find the source of truth without scanning the whole tree.
   - Operational guide for configuration layering and ortho-config usage.
 - [Ortho-config v0.9.0 migration guide](ortho-config-v0-9-0-migration-guide.md)
   - Current Weaver adoption notes for the published ortho-config release.
+- [Ortho-config v0.10.0 migration guide](ortho-config-v0-10-0-migration-guide.md)
+  - Current Weaver adoption notes for the published ortho-config release.
+- [Ortho-config v0.10.0 migration ExecPlan][issue-368-execplan]
+  - Living provenance, applicability, implementation, and validation record.
 - [Ortho-config v0.8.0 migration guide](ortho-config-v0-8-0-migration-guide.md)
   - Historical Weaver-specific adoption notes for the v0.8.0 upgrade.
 - [Pratt parser design for DDlog expressions](pratt-parser-for-ddlog-expressions.md)
@@ -140,3 +144,6 @@ readers can find the source of truth without scanning the whole tree.
 - [Weaver LSP host v0.1.0 migration guide](weaver-lsp-host-v0.1.0-migration-guide.md)
   - Migration details for Language Server Protocol (LSP) host capability and
     API changes.
+
+[issue-368-execplan]:
+  <execplans/issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0.md>
