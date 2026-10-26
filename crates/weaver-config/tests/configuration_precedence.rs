@@ -26,6 +26,7 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 const LOCALE_ENV: &str = "WEAVER_LOCALE";
 const SOCKET_ENV: &str = "WEAVER_DAEMON_SOCKET";
 const CAPABILITY_OVERRIDES_ENV: &str = "WEAVER_CAPABILITY_OVERRIDES";
+const CONFIG_PATH_ENV: &str = "WEAVER_CONFIG_PATH";
 const CONFIG_FILE_NAME: &str = "weaver.toml";
 type HarnessState = Result<Harness, String>;
 
@@ -97,21 +98,23 @@ impl Harness {
             return Ok(());
         }
         let config_path = self.write_file()?;
-        let environment = self
+        let mut environment = self
             .environment
             .borrow()
             .iter()
             .fold(MapEnv::new(), |source, (key, value)| {
                 source.with_var(*key, value.clone())
             });
+        if let Some(path) = config_path {
+            environment =
+                environment.with_var(CONFIG_PATH_ENV, path.to_string_lossy().into_owned());
+        }
         let environment = Arc::new(environment);
         let discovery: SharedEnvSource = environment.clone();
         let merge: SharedScanEnvSource = environment;
-        let mut arguments = vec![OsString::from("weaver")];
-        if let Some(path) = config_path {
-            arguments.extend([OsString::from("--config-path"), path.into_os_string()]);
-        }
-        arguments.extend(self.cli.borrow().iter().cloned());
+        let arguments = std::iter::once(OsString::from("weaver"))
+            .chain(self.cli.borrow().iter().cloned())
+            .collect::<Vec<_>>();
         self.resolved.replace(Some(
             Config::load_from_iter_with_sources(arguments, discovery, merge)
                 .map_err(|error| error.to_string()),
