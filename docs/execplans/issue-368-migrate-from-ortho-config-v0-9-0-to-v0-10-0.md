@@ -355,7 +355,7 @@ built-in default. The untouched fail-fast discovery test still passes.
 | `make check-fmt`                                                             | Passed; 103 files unchanged.                                                                                       |
 | `make typecheck`                                                             | Passed; existing manifest warnings remain.                                                                         |
 | `make lint`                                                                  | Passed, including Clippy, Rustdoc, and Whitaker; existing warnings remain.                                         |
-| `make test`                                                                  | Failed after fail-fast: 559 passed, 8 failed, 4 skipped, 995 not run.                                              |
+| `make test`                                                                  | Failed after fail-fast: 552 passed, 8 failed, 4 skipped, 1,002 not run.                                            |
 | `make markdownlint`                                                          | Passed; 103 files, zero errors.                                                                                    |
 | `make nixie`                                                                 | Passed; all diagrams validated.                                                                                    |
 | `make test-workflow-contracts`                                               | Passed; 271 tests.                                                                                                 |
@@ -391,6 +391,37 @@ Nightly uses LLVM and passes the full all-target suite. The stable 1.93.1 full
 test run is supplemental only: its three trybuild failures come from
 Nightly-only flags inherited by nested compilations, while the stable
 all-target compile check passes.
+
+The MapEnv discovery correction is committed as `b76ea992`. Its focused
+precedence test and the untouched fail-fast discovery tests pass. A first
+follow-up `make lint` stopped in the worktree-local Whitaker target after an
+`autocfg` build script could not write a target artifact. Cleaning only
+`target/dylint/target/nightly-2026-05-28` removed 416.8 MiB, and the single
+retry passed. The subsequent assertion fix is committed as `0e16d97`; its
+recursive canonical projection test now compares the IR 2.0 `behaviour` and
+`profiles` fields. On that candidate, `make check-fmt`, `make typecheck`,
+`make lint`, `cargo test -p weaver-cli --lib` (200 passed, 3 ignored), and the
+pinned-Nightly release all-target suite (1,562 passed, 4 ignored) passed.
+`make test` again stopped on the same eight Cranelift aborts, with 552 passed,
+4 skipped, and 1,002 not run. CodeRabbit reviewed the earlier source candidate
+`b76ea992` and found the missing `behaviour` and `profiles` comparisons. The
+fix addresses that finding. A follow-up review request for `0e16d97` was
+rate-limited; the user-directed 63-minute cooldown is in progress, so the fix's
+fresh CodeRabbit verdict remains pending.
+
+Follow-up gate and review logs:
+
+```plaintext
+/tmp/lint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-followup-2.out
+/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
+/tmp/typecheck-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
+/tmp/lint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
+/tmp/test-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
+/tmp/test-weaver-cli-lib-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
+/tmp/test-release-all-targets-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
+/tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-after-mapenv.out
+/tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
+```
 
 The required focused and full validation log paths follow:
 
