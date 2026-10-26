@@ -147,6 +147,8 @@ fn assert_canonical_command(expected: &DocMetadata, actual: &DocMetadata, path: 
         "{path}.synopsis_id"
     );
     assert_eq!(actual.sections, expected.sections, "{path}.sections");
+    assert_eq!(actual.behaviour, expected.behaviour, "{path}.behaviour");
+    assert_eq!(actual.profiles, expected.profiles, "{path}.profiles");
     assert_eq!(actual.windows, expected.windows, "{path}.windows");
     assert_eq!(
         actual.fields.len(),
