@@ -415,8 +415,14 @@ passed: 103 files formatted, 103 Markdown files with zero errors, all diagrams
 valid, and 48 docs-gate tests passed. Cargo and Markdownlint reported only the
 existing workspace warnings and colour-variable warning. The repair is
 committed as `eb09136`. CodeRabbit's follow-up request for that head was
-rate-limited with a 6-minute service wait. The user-directed randomized
-90-minute cooldown is in progress; a fresh verdict remains pending.
+rate-limited with a 6-minute service wait. After the user-directed cooldown,
+the review completed on `3297bf9` with zero findings.
+
+Before delivery, `origin/main` advanced to `64da324`, adding a
+`nightly-2026-10-27` pin and `serde-saphyr` 2.0.0. Git's merge-tree check is
+clean, but the merged compiler and dependency combination has not been
+validated. The recorded full suite used this branch's `nightly-2026-10-26` pin;
+hosted integration checks must establish the result against the newer base.
 
 Follow-up gate and review logs:
 
@@ -432,6 +438,7 @@ Follow-up gate and review logs:
 /tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-review-fix.out
 /tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-final-review.out
 /tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-doc-link-fix.out
+/tmp/coderabbit-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-resumed-review.out
 /tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-eb09136-docs.out
 /tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-eb09136-docs.out
 /tmp/nixie-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-eb09136-docs.out
@@ -521,7 +528,10 @@ The required focused and full validation log paths follow:
 - [x] Complete EP-M3 source changes and focused regression coverage.
 - [x] Complete EP-M4 active documentation, full validation, and final
   post-format documentation gates.
-- [ ] Complete EP-M5 CodeRabbit review, SSH push, and draft PR readback.
+- [x] Complete EP-M5 CodeRabbit review, SSH push, and draft PR readback.
+  [Draft PR #376](https://github.com/leynos/weaver/pull/376) was created with
+  reviewed head `3297bf9` and base `64da324`. The requested branch tracks its
+  matching `origin` branch. Hosted validation of the newer base is pending.
 
 ## Acceptance criteria
 
