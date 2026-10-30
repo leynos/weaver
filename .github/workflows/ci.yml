@@ -67,13 +67,13 @@ jobs:
       # resolves to `self-hosted` on Ubicloud.
       - name: Export Ubicloud cache credentials
         if: runner.environment == 'self-hosted'
-        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@6e99f225cb06684f9e6f89b63a7ca4a04095c067
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/setup-rust@6e99f225cb06684f9e6f89b63a7ca4a04095c067
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         with:
           version: "0.6.1"
 
@@ -108,7 +108,7 @@ jobs:
       # not provide it, so uv fetches a managed 3.14 for the tool, as the
       # step this replaces already did.
       - name: Install Nixie and Merman
-        uses: leynos/shared-actions/.github/actions/install-nixie@a5765019912a8ab6882b12db049c7cde635f3a85
+        uses: leynos/shared-actions/.github/actions/install-nixie@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         with:
           nixie-version: '1.1.0'
           merman-version: '0.7.0'
@@ -130,7 +130,7 @@ jobs:
           RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }$STANDARD_RUSTFLAGS"
           cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
       - name: Install Whitaker
-        uses: leynos/shared-actions/.github/actions/install-whitaker@5a99aed78ce68dcebd3052b75c31e6f173162b1e # shared-actions 5a99aed7 (whitaker-installer 0.2.11)
+        uses: leynos/shared-actions/.github/actions/install-whitaker@6e99f225cb06684f9e6f89b63a7ca4a04095c067 # shared-actions 5a99aed7 (whitaker-installer 0.2.11)
         with:
           cranelift: true
       - name: Lint
@@ -138,7 +138,7 @@ jobs:
       - name: Workflow contract tests
         run: make test-workflow-contracts
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/generate-coverage@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         with:
           output-path: lcov.info
           format: lcov
