@@ -19,7 +19,7 @@ import pytest
 from workflow_loader import WORKFLOW_DIR, Document, load_workflow
 
 INSTALL_ACTION: typ.Final = "leynos/shared-actions/.github/actions/install-whitaker@"
-PINNED_REVISION: typ.Final = "6cec89bac47a21cf756d68d638a9a510998e57f8"
+PINNED_REVISION: typ.Final = "5a99aed78ce68dcebd3052b75c31e6f173162b1e"
 _ACTION: typ.Final = f"{INSTALL_ACTION}{PINNED_REVISION}"
 #: Text that marks a hand-rolled Whitaker install or a suite pin.
 HAND_ROLLED_RE: typ.Final = re.compile(r"whitaker-installer|WHITAKER_REV")
