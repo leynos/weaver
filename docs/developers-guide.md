@@ -271,10 +271,11 @@ wireframe, so two vCPU would roughly triple a lane that already takes a quarter
 of an hour.
 
 `coverage-upload` is the one compile-heavy lane on the smaller shape, and that
-is a computed margin rather than an oversight. The workspace has two trybuild
-cases, `public_api_contracts_compile` and
-`test_support_exports_compile_downstream`, which spawn their own cargo builds;
-they took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
+is a computed margin rather than an oversight. The workspace has three trybuild
+cases which spawn their own cargo builds: `public_api_contracts_compile` in
+`weaver-config` and in `weaver-docs-gate`, and
+`test_support_exports_compile_downstream` in `weaver-plugins`. The two older
+cases took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
 kills a test after 180 seconds by default, and this repository sets no nextest
 configuration, so that default applies. Even at three times slower those cases
 stay under half the kill. Nobody waits on this lane, so the smaller shape is
@@ -1029,6 +1030,12 @@ OrthoConfig v0.10.0's `_with_sources` loaders accept `MapEnv` and explicit file
 sources for tests that exercise discovery and merging. Pass `--config-path`
 when a test needs to control a configuration file. Direct `std::env::set_var`
 and `std::env::remove_var` are forbidden in Weaver tests.
+
+`crates/weaver-config/tests/compile_time.rs` compiles a downstream-style
+fixture against the public API with `trybuild`. The OrthoConfig derive
+generates much of `Config`, so a fixture keeps the default configuration, its
+accessors, the capability matrix, and the help lookup callable from outside the
+crate after an upgrade changes the generated surface.
 
 ### 15.3 Dependency-graph resolution
 

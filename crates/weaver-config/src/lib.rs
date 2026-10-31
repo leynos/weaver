@@ -59,6 +59,7 @@ pub use runtime::{RuntimePaths, RuntimePathsError};
 use serde::{Deserialize, Serialize};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
 
+/// Returns the locale used when no configuration source supplies one.
 fn default_locale() -> Locale { Locale::en_us() }
 
 const CONFIG_FIELD_HELP: &[(&str, &str)] = &[
@@ -203,12 +204,18 @@ impl Config {
     #[must_use]
     pub fn locale(&self) -> &Locale { &self.locale }
 
+    /// Collapses repeated capability directives into last-wins order, so the
+    /// capability matrix and CLI agree on which directive for a language and
+    /// capability takes effect.
     fn normalise_capability_overrides(&mut self) {
         deduplicate_directives(&mut self.capability_overrides);
     }
 }
 
 impl PostMergeHook for Config {
+    /// OrthoConfig calls this after merging all layers, so every load path,
+    /// including defaults and `merge_from_layers`, normalises capability
+    /// directives before the configuration is returned.
     fn post_merge(&mut self, _context: &PostMergeContext) -> OrthoResult<()> {
         self.normalise_capability_overrides();
         Ok(())

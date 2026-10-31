@@ -104,6 +104,9 @@ fn hand_assembled_argument_metadata_matches_the_upstream_derive() {
     assert_eq!(hand_assembled, derived.fields);
 }
 
+/// Rebuilds the field metadata the OrthoConfig derive would emit for a
+/// fixture argument, so the hand-assembled projection can be compared against
+/// the real derive. Returns `None` when the argument has no CLI metadata.
 fn derived_field(long: &'static str, value_name: Option<&'static str>) -> Option<FieldMetadata> {
     let mut field = field_metadata(&CommandArgument {
         long,
@@ -201,6 +204,9 @@ fn unresolved_identifiers_are_not_silently_accepted_by_the_test_helper() {
     );
 }
 
+/// Walks the projected tree and asserts every Fluent identifier resolves from
+/// the embedded catalogue. Recursion keeps the check aligned with the
+/// hierarchy, so a new nested node cannot escape validation.
 fn assert_identifiers_resolve(metadata: &DocMetadata, localizer: &dyn Localizer) {
     assert_resolves(&metadata.about_id, localizer);
     if let Some(synopsis_id) = &metadata.synopsis_id {
@@ -235,6 +241,8 @@ fn assert_identifiers_resolve(metadata: &DocMetadata, localizer: &dyn Localizer)
     }
 }
 
+/// Asserts one projected identifier exists in the catalogue, naming the
+/// identifier in the panic so a broken resource key is easy to trace.
 fn assert_resolves(id: &str, localizer: &dyn Localizer) {
     assert!(
         localizer.lookup(id, None).is_some(),
@@ -244,6 +252,9 @@ fn assert_resolves(id: &str, localizer: &dyn Localizer) {
 
 const LABELS: &[&str] = &["zero", "one", "two", "three", "four"];
 
+/// Builds a synthetic command tree for property tests; `depth` counts the
+/// levels above a leaf and `branching` must not exceed the `LABELS` fixtures.
+/// The nodes are leaked because projection consumes `&'static` trees.
 fn generated_tree(depth: usize, branching: usize, label: &'static str) -> &'static CommandNode {
     if depth == 0 {
         return Box::leak(Box::new(CommandNode {
@@ -273,6 +284,9 @@ fn generated_tree(depth: usize, branching: usize, label: &'static str) -> &'stat
     }))
 }
 
+/// Recursively asserts the projection preserves the source tree's shape: one
+/// subcommand per child, in order, with matching names. Panics on the first
+/// divergence so a structural regression is reported at its node.
 fn assert_shape_preserved(node: &CommandNode, metadata: &DocMetadata) {
     assert_eq!(metadata.subcommands.len(), node.children.len());
     for (child, child_metadata) in node.children.iter().zip(&metadata.subcommands) {
@@ -306,6 +320,9 @@ fn projection_handles_a_tree_with_at_least_two_levels_without_filtering_cases() 
     assert_shape_preserved(tree, &project(tree).expect("nested tree should project"));
 }
 
+/// Builds a linear chain of `depth` parent nodes around a leaf, so tests can
+/// probe exactly one command per level of the projection depth bound. The
+/// nodes are leaked to satisfy the `&'static` projection input.
 fn chain(depth: usize) -> &'static CommandNode {
     let mut node = Box::leak(Box::new(CommandNode {
         resource_path: &[],

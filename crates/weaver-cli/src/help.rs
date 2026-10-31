@@ -115,6 +115,13 @@ pub fn write_help_for_args<W: Write>(
     }
 }
 
+/// Assembles the augmented help command from the projected command metadata,
+/// the localisation resources, and the configuration fields OrthoConfig
+/// exposes.
+///
+/// The returned command is safe to render repeatedly; ordering caveats are
+/// attached to every nested subcommand so each help page keeps the same
+/// guidance.
 fn build_command(
     root: &command_tree::CommandNode,
     localisation_resources: impl IntoIterator<Item = &'static str>,

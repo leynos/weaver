@@ -39,6 +39,9 @@ struct Harness {
 }
 
 impl Harness {
+    /// Creates a harness with a fresh temporary directory and empty file,
+    /// environment, and CLI inputs. Returns a `Result` because creating the
+    /// directory can fail before any scenario step runs.
     fn new() -> HarnessState {
         Ok(Self {
             temp_dir: TempDir::new()
@@ -64,6 +67,9 @@ impl Harness {
 
     fn add_file_locale(&self, locale: &str) { self.add_file_line(format!("locale = {locale:?}")); }
 
+    /// Appends a TOML daemon-socket line for a TCP endpoint, validating the
+    /// text through `SocketEndpoint` first. Non-TCP endpoints are rejected
+    /// because the precedence scenarios only exercise transport over TCP.
     fn add_file_socket(&self, endpoint: &str) -> Result<(), String> {
         let endpoint = endpoint
             .parse::<SocketEndpoint>()
@@ -79,6 +85,9 @@ impl Harness {
         Ok(())
     }
 
+    /// Writes the accumulated file lines into the temporary directory and
+    /// returns the path, or `None` when no lines were queued so discovery falls
+    /// back to defaults. The path is injected as `WEAVER_CONFIG_PATH` later.
     fn write_file(&self) -> Result<Option<std::path::PathBuf>, String> {
         let contents = self.file_lines.borrow();
         if contents.is_empty() {
@@ -93,6 +102,9 @@ impl Harness {
         Ok(Some(self.temp_dir.path().join(CONFIG_FILE_NAME)))
     }
 
+    /// Loads configuration from the queued file, environment, and CLI inputs and
+    /// caches the outcome. Later calls return without reloading, so `config`
+    /// and `error` observe the same load even when it failed.
     fn resolve(&self) -> Result<(), String> {
         if self.resolved.borrow().is_some() {
             return Ok(());
@@ -122,6 +134,9 @@ impl Harness {
         Ok(())
     }
 
+    /// Returns a clone of the cached configuration, failing when `resolve` has
+    /// not run or the load itself failed, so assertions never silently see
+    /// defaults.
     fn config(&self) -> Result<Config, String> {
         self.resolved
             .borrow()
@@ -130,6 +145,8 @@ impl Harness {
             .clone()
     }
 
+    /// Returns the cached load error, or an error when resolution succeeded, so a
+    /// scenario asserting failure cannot pass against a valid configuration.
     fn error(&self) -> Result<String, String> {
         match self.config() {
             Ok(config) => Err(format!("configuration should fail, got {config:?}")),
@@ -142,6 +159,8 @@ impl Harness {
 #[fixture]
 fn harness() -> HarnessState { Harness::new() }
 
+/// Unwraps the harness state for a BDD step, cloning any setup error so the
+/// step can propagate it with `?` instead of panicking.
 fn configured_harness(harness: &HarnessState) -> Result<&Harness, String> {
     harness.as_ref().map_err(Clone::clone)
 }

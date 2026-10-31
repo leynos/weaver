@@ -5,6 +5,8 @@ use ortho_config::docs::CliMetadata;
 
 use super::*;
 
+/// Builds minimal field metadata carrying the supplied CLI block and no other
+/// sources, so tests can isolate how `config_field_arg` decides visibility.
 fn field_metadata(cli: Option<CliMetadata>) -> FieldMetadata {
     FieldMetadata {
         name: "example_field".to_string(),
@@ -23,6 +25,8 @@ fn field_metadata(cli: Option<CliMetadata>) -> FieldMetadata {
     }
 }
 
+/// Builds CLI metadata with fixed long, short, and value name, so tests vary
+/// only the `takes_value` shape they are exercising.
 fn cli_metadata(takes_value: bool) -> CliMetadata {
     CliMetadata {
         long: Some("example-field".to_string()),
@@ -238,6 +242,46 @@ fn optional_value_flags_accept_attached_values_and_render_them_as_optional() {
     );
 }
 
+/// Guards the adapter that copies optional-value metadata from the generated
+/// `CliMetadata` into `clap`. The sibling
+/// `optional_value_flags_accept_attached_values_and_render_them_as_optional`
+/// test builds the metadata by hand, so on its own it would still pass if
+/// `config_field_arg` dropped `cli.value_optional` or `cli.value_name`.
+#[test]
+fn config_field_arg_propagates_optional_value_metadata() {
+    let mut cli = cli_metadata(true);
+    cli.value_optional = true;
+    cli.value_name = Some("BOOL".to_string());
+    let arg = config_field_arg(&field_metadata(Some(cli))).expect("arg should be visible");
+    let mut command = Command::new("test").arg(arg);
+
+    assert!(
+        command
+            .render_help()
+            .to_string()
+            .contains("--example-field[=<BOOL>]"),
+        "the production adapter should render the optional value form"
+    );
+
+    let matches = command
+        .clone()
+        .try_get_matches_from(["test", "--example-field=false"])
+        .expect("an attached boolean value should parse");
+    assert_eq!(
+        matches
+            .get_one::<String>("example_field")
+            .map(String::as_str),
+        Some("false")
+    );
+
+    assert!(
+        command
+            .try_get_matches_from(["test", "--example-field", "false"])
+            .is_err(),
+        "an optional value must remain attached to its flag"
+    );
+}
+
 #[test]
 fn projection_failure_returns_construction_error_without_a_command() {
     let root = deep_command_chain(command_ir::MAX_COMMAND_DEPTH + 1);
@@ -252,6 +296,9 @@ fn projection_failure_returns_construction_error_without_a_command() {
     ));
 }
 
+/// Builds a linear chain of `depth` parents around a leaf so tests can exceed
+/// the projection depth bound by exactly one level. Nodes are leaked to
+/// satisfy the `&'static` projection input.
 fn deep_command_chain(depth: usize) -> &'static command_tree::CommandNode {
     let mut node = Box::leak(Box::new(command_tree::CommandNode {
         resource_path: &[],
