@@ -155,15 +155,16 @@ proportionate to this dependency/API migration.
 | Preserve compiler and quality policy                                          | Repository Make targets, current compiler identity, lockfile and manifest review | Required gates pass under the selected supported toolchain; failures are reported with logs                   |
 
 The BDD feature contract is
-`crates/weaver-config/tests/features/configuration_precedence.feature`:
+`crates/weaver-config/tests/features/configuration_precedence.feature`. Every
+scenario in that file is bound by name, so all eight precedence partitions
+execute:
 
 ```gherkin
-Feature: OrthoConfig v0.10.0 configuration precedence
-  Scenario: An explicit default value overrides lower layers
-    Given a configuration file setting the locale to "ja-JP"
-    And the environment overrides the locale to "fr-FR"
-    When the CLI explicitly sets the locale to "en-US"
-    Then the resolved locale is "en-US"
+Scenario: Explicit CLI value equal to the default overrides lower layers
+  Given a configuration file setting the locale to "ja-JP"
+  And the environment overrides the locale to "fr-FR"
+  When the CLI sets the locale to "en-US"
+  Then loading the configuration resolves the locale to "en-US"
 ```
 
 This scenario has witnesses for the file, environment, and CLI tiers and fails
@@ -362,7 +363,7 @@ built-in default. The untouched fail-fast discovery test still passes.
 | `cargo test -p weaver-docs-gate`                                             | Passed; 36 tests and 12 doctests.                                                                                  |
 | `cargo test -p weaver-cli --lib`                                             | Passed; 200 tests, 3 ignored.                                                                                      |
 | `cargo test -p weaver-config --features cli --lib`                           | Passed; 37 tests.                                                                                                  |
-| `cargo test -p weaver-config --features cli --test configuration_precedence` | Passed; 1 test.                                                                                                    |
+| `cargo test -p weaver-config --features cli --test configuration_precedence` | Passed; 1 test. Only the first scenario was bound then; see the post-review repair below.                          |
 | `cargo test -p weaver-config --features cli --test configuration_failfast`   | Passed; 2 tests.                                                                                                   |
 | Rust 1.90 release workspace check, all features                              | Passed; validates the application runtime floor.                                                                   |
 | Rust 1.93.1 release workspace check, all targets and features                | Passed; validates the all-target test graph.                                                                       |
@@ -468,6 +469,42 @@ The required focused and full validation log paths follow:
 /tmp/doc-test-nightly-release-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-12.out
 ```
 
+## Post-review repair and current-base validation
+
+CodeRabbit's completeness/correctness assessment of head `83eda47`, reviewed on
+2026-10-30, confirmed one test-coverage defect and one current-base validation
+gap:
+
+- `#[scenario(path = ...)]` without `name` or `index` expands only the first
+  scenario. The single binding therefore exercised the CLI-locale scenario and
+  left the explicit-default regression and the other six scenarios unrun.
+  Every scenario is now bound by name. Running all eight exposed a second
+  latent defect: the environment capability override used the directive's
+  `Display` spelling, but OrthoConfig parses environment collections with
+  Figment's TOML-like inline-table syntax, so the value was treated as a string
+  and failed to deserialize. It is now encoded as
+  `[{language = "Rust", capability = "observe.rename", directive = "force"}]`.
+  All eight scenarios pass.
+- The hosted `build-test` failure was not the known Cranelift abort. `make
+  lint` stopped while building `dylint_driver` 6.0.1 with
+  `revparse_ext failed for master` / `revspec 'master' not found`. Main commit
+  `9284f73` repins `install-whitaker` to installer 0.2.11, whose verified
+  Clippy snapshot bootstrap fixes that Dylint driver build after Clippy's
+  master-to-main rename.
+
+The branch was rebased onto `9284f73` (base `9284f73`, previously `64da324`),
+which also brings `nightly-2026-10-27` and `serde-saphyr` 2.0.0. The rebase
+completed without conflicts, and the combined lockfile still resolves
+`ortho_config` 0.10.0 and `serde-saphyr` 2.0.0. The repair is committed after
+the replay, and the full sequential gate run and hosted validation for the new
+head remain to be recorded here.
+
+Focused repair evidence:
+
+```plaintext
+/tmp/test-precedence-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-3.out
+```
+
 ## Decision log
 
 - **2026-10-26 — Import immutable documentation first.** The upstream tag and
@@ -501,6 +538,22 @@ The required focused and full validation log paths follow:
   imports. Correct local descriptions and persist the gate evidence in this
   plan instead.
 
+- **2026-10-31 — Bind every precedence scenario by name.** A bare
+  `#[scenario(path = ...)]` runs only the first scenario, so the PR's new
+  regression case and six existing scenarios were never executed. Named
+  bindings make the test count match the feature file instead of relying on
+  scenario order.
+- **2026-10-31 — Encode environment collections with Figment syntax.**
+  OrthoConfig's environment layer parses values with Figment's TOML-like
+  parser. The directive `Display` form and JSON colon syntax are not accepted
+  for collection fields; an array of inline tables is. This corrects the
+  latent scenario failure revealed by binding all eight cases.
+- **2026-10-31 — Rebase onto `9284f73` for the Whitaker fix.** The hosted
+  `make lint` failure was a `dylint_driver` build error caused by Clippy's
+  master-to-main rename, not an OrthoConfig regression. Main's installer repin
+  fixes it, so the branch takes that base rather than changing this PR's lint
+  configuration.
+
 ## Progress
 
 - [x] Read `AGENTS.md`, repository contents/layout, requested skills, and the
@@ -532,6 +585,13 @@ The required focused and full validation log paths follow:
   [Draft PR #376](https://github.com/leynos/weaver/pull/376) was created with
   reviewed head `3297bf9` and base `64da324`. The requested branch tracks its
   matching `origin` branch. Hosted validation of the newer base is pending.
+- [x] Repair CodeRabbit's confirmed coverage finding by binding all eight
+  precedence scenarios and encoding the environment capability override with
+  Figment syntax; the focused suite passes eight tests.
+- [x] Rebase onto `9284f73`, which supplies the Whitaker installer fix for the
+  hosted Dylint driver failure.
+- [ ] Run the sequential gates and obtain hosted validation for the rebased
+  head, then reconcile the formal review and merge.
 
 ## Acceptance criteria
 
