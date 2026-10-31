@@ -143,13 +143,13 @@ a longer allowance than the default:
   loaded local host the 85-second test took about 1,000 seconds waiting on the
   shared Cargo cache.
 
-The end-to-end binaries can also run `cargo build` to find the `weaver`
-binary, but only when it is missing and at most once per process, so they stay
-in the default pool. `tests/workflow_contracts/nextest_config_test.py` reads
-the file with `tomllib` and checks the group, the override and the timeouts; it
-starts no `cargo`. The Concordat `nested-cargo-nextest` rule (NC-004, NC-005)
-holds the same property from outside. A new test binary that starts a compiler
-joins the override's `filter`.
+The end-to-end binaries can also run `cargo build` to find the `weaver` binary,
+but only when it is missing and at most once per process, so they stay in the
+default pool. `tests/workflow_contracts/nextest_config_test.py` reads the file
+with `tomllib` and checks the group, the override and the timeouts; it starts no
+`cargo`. The Concordat `nested-cargo-nextest` rule (NC-004, NC-005) holds the
+same property from outside. A new test binary that starts a compiler joins the
+override's `filter`.
 
 ## 4 Workspace lint policy
 
