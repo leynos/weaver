@@ -98,8 +98,8 @@ make release
 
 `make release` adds neither the configuration's frontend flag nor `mold`, and
 forwards any `RUSTFLAGS` you export. The bare equivalent,
-`cargo +nightly-2026-10-27 build --release`, takes both flags, because Cargo
-applies the configuration to every build.
+`cargo +nightly-2026-10-27 build --release`, takes the frontend flag (and
+`mold` on Linux) because Cargo applies the configuration to every build.
 
 To run the test suite:
 
