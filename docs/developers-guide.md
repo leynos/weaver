@@ -37,7 +37,7 @@ library retains a Rust 1.89 minimum: its runtime dependency graph passes a Rust
 1.89.0 check. Its test targets use the internal `weaver-test-macros` package,
 which follows the workspace's Rust 1.90 floor. The workspace floor follows
 `tree-sitter` 0.27.1, which requires Rust 1.90. Test-only `serial_test` 4.0.1
-requires Rust 1.93.1; `rust-toolchain.toml` pins Nightly 2026-10-26 for
+requires Rust 1.93.1; `rust-toolchain.toml` pins Nightly 2026-10-27 for
 repository builds and full-suite tests.
 
 ## 3 The build standard
@@ -1008,8 +1008,9 @@ alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
 
 An explicit CLI value takes precedence even when it equals the clap default.
-Boolean options accept an attached value such as `--force=false`; the
-space-separated form `--force false` is rejected.
+OrthoConfig derives accept an attached value for boolean fields, such as
+`--force=false` in the derive fixture; the space-separated form `--force false`
+is rejected. Weaver defines no `--force` option.
 
 `Config` enables OrthoConfig's `post_merge_hook` and owns the normalization of
 duplicate capability directives there. This keeps the invariant consistent for

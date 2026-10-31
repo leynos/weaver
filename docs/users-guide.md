@@ -18,7 +18,7 @@ Weaver's workspace targets require Rust 1.90 or newer because the `tree-sitter`
 0.27 dependency sets that minimum. The separately consumable `weaver-config`
 library retains its Rust 1.89 minimum, matching its runtime dependency graph.
 The repository's own checkout additionally needs the pinned Nightly toolchain
-(`nightly-2026-10-26`): its `.cargo/config.toml` uses Nightly-only options, so
+(`nightly-2026-10-27`): its `.cargo/config.toml` uses Nightly-only options, so
 stable Rust is not sufficient for local Cargo builds there. The README lists
 the toolchain setup.
 
