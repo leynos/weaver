@@ -125,6 +125,32 @@ Debug data is off, so a debugger sees no variables in a development build. Set
 `CARGO_PROFILE_DEV_DEBUG=2` for a debugging session, and `make release` or a
 `--release` build for anything that ships.
 
+### 3.3 Tests that start a compiler
+
+Some tests start a child `cargo` or `rustc` of their own: the `weaver-docs-gate`
+`load_manifest` binary runs the renderer example through `cargo`, and both
+`compile_time` binaries (`weaver-docs-gate` and `weaver-plugins`) build
+fixtures. Run beside each other they contend for Cargo's package-cache and
+build-directory locks, and a cold build then looks like a hang.
+`.config/nextest.toml` therefore puts those binaries in the
+`nested-cargo-builds` test group, which runs one test at a time, and gives them
+a longer allowance than the default:
+
+- The default profile warns after 60 seconds and terminates a test after 180
+  seconds (three periods), and the whole run after 45 minutes.
+- The `nested-cargo-builds` group terminates after 1,200 seconds (twenty
+  periods). On CI the slowest of these tests took 26, 39 and 85 seconds; on a
+  loaded local host the 85-second test took about 1,000 seconds waiting on the
+  shared Cargo cache.
+
+The end-to-end binaries can also run `cargo build` to find the `weaver` binary,
+but only when it is missing and at most once per process, so they stay in the
+default pool. `tests/workflow_contracts/nextest_config_test.py` reads the file
+with `tomllib` and checks the group, the override and the timeouts; it starts no
+`cargo`. The Concordat `nested-cargo-nextest` rule (NC-004, NC-005) holds the
+same property from outside. A new test binary that starts a compiler joins the
+override's `filter`.
+
 ## 4 Workspace lint policy
 
 The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates
