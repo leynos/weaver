@@ -560,6 +560,30 @@ hyphen stays: "Nightly" is here the proper name of the Rust release channel,
 not an adverb modifying the following participle, so the flagged rule does not
 apply.
 
+The same review run reported one failed pre-merge check and two warnings. All
+three were verified against the source and actioned rather than dismissed; the
+banner itself calls warnings optional, but the standing requirement is to
+action review requests:
+
+- **Testing (Overall), error.** The optional-value expectations ran through
+  `config_arg_from_metadata`, so `config_field_arg`'s copy of
+  `cli.value_optional` and `cli.value_name` was never exercised. The new
+  `config_field_arg_propagates_optional_value_metadata` test drives the
+  production adapter and asserts both the rendered `--example-field[=<BOOL>]`
+  form and that an unattached value is rejected.
+- **Docstring Coverage, warning.** Coverage was 37.5% against the 80% threshold
+  for functions touched by this diff. Twenty-three Rustdoc comments were added
+  to the branch-bearing helpers in the migration's test modules and to the two
+  private configuration methods that carry policy, leaving the tests' short
+  cases undocumented as the repository style prefers.
+- **Testing (Compile-Time / Ui), warning.** The migration changes the surface
+  the OrthoConfig derive generates. A third `trybuild` suite,
+  `crates/weaver-config/tests/compile_time.rs` with fixture
+  `tests/ui/public_api.rs`, compiles downstream-style use of `Config`, its
+  accessors, the capability matrix, and `config_field_help`, following the
+  existing `weaver-config`/`weaver-docs-gate`/`weaver-plugins` practice. The
+  developers guide records the new case.
+
 ## Decision log
 
 - **2026-10-26 — Import immutable documentation first.** The upstream tag and
