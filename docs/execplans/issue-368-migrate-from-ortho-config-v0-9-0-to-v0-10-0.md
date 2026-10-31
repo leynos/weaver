@@ -477,16 +477,16 @@ gap:
 
 - `#[scenario(path = ...)]` without `name` or `index` expands only the first
   scenario. The single binding therefore exercised the CLI-locale scenario and
-  left the explicit-default regression and the other six scenarios unrun.
-  Every scenario is now bound by name. Running all eight exposed a second
-  latent defect: the environment capability override used the directive's
-  `Display` spelling, but OrthoConfig parses environment collections with
-  Figment's TOML-like inline-table syntax, so the value was treated as a string
-  and failed to deserialize. It is now encoded as
+  left the explicit-default regression and the other six scenarios unrun. Every
+  scenario is now bound by name. Running all eight exposed a second latent
+  defect: the environment capability override used the directive's `Display`
+  spelling, but OrthoConfig parses environment collections with Figment's
+  TOML-like inline-table syntax, so the value was treated as a string and
+  failed to deserialize. It is now encoded as
   `[{language = "Rust", capability = "observe.rename", directive = "force"}]`.
   All eight scenarios pass.
-- The hosted `build-test` failure was not the known Cranelift abort. `make
-  lint` stopped while building `dylint_driver` 6.0.1 with
+- The hosted `build-test` failure was not the known Cranelift abort.
+  `make lint` stopped while building `dylint_driver` 6.0.1 with
   `revparse_ext failed for master` / `revspec 'master' not found`. Main commit
   `9284f73` repins `install-whitaker` to installer 0.2.11, whose verified
   Clippy snapshot bootstrap fixes that Dylint driver build after Clippy's
@@ -546,8 +546,8 @@ Focused repair evidence:
 - **2026-10-31 — Encode environment collections with Figment syntax.**
   OrthoConfig's environment layer parses values with Figment's TOML-like
   parser. The directive `Display` form and JSON colon syntax are not accepted
-  for collection fields; an array of inline tables is. This corrects the
-  latent scenario failure revealed by binding all eight cases.
+  for collection fields; an array of inline tables is. This corrects the latent
+  scenario failure revealed by binding all eight cases.
 - **2026-10-31 — Rebase onto `9284f73` for the Whitaker fix.** The hosted
   `make lint` failure was a `dylint_driver` build error caused by Clippy's
   master-to-main rename, not an OrthoConfig regression. Main's installer repin
