@@ -535,6 +535,31 @@ Focused repair evidence:
 /tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-recheck.out
 ```
 
+## Formal review round and dispositions
+
+Readiness at `21ef53d` let CodeRabbit review the PR formally. Sourcery skipped
+the PR because its diff exceeds that bot's 150,000-character limit, and the
+Codex reviewer skipped it because the paying account has exhausted its usage
+limits; neither produced a finding to disposition. CodeRabbit submitted
+changes-requested with two minor documentation findings, both verified against
+the source and repaired in `234fa30`:
+
+- Section 15.1 of the developers guide presented `--force=false` as a Weaver
+  configuration option. `weaver_config::Config` has no `force` field and
+  `weaver-cli` defines no `--force` flag; the only `force` boolean is the
+  `DerivedFixture` in `crates/weaver-cli/src/command_ir/tests.rs`. The
+  paragraph now names the derive fixture and states that Weaver exposes no such
+  option.
+- The users and developers guides still named `nightly-2026-10-26` after the
+  rebase moved `rust-toolchain.toml` to `nightly-2026-10-27`. Both now name the
+  pin the repository actually reads. The earlier decision-log entry that
+  records the 2026-10-26 pin is retained as history and marked superseded.
+
+LanguageTool also flagged the hyphen in "Nightly-only" in the users guide. That
+hyphen stays: "Nightly" is here the proper name of the Rust release channel,
+not an adverb modifying the following participle, so the flagged rule does not
+apply.
+
 ## Decision log
 
 - **2026-10-26 — Import immutable documentation first.** The upstream tag and
@@ -549,9 +574,10 @@ Focused repair evidence:
   1.93.1. The test-only `weaver-test-macros` crate also follows the workspace
   floor, so `weaver-config` all-target checks need Rust 1.90 even though its
   runtime library check passes on 1.89. CI and local repository builds use the
-  pinned Nightly 2026-10-26 toolchain, which the pinned CI setup action reads
-  from `rust-toolchain.toml`; that existing dated pin already provides the
-  required components.
+  pinned Nightly toolchain, which the pinned CI setup action reads from
+  `rust-toolchain.toml`; the pin in force at that time, Nightly 2026-10-26,
+  already provided the required components. The later `9284f73` rebase moves
+  the pin to Nightly 2026-10-27.
 - **2026-10-26 — Preserve the baseline Cranelift failure as separate evidence.**
   The workspace's configured development backend fails in unrelated
   `weaver-cards` tests before migration. Do not suppress, skip, or attribute
@@ -624,8 +650,11 @@ Focused repair evidence:
   head. `make check-fmt` and `make markdownlint` pass again at `394e65b`, the
   release all-target and doctest gates pass, and hosted `CI` and
   `Release Dry Run` are green for that head.
-- [ ] Reconcile the formal CodeRabbit review and the pre-merge checks, then
-  merge when the equilibrium conditions hold.
+- [x] Mark the PR ready, reply to the completeness/correctness assessment with
+  candidate-bound evidence, and disposition the formal CodeRabbit review's two
+  documentation findings by repairing them in `234fa30`.
+- [ ] Re-gate the repaired head, confirm the review round is clean, and merge
+  when the equilibrium conditions hold.
 
 ## Acceptance criteria
 
