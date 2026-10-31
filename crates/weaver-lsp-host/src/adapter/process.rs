@@ -3,6 +3,7 @@
 use std::{
     process::{Child, Command, Stdio},
     sync::Mutex,
+    time::{Duration, Instant},
 };
 
 use serde::de::DeserializeOwned;
@@ -17,6 +18,14 @@ use super::{
     transport::StdioTransport,
 };
 use crate::Language;
+
+/// How long a server that stopped answering is left alone before the adapter
+/// will start a fresh process for it.
+///
+/// Without a cooldown, every request in a batch (for example one hover per card
+/// in a graph slice) would start a new process and wait out its own deadline,
+/// multiplying the stall by the batch size.
+const RESTART_COOLDOWN: Duration = Duration::from_secs(60);
 
 /// A language server adapter that spawns and communicates with an external process.
 ///
@@ -36,6 +45,8 @@ pub struct ProcessLanguageServer {
     language: Language,
     config: LspServerConfig,
     state: Mutex<ProcessState>,
+    /// When the process was last stopped for not answering in time.
+    unresponsive_since: Mutex<Option<Instant>>,
 }
 
 impl ProcessLanguageServer {
@@ -46,6 +57,7 @@ impl ProcessLanguageServer {
             language,
             config: LspServerConfig::for_language(language),
             state: Mutex::new(ProcessState::NotStarted),
+            unresponsive_since: Mutex::new(None),
         }
     }
 
@@ -56,6 +68,7 @@ impl ProcessLanguageServer {
             language,
             config,
             state: Mutex::new(ProcessState::NotStarted),
+            unresponsive_since: Mutex::new(None),
         }
     }
 
@@ -65,6 +78,7 @@ impl ProcessLanguageServer {
 
     /// Spawns the language server process.
     pub(super) fn spawn_process(&self) -> Result<(Child, StdioTransport), AdapterError> {
+        self.refuse_while_cooling_down()?;
         debug!(
             target: ADAPTER_TARGET,
             language = %self.language,
@@ -114,7 +128,8 @@ impl ProcessLanguageServer {
                 source: std::sync::Arc::new(std::io::Error::other("no stdout")),
             })?;
 
-        let transport = StdioTransport::new(stdout, stdin);
+        let transport =
+            StdioTransport::new(stdout, stdin).with_response_timeout(self.config.response_timeout);
 
         debug!(
             target: ADAPTER_TARGET,
@@ -124,6 +139,56 @@ impl ProcessLanguageServer {
         );
 
         Ok((child, transport))
+    }
+
+    /// Fails fast while a server that stopped answering is still cooling down.
+    fn refuse_while_cooling_down(&self) -> Result<(), AdapterError> {
+        let since = *self
+            .unresponsive_since
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        match since {
+            Some(at) if at.elapsed() < RESTART_COOLDOWN => Err(AdapterError::Unresponsive {
+                cooldown_secs: RESTART_COOLDOWN.as_secs(),
+            }),
+            _ => Ok(()),
+        }
+    }
+
+    /// Kills a server that missed its deadline and starts the restart cooldown.
+    ///
+    /// The stream cannot be trusted afterwards: a late reply would be read as
+    /// the answer to the next request. Killing the process also closes its
+    /// stdout, which ends the transport's reader thread.
+    fn stop_unresponsive(&self) {
+        warn!(
+            target: ADAPTER_TARGET,
+            language = %self.language,
+            timeout_secs = self.config.response_timeout.as_secs_f32(),
+            "language server did not respond in time; stopping it"
+        );
+        *self
+            .unresponsive_since
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = Some(Instant::now());
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if let ProcessState::Running { mut child, .. } =
+            std::mem::replace(&mut *state, ProcessState::Stopped)
+        {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
+    /// Stops the server if `result` shows it missed its deadline, then returns `result`.
+    fn stop_if_timed_out<T>(&self, result: Result<T, AdapterError>) -> Result<T, AdapterError> {
+        if result.as_ref().is_err_and(AdapterError::is_timeout) {
+            self.stop_unresponsive();
+        }
+        result
     }
 
     /// Accesses the running transport with the state lock held.
@@ -167,7 +232,8 @@ impl ProcessLanguageServer {
         P: serde::Serialize,
         R: DeserializeOwned,
     {
-        self.execute_messaging_operation(method, params, messaging::send_request)
+        let result = self.execute_messaging_operation(method, params, messaging::send_request);
+        self.stop_if_timed_out(result)
     }
 
     /// Sends a notification (no response expected).
@@ -190,7 +256,9 @@ impl ProcessLanguageServer {
         P: serde::Serialize,
         R: DeserializeOwned,
     {
-        self.execute_messaging_operation(method, params, messaging::send_request_optional)
+        let result =
+            self.execute_messaging_operation(method, params, messaging::send_request_optional);
+        self.stop_if_timed_out(result)
     }
 
     /// Performs graceful shutdown of the language server.

@@ -42,4 +42,4 @@ pub use error::{AdapterError, TransportError};
 pub use jsonrpc::{JsonRpcError, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 pub use process::ProcessLanguageServer;
 pub use state::ProcessState;
-pub use transport::StdioTransport;
+pub use transport::{DEFAULT_RESPONSE_TIMEOUT, StdioTransport};

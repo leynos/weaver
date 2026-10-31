@@ -6,3 +6,4 @@ mod behaviour_assertions;
 mod rebuild_host_tests;
 mod support;
 mod unit;
+mod unresponsive_server;

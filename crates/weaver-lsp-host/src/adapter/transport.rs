@@ -8,8 +8,11 @@
 //! ```
 
 use std::{
-    io::{BufRead, BufReader, BufWriter, Read, Write},
+    io::{self, BufRead, BufReader, BufWriter, Write},
     process::{ChildStdin, ChildStdout},
+    sync::mpsc::{self, Receiver, RecvTimeoutError, Sender},
+    thread,
+    time::{Duration, Instant},
 };
 
 use super::error::TransportError;
@@ -50,24 +53,53 @@ fn read_content_length<R: BufRead>(reader: &mut R) -> Result<usize, TransportErr
     content_length.ok_or(TransportError::MissingContentLength)
 }
 
+/// How long to wait for a language server to answer before giving up on it.
+///
+/// A language server that stops responding (wedged on a lock, starved of CPU,
+/// or stuck loading a workspace) would otherwise block the daemon's dispatch
+/// thread for ever, because a pipe read has no deadline of its own. The value
+/// sits well above a healthy server's worst start-up on a loaded host and well
+/// below the multi-minute kill limits that test runners apply.
+pub const DEFAULT_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Reads and writes LSP-framed messages over process stdio.
 ///
 /// The transport handles the LSP header framing protocol, which prefixes
-/// each message with a `Content-Length` header.
+/// each message with a `Content-Length` header. Reads happen on a dedicated
+/// thread that forwards whole frames over a channel, so callers can wait for a
+/// frame with a deadline ([`Self::receive_before`]) instead of blocking on the
+/// pipe. The thread ends when the server's stdout closes, which happens when
+/// the process exits or is killed.
 pub struct StdioTransport {
-    reader: BufReader<ChildStdout>,
+    frames: Receiver<Result<Vec<u8>, TransportError>>,
     writer: BufWriter<ChildStdin>,
+    response_timeout: Duration,
 }
 
 impl StdioTransport {
-    /// Creates a new transport from process handles.
+    /// Creates a new transport from process handles, using
+    /// [`DEFAULT_RESPONSE_TIMEOUT`].
     #[must_use]
     pub fn new(stdout: ChildStdout, stdin: ChildStdin) -> Self {
+        let (sender, frames) = mpsc::channel();
+        thread::spawn(move || forward_frames(BufReader::new(stdout), &sender));
         Self {
-            reader: BufReader::new(stdout),
+            frames,
             writer: BufWriter::new(stdin),
+            response_timeout: DEFAULT_RESPONSE_TIMEOUT,
         }
     }
+
+    /// Sets how long callers wait for the response to one request.
+    #[must_use]
+    pub const fn with_response_timeout(mut self, response_timeout: Duration) -> Self {
+        self.response_timeout = response_timeout;
+        self
+    }
+
+    /// Returns how long a caller should wait for the response to one request.
+    #[must_use]
+    pub const fn response_timeout(&self) -> Duration { self.response_timeout }
 
     /// Sends an LSP-framed message.
     ///
@@ -78,25 +110,52 @@ impl StdioTransport {
         write_framed(&mut self.writer, message)
     }
 
-    /// Receives an LSP-framed message (blocks until complete).
+    /// Receives the next LSP-framed message, waiting until `deadline` at most.
     ///
     /// # Errors
     ///
-    /// Returns `TransportError::MissingContentLength` if no Content-Length header is found.
-    /// Returns `TransportError::Io` if reading from the process fails.
-    pub fn receive(&mut self) -> Result<Vec<u8>, TransportError> {
-        let content_length = read_content_length(&mut self.reader)?;
-        let mut content = vec![0u8; content_length];
-        self.reader.read_exact(&mut content)?;
-        Ok(content)
+    /// Returns `TransportError::TimedOut` if no complete frame arrives before
+    /// `deadline`. Returns `TransportError::MissingContentLength`,
+    /// `TransportError::InvalidHeader` or `TransportError::Io` if the server
+    /// sends a malformed frame or closes its stdout.
+    pub fn receive_before(&mut self, deadline: Instant) -> Result<Vec<u8>, TransportError> {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match self.frames.recv_timeout(remaining) {
+            Ok(frame) => frame,
+            Err(RecvTimeoutError::Timeout) => Err(TransportError::TimedOut),
+            Err(RecvTimeoutError::Disconnected) => Err(TransportError::Io(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "language server closed its output",
+            ))),
+        }
     }
+}
+
+/// Reads frames from `reader` and sends them until the stream ends, a frame is
+/// malformed, or the receiving side is dropped.
+fn forward_frames<R: BufRead>(mut reader: R, sender: &Sender<Result<Vec<u8>, TransportError>>) {
+    loop {
+        let frame = read_frame(&mut reader);
+        let is_error = frame.is_err();
+        if sender.send(frame).is_err() || is_error {
+            return;
+        }
+    }
+}
+
+/// Reads one complete LSP frame (headers, then exactly `Content-Length` bytes).
+fn read_frame<R: BufRead>(reader: &mut R) -> Result<Vec<u8>, TransportError> {
+    let content_length = read_content_length(reader)?;
+    let mut content = vec![0u8; content_length];
+    reader.read_exact(&mut content)?;
+    Ok(content)
 }
 
 #[cfg(test)]
 mod tests {
     //! Unit tests for LSP transport layer and message framing.
 
-    use std::io::Cursor;
+    use std::io::{Cursor, Read};
 
     use rstest::rstest;
 
@@ -221,5 +280,65 @@ mod tests {
         let received = receiving.receive().expect("receive failed");
 
         assert_eq!(received, json.as_bytes());
+    }
+
+    #[cfg(unix)]
+    mod stdio {
+        //! Tests that exercise the real pipe-backed transport against `cat`.
+
+        use std::process::{Child, Command, Stdio};
+
+        use super::*;
+
+        /// Spawns `command` with piped stdio and wraps its pipes in a transport.
+        fn spawn_transport(command: &str, args: &[&str]) -> (Child, StdioTransport) {
+            let mut child = Command::new(command)
+                .args(args)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("spawn helper process");
+            let stdin = child.stdin.take().expect("piped stdin");
+            let stdout = child.stdout.take().expect("piped stdout");
+            (child, StdioTransport::new(stdout, stdin))
+        }
+
+        #[rstest]
+        fn receive_before_returns_a_frame_the_peer_sent() {
+            // `cat` echoes our framed bytes back, standing in for a server reply.
+            let (mut child, mut transport) = spawn_transport("cat", &[]);
+            transport.send(b"hello").expect("send failed");
+
+            let received = transport
+                .receive_before(Instant::now() + Duration::from_secs(20))
+                .expect("echoed frame should arrive");
+
+            assert_eq!(received, b"hello");
+            child.kill().expect("kill helper");
+            child.wait().expect("reap helper");
+        }
+
+        #[rstest]
+        fn receive_before_times_out_on_a_silent_peer() {
+            let (mut child, mut transport) = spawn_transport("sh", &["-c", "cat > /dev/null"]);
+            let started = Instant::now();
+
+            let result = transport.receive_before(Instant::now() + Duration::from_millis(100));
+
+            assert!(matches!(result, Err(TransportError::TimedOut)));
+            assert!(started.elapsed() < Duration::from_secs(20));
+            child.kill().expect("kill helper");
+            child.wait().expect("reap helper");
+        }
+
+        #[rstest]
+        fn receive_before_reports_a_closed_peer_as_eof() {
+            let (mut child, mut transport) = spawn_transport("true", &[]);
+            child.wait().expect("reap helper");
+
+            let result = transport.receive_before(Instant::now() + Duration::from_secs(20));
+
+            assert!(matches!(result, Err(TransportError::Io(_))));
+        }
     }
 }
