@@ -1028,14 +1028,19 @@ child-only `.env(...)` values to prove the real CLI environment adapter.
 
 OrthoConfig v0.10.0's `_with_sources` loaders accept `MapEnv` and explicit file
 sources for tests that exercise discovery and merging. Pass `--config-path`
-when a test needs to control a configuration file. Direct `std::env::set_var`
+when a test needs to control a configuration file. When a scenario exercises
+the no-override path, pin `WEAVER_CONFIG_PATH` to an empty file rather than
+leaving the selector unset: discovery otherwise falls through to
+`/etc/xdg/weaver/config.toml`, an XDG base, or a `weaver.toml` in the working
+directory, so the result would depend on the host. Direct `std::env::set_var`
 and `std::env::remove_var` are forbidden in Weaver tests.
 
 `crates/weaver-config/tests/compile_time.rs` compiles a downstream-style
 fixture against the public API with `trybuild`. The OrthoConfig derive
 generates much of `Config`, so a fixture keeps the default configuration, its
-accessors, the capability matrix, and the help lookup callable from outside the
-crate after an upgrade changes the generated surface.
+accessors, the capability matrix, the help lookup, the `ARG_IDS` localization
+identifiers, and the `get_doc_metadata()` documentation metadata callable from
+outside the crate after an upgrade changes the generated surface.
 
 ### 15.3 Dependency-graph resolution
 

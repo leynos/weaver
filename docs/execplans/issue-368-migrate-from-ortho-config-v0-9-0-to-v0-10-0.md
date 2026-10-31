@@ -544,21 +544,21 @@ limits; neither produced a finding to disposition. CodeRabbit submitted
 changes-requested with two minor documentation findings, both verified against
 the source and repaired in `234fa30`:
 
-- Section 15.1 of the developers guide presented `--force=false` as a Weaver
+- Section 15.1 of the developers' guide presented `--force=false` as a Weaver
   configuration option. `weaver_config::Config` has no `force` field and
   `weaver-cli` defines no `--force` flag; the only `force` boolean is the
   `DerivedFixture` in `crates/weaver-cli/src/command_ir/tests.rs`. The
   paragraph now names the derive fixture and states that Weaver exposes no such
   option.
-- The users and developers guides still named `nightly-2026-10-26` after the
+- The users' and developers' guides still named `nightly-2026-10-26` after the
   rebase moved `rust-toolchain.toml` to `nightly-2026-10-27`. Both now name the
   pin the repository actually reads. The earlier decision-log entry that
   records the 2026-10-26 pin is retained as history and marked superseded.
 
-LanguageTool also flagged the hyphen in "Nightly-only" in the users guide. That
-hyphen stays: "Nightly" is here the proper name of the Rust release channel,
-not an adverb modifying the following participle, so the flagged rule does not
-apply.
+LanguageTool also flagged the hyphen in "Nightly-only" in the users' guide.
+That hyphen stays: "Nightly" is here the proper name of the Rust release
+channel, not an adverb modifying the following participle, so the flagged rule
+does not apply.
 
 The same review run reported one failed pre-merge check and two warnings. All
 three were verified against the source and actioned rather than dismissed; the
@@ -582,7 +582,52 @@ action review requests:
   `tests/ui/public_api.rs`, compiles downstream-style use of `Config`, its
   accessors, the capability matrix, and `config_field_help`, following the
   existing `weaver-config`/`weaver-docs-gate`/`weaver-plugins` practice. The
-  developers guide records the new case.
+  developers' guide records the new case.
+
+## Second review round and dispositions
+
+The queued review of `717d2c1` completed at 2026-10-31 13:58 UTC with two
+findings and one repeated pre-merge warning. All three were verified against
+the source and actioned:
+
+- **Ambient discovery in the precedence harness, functional correctness.**
+  `write_file` returned `None` when no file lines were queued, so the defaults
+  scenario performed live discovery. OrthoConfig orders candidates as required
+  paths, explicit paths, the `WEAVER_CONFIG_PATH` selector, XDG bases, home,
+  then project roots, and `load_first` takes the first existing candidate. A
+  host with `/etc/xdg/weaver/config.toml`, an XDG base, or a `weaver.toml` in
+  the working directory would therefore have decided the scenario. The harness
+  now always writes its temporary file, empty when no lines are queued, and
+  always pins it through `WEAVER_CONFIG_PATH`, which precedes every ambient
+  candidate. `defaults_harness_shadows_ambient_discovery` guards the invariant
+  by placing a French-locale configuration in an injected `XDG_CONFIG_HOME` and
+  asserting the built-in locale still wins.
+- **Possessive forms in this plan, grammar.** The earlier prose used
+  "developers guide" and "users guide" as bare compounds. The guide names are
+  possessive, matching the repository's `developers' guide` and `users' guide`
+  usage, and now read accordingly.
+- **Testing (Compile-Time / Ui), warning, repeated.** The first fixture
+  compiled only `Config` accessors and `config_field_help`; it did not reach
+  the generated surface the migration actually changes.
+  `tests/ui/public_api.rs` now also imports `OrthoConfig`,
+  `OrthoConfigLocalization`, and `OrthoConfigDocs`, compiles `Config::ARG_IDS`
+  and the generated localization constants, and reads
+  `Config::get_doc_metadata()` and `get_doc_metadata_for_path` field by field
+  as the help path does.
+
+Gate evidence for the repaired tree, run sequentially on top of `717d2c1`:
+
+| Gate                                                                         | Result                                                                                                     |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `make check-fmt`                                                             | Passed after `mdtablefix` formatting; 103 files unchanged.                                                 |
+| `make markdownlint`                                                          | Passed; the spelling gate left `typos.toml` unchanged and markdownlint reported 0 issues in 103 files.     |
+| `make nixie`                                                                 | Passed; all diagrams validated.                                                                            |
+| `make lint`                                                                  | Passed; rustdoc, Clippy across all targets and features, and Whitaker.                                     |
+| `make test-workflow-contracts`                                               | Passed; 271 tests.                                                                                         |
+| `cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture`     | Passed; 15 tests.                                                                                          |
+| `make test`                                                                  | Stopped at the recorded baseline: 8 `weaver-cards` Cranelift SIGABRTs, 588 passed, 4 skipped, 976 not run. |
+| `cargo test -p weaver-config --all-features --test configuration_precedence` | Passed; 9 tests.                                                                                           |
+| `cargo test -p weaver-config --all-features --test compile_time`             | Passed; the fixture crate compiled and ran in 247.63 seconds while waiting for compile slots.              |
 
 ## Decision log
 
@@ -677,6 +722,10 @@ action review requests:
 - [x] Mark the PR ready, reply to the completeness/correctness assessment with
   candidate-bound evidence, and disposition the formal CodeRabbit review's two
   documentation findings by repairing them in `234fa30`.
+- [x] Disposition the review of `717d2c1`: pin harness discovery to an empty
+  temporary file with a shadowing regression test, correct the plan's
+  possessive guide names, and extend the `trybuild` fixture to the generated
+  localization and documentation metadata.
 - [ ] Re-gate the repaired head, confirm the review round is clean, and merge
   when the equilibrium conditions hold.
 
