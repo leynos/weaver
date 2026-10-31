@@ -629,6 +629,33 @@ Gate evidence for the repaired tree, run sequentially on top of `717d2c1`:
 | `cargo test -p weaver-config --all-features --test configuration_precedence` | Passed; 9 tests.                                                                                           |
 | `cargo test -p weaver-config --all-features --test compile_time`             | Passed; the fixture crate compiled and ran in 247.63 seconds while waiting for compile slots.              |
 
+## Hosted CI repair for the extended fixture
+
+Hosted coverage on `0164a29` failed the `build-test` lane (run 41216559213):
+nextest terminated `weaver-config::compile_time public_api_contracts_compile`
+after its default 180 seconds, with 1593 of 1594 tests passing and four
+skipped. The log shows the fixture crate's dev-profile build finishing in
+`1m 53s` and the test killed before it finished. Extending the fixture to
+compile the generated localization and documentation metadata is what the
+pre-merge warning asked for; the cost lands in an instrumented from-scratch
+build of the fixture crate's dependency tree, not in the fixture file itself.
+
+`.config/nextest.toml` now sets
+`slow-timeout = { period = "120s", terminate-after = 5 }` for the
+`compile_time` binaries only. Section 7.2 of the developers' guide previously
+recorded that the repository set no nextest configuration and that a larger
+runner was the remedy for a slow lane; it now records the measured overrun, the
+scoped override, and that lane duration is still a runner-sizing question.
+
+Gate evidence for the repair:
+
+| Gate                                                                    | Result                                                                                                                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `make check-fmt`                                                        | Passed after `mdtablefix` rewrapped this section; the recheck left every file unchanged.                                        |
+| `make markdownlint`                                                     | Passed; the spelling stage left `typos.toml` unchanged and markdownlint reported 0 issues in 103 files.                         |
+| `make nixie`                                                            | Passed; all diagrams validated.                                                                                                 |
+| `cargo nextest run -p weaver-config --all-features --test compile_time` | Passed; 1 test in 255.04 seconds with `SLOW` markers at 120 and 240 seconds, which proves the override applies, and no timeout. |
+
 ## Decision log
 
 - **2026-10-26 — Import immutable documentation first.** The upstream tag and
@@ -678,6 +705,13 @@ Gate evidence for the repaired tree, run sequentially on top of `717d2c1`:
   master-to-main rename, not an OrthoConfig regression. Main's installer repin
   fixes it, so the branch takes that base rather than changing this PR's lint
   configuration.
+- **2026-10-31 — Scope the nextest slow-timeout to the trybuild suites.** The
+  coverage lane terminated `weaver-config`'s compile-time fixture at nextest's
+  default 180 seconds, which the instrumented from-scratch build of the fixture
+  crate now needs for itself. Raising the deadline for the whole workspace
+  would hide genuinely slow tests; raising it for the three `compile_time`
+  binaries covers only the builds that legitimately take that long. Lane
+  duration remains a runner-sizing question.
 
 ## Progress
 
@@ -726,6 +760,9 @@ Gate evidence for the repaired tree, run sequentially on top of `717d2c1`:
   temporary file with a shadowing regression test, correct the plan's
   possessive guide names, and extend the `trybuild` fixture to the generated
   localization and documentation metadata.
+- [x] Repair the hosted coverage timeout introduced by extending the
+  `trybuild` fixture: scope a nextest `slow-timeout` override to the
+  `compile_time` binaries and record the decision in the developers' guide.
 - [ ] Re-gate the repaired head, confirm the review round is clean, and merge
   when the equilibrium conditions hold.
 

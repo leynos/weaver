@@ -1,0 +1,12 @@
+# Nextest terminates a test after three slow periods, which is 180 seconds by
+# default. That budget suits unit and behavioural tests, but the `compile_time`
+# suites drive `trybuild`, which compiles a downstream crate and its whole
+# dependency tree from inside the test process. The coverage job performs that
+# build under instrumentation, so these suites run an order of magnitude longer
+# than an ordinary test and the default budget expires while the fixture is
+# still compiling. Give that family a budget sized for a from-scratch build,
+# while still terminating a genuinely hung test.
+
+[[profile.default.overrides]]
+filter = 'binary(compile_time)'
+slow-timeout = { period = "120s", terminate-after = 5 }
