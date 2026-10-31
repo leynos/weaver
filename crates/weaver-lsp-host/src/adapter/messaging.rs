@@ -5,6 +5,7 @@ use serde_json::Value;
 use tracing::{debug, warn};
 
 use super::{
+    clock::Deadline,
     error::AdapterError,
     jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse},
     lifecycle::ADAPTER_TARGET,
@@ -109,11 +110,22 @@ where
 /// Handles interleaved JSON-RPC messages (notifications, server requests, and responses)
 /// by looping and processing each message until a response with matching ID is found.
 ///
-/// Uses a bounded iteration limit to prevent blocking indefinitely on interleaved messages.
+/// Uses a bounded iteration limit and a single deadline (the transport's response timeout) to
+/// prevent blocking indefinitely on interleaved messages or a silent server.
+///
+/// # Errors
+/// Returns `TransportError::TimedOut` (wrapped) if the deadline passes first, and
+/// `AdapterError::InvalidResponseTimeout` if the configured timeout is too large to add to the
+/// current time.
 pub(super) fn receive_response_for_request(
     transport: &mut StdioTransport,
     request_id: i64,
 ) -> Result<JsonRpcResponse, AdapterError> {
+    // One deadline for the whole wait, so a server that keeps sending
+    // notifications but never answers cannot extend it message by message.
+    let timeout = transport.response_timeout();
+    let deadline = Deadline::after(transport.now(), timeout)
+        .ok_or(AdapterError::InvalidResponseTimeout { timeout })?;
     let mut iteration_count = 0;
     loop {
         if iteration_count >= MAX_RESPONSE_ITERATIONS {
@@ -127,7 +139,7 @@ pub(super) fn receive_response_for_request(
         }
         iteration_count += 1;
 
-        let message_bytes = transport.receive()?;
+        let message_bytes = transport.receive_before(deadline)?;
 
         let message = JsonRpcMessage::from_bytes(&message_bytes)?;
 

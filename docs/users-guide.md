@@ -1521,6 +1521,14 @@ Graceful shutdown is performed when the daemon stops: a `shutdown` request is
 sent to each running language server, followed by an `exit` notification. If a
 server does not exit within five seconds, it is terminated forcefully.
 
+Each request to a language server has a 30-second response deadline. A server
+that does not answer in time (for example because it is wedged or starved of
+CPU) is terminated and the request fails, so operations that treat the language
+server as optional, such as `--detail semantic` enrichment, degrade instead of
+stalling. The daemon does not start a replacement for that server for 60
+seconds, so a batch of requests fails quickly rather than waiting out one
+deadline per request.
+
 ## Double-Lock safety harness
 
 All `act` commands pass through a "Double-Lock" safety harness before any

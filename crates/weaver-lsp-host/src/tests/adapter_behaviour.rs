@@ -9,7 +9,7 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::{
     Language,
-    adapter::{AdapterError, LspServerConfig, ProcessLanguageServer},
+    adapter::{AdapterError, DEFAULT_RESPONSE_TIMEOUT, LspServerConfig, ProcessLanguageServer},
     server::{LanguageServer, LanguageServerError},
 };
 
@@ -47,6 +47,7 @@ fn create_rust_adapter_with_command(
         command: command.into(),
         args: Vec::new(),
         working_dir: None,
+        response_timeout: DEFAULT_RESPONSE_TIMEOUT,
     };
     let adapter = ProcessLanguageServer::with_config(Language::Rust, config);
     world.borrow_mut().adapter = Some(adapter);
@@ -172,6 +173,7 @@ fn then_adapter_command_is_custom(_world: &RefCell<AdapterTestWorld>) -> Result<
         command: PathBuf::from("my-rust-analyzer"),
         args: Vec::new(),
         working_dir: None,
+        response_timeout: DEFAULT_RESPONSE_TIMEOUT,
     };
     ensure!(
         command_file_name(&config) == Some("my-rust-analyzer"),
