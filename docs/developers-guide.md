@@ -40,12 +40,9 @@ Development builds follow the estate's Rust build standard, which
 `.cargo/config.toml` sets and Cargo auto-discovers, so a bare `cargo build`
 gets it:
 
-- Cranelift is the development-profile codegen backend. The suite was measured
-  under it on the pinned toolchain; CI's coverage lane builds with LLVM, and
-  its scope is narrower than `make test`: the pinned coverage action defaults
-  `all-features`, `all-targets` and `doctests` to `false`, and this workflow
-  does not override them. A green coverage lane is therefore not evidence that
-  `make test` passes under Cranelift; that comes from `make test` itself.
+- LLVM is the development-profile codegen backend. Cranelift is a recorded
+  exception, because the suite aborts under it (see
+  [3.1 The Cranelift codegen backend exception](#31-the-cranelift-codegen-backend-exception)).
 - Every `rustflags` source enables the parallel `rustc` frontend with
   `-Zthreads=8`.
 - The `cfg(target_os = "linux")` source also links with `mold`. macOS and
@@ -84,6 +81,49 @@ and `build_standard_warnings_test.py` holds the default warning policy, and
 its own arguments. Every dry run starts from `build_standard_env.py`'s
 controlled environment, which removes the caller's exported targets, flag sets
 and Make options, and `build_standard_env_test.py` holds each helper to it.
+
+### 3.1 The Cranelift codegen backend exception
+
+The Concordat `rust-build-defaults` rule makes Cranelift the development
+default only where the repository's own suite passes under it. Weaver's does
+not, so it records an exception, and `.cargo/config.toml` carries no
+`codegen-backend` key (`tests/workflow_contracts/build_footprint_test.py`
+refuses one).
+
+Measured on `nightly-2026-10-27` (31 October 2026), with
+`cargo nextest run --workspace --all-targets --all-features --no-fail-fast`
+under the Cranelift development default: 1,564 tests ran and 48 failed, all
+with the same abort, `llvm.x86.sse2.pmulhu.w is not yet supported` (SIGABRT,
+from `rustc_codegen_cranelift` issue 171). The failing tests are every
+`observe graph-slice` test that builds the graph-slice code path:
+
+- `weaver-cards`: `tests::graph_slice_behaviour::graph_slice_schema_behaviour`
+  and seven `tests::graph_slice_snapshot_tests::snapshot_*` tests;
+- `weaverd`: six `dispatch::observe::graph_slice::tests::*` tests;
+- `weaver-e2e`: the 34 `graph_slice_snapshots` cases that run the
+  Cranelift-built `weaver` binary.
+
+The same suite under LLVM fails only the 18 Python graph-slice snapshot cases
+on a machine where `pyrefly` is installed (the snapshots expect it absent), so
+the backend is the cause. Re-measure on the next toolchain bump: remove the
+exception and restore the key only if the whole suite passes under Cranelift.
+
+### 3.2 The development-build footprint
+
+The Concordat `rust-dev-build-footprint` rule holds the size of a development
+`target` directory down, and `tests/workflow_contracts/build_footprint_test.py`
+holds the configuration to it:
+
+- `[profile.dev]` in the root `Cargo.toml` sets `incremental = false` (DF-001)
+  and `debug = 0` (DF-002). CI never reads incremental caches or debug data.
+- `[unstable] embed-metadata = false` in `.cargo/config.toml` (DF-003) is the
+  native Cargo key for the dated nightly pins from 2026-07-31. Never use raw
+  `rustc` metadata flags; they broke build scripts. A pin older than that date
+  would need `no-embed-metadata = true` instead.
+
+Debug data is off, so a debugger sees no variables in a development build. Set
+`CARGO_PROFILE_DEV_DEBUG=2` for a debugging session, and `make release` or a
+`--release` build for anything that ships.
 
 ## 4 Workspace lint policy
 
@@ -725,11 +765,11 @@ instead of compiling them on every run:
 - **Whitaker**, Weaver's external lint engine, comes from the
   `install-whitaker` action, pinned to a full commit SHA in
   `.github/workflows/ci.yml`. Its `cranelift: true` input provisions the
-  backend used by Weaver's development profile. The action installs a
-  digest-verified prebuilt installer and rolling lint suite, and fails in
-  `ci-mode` rather than falling back to a source build. The suite follows
-  Whitaker's default branch tip; the action revision and installer version are
-  pinned, but the suite itself is not.
+  backend Whitaker's own lint build uses; Weaver's development profile builds
+  with LLVM. The action installs a digest-verified prebuilt installer and
+  rolling lint suite, and fails in `ci-mode` rather than falling back to a
+  source build. The suite follows Whitaker's default branch tip; the action
+  revision and installer version are pinned, but the suite itself is not.
 - **Merman**, the Mermaid renderer used by `make nixie`, comes from
   `install-nixie`. The action verifies Merman 0.7.0's release archive against
   its pinned checksum and installs Nixie 1.1.0 on Python 3.14, which that
