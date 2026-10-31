@@ -86,20 +86,21 @@ impl Harness {
     }
 
     /// Writes the accumulated file lines into the temporary directory and
-    /// returns the path, or `None` when no lines were queued so discovery falls
-    /// back to defaults. The path is injected as `WEAVER_CONFIG_PATH` later.
-    fn write_file(&self) -> Result<Option<std::path::PathBuf>, String> {
+    /// returns the path. The path is always pinned through
+    /// `WEAVER_CONFIG_PATH`, even when no lines are queued, so discovery never
+    /// falls through to ambient candidates such as
+    /// `$XDG_CONFIG_HOME/weaver/config.toml`, `/etc/xdg/weaver/config.toml`, or
+    /// a `weaver.toml` in the working directory. An empty file is a valid
+    /// configuration layer that supplies no overrides.
+    fn write_file(&self) -> Result<std::path::PathBuf, String> {
         let contents = self.file_lines.borrow();
-        if contents.is_empty() {
-            return Ok(None);
-        }
         let directory =
             Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
                 .map_err(|error| format!("open temporary configuration directory: {error}"))?;
         directory
             .write(CONFIG_FILE_NAME, contents.join("\n").as_bytes())
             .map_err(|error| format!("write temporary configuration file: {error}"))?;
-        Ok(Some(self.temp_dir.path().join(CONFIG_FILE_NAME)))
+        Ok(self.temp_dir.path().join(CONFIG_FILE_NAME))
     }
 
     /// Loads configuration from the queued file, environment, and CLI inputs and
@@ -110,17 +111,14 @@ impl Harness {
             return Ok(());
         }
         let config_path = self.write_file()?;
-        let mut environment = self
+        let environment = self
             .environment
             .borrow()
             .iter()
             .fold(MapEnv::new(), |source, (key, value)| {
                 source.with_var(*key, value.clone())
-            });
-        if let Some(path) = config_path {
-            environment =
-                environment.with_var(CONFIG_PATH_ENV, path.to_string_lossy().into_owned());
-        }
+            })
+            .with_var(CONFIG_PATH_ENV, config_path.to_string_lossy().into_owned());
         let environment = Arc::new(environment);
         let discovery: SharedEnvSource = environment.clone();
         let merge: SharedScanEnvSource = environment;
@@ -311,6 +309,48 @@ fn then_rename_is_denied(harness: &HarnessState) -> Result<(), String> {
         Some(CapabilityOverride::Deny)
     );
     Ok(())
+}
+
+/// Guards the harness's discovery isolation. OrthoConfig takes the first
+/// existing candidate in selector, XDG, home, then project order, so an
+/// ambient configuration file would otherwise decide the defaults scenario.
+/// The harness pins `WEAVER_CONFIG_PATH` to its own empty file, which must
+/// shadow a discoverable XDG configuration.
+#[test]
+fn defaults_harness_shadows_ambient_discovery() -> Result<(), String> {
+    let harness = Harness::new()?;
+    let ambient = TempDir::new().map_err(|error| format!("create ambient directory: {error}"))?;
+    write_ambient_xdg_configuration(&ambient)?;
+    harness.set_environment(
+        "XDG_CONFIG_HOME",
+        ambient.path().to_string_lossy().into_owned(),
+    );
+
+    harness.resolve()?;
+
+    assert_eq!(
+        harness.config()?.locale(),
+        Config::default().locale(),
+        "the pinned empty file must outrank an ambient XDG configuration"
+    );
+    Ok(())
+}
+
+/// Writes a distinguishable `weaver/config.toml` beneath `root`, so a scenario
+/// that leaked discovery would resolve the French locale rather than the
+/// built-in default.
+fn write_ambient_xdg_configuration(root: &TempDir) -> Result<(), String> {
+    let directory = Dir::open_ambient_dir(root.path(), cap_std::ambient_authority())
+        .map_err(|error| format!("open ambient configuration directory: {error}"))?;
+    directory
+        .create_dir_all("weaver")
+        .map_err(|error| format!("create ambient configuration directory: {error}"))?;
+    let weaver_directory = directory
+        .open_dir("weaver")
+        .map_err(|error| format!("open ambient weaver directory: {error}"))?;
+    weaver_directory
+        .write(CONFIG_FILE_NAME, b"locale = \"fr-FR\"\n")
+        .map_err(|error| format!("write ambient configuration file: {error}"))
 }
 
 // Bind every scenario by name. `#[scenario(path = ...)]` without `name` or
