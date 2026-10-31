@@ -180,9 +180,14 @@ fn given_file_allows_rename(harness: &HarnessState) -> Result<(), String> {
 
 #[given("the environment forces the Rust rename capability")]
 fn given_environment_forces_rename(harness: &HarnessState) -> Result<(), String> {
+    // OrthoConfig parses environment values with Figment's TOML-like inline
+    // syntax, not the directive's `Display` spelling or JSON, so a collection
+    // must be encoded as an array of inline tables.
     configured_harness(harness)?.set_environment(
         CAPABILITY_OVERRIDES_ENV,
-        String::from("Rust:observe.rename=force"),
+        String::from(
+            r#"[{language = "Rust", capability = "observe.rename", directive = "force"}]"#,
+        ),
     );
     Ok(())
 }
@@ -289,5 +294,54 @@ fn then_rename_is_denied(harness: &HarnessState) -> Result<(), String> {
     Ok(())
 }
 
-#[scenario(path = "tests/features/configuration_precedence.feature")]
-fn configuration_precedence(#[from(harness)] _harness: HarnessState) {}
+// Bind every scenario by name. `#[scenario(path = ...)]` without `name` or
+// `index` expands only the first scenario in the file, which silently leaves
+// the rest unexercised.
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "CLI locale overrides environment and configuration file values"
+)]
+fn cli_locale_overrides_lower_layers(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Explicit CLI value equal to the default overrides lower layers"
+)]
+fn explicit_cli_default_overrides_lower_layers(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Environment locale overrides a configuration file value"
+)]
+fn environment_locale_overrides_file(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Configuration file locale overrides the built-in default"
+)]
+fn file_locale_overrides_builtin_default(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Defaults are returned when no configuration sources are provided"
+)]
+fn defaults_without_sources(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Invalid environment locale fails closed"
+)]
+fn invalid_environment_locale_fails_closed(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "CLI daemon socket overrides environment and configuration file values"
+)]
+fn cli_socket_overrides_lower_layers(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "The last duplicate capability directive wins during configuration loading"
+)]
+fn last_duplicate_capability_directive_wins(#[from(harness)] _harness: HarnessState) {}
