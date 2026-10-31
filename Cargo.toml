@@ -145,3 +145,9 @@ bare_urls = "deny"
 invalid_html_tags = "deny"
 invalid_codeblock_attributes = "deny"
 unescaped_backticks = "deny"
+
+# Dev-build footprint (DF-001, DF-002): incremental caches and debug data are
+# the bulk of a dev `target` directory and CI never reads either.
+[profile.dev]
+incremental = false
+debug = 0

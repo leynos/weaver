@@ -1,8 +1,11 @@
 # Repository-wide Cargo defaults for the development build standard.
 #
-# Cranelift is the development-profile backend, the parallel `rustc` frontend
-# is the default for every build, and the mold linker is the default on Linux.
-# Cargo auto-discovers this file, so a bare `cargo build` gets all three.
+# The parallel `rustc` frontend is the default for every build, and the mold
+# linker is the default on Linux. Cargo auto-discovers this file, so a bare
+# `cargo build` gets both. Cranelift is deliberately not the development
+# backend: the suite fails under it on the pinned toolchain (developers' guide,
+# "The Cranelift codegen backend exception"), and
+# `tests/workflow_contracts/build_footprint_test.py` refuses the key.
 # `make release` and coverage assign `RUSTFLAGS`, which displaces every
 # `rustflags` source below, so neither adds the frontend flag or mold (a flag the
 # caller exports still survives).
@@ -14,11 +17,11 @@
 # is therefore repeated in each source, and the Makefile restates them where it
 # assigns `RUSTFLAGS` for the gate targets.
 
+# Dev-build footprint (DF-003): on the dated nightly pins from 2026-07-31 the
+# native key stops Cargo embedding metadata in rlibs. Never use raw rustc
+# metadata flags; they broke build scripts.
 [unstable]
-codegen-backend = true
-
-[profile.dev]
-codegen-backend = "cranelift"
+embed-metadata = false
 
 [build]
 rustflags = ["-Zthreads=8"]
