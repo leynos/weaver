@@ -496,13 +496,43 @@ The branch was rebased onto `9284f73` (base `9284f73`, previously `64da324`),
 which also brings `nightly-2026-10-27` and `serde-saphyr` 2.0.0. The rebase
 completed without conflicts, and the combined lockfile still resolves
 `ortho_config` 0.10.0 and `serde-saphyr` 2.0.0. The repair is committed after
-the replay, and the full sequential gate run and hosted validation for the new
-head remain to be recorded here.
+the replay.
+
+The sequential gate run started at candidate `6179581`. `make check-fmt` failed
+there because `mdtablefix` wanted to rewrap this plan; commit `334a52d` applied
+that rewrap, and commit `394e65b` committed the `typos.toml` that the spelling
+stage regenerated. Both documentation gates were then re-run at head `394e65b`
+and pass. The Rust gates were not affected by those two documentation-only
+commits, so their evidence stands for both candidates.
+
+| Gate or focused validation                                                   | Result at `394e65b`                                                                                                                         |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make check-fmt`                                                             | Passed; `cargo fmt --check` clean and `mdtablefix --check` reported 103 files unchanged.                                                    |
+| `make markdownlint`                                                          | Passed; spelling gate refreshed `typos.toml` with no diff and markdownlint reported 0 issues in 103 files.                                  |
+| `make nixie`                                                                 | Passed; all diagrams validated.                                                                                                             |
+| `make lint`                                                                  | Passed; rustdoc and Clippy all targets/all features, plus Whitaker.                                                                         |
+| `make test-workflow-contracts`                                               | Passed; 271 pytest cases.                                                                                                                   |
+| `cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture`     | Passed; 15 tests.                                                                                                                           |
+| `make test`                                                                  | Stopped at the recorded baseline: 8 `weaver-cards` SIGABRTs from Cranelift's unsupported `llvm.x86.sse2.pmulhu.w`, leaving 964 tests unrun. |
+| `cargo test -p weaver-config --features cli --test configuration_precedence` | Passed; 8 tests, one per scenario.                                                                                                          |
+| `cargo test --workspace --all-targets --all-features --release`              | Passed; 1569 tests, 4 ignored, 37 test binaries under `nightly-2026-10-27`.                                                                 |
+| `cargo test --workspace --doc --release`                                     | Passed; 93 doctests, 8 ignored.                                                                                                             |
+
+The default-profile `make test` abort is the previously recorded Cranelift
+backend limitation, unrelated to OrthoConfig; the release all-target and
+doctest gates are the authoritative full-workspace validation and pass.
+
+Hosted validation at `394e65b` is green: the `CI` workflow's `build-test` job
+succeeded, which confirms the `9284f73` Whitaker installer repin clears the
+Dylint driver failure, and the `Release Dry Run` workflow succeeded for all
+published targets.
 
 Focused repair evidence:
 
 ```plaintext
 /tmp/test-precedence-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0-3.out
+/tmp/check-fmt-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-recheck.out
+/tmp/markdownlint-82e5abc1-2df2-47e5-89b8-49d2b584e7d8-issue-368-recheck.out
 ```
 
 ## Decision log
@@ -590,8 +620,12 @@ Focused repair evidence:
   Figment syntax; the focused suite passes eight tests.
 - [x] Rebase onto `9284f73`, which supplies the Whitaker installer fix for the
   hosted Dylint driver failure.
-- [ ] Run the sequential gates and obtain hosted validation for the rebased
-  head, then reconcile the formal review and merge.
+- [x] Run the sequential gates and obtain hosted validation for the rebased
+  head. `make check-fmt` and `make markdownlint` pass again at `394e65b`, the
+  release all-target and doctest gates pass, and hosted `CI` and
+  `Release Dry Run` are green for that head.
+- [ ] Reconcile the formal CodeRabbit review and the pre-merge checks, then
+  merge when the equilibrium conditions hold.
 
 ## Acceptance criteria
 
