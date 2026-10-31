@@ -1,12 +1,11 @@
 //! JSON-RPC messaging functionality for language server communication.
 
-use std::time::Instant;
-
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use tracing::{debug, warn};
 
 use super::{
+    clock::Deadline,
     error::AdapterError,
     jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse},
     lifecycle::ADAPTER_TARGET,
@@ -125,8 +124,7 @@ pub(super) fn receive_response_for_request(
     // One deadline for the whole wait, so a server that keeps sending
     // notifications but never answers cannot extend it message by message.
     let timeout = transport.response_timeout();
-    let deadline = Instant::now()
-        .checked_add(timeout)
+    let deadline = Deadline::after(transport.now(), timeout)
         .ok_or(AdapterError::InvalidResponseTimeout { timeout })?;
     let mut iteration_count = 0;
     loop {

@@ -10,12 +10,18 @@
 use std::{
     io::{self, BufRead, BufReader, BufWriter, Write},
     process::{ChildStdin, ChildStdout},
-    sync::mpsc::{self, Receiver, RecvTimeoutError, Sender},
+    sync::{
+        Arc,
+        mpsc::{self, Receiver, RecvTimeoutError, Sender},
+    },
     thread,
     time::{Duration, Instant},
 };
 
-use super::error::TransportError;
+use super::{
+    clock::{Clock, Deadline, SystemClock},
+    error::TransportError,
+};
 
 /// Writes an LSP-framed message to any writer.
 fn write_framed<W: Write>(mut writer: W, message: &[u8]) -> Result<(), TransportError> {
@@ -74,6 +80,7 @@ pub struct StdioTransport {
     frames: Receiver<Result<Vec<u8>, TransportError>>,
     writer: BufWriter<ChildStdin>,
     response_timeout: Duration,
+    clock: Arc<dyn Clock>,
 }
 
 impl StdioTransport {
@@ -87,8 +94,20 @@ impl StdioTransport {
             frames,
             writer: BufWriter::new(stdin),
             response_timeout: DEFAULT_RESPONSE_TIMEOUT,
+            clock: Arc::new(SystemClock),
         }
     }
+
+    /// Replaces the clock that decides how much of a deadline is left.
+    #[must_use]
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Returns the current instant according to the transport's clock.
+    #[must_use]
+    pub fn now(&self) -> Instant { self.clock.now() }
 
     /// Sets how long callers wait for the response to one request.
     #[must_use]
@@ -118,8 +137,8 @@ impl StdioTransport {
     /// `deadline`. Returns `TransportError::MissingContentLength`,
     /// `TransportError::InvalidHeader` or `TransportError::Io` if the server
     /// sends a malformed frame or closes its stdout.
-    pub fn receive_before(&mut self, deadline: Instant) -> Result<Vec<u8>, TransportError> {
-        let remaining = deadline.saturating_duration_since(Instant::now());
+    pub fn receive_before(&mut self, deadline: Deadline) -> Result<Vec<u8>, TransportError> {
+        let remaining = deadline.remaining(self.clock.now());
         match self.frames.recv_timeout(remaining) {
             Ok(frame) => frame,
             Err(RecvTimeoutError::Timeout) => Err(TransportError::TimedOut),
@@ -289,6 +308,12 @@ mod tests {
         use std::process::{Child, Command, Stdio};
 
         use super::*;
+        use crate::adapter::ManualClock;
+
+        /// Returns a deadline `timeout` from now on the real clock.
+        fn deadline_in(timeout: Duration) -> Deadline {
+            Deadline::after(Instant::now(), timeout).expect("test timeouts fit the clock")
+        }
 
         /// Spawns `command` with piped stdio and wraps its pipes in a transport.
         fn spawn_transport(command: &str, args: &[&str]) -> (Child, StdioTransport) {
@@ -310,7 +335,7 @@ mod tests {
             transport.send(b"hello").expect("send failed");
 
             let received = transport
-                .receive_before(Instant::now() + Duration::from_secs(20))
+                .receive_before(deadline_in(Duration::from_secs(20)))
                 .expect("echoed frame should arrive");
 
             assert_eq!(received, b"hello");
@@ -323,10 +348,30 @@ mod tests {
             let (mut child, mut transport) = spawn_transport("sh", &["-c", "cat > /dev/null"]);
             let started = Instant::now();
 
-            let result = transport.receive_before(Instant::now() + Duration::from_millis(100));
+            let result = transport.receive_before(deadline_in(Duration::from_millis(100)));
 
             assert!(matches!(result, Err(TransportError::TimedOut)));
             assert!(started.elapsed() < Duration::from_secs(20));
+            child.kill().expect("kill helper");
+            child.wait().expect("reap helper");
+        }
+
+        #[rstest]
+        fn receive_before_expires_when_the_injected_clock_passes_the_deadline() {
+            // An hour-long deadline on a clock that then jumps two hours: the
+            // transport must answer from the clock, not wait the hour out.
+            let clock = Arc::new(ManualClock::new());
+            let (mut child, transport) = spawn_transport("sh", &["-c", "cat > /dev/null"]);
+            let mut transport = transport.with_clock(Arc::clone(&clock) as Arc<dyn Clock>);
+            let deadline = Deadline::after(transport.now(), Duration::from_secs(3600))
+                .expect("an hour fits the clock");
+            clock.advance(Duration::from_secs(7200));
+            let started = Instant::now();
+
+            let result = transport.receive_before(deadline);
+
+            assert!(matches!(result, Err(TransportError::TimedOut)));
+            assert!(started.elapsed() < Duration::from_secs(5));
             child.kill().expect("kill helper");
             child.wait().expect("reap helper");
         }
@@ -336,7 +381,7 @@ mod tests {
             let (mut child, mut transport) = spawn_transport("true", &[]);
             child.wait().expect("reap helper");
 
-            let result = transport.receive_before(Instant::now() + Duration::from_secs(20));
+            let result = transport.receive_before(deadline_in(Duration::from_secs(20)));
 
             assert!(matches!(result, Err(TransportError::Io(_))));
         }

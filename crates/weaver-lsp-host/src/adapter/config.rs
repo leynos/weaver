@@ -107,4 +107,22 @@ mod tests {
 
         assert_eq!(config.working_dir, Some(PathBuf::from("/workspace")));
     }
+
+    #[rstest]
+    #[case(Language::Rust)]
+    #[case(Language::Python)]
+    #[case(Language::TypeScript)]
+    fn every_default_config_waits_the_default_response_timeout(#[case] language: Language) {
+        let config = LspServerConfig::for_language(language);
+
+        assert_eq!(config.response_timeout, DEFAULT_RESPONSE_TIMEOUT);
+        assert_eq!(DEFAULT_RESPONSE_TIMEOUT, Duration::from_secs(30));
+    }
+
+    #[rstest]
+    fn response_timeout_builder_overrides_the_default() {
+        let config = LspServerConfig::rust_default().with_response_timeout(Duration::from_secs(5));
+
+        assert_eq!(config.response_timeout, Duration::from_secs(5));
+    }
 }

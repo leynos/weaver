@@ -2,7 +2,7 @@
 
 use std::{
     process::{Child, Command, Stdio},
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -10,6 +10,7 @@ use serde::de::DeserializeOwned;
 use tracing::{debug, warn};
 
 use super::{
+    clock::{Clock, RestartCooldown, SystemClock},
     config::LspServerConfig,
     error::AdapterError,
     lifecycle::{ADAPTER_TARGET, terminate_child},
@@ -19,13 +20,9 @@ use super::{
 };
 use crate::Language;
 
-/// How long a server that stopped answering is left alone before the adapter
-/// will start a fresh process for it.
-///
-/// Without a cooldown, every request in a batch (for example one hover per card
-/// in a graph slice) would start a new process and wait out its own deadline,
-/// multiplying the stall by the batch size.
-const RESTART_COOLDOWN: Duration = Duration::from_secs(60);
+/// How long a server that stopped answering is left alone (see
+/// [`RestartCooldown`] for why).
+const RESTART_COOLDOWN: RestartCooldown = RestartCooldown::new(Duration::from_secs(60));
 
 /// A language server adapter that spawns and communicates with an external process.
 ///
@@ -47,6 +44,8 @@ pub struct ProcessLanguageServer {
     state: Mutex<ProcessState>,
     /// When the process was last stopped for not answering in time.
     unresponsive_since: Mutex<Option<Instant>>,
+    /// Source of "now" for response deadlines and the restart cooldown.
+    clock: Arc<dyn Clock>,
 }
 
 impl ProcessLanguageServer {
@@ -58,6 +57,7 @@ impl ProcessLanguageServer {
             config: LspServerConfig::for_language(language),
             state: Mutex::new(ProcessState::NotStarted),
             unresponsive_since: Mutex::new(None),
+            clock: Arc::new(SystemClock),
         }
     }
 
@@ -69,7 +69,15 @@ impl ProcessLanguageServer {
             config,
             state: Mutex::new(ProcessState::NotStarted),
             unresponsive_since: Mutex::new(None),
+            clock: Arc::new(SystemClock),
         }
+    }
+
+    /// Replaces the clock behind response deadlines and the restart cooldown.
+    #[must_use]
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     /// Returns the language this adapter serves.
@@ -128,8 +136,9 @@ impl ProcessLanguageServer {
                 source: std::sync::Arc::new(std::io::Error::other("no stdout")),
             })?;
 
-        let transport =
-            StdioTransport::new(stdout, stdin).with_response_timeout(self.config.response_timeout);
+        let transport = StdioTransport::new(stdout, stdin)
+            .with_response_timeout(self.config.response_timeout)
+            .with_clock(Arc::clone(&self.clock));
 
         debug!(
             target: ADAPTER_TARGET,
@@ -147,12 +156,12 @@ impl ProcessLanguageServer {
             .unresponsive_since
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
-        match since {
-            Some(at) if at.elapsed() < RESTART_COOLDOWN => Err(AdapterError::Unresponsive {
-                cooldown_secs: RESTART_COOLDOWN.as_secs(),
-            }),
-            _ => Ok(()),
+        if RESTART_COOLDOWN.is_cooling(since, self.clock.now()) {
+            return Err(AdapterError::Unresponsive {
+                cooldown_secs: RESTART_COOLDOWN.period().as_secs(),
+            });
         }
+        Ok(())
     }
 
     /// Kills a server that missed its deadline and starts the restart cooldown.
@@ -170,7 +179,7 @@ impl ProcessLanguageServer {
         *self
             .unresponsive_since
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner()) = Some(Instant::now());
+            .unwrap_or_else(|poison| poison.into_inner()) = Some(self.clock.now());
         let mut state = self
             .state
             .lock()
