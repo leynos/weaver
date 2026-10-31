@@ -87,10 +87,18 @@ and Make options, and `build_standard_env_test.py` holds each helper to it.
 
 ## 4 Workspace lint policy
 
-The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates
-that opt into `[lints] workspace = true` must therefore document their private
-items as well as their public API. The existing `missing_docs` rustc lint
-continues to deny undocumented public items.
+The workspace lint tables include Rust and Clippy rules, but Cargo applies them
+to a package only when its manifest opts in with `[lints] workspace = true`.
+That setting brings in the full workspace Clippy policy, including
+`clippy::missing_docs_in_private_items`.
+
+`weaver-cli`, `weaver-config`, `weaver-sandbox`, and `weaverd` opt into only
+the Rust public API documentation requirement. Each manifest declares
+`[lints.rust] missing_docs = "deny"` directly, without inheriting the broader
+workspace Clippy policy. Keep the package list here aligned with those
+manifests. The `weaver-cli` compile-time test checks all four declarations and
+uses `trybuild` fixtures to pin the accepted and rejected `missing_docs`
+diagnostics.
 
 ## 5 Workflow pins and Dependabot
 

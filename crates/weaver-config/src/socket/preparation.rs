@@ -14,57 +14,82 @@ use super::SocketEndpoint;
 pub enum SocketPreparationError {
     /// Parent directory is missing when creating a Unix socket path.
     #[error("socket path '{path}' has no parent directory")]
-    MissingParent { path: Utf8PathBuf },
+    MissingParent {
+        /// The socket path that has no parent directory.
+        path: Utf8PathBuf,
+    },
     /// Failed to create or adjust socket directories.
     #[error("failed to create socket directory '{path}': {source}")]
     CreateDirectory {
+        /// The directory that could not be created or adjusted.
         path: Utf8PathBuf,
+        /// The underlying I/O error.
         #[source]
         source: std::io::Error,
     },
     /// Failed to read metadata while securing socket directories.
     #[error("failed to inspect socket directory '{path}': {source}")]
     ReadMetadata {
+        /// The directory whose metadata could not be read.
         path: Utf8PathBuf,
+        /// The underlying I/O error.
         #[source]
         source: std::io::Error,
     },
     /// Failed to canonicalize a socket directory while validating safety.
     #[error("failed to canonicalize socket directory '{path}': {source}")]
     Canonicalize {
+        /// The directory that could not be canonicalized.
         path: Utf8PathBuf,
+        /// The underlying I/O error.
         #[source]
         source: std::io::Error,
     },
     /// Encountered a symbolic link in the socket directory path.
     #[error("socket directory '{path}' resolves through a symlink")]
-    SymlinkDetected { path: Utf8PathBuf },
+    SymlinkDetected {
+        /// The directory path that resolves through a symlink.
+        path: Utf8PathBuf,
+    },
     /// Socket directory canonicalization produced a non-UTF-8 path.
     #[error("socket directory canonicalizes to a non-UTF-8 path: {path:?}")]
-    NonUtf8CanonicalPath { path: std::path::PathBuf },
+    NonUtf8CanonicalPath {
+        /// The canonical path that is not valid UTF-8.
+        path: std::path::PathBuf,
+    },
     /// Socket directory escapes the configured base path.
     #[error("socket directory '{path}' escapes to '{canonical}' when canonicalized")]
     PathTraversal {
+        /// The directory as configured.
         path: Utf8PathBuf,
+        /// The canonical path it resolved to.
         canonical: Utf8PathBuf,
     },
     /// Socket directory resolves to a non-directory entry.
     #[cfg(unix)]
     #[error("socket directory '{path}' is not a directory")]
-    NotDirectory { path: Utf8PathBuf },
+    NotDirectory {
+        /// The path that is not a directory.
+        path: Utf8PathBuf,
+    },
     /// Socket directory ownership does not match the effective user ID.
     #[cfg(unix)]
     #[error("socket directory '{path}' is owned by uid {owner} but expected uid {expected}")]
     WrongOwner {
+        /// The directory with the unexpected owner.
         path: Utf8PathBuf,
+        /// The owning user ID found.
         owner: u32,
+        /// The effective user ID expected.
         expected: u32,
     },
     /// Updating socket directory permissions failed.
     #[cfg(unix)]
     #[error("failed to update permissions for socket directory '{path}': {source}")]
     SetPermissions {
+        /// The directory whose permissions could not be updated.
         path: Utf8PathBuf,
+        /// The underlying I/O error.
         #[source]
         source: std::io::Error,
     },
