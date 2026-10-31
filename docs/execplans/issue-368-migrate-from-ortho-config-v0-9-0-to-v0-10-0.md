@@ -665,6 +665,25 @@ validated by their own workflow runs and reported in the pull-request
 conversation rather than by editing this file again; this plan's hosted
 evidence therefore trails the reviewed head by one documentation commit.
 
+## Third review round and dispositions
+
+Review 5724442616 completed at 2026-10-31 19:03 UTC against `ebf459d`, the head
+that repaired the coverage timeout. It was incremental over the five files
+changed since `717d2c1` and contained no inline comments and no pre-merge
+warnings. Its single finding was an outside-diff Minor on this plan: the
+progress list quoted green hosted runs for `394e65b` without naming the runs or
+saying they covered an earlier head, which read as current-head validation.
+
+The finding was valid and was actioned in `5585264`, which records the runs for
+`ebf459d`, states that the earlier runs validated `394e65b`, and explains that
+later heads are validated by their own runs rather than by editing this plan.
+`CI` run 41233230578 and `Release Dry Run` run 41233230657 are green for that
+commit. The disposition comment (issue comment 6548055083) asked CodeRabbit to
+check the repair, and its reply (issue comment 6548066107) confirmed the
+finding addressed against `5585264`, publishing the run table for both heads.
+The finding sits in the review body rather than a native review thread, so
+there was no thread to resolve.
+
 ## Decision log
 
 - **2026-10-26 — Import immutable documentation first.** The upstream tag and
@@ -772,8 +791,9 @@ evidence therefore trails the reviewed head by one documentation commit.
 - [x] Repair the hosted coverage timeout introduced by extending the
   `trybuild` fixture: scope a nextest `slow-timeout` override to the
   `compile_time` binaries and record the decision in the developers' guide.
-- [ ] Disposition the review of `ebf459d`: record commit-bound hosted evidence
-  and state how later heads are validated.
+- [x] Disposition the review of `ebf459d`: record commit-bound hosted evidence
+  and state how later heads are validated. CodeRabbit confirmed the repair in
+  issue comment 6548066107.
 - [ ] Re-gate the repaired head, confirm the review round is clean, and merge
   when the equilibrium conditions hold.
 
