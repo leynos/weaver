@@ -32,7 +32,13 @@ quoted-source spelling that must remain unchanged.
 
 ## 2 Workspace baseline
 
-The workspace targets `ortho_config` v0.9.0 and Rust 1.89.
+The workspace targets `ortho_config` v0.10.0 and Rust 1.90. The `weaver-config`
+library retains a Rust 1.89 minimum: its runtime dependency graph passes a Rust
+1.89.0 check. Its test targets use the internal `weaver-test-macros` package,
+which follows the workspace's Rust 1.90 floor. The workspace floor follows
+`tree-sitter` 0.27.1, which requires Rust 1.90. Test-only `serial_test` 4.0.1
+requires Rust 1.93.1; `rust-toolchain.toml` pins Nightly 2026-10-27 for
+repository builds and full-suite tests.
 
 ## 3 The build standard
 
@@ -305,15 +311,23 @@ wireframe, so two vCPU would roughly triple a lane that already takes a quarter
 of an hour.
 
 `coverage-upload` is the one compile-heavy lane on the smaller shape, and that
-is a computed margin rather than an oversight. The workspace has two trybuild
-cases, `public_api_contracts_compile` and
-`test_support_exports_compile_downstream`, which spawn their own cargo builds;
-they took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
-kills a test after 180 seconds by default, and this repository sets no nextest
-configuration, so that default applies. Even at three times slower those cases
-stay under half the kill. Nobody waits on this lane, so the smaller shape is
-worth the slower run. Should the margin close, the remedy is
-`ubicloud-standard-4`, not a longer deadline for the test.
+is a computed margin rather than an oversight. The workspace has three trybuild
+cases which spawn their own cargo builds: `public_api_contracts_compile` in
+`weaver-config` and in `weaver-docs-gate`, and
+`test_support_exports_compile_downstream` in `weaver-plugins`. The two older
+cases took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
+terminates a test after three 60-second periods by default, and those cases
+then sat under half that kill. An instrumented trybuild build grows with the
+downstream crate's dependency tree rather than with the fixture. On 2026-10-31
+the `weaver-config` case exceeded the default kill on the developer lane once
+the fixture grew to cover the generated metadata: its instrumented build alone
+took almost two minutes, and the fixture then ran past the remaining budget.
+`.config/nextest.toml` therefore allows five 120-second periods for the
+`compile_time` binaries alone. That budget fits a from-scratch instrumented
+build and still terminates a hung test inside the job timeout. It is not a
+general deadline increase: the remedy for a slow lane stays
+`ubicloud-standard-4`, not a longer deadline for every test. Nobody waits on
+`coverage-upload`, so the smaller shape is worth the slower run there.
 
 ### 7.3 The fork fallback
 
@@ -1023,14 +1037,14 @@ test crates.
 
 ## 15 Configuration framework internals
 
-### 15.1 `ortho_config` v0.9.0 integration
+### 15.1 `ortho_config` v0.10.0 integration
 
 `weaver_config::Config` declares its discovery policy inline through the
 `#[ortho_config(discovery(...))]` attribute. The app name, dotfile, project
 file, and `--config-path` flag are all defined next to the struct, so every
 consumer shares the same generated loader without bespoke builders.
 
-The `ortho_config` v0.9.0 loader preserves the stricter discovery and parsing
+The `ortho_config` v0.10.0 loader preserves the stricter discovery and parsing
 model adopted in earlier releases: if any discovered configuration file fails
 to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
 Both the CLI and daemon bubble that error to the user instead of quietly
@@ -1040,6 +1054,11 @@ Configuration is layered with `ortho_config`, producing the precedence order
 `defaults < files < environment < CLI`. File discovery honours `--config-path`
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
+
+An explicit CLI value takes precedence even when it equals the clap default.
+OrthoConfig derives accept an attached value for boolean fields, such as
+`--force=false` in the derive fixture; the space-separated form `--force false`
+is rejected. Weaver defines no `--force` option.
 
 `Config` enables OrthoConfig's `post_merge_hook` and owns the normalization of
 duplicate capability directives there. This keeps the invariant consistent for
@@ -1054,10 +1073,21 @@ it exercises the `weaver-config` domain merge policy without changing the test
 process environment. Binary-level tests use `assert_cmd` with `env_clear()` and
 child-only `.env(...)` values to prove the real CLI environment adapter.
 
-`MapEnv` is limited to OrthoConfig discovery inputs, such as home or XDG path
-selection. It does not model `WEAVER_*` configuration-value merging, so do not
-use it in place of declarative layers or child-process tests. Direct
-`std::env::set_var` and `std::env::remove_var` are forbidden in Weaver tests.
+OrthoConfig v0.10.0's `_with_sources` loaders accept `MapEnv` and explicit file
+sources for tests that exercise discovery and merging. Pass `--config-path`
+when a test needs to control a configuration file. When a scenario exercises
+the no-override path, pin `WEAVER_CONFIG_PATH` to an empty file rather than
+leaving the selector unset: discovery otherwise falls through to
+`/etc/xdg/weaver/config.toml`, an XDG base, or a `weaver.toml` in the working
+directory, so the result would depend on the host. Direct `std::env::set_var`
+and `std::env::remove_var` are forbidden in Weaver tests.
+
+`crates/weaver-config/tests/compile_time.rs` compiles a downstream-style
+fixture against the public API with `trybuild`. The OrthoConfig derive
+generates much of `Config`, so a fixture keeps the default configuration, its
+accessors, the capability matrix, the help lookup, the `ARG_IDS` localization
+identifiers, and the `get_doc_metadata()` documentation metadata callable from
+outside the crate after an upgrade changes the generated surface.
 
 ### 15.3 Dependency-graph resolution
 

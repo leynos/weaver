@@ -21,6 +21,9 @@ fn canonical_projection_matches_the_independent_command_contract() {
     assert_canonical_command(&canonical_projection(), &metadata, "weaver");
 }
 
+/// Builds the expected metadata for the built-in command tree by hand.
+/// Keeping the expectation independent of the production projection means a
+/// regression in that code cannot silently rewrite what the test asserts.
 fn canonical_projection() -> DocMetadata {
     command(
         ("weaver", Some("weaver"), "weaver-command-root"),
@@ -67,6 +70,8 @@ fn canonical_projection() -> DocMetadata {
     )
 }
 
+/// Assembles one expected command node with the shared canonical sections and
+/// no optional metadata, keeping the fixture focused on names and nesting.
 fn command(
     (app_name, bin_name, about_id): (&str, Option<&str>, &str),
     fields: Vec<FieldMetadata>,
@@ -81,10 +86,14 @@ fn command(
         sections: canonical_sections(),
         fields,
         subcommands,
+        behaviour: None,
+        profiles: None,
         windows: None,
     }
 }
 
+/// Builds a required string field with CLI metadata for the expected tree, so
+/// field-level expectations stay declarative beside the command they belong to.
 fn field(name: &str, help_id: &str, value_name: &str) -> FieldMetadata {
     FieldMetadata {
         name: name.to_owned(),
@@ -100,6 +109,7 @@ fn field(name: &str, help_id: &str, value_name: &str) -> FieldMetadata {
             value_name: Some(value_name.to_owned()),
             multiple: false,
             takes_value: true,
+            value_optional: false,
             possible_values: Vec::new(),
             hide_in_help: false,
         }),
@@ -111,6 +121,8 @@ fn field(name: &str, help_id: &str, value_name: &str) -> FieldMetadata {
     }
 }
 
+/// Returns the heading identifiers every expected command shares, letting the
+/// fixture vary only command-specific data while still asserting headings.
 fn canonical_sections() -> SectionsMetadata {
     SectionsMetadata {
         headings_ids: HeadingIds {
@@ -134,6 +146,9 @@ fn canonical_sections() -> SectionsMetadata {
     }
 }
 
+/// Recursively compares an actual projection against the expected fixture,
+/// prefixing each failure with its command path. Lengths are checked before
+/// zipping so missing or extra nodes fail with a readable path, not truncation.
 fn assert_canonical_command(expected: &DocMetadata, actual: &DocMetadata, path: &str) {
     assert_eq!(actual.ir_version, expected.ir_version, "{path}.ir_version");
     assert_eq!(actual.app_name, expected.app_name, "{path}.app_name");
@@ -144,6 +159,8 @@ fn assert_canonical_command(expected: &DocMetadata, actual: &DocMetadata, path: 
         "{path}.synopsis_id"
     );
     assert_eq!(actual.sections, expected.sections, "{path}.sections");
+    assert_eq!(actual.behaviour, expected.behaviour, "{path}.behaviour");
+    assert_eq!(actual.profiles, expected.profiles, "{path}.profiles");
     assert_eq!(actual.windows, expected.windows, "{path}.windows");
     assert_eq!(
         actual.fields.len(),

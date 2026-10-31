@@ -33,6 +33,7 @@ struct ConfigFieldArgMetadata {
     short: Option<char>,
     help: &'static str,
     takes_value: bool,
+    value_optional: bool,
     multiple: bool,
     value_name: Option<String>,
 }
@@ -114,6 +115,13 @@ pub fn write_help_for_args<W: Write>(
     }
 }
 
+/// Assembles the augmented help command from the projected command metadata,
+/// the localisation resources, and the configuration fields OrthoConfig
+/// exposes.
+///
+/// The returned command is safe to render repeatedly; ordering caveats are
+/// attached to every nested subcommand so each help page keeps the same
+/// guidance.
 fn build_command(
     root: &command_tree::CommandNode,
     localisation_resources: impl IntoIterator<Item = &'static str>,
@@ -161,6 +169,7 @@ fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
         short: cli.short,
         help: config_field_help(&field.help_id),
         takes_value: cli.takes_value,
+        value_optional: cli.value_optional,
         multiple: cli.multiple,
         value_name: cli.value_name.clone(),
     };
@@ -176,6 +185,7 @@ fn config_arg_from_metadata(field: ConfigFieldArgMetadata) -> Arg {
         short,
         help,
         takes_value,
+        value_optional,
         multiple,
         value_name,
     } = field;
@@ -195,6 +205,12 @@ fn config_arg_from_metadata(field: ConfigFieldArgMetadata) -> Arg {
         } else {
             ArgAction::Set
         });
+        if value_optional {
+            arg = arg
+                .num_args(0..=1)
+                .require_equals(true)
+                .default_missing_value("true");
+        }
         if let Some(value_name) = value_name {
             arg = arg.value_name(value_name);
         }

@@ -3,17 +3,11 @@
 
 #![cfg(feature = "cli")]
 
-use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    env,
-    ffi::OsString,
-    path::Path,
-    sync::{Mutex, MutexGuard},
-};
+use std::{cell::RefCell, collections::BTreeMap, ffi::OsString, sync::Arc};
 
 use cap_std::fs::Dir;
 use googletest::prelude::*;
+use ortho_config::{MapEnv, OrthoConfig, SharedEnvSource, SharedScanEnvSource};
 use pretty_assertions::assert_eq;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -29,22 +23,11 @@ use weaver_config::{
 };
 use weaver_test_macros::allow_fixture_expansion_lints;
 
-const CONFIG_PATH_ENV: &str = "WEAVER_CONFIG_PATH";
 const LOCALE_ENV: &str = "WEAVER_LOCALE";
 const SOCKET_ENV: &str = "WEAVER_DAEMON_SOCKET";
 const CAPABILITY_OVERRIDES_ENV: &str = "WEAVER_CAPABILITY_OVERRIDES";
+const CONFIG_PATH_ENV: &str = "WEAVER_CONFIG_PATH";
 const CONFIG_FILE_NAME: &str = "weaver.toml";
-const DISCOVERY_VARIABLES: &[&str] = &[
-    "HOME",
-    "USERPROFILE",
-    "APPDATA",
-    "LOCALAPPDATA",
-    "XDG_CONFIG_HOME",
-    "XDG_CONFIG_DIRS",
-];
-
-static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
-
 type HarnessState = Result<Harness, String>;
 
 struct Harness {
@@ -56,6 +39,9 @@ struct Harness {
 }
 
 impl Harness {
+    /// Creates a harness with a fresh temporary directory and empty file,
+    /// environment, and CLI inputs. Returns a `Result` because creating the
+    /// directory can fail before any scenario step runs.
     fn new() -> HarnessState {
         Ok(Self {
             temp_dir: TempDir::new()
@@ -81,6 +67,9 @@ impl Harness {
 
     fn add_file_locale(&self, locale: &str) { self.add_file_line(format!("locale = {locale:?}")); }
 
+    /// Appends a TOML daemon-socket line for a TCP endpoint, validating the
+    /// text through `SocketEndpoint` first. Non-TCP endpoints are rejected
+    /// because the precedence scenarios only exercise transport over TCP.
     fn add_file_socket(&self, endpoint: &str) -> Result<(), String> {
         let endpoint = endpoint
             .parse::<SocketEndpoint>()
@@ -96,37 +85,56 @@ impl Harness {
         Ok(())
     }
 
-    fn write_file(&self) -> Result<Option<std::path::PathBuf>, String> {
+    /// Writes the accumulated file lines into the temporary directory and
+    /// returns the path. The path is always pinned through
+    /// `WEAVER_CONFIG_PATH`, even when no lines are queued, so discovery never
+    /// falls through to ambient candidates such as
+    /// `$XDG_CONFIG_HOME/weaver/config.toml`, `/etc/xdg/weaver/config.toml`, or
+    /// a `weaver.toml` in the working directory. An empty file is a valid
+    /// configuration layer that supplies no overrides.
+    fn write_file(&self) -> Result<std::path::PathBuf, String> {
         let contents = self.file_lines.borrow();
-        if contents.is_empty() {
-            return Ok(None);
-        }
         let directory =
             Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
                 .map_err(|error| format!("open temporary configuration directory: {error}"))?;
         directory
             .write(CONFIG_FILE_NAME, contents.join("\n").as_bytes())
             .map_err(|error| format!("write temporary configuration file: {error}"))?;
-        Ok(Some(self.temp_dir.path().join(CONFIG_FILE_NAME)))
+        Ok(self.temp_dir.path().join(CONFIG_FILE_NAME))
     }
 
+    /// Loads configuration from the queued file, environment, and CLI inputs and
+    /// caches the outcome. Later calls return without reloading, so `config`
+    /// and `error` observe the same load even when it failed.
     fn resolve(&self) -> Result<(), String> {
         if self.resolved.borrow().is_some() {
             return Ok(());
         }
         let config_path = self.write_file()?;
-        let environment = self.environment.borrow().clone();
-        let _scope =
-            IsolatedEnvironment::new(&self.temp_dir, config_path.as_deref(), &environment)?;
+        let environment = self
+            .environment
+            .borrow()
+            .iter()
+            .fold(MapEnv::new(), |source, (key, value)| {
+                source.with_var(*key, value.clone())
+            })
+            .with_var(CONFIG_PATH_ENV, config_path.to_string_lossy().into_owned());
+        let environment = Arc::new(environment);
+        let discovery: SharedEnvSource = environment.clone();
+        let merge: SharedScanEnvSource = environment;
         let arguments = std::iter::once(OsString::from("weaver"))
             .chain(self.cli.borrow().iter().cloned())
             .collect::<Vec<_>>();
         self.resolved.replace(Some(
-            Config::load_from_iter(arguments).map_err(|error| error.to_string()),
+            Config::load_from_iter_with_sources(arguments, discovery, merge)
+                .map_err(|error| error.to_string()),
         ));
         Ok(())
     }
 
+    /// Returns a clone of the cached configuration, failing when `resolve` has
+    /// not run or the load itself failed, so assertions never silently see
+    /// defaults.
     fn config(&self) -> Result<Config, String> {
         self.resolved
             .borrow()
@@ -135,6 +143,8 @@ impl Harness {
             .clone()
     }
 
+    /// Returns the cached load error, or an error when resolution succeeded, so a
+    /// scenario asserting failure cannot pass against a valid configuration.
     fn error(&self) -> Result<String, String> {
         match self.config() {
             Ok(config) => Err(format!("configuration should fail, got {config:?}")),
@@ -143,77 +153,12 @@ impl Harness {
     }
 }
 
-struct IsolatedEnvironment {
-    _lock: MutexGuard<'static, ()>,
-    previous: BTreeMap<OsString, Option<OsString>>,
-}
-
-impl IsolatedEnvironment {
-    fn new(
-        temp_dir: &TempDir,
-        config_path: Option<&Path>,
-        overrides: &BTreeMap<&'static str, String>,
-    ) -> Result<Self, String> {
-        let lock = ENVIRONMENT_LOCK
-            .lock()
-            .map_err(|error| format!("lock configuration environment: {error}"))?;
-        let mut previous = DISCOVERY_VARIABLES
-            .iter()
-            .map(|key| (OsString::from(key), env::var_os(key)))
-            .collect::<BTreeMap<_, _>>();
-        previous.extend(
-            env::vars_os()
-                .filter(|(key, _)| key.to_string_lossy().starts_with("WEAVER_"))
-                .map(|(key, value)| (key, Some(value))),
-        );
-
-        // SAFETY: this guard serialises every mutation in this test binary and
-        // restores the complete captured configuration environment on drop.
-        unsafe {
-            for key in previous.keys() {
-                env::remove_var(key);
-            }
-            env::set_var("HOME", temp_dir.path());
-            env::set_var("USERPROFILE", temp_dir.path());
-            env::set_var("APPDATA", temp_dir.path());
-            env::set_var("LOCALAPPDATA", temp_dir.path());
-            env::set_var("XDG_CONFIG_HOME", temp_dir.path().join("xdg-home"));
-            env::set_var("XDG_CONFIG_DIRS", temp_dir.path().join("xdg-dirs"));
-            if let Some(path) = config_path {
-                env::set_var(CONFIG_PATH_ENV, path);
-            }
-            for (key, value) in overrides {
-                env::set_var(key, value);
-            }
-        }
-        Ok(Self {
-            _lock: lock,
-            previous,
-        })
-    }
-}
-
-impl Drop for IsolatedEnvironment {
-    fn drop(&mut self) {
-        // SAFETY: `new` captured these values while holding the matching lock;
-        // restoring them prevents test configuration from leaking to callers.
-        unsafe {
-            for key in self.previous.keys() {
-                env::remove_var(key);
-            }
-            for (key, value) in &self.previous {
-                if let Some(value) = value {
-                    env::set_var(key, value);
-                }
-            }
-        }
-    }
-}
-
 #[allow_fixture_expansion_lints]
 #[fixture]
 fn harness() -> HarnessState { Harness::new() }
 
+/// Unwraps the harness state for a BDD step, cloning any setup error so the
+/// step can propagate it with `?` instead of panicking.
 fn configured_harness(harness: &HarnessState) -> Result<&Harness, String> {
     harness.as_ref().map_err(Clone::clone)
 }
@@ -252,9 +197,14 @@ fn given_file_allows_rename(harness: &HarnessState) -> Result<(), String> {
 
 #[given("the environment forces the Rust rename capability")]
 fn given_environment_forces_rename(harness: &HarnessState) -> Result<(), String> {
+    // OrthoConfig parses environment values with Figment's TOML-like inline
+    // syntax, not the directive's `Display` spelling or JSON, so a collection
+    // must be encoded as an array of inline tables.
     configured_harness(harness)?.set_environment(
         CAPABILITY_OVERRIDES_ENV,
-        String::from("Rust:observe.rename=force"),
+        String::from(
+            r#"[{language = "Rust", capability = "observe.rename", directive = "force"}]"#,
+        ),
     );
     Ok(())
 }
@@ -361,5 +311,96 @@ fn then_rename_is_denied(harness: &HarnessState) -> Result<(), String> {
     Ok(())
 }
 
-#[scenario(path = "tests/features/configuration_precedence.feature")]
-fn configuration_precedence(#[from(harness)] _harness: HarnessState) {}
+/// Guards the harness's discovery isolation. OrthoConfig takes the first
+/// existing candidate in selector, XDG, home, then project order, so an
+/// ambient configuration file would otherwise decide the defaults scenario.
+/// The harness pins `WEAVER_CONFIG_PATH` to its own empty file, which must
+/// shadow a discoverable XDG configuration.
+#[test]
+fn defaults_harness_shadows_ambient_discovery() -> Result<(), String> {
+    let harness = Harness::new()?;
+    let ambient = TempDir::new().map_err(|error| format!("create ambient directory: {error}"))?;
+    write_ambient_xdg_configuration(&ambient)?;
+    harness.set_environment(
+        "XDG_CONFIG_HOME",
+        ambient.path().to_string_lossy().into_owned(),
+    );
+
+    harness.resolve()?;
+
+    assert_eq!(
+        harness.config()?.locale(),
+        Config::default().locale(),
+        "the pinned empty file must outrank an ambient XDG configuration"
+    );
+    Ok(())
+}
+
+/// Writes a distinguishable `weaver/config.toml` beneath `root`, so a scenario
+/// that leaked discovery would resolve the French locale rather than the
+/// built-in default.
+fn write_ambient_xdg_configuration(root: &TempDir) -> Result<(), String> {
+    let directory = Dir::open_ambient_dir(root.path(), cap_std::ambient_authority())
+        .map_err(|error| format!("open ambient configuration directory: {error}"))?;
+    directory
+        .create_dir_all("weaver")
+        .map_err(|error| format!("create ambient configuration directory: {error}"))?;
+    let weaver_directory = directory
+        .open_dir("weaver")
+        .map_err(|error| format!("open ambient weaver directory: {error}"))?;
+    weaver_directory
+        .write(CONFIG_FILE_NAME, b"locale = \"fr-FR\"\n")
+        .map_err(|error| format!("write ambient configuration file: {error}"))
+}
+
+// Bind every scenario by name. `#[scenario(path = ...)]` without `name` or
+// `index` expands only the first scenario in the file, which silently leaves
+// the rest unexercised.
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "CLI locale overrides environment and configuration file values"
+)]
+fn cli_locale_overrides_lower_layers(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Explicit CLI value equal to the default overrides lower layers"
+)]
+fn explicit_cli_default_overrides_lower_layers(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Environment locale overrides a configuration file value"
+)]
+fn environment_locale_overrides_file(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Configuration file locale overrides the built-in default"
+)]
+fn file_locale_overrides_builtin_default(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Defaults are returned when no configuration sources are provided"
+)]
+fn defaults_without_sources(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Invalid environment locale fails closed"
+)]
+fn invalid_environment_locale_fails_closed(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "CLI daemon socket overrides environment and configuration file values"
+)]
+fn cli_socket_overrides_lower_layers(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "The last duplicate capability directive wins during configuration loading"
+)]
+fn last_duplicate_capability_directive_wins(#[from(harness)] _harness: HarnessState) {}

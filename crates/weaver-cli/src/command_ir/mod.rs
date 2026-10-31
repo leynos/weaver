@@ -48,6 +48,8 @@ fn project_node(node: &CommandNode, depth: usize) -> Result<DocMetadata, Project
         sections: sections_metadata(),
         fields: node.arguments.iter().map(field_metadata).collect(),
         subcommands: project_children(node, depth)?,
+        behaviour: None,
+        profiles: None,
         windows: None,
     })
 }
@@ -90,6 +92,7 @@ fn field_metadata(argument: &CommandArgument) -> FieldMetadata {
             value_name: argument.value_name.map(str::to_owned),
             multiple: false,
             takes_value: argument.value_name.is_some(),
+            value_optional: false,
             possible_values: Vec::new(),
             hide_in_help: false,
         }),
