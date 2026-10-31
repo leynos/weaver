@@ -12,8 +12,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rstest::{fixture, rstest};
-
 use crate::{
     Language,
     adapter::{AdapterError, LspServerConfig, ProcessLanguageServer},
@@ -28,13 +26,12 @@ const RESPONSE_TIMEOUT: Duration = Duration::from_millis(300);
 /// tolerate a starved host, and far below any external kill limit.
 const PROMPTNESS_BOUND: Duration = Duration::from_secs(20);
 
-#[fixture]
-fn silent_server() -> ProcessLanguageServer {
+fn silent_server_with_timeout(response_timeout: Duration) -> ProcessLanguageServer {
     let config = LspServerConfig {
         command: PathBuf::from("sh"),
         args: vec![String::from("-c"), String::from("cat > /dev/null")],
         working_dir: None,
-        response_timeout: RESPONSE_TIMEOUT,
+        response_timeout,
     };
     ProcessLanguageServer::with_config(Language::Rust, config)
 }
@@ -46,8 +43,9 @@ fn adapter_error(error: &LanguageServerError) -> &AdapterError {
         .expect("error should wrap an AdapterError")
 }
 
-#[rstest]
-fn initialize_gives_up_on_a_silent_server(mut silent_server: ProcessLanguageServer) {
+#[test]
+fn initialize_gives_up_on_a_silent_server() {
+    let mut silent_server = silent_server_with_timeout(RESPONSE_TIMEOUT);
     let started = Instant::now();
 
     let error = silent_server
@@ -65,8 +63,9 @@ fn initialize_gives_up_on_a_silent_server(mut silent_server: ProcessLanguageServ
     );
 }
 
-#[rstest]
-fn an_unresponsive_server_is_not_restarted_straight_away(mut silent_server: ProcessLanguageServer) {
+#[test]
+fn an_unresponsive_server_is_not_restarted_straight_away() {
+    let mut silent_server = silent_server_with_timeout(RESPONSE_TIMEOUT);
     silent_server
         .initialize()
         .expect_err("first attempt times out");
@@ -86,5 +85,22 @@ fn an_unresponsive_server_is_not_restarted_straight_away(mut silent_server: Proc
     assert!(
         matches!(adapter_error(&error), AdapterError::Unresponsive { .. }),
         "expected Unresponsive, got {error:?}"
+    );
+}
+
+#[test]
+fn a_timeout_too_large_for_the_clock_is_rejected_not_a_panic() {
+    let mut server = silent_server_with_timeout(Duration::MAX);
+
+    let error = server
+        .initialize()
+        .expect_err("an unrepresentable deadline cannot be waited for");
+
+    assert!(
+        matches!(
+            adapter_error(&error),
+            AdapterError::InvalidResponseTimeout { .. }
+        ),
+        "expected InvalidResponseTimeout, got {error:?}"
     );
 }

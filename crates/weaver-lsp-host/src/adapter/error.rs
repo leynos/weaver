@@ -1,6 +1,6 @@
 //! Error types for process-based language server adapters.
 
-use std::{io, sync::Arc};
+use std::{io, sync::Arc, time::Duration};
 
 use thiserror::Error;
 
@@ -63,6 +63,13 @@ pub enum AdapterError {
     Unresponsive {
         /// Seconds that must pass after the failure before a restart is tried.
         cooldown_secs: u64,
+    },
+
+    /// The configured response timeout cannot be turned into a deadline.
+    #[error("response timeout {timeout:?} is too large to use as a deadline")]
+    InvalidResponseTimeout {
+        /// The timeout that overflowed the clock.
+        timeout: Duration,
     },
 
     /// Maximum response iterations reached while waiting for response.
