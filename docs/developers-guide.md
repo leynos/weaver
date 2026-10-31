@@ -93,10 +93,9 @@ refuses one).
 Measured on `nightly-2026-10-27` (31 October 2026), with
 `cargo nextest run --workspace --all-targets --all-features --no-fail-fast`
 under the Cranelift development default: 1,564 tests ran and 48 failed, all
-with the same abort,
-`llvm.x86.sse2.pmulhu.w is not yet supported` (SIGABRT, from
-`rustc_codegen_cranelift` issue 171). The failing tests are every `observe
-graph-slice` test that builds the graph-slice code path:
+with the same abort, `llvm.x86.sse2.pmulhu.w is not yet supported` (SIGABRT,
+from `rustc_codegen_cranelift` issue 171). The failing tests are every
+`observe graph-slice` test that builds the graph-slice code path:
 
 - `weaver-cards`: `tests::graph_slice_behaviour::graph_slice_schema_behaviour`
   and seven `tests::graph_slice_snapshot_tests::snapshot_*` tests;
@@ -767,11 +766,10 @@ instead of compiling them on every run:
   `install-whitaker` action, pinned to a full commit SHA in
   `.github/workflows/ci.yml`. Its `cranelift: true` input provisions the
   backend Whitaker's own lint build uses; Weaver's development profile builds
-  with LLVM. The action installs a
-  digest-verified prebuilt installer and rolling lint suite, and fails in
-  `ci-mode` rather than falling back to a source build. The suite follows
-  Whitaker's default branch tip; the action revision and installer version are
-  pinned, but the suite itself is not.
+  with LLVM. The action installs a digest-verified prebuilt installer and
+  rolling lint suite, and fails in `ci-mode` rather than falling back to a
+  source build. The suite follows Whitaker's default branch tip; the action
+  revision and installer version are pinned, but the suite itself is not.
 - **Merman**, the Mermaid renderer used by `make nixie`, comes from
   `install-nixie`. The action verifies Merman 0.7.0's release archive against
   its pinned checksum and installs Nixie 1.1.0 on Python 3.14, which that
