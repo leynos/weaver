@@ -656,6 +656,15 @@ Gate evidence for the repair:
 | `make nixie`                                                            | Passed; all diagrams validated.                                                                                                 |
 | `cargo nextest run -p weaver-config --all-features --test compile_time` | Passed; 1 test in 255.04 seconds with `SLOW` markers at 120 and 240 seconds, which proves the override applies, and no timeout. |
 
+Hosted evidence is bound to the commit it validated. `CI` run 41221779555 and
+`Release Dry Run` run 41221779571 both completed successfully for `ebf459d`,
+the head under formal review when this section was written. The earlier green
+runs quoted in the progress list below validated `394e65b`, not a later head.
+Recording a run in this plan produces a new head, so subsequent heads are
+validated by their own workflow runs and reported in the pull-request
+conversation rather than by editing this file again; this plan's hosted
+evidence therefore trails the reviewed head by one documentation commit.
+
 ## Decision log
 
 - **2026-10-26 — Import immutable documentation first.** The upstream tag and
@@ -763,6 +772,8 @@ Gate evidence for the repair:
 - [x] Repair the hosted coverage timeout introduced by extending the
   `trybuild` fixture: scope a nextest `slow-timeout` override to the
   `compile_time` binaries and record the decision in the developers' guide.
+- [ ] Disposition the review of `ebf459d`: record commit-bound hosted evidence
+  and state how later heads are validated.
 - [ ] Re-gate the repaired head, confirm the review round is clean, and merge
   when the equilibrium conditions hold.
 
