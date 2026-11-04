@@ -25,41 +25,54 @@ use super::{
 
 /// Verifies both endpoints share the runtime directory but not file names.
 pub(super) fn verify_distinct_artefact_names(scenario: &Scenario) -> ScenarioResult<()> {
-    let shared_dir = scenario.runtime_dir();
     for side in [Side::A, Side::B] {
-        let paths = scenario.paths(side);
-        if paths.runtime_dir() != shared_dir {
-            return Err(format!(
-                "endpoint {side:?} runtime directory should be {}, got {}",
-                shared_dir.display(),
-                paths.runtime_dir().display()
-            ));
-        }
-        require_endpoint_scoped_name(paths.lock_file_name(), "lock")?;
-        require_endpoint_scoped_name(paths.pid_file_name(), "pid")?;
-        require_endpoint_scoped_name(paths.health_file_name(), "health")?;
+        verify_endpoint_names(scenario, side)?;
     }
+    verify_endpoint_names_differ(scenario)
+}
 
+/// Verifies one endpoint uses endpoint-scoped names in the shared directory.
+fn verify_endpoint_names(scenario: &Scenario, side: Side) -> ScenarioResult<()> {
+    let paths = scenario.paths(side);
+    require_shared_runtime_dir(scenario.runtime_dir(), paths.runtime_dir(), side)?;
+    require_endpoint_scoped_name(paths.lock_file_name(), "lock")?;
+    require_endpoint_scoped_name(paths.pid_file_name(), "pid")?;
+    require_endpoint_scoped_name(paths.health_file_name(), "health")
+}
+
+/// Fails unless `actual` matches the directory both endpoints share.
+fn require_shared_runtime_dir(shared: &Path, actual: &Path, side: Side) -> ScenarioResult<()> {
+    if actual == shared {
+        return Ok(());
+    }
+    Err(format!(
+        "endpoint {side:?} runtime directory should be {}, got {}",
+        shared.display(),
+        actual.display()
+    ))
+}
+
+/// Verifies the two endpoints resolve to different names for each artefact.
+fn verify_endpoint_names_differ(scenario: &Scenario) -> ScenarioResult<()> {
+    let paths_a = scenario.paths(Side::A);
+    let paths_b = scenario.paths(Side::B);
     for (first, second) in [
-        (
-            scenario.paths(Side::A).lock_file_name(),
-            scenario.paths(Side::B).lock_file_name(),
-        ),
-        (
-            scenario.paths(Side::A).pid_file_name(),
-            scenario.paths(Side::B).pid_file_name(),
-        ),
-        (
-            scenario.paths(Side::A).health_file_name(),
-            scenario.paths(Side::B).health_file_name(),
-        ),
+        (paths_a.lock_file_name(), paths_b.lock_file_name()),
+        (paths_a.pid_file_name(), paths_b.pid_file_name()),
+        (paths_a.health_file_name(), paths_b.health_file_name()),
     ] {
-        if first == second {
-            return Err(format!(
-                "endpoints should not share the runtime file name {}",
-                first.display()
-            ));
-        }
+        require_distinct_names(first, second)?;
+    }
+    Ok(())
+}
+
+/// Fails when both endpoints resolve to the same runtime file name.
+fn require_distinct_names(first: &Path, second: &Path) -> ScenarioResult<()> {
+    if first == second {
+        return Err(format!(
+            "endpoints should not share the runtime file name {}",
+            first.display()
+        ));
     }
     Ok(())
 }
