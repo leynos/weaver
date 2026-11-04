@@ -88,25 +88,31 @@ impl FromStr for CapabilityDirective {
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         let (language, rest) = input
             .split_once(':')
-            .ok_or_else(|| CapabilityDirectiveParseError::MissingLanguage(input.to_string()))?;
-        let language = language.trim();
-        if language.is_empty() {
+            .ok_or_else(|| CapabilityDirectiveParseError::MissingLanguage(input.to_owned()))?;
+        let trimmed_language = language.trim();
+        if trimmed_language.is_empty() {
             return Err(CapabilityDirectiveParseError::EmptyLanguage(
-                input.to_string(),
+                input.to_owned(),
             ));
         }
         let (capability, directive) = rest
             .split_once('=')
-            .ok_or_else(|| CapabilityDirectiveParseError::MissingDirective(input.to_string()))?;
-        let capability = capability.trim();
-        if capability.is_empty() {
+            .ok_or_else(|| CapabilityDirectiveParseError::MissingDirective(input.to_owned()))?;
+        let trimmed_capability = capability.trim();
+        if trimmed_capability.is_empty() {
             return Err(CapabilityDirectiveParseError::EmptyCapability(
-                input.to_string(),
+                input.to_owned(),
             ));
         }
-        let directive = CapabilityOverride::from_str(directive.trim())
-            .map_err(|_| CapabilityDirectiveParseError::InvalidDirective(directive.to_string()))?;
-        Ok(Self::new(language, capability, directive))
+        let trimmed_directive = directive.trim();
+        let parsed_directive = CapabilityOverride::from_str(trimmed_directive).map_err(|_| {
+            CapabilityDirectiveParseError::InvalidDirective(trimmed_directive.to_owned())
+        })?;
+        Ok(Self::new(
+            trimmed_language,
+            trimmed_capability,
+            parsed_directive,
+        ))
     }
 }
 
@@ -143,20 +149,20 @@ impl CapabilityMatrix {
         capability: impl Into<String>,
         directive: CapabilityOverride,
     ) {
-        let language = normalise_key(&language.into());
-        let capability = normalise_key(&capability.into());
-        let entry = self.languages.entry(language).or_default();
-        entry.overrides.insert(capability, directive);
+        let normalised_language = normalise_key(&language.into());
+        let normalised_capability = normalise_key(&capability.into());
+        let entry = self.languages.entry(normalised_language).or_default();
+        entry.overrides.insert(normalised_capability, directive);
     }
 
     /// Retrieves an override for a capability, when present.
     #[must_use]
     pub fn override_for(&self, language: &str, capability: &str) -> Option<CapabilityOverride> {
-        let language = normalise_key(language);
-        let capability = normalise_key(capability);
+        let normalised_language = normalise_key(language);
+        let normalised_capability = normalise_key(capability);
         self.languages
-            .get(&language)
-            .and_then(|caps| caps.overrides.get(&capability).copied())
+            .get(&normalised_language)
+            .and_then(|caps| caps.overrides.get(&normalised_capability).copied())
     }
 }
 
@@ -174,13 +180,14 @@ pub fn deduplicate_directives(directives: &mut Vec<CapabilityDirective>) {
     for mut directive in directives.drain(..) {
         let language = normalise_key(&directive.language);
         let capability = normalise_key(&directive.capability);
-        directive.language = language.clone();
-        directive.capability = capability.clone();
+        directive.language.clone_from(&language);
+        directive.capability.clone_from(&capability);
         merged.insert((language, capability), directive);
     }
     *directives = merged.into_values().collect();
 }
 
+/// Trims surrounding whitespace and lowercases a capability key.
 fn normalise_key(key: &str) -> String { key.trim().to_lowercase() }
 
 #[cfg(test)]
@@ -209,9 +216,10 @@ mod tests {
         deduplicate_directives(&mut directives);
 
         assert_eq!(directives.len(), 1);
-        assert_eq!(directives[0].directive, CapabilityOverride::Deny);
-        assert_eq!(directives[0].language, "rust");
-        assert_eq!(directives[0].capability, "observe.rename");
+        let directive = directives.first().expect("one directive remains");
+        assert_eq!(directive.directive, CapabilityOverride::Deny);
+        assert_eq!(directive.language, "rust");
+        assert_eq!(directive.capability, "observe.rename");
     }
 
     #[test]

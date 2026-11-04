@@ -20,7 +20,13 @@ use lsp_types::{
     Uri,
     VersionedTextDocumentIdentifier,
 };
-pub use recording_server::{CallKind, DocumentSyncErrors, RecordingLanguageServer, ResponseSet};
+pub use recording_server::{
+    CallHierarchyResponses,
+    CallKind,
+    DocumentSyncErrors,
+    RecordingLanguageServer,
+    ResponseSet,
+};
 use rstest::fixture;
 use weaver_test_macros::allow_fixture_expansion_lints;
 pub use world::{TestServerConfig, TestWorld};

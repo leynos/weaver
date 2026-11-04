@@ -20,6 +20,8 @@ use super::{
 };
 use crate::Language;
 
+mod debug;
+
 /// How long a server that stopped answering is left alone (see
 /// [`RestartCooldown`] for why).
 const RESTART_COOLDOWN: RestartCooldown = RestartCooldown::new(Duration::from_secs(60));
@@ -39,8 +41,11 @@ const RESTART_COOLDOWN: RestartCooldown = RestartCooldown::new(Duration::from_se
 /// let capabilities = server.initialize()?;
 /// ```
 pub struct ProcessLanguageServer {
+    /// Language this adapter serves.
     language: Language,
+    /// Spawn configuration for the language server process.
     config: LspServerConfig,
+    /// Current process lifecycle state.
     state: Mutex<ProcessState>,
     /// When the process was last stopped for not answering in time.
     unresponsive_since: Mutex<Option<Instant>>,
@@ -82,7 +87,7 @@ impl ProcessLanguageServer {
 
     /// Returns the language this adapter serves.
     #[must_use]
-    pub fn language(&self) -> Language { self.language }
+    pub const fn language(&self) -> Language { self.language }
 
     /// Spawns the language server process.
     pub(super) fn spawn_process(&self) -> Result<(Child, StdioTransport), AdapterError> {
@@ -124,7 +129,7 @@ impl ProcessLanguageServer {
             .stdin
             .take()
             .ok_or_else(|| AdapterError::SpawnFailed {
-                message: "failed to capture stdin".to_string(),
+                message: "failed to capture stdin".to_owned(),
                 source: std::sync::Arc::new(std::io::Error::other("no stdin")),
             })?;
 
@@ -132,7 +137,7 @@ impl ProcessLanguageServer {
             .stdout
             .take()
             .ok_or_else(|| AdapterError::SpawnFailed {
-                message: "failed to capture stdout".to_string(),
+                message: "failed to capture stdout".to_owned(),
                 source: std::sync::Arc::new(std::io::Error::other("no stdout")),
             })?;
 
@@ -155,7 +160,7 @@ impl ProcessLanguageServer {
         let since = *self
             .unresponsive_since
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if RESTART_COOLDOWN.is_cooling(since, self.clock.now()) {
             return Err(AdapterError::Unresponsive {
                 cooldown_secs: RESTART_COOLDOWN.period().as_secs(),
@@ -179,16 +184,30 @@ impl ProcessLanguageServer {
         *self
             .unresponsive_since
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner()) = Some(self.clock.now());
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(self.clock.now());
         let mut state = self
             .state
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let ProcessState::Running { mut child, .. } =
             std::mem::replace(&mut *state, ProcessState::Stopped)
         {
-            let _ = child.kill();
-            let _ = child.wait();
+            if let Err(error) = child.kill() {
+                warn!(
+                    target: ADAPTER_TARGET,
+                    language = %self.language,
+                    error = %error,
+                    "failed to kill unresponsive language server"
+                );
+            }
+            if let Err(error) = child.wait() {
+                warn!(
+                    target: ADAPTER_TARGET,
+                    language = %self.language,
+                    error = %error,
+                    "failed to reap unresponsive language server"
+                );
+            }
         }
     }
 
@@ -208,7 +227,7 @@ impl ProcessLanguageServer {
         let mut state = self
             .state
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // Recover from poisoning to attempt graceful shutdown even after a panic
 
         let transport = match &mut *state {
@@ -274,6 +293,12 @@ impl ProcessLanguageServer {
     ///
     /// Sends a `shutdown` request followed by an `exit` notification,
     /// then waits for the process to terminate.
+    ///
+    /// # Errors
+    ///
+    /// Never returns an error today: request and notification failures are
+    /// logged and the process is still reaped. The `Result` is retained so a
+    /// future transport failure can be surfaced without a breaking change.
     pub fn shutdown(&self) -> Result<(), AdapterError> {
         debug!(
             target: ADAPTER_TARGET,
@@ -304,7 +329,7 @@ impl ProcessLanguageServer {
         let mut state = self
             .state
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // Recover from poisoning to attempt graceful shutdown even after a panic
         if let ProcessState::Running { mut child, .. } =
@@ -321,7 +346,7 @@ impl ProcessLanguageServer {
         let mut state = self
             .state
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         *state = ProcessState::Running { child, transport };
     }
@@ -345,33 +370,14 @@ impl Drop for ProcessLanguageServer {
                     error = %e,
                     "failed to kill language server process on drop"
                 );
-            } else {
-                let _ = child.wait();
+            } else if let Err(error) = child.wait() {
+                warn!(
+                    target: ADAPTER_TARGET,
+                    language = %self.language,
+                    error = %error,
+                    "failed to reap language server process on drop"
+                );
             }
         }
-    }
-}
-
-impl std::fmt::Debug for ProcessLanguageServer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state_desc = match self.state.lock() {
-            Ok(guard) => match &*guard {
-                ProcessState::NotStarted => "not_started",
-                ProcessState::Running { child, .. } => {
-                    return f
-                        .debug_struct("ProcessLanguageServer")
-                        .field("language", &self.language)
-                        .field("state", &format!("running (pid: {})", child.id()))
-                        .finish();
-                }
-                ProcessState::Stopped => "stopped",
-            },
-            Err(_) => "poisoned",
-        };
-
-        f.debug_struct("ProcessLanguageServer")
-            .field("language", &self.language)
-            .field("state", &state_desc)
-            .finish()
     }
 }

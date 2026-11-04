@@ -16,6 +16,7 @@ use crate::{
     language::Language,
     server::ServerCapabilitySet,
     tests::support::{
+        CallHierarchyResponses,
         DocumentSyncErrors,
         ResponseSet,
         TestServerConfig,
@@ -110,9 +111,9 @@ fn given_rust_failure(world: &RefCell<TestWorld>) -> Result<()> {
 fn given_rust_document_sync_failure(world: &RefCell<TestWorld>) -> Result<()> {
     let mut responses = sample_responses()?;
     responses.document_sync = DocumentSyncErrors {
-        did_open_error: None,
-        did_change_error: Some(String::from("intentional didChange failure")),
-        did_close_error: None,
+        open: None,
+        change: Some(String::from("intentional didChange failure")),
+        close: None,
     };
     let configs = vec![TestServerConfig {
         language: Language::Rust,
@@ -263,7 +264,7 @@ fn sample_responses() -> Result<ResponseSet> {
         }],
         diagnostics: vec![Diagnostic::default()],
         document_sync: DocumentSyncErrors::default(),
-        call_hierarchy: Default::default(),
+        call_hierarchy: CallHierarchyResponses::default(),
         hover: None,
     })
 }
