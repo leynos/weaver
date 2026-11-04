@@ -2221,6 +2221,35 @@ retained. The `sha2` dependency derives endpoint identifiers, `rustix` provides
 Unix file-lock operations, and `windows-sys` exposes the Windows `LockFileEx`
 and `UnlockFileEx` APIs.
 
+### 25.1 Test infrastructure for runtime paths
+
+`crates/weaverd/src/tests/support/` holds the helpers that daemon tests use to
+exercise endpoint-scoped runtime artefacts without touching a real daemon's
+files.
+
+`TestConfigLoader` (`config_loader.rs`) provisions a Unix socket path under a
+temporary directory. Its `runtime_paths` method loads that configuration and
+derives `RuntimePaths` with `from_config_readonly`, so a test sees the same
+endpoint-scoped lock, PID, and health names that production derives while no
+runtime directory is created as a side effect.
+
+`ProcessTestWorld` (`process_world.rs`) stores those derived paths and exposes
+`lock_path`, `pid_path`, and `health_path`. Scenarios assert against those
+accessors rather than fixed `weaverd.*` names, which keeps the behavioural
+features independent of the endpoint identifier.
+
+`terminate_before_pid_write`
+(`crates/weaverd/src/process/guard/test_support.rs`) acquires a real
+`ProcessGuard` on the runtime directory and simulates a launch that dies after
+taking the lock but before it writes a PID. The world's method of the same name
+delegates to it, and the resulting stale lock exercises startup reclamation.
+
+`ProcessTestWorld::lock_exists` returns `Result<bool, String>` rather than a
+plain `bool`: `Ok(true)` and `Ok(false)` report a successful existence check,
+while `Err` reports that the check itself failed. A permission or I/O error is
+therefore surfaced instead of being flattened into "absent", which would let a
+test pass for the wrong reason.
+
 ## 26 Dispatch lifecycle observability internals
 
 This section documents the dispatch and startup-observability helpers added for
