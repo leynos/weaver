@@ -1,8 +1,11 @@
-# Architectural decision record (ADR) 014: Endpoint-scoped daemon runtime artefacts
+# Architectural decision record (ADR) 0014: Endpoint-scoped daemon runtime artefacts
 
 ## Status
 
-Accepted.
+Accepted, 2026-10-18. Weaver keeps the legacy runtime filenames for the default
+endpoint and derives non-default lock, PID, and health filenames from the
+complete configured endpoint, requiring older non-default daemons to stop
+before upgrade.
 
 ## Date
 
