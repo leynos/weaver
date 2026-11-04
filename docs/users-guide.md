@@ -220,7 +220,9 @@ running daemon with a non-default endpoint before upgrading. Those older PID
 and health files did not record their endpoint, so the current CLI cannot
 safely determine which daemon owns them and will not use them to signal a
 process. Stop the daemon with the previous version or its known PID, then
-upgrade and start it again.
+upgrade and start it again. See the
+[endpoint-scoped runtime artefact migration guide](weaver-endpoint-scoped-runtime-migration-guide.md)
+for step-by-step instructions.
 
 The daemon now binds a socket listener as part of startup. It binds to the
 configured `--daemon-socket` endpoint and accepts multiple client connections
