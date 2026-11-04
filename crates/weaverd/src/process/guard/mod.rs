@@ -264,16 +264,6 @@ fn remove_file(dir: &Dir, path: &Path) -> Result<(), LaunchError> {
     with_runtime_file(dir, path, (), |d, name| d.remove_file(name))
 }
 
-/// Reports whether the runtime artefact exists.
-///
-/// # Errors
-///
-/// Returns [`LaunchError::Cleanup`] if the path is invalid or metadata lookup
-/// fails for a reason other than absence.
-fn runtime_file_exists(dir: &Dir, path: &Path) -> Result<bool, LaunchError> {
-    with_runtime_file(dir, path, false, |d, name| d.metadata(name).map(|_| true))
-}
-
 /// Extracts the file name used to address `path` within the runtime directory.
 ///
 /// # Errors
@@ -313,6 +303,8 @@ pub(super) mod test_support;
 
 #[cfg(test)]
 mod tests;
+// check' to verify your resolution
+// weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
 // check' to verify your resolution
 // weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
 // check' to verify your resolution
