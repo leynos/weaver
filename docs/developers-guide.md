@@ -311,23 +311,25 @@ wireframe, so two vCPU would roughly triple a lane that already takes a quarter
 of an hour.
 
 `coverage-upload` is the one compile-heavy lane on the smaller shape, and that
-is a computed margin rather than an oversight. The workspace has three trybuild
+is a computed margin rather than an oversight. The workspace has four trybuild
 cases which spawn their own cargo builds: `public_api_contracts_compile` in
 `weaver-config` and in `weaver-docs-gate`, and
-`test_support_exports_compile_downstream` in `weaver-plugins`. The two older
-cases took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
-terminates a test after three 60-second periods by default, and those cases
-then sat under half that kill. An instrumented trybuild build grows with the
-downstream crate's dependency tree rather than with the fixture. On 2026-10-31
-the `weaver-config` case exceeded the default kill on the developer lane once
-the fixture grew to cover the generated metadata: its instrumented build alone
-took almost two minutes, and the fixture then ran past the remaining budget.
-`.config/nextest.toml` therefore allows five 120-second periods for the
-`compile_time` binaries alone. That budget fits a from-scratch instrumented
-build and still terminates a hung test inside the job timeout. It is not a
-general deadline increase: the remedy for a slow lane stays
-`ubicloud-standard-4`, not a longer deadline for every test. Nobody waits on
-`coverage-upload`, so the smaller shape is worth the slower run there.
+`test_support_exports_compile_downstream` in `weaver-plugins` and in `weaverd`.
+The two older cases took 20.5 and 25.4 seconds of a 50.3-second suite on four
+vCPU. nextest terminates a test after three 60-second periods by default, and
+those cases then sat under half that kill. An instrumented trybuild build grows
+with the downstream crate's dependency tree rather than with the fixture. On
+2026-10-31 the `weaver-config` case exceeded the default kill on the developer
+lane once the fixture grew to cover the generated metadata: its instrumented
+build alone took almost two minutes, and the fixture then ran past the
+remaining budget. `.config/nextest.toml` therefore allows five 120-second
+periods for the `compile_time` binaries alone. That budget fits a from-scratch
+instrumented build and still terminates a hung test inside the job timeout. The
+`weaverd` case instruments the largest dependency tree of the four, so it is
+the one to watch if that budget is ever tightened. It is not a general deadline
+increase: the remedy for a slow lane stays `ubicloud-standard-4`, not a longer
+deadline for every test. Nobody waits on `coverage-upload`, so the smaller
+shape is worth the slower run there.
 
 ### 7.3 The fork fallback
 
@@ -2191,6 +2193,21 @@ plain `bool`: `Ok(true)` and `Ok(false)` report a successful existence check,
 while `Err` reports that the check itself failed. A permission or I/O error is
 therefore surfaced instead of being flattened into "absent", which would let a
 test pass for the wrong reason.
+
+`ProcessTestWorld::wait_for_condition` takes a predicate returning
+`Result<bool, String>` and polls it until it reports `true` or the wait
+deadline expires. A predicate error is returned immediately rather than being
+retried until the timeout, so a broken probe fails the step with its own
+diagnosis instead of a misleading "timed out waiting for …" message.
+
+The end-to-end counterpart lives in
+`crates/weaver-e2e/tests/runtime_artefacts/`. Its `main.rs` carries
+`#![cfg(unix)]` because the scenario drives real `weaver` and `weaverd`
+processes over Unix sockets; the module is therefore compiled and run only on
+Unix hosts. Unlike the daemon unit tests, it derives the expected artefact
+names through the public `RuntimePaths` API rather than the `test-support`
+helpers, so the assertions exercise the same surface a user's configuration
+reaches.
 
 ## 26 Dispatch lifecycle observability internals
 
