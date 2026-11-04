@@ -1485,10 +1485,10 @@ never observe a truncated payload. The snapshot records the lifecycle state
 (`starting`, `ready`, `stopping`), the PID, and a UNIX timestamp, so external
 probes can consume the same readiness signal as the CLI. The endpoint-scoped
 naming and upgrade boundary are recorded in
-[ADR 014](adr-014-endpoint-scoped-runtime-artefacts.md). A daemon started by an
-older version with a non-default endpoint must be stopped before upgrading:
-legacy runtime files contain no endpoint identity, so the new CLI refuses to
-infer ownership from a reachable socket or shared PID file.
+[ADR 0014](adrs/adr-0014-endpoint-scoped-runtime-artefacts.md). A daemon
+started by an older version with a non-default endpoint must be stopped before
+upgrading: legacy runtime files contain no endpoint identity, so the new CLI
+refuses to infer ownership from a reachable socket or shared PID file.
 
 The private runtime lock module keeps platform details at the `ProcessGuard`
 boundary: Unix uses `flock`, Solaris uses `fcntl` with a process-local guard
