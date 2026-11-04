@@ -107,35 +107,35 @@ proptest! {
     #[test]
     fn resolution_matches_advertisement_and_overrides(
         mask in 0u8..32,
-        denied in 0usize..5,
-        forced in 0usize..5,
-        allowed in 0usize..5,
+        denied in prop::sample::select(ALL_KINDS.to_vec()),
+        forced in prop::sample::select(ALL_KINDS.to_vec()),
+        allowed in prop::sample::select(ALL_KINDS.to_vec()),
     ) {
         prop_assume!(denied != forced && denied != allowed && forced != allowed);
         let advertised = set_from_bits(mask);
         let mut overrides = CapabilityMatrix::default();
         overrides.set_override(
             Language::Rust.as_str(),
-            ALL_KINDS[denied].key(),
+            denied.key(),
             CapabilityOverride::Deny,
         );
         overrides.set_override(
             Language::Rust.as_str(),
-            ALL_KINDS[forced].key(),
+            forced.key(),
             CapabilityOverride::Force,
         );
         overrides.set_override(
             Language::Rust.as_str(),
-            ALL_KINDS[allowed].key(),
+            allowed.key(),
             CapabilityOverride::Allow,
         );
 
         let summary = resolve_capabilities(Language::Rust, &advertised, &overrides);
 
         for (index, kind) in ALL_KINDS.iter().enumerate() {
-            let expected = if index == denied {
+            let expected = if *kind == denied {
                 (false, CapabilitySource::DeniedOverride)
-            } else if index == forced {
+            } else if *kind == forced {
                 (true, CapabilitySource::ForcedOverride)
             } else if mask & (1u8 << index) != 0 {
                 (true, CapabilitySource::ServerAdvertised)
