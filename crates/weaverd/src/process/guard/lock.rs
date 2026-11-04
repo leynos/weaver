@@ -111,49 +111,58 @@ pub(super) fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<LockFile, 
     }
 }
 
+/// Reclaims an existing lock file, or reports the daemon that owns it.
+///
+/// The OS lock, not the recorded PID, decides whether a daemon is running. A
+/// PID file can outlive its daemon and its number can be reused by an unrelated
+/// process, so trusting the PID first would refuse a launch whose lock is
+/// actually free. Acquisition therefore runs first; only when the lock is held
+/// is the recorded PID consulted, to tell a live daemon from a launch that has
+/// taken the lock but not yet written its PID.
 fn handle_existing_lock(
     dir: &Dir,
     paths: &RuntimePaths,
     process_lock: ProcessLock,
 ) -> Result<LockFile, LaunchError> {
-    if super::runtime_file_exists(dir, paths.pid_path())? {
-        match super::read_pid(dir, paths.pid_path()) {
-            Some(0) => {
-                warn!(
-                    target: PROCESS_TARGET,
-                    "existing daemon recorded zero pid; cleaning stale files",
-                );
-            }
-            Some(pid) => match super::check_process(pid)? {
-                true => {
+    let lock = match lock_existing_file(dir, paths, process_lock) {
+        Ok(lock) => lock,
+        Err(error @ LaunchError::StartupInProgress { .. }) => {
+            return match live_recorded_pid(dir, paths)? {
+                Some(pid) => {
                     info!(
                         target: PROCESS_TARGET,
                         pid,
                         "refusing to start: existing daemon alive",
                     );
-                    return Err(LaunchError::AlreadyRunning { pid });
+                    Err(LaunchError::AlreadyRunning { pid })
                 }
-                false => {
-                    warn!(
-                        target: PROCESS_TARGET,
-                        pid,
-                        "existing daemon not detected; cleaning stale files",
-                    );
-                }
-            },
-            None => {
-                warn!(
-                    target: PROCESS_TARGET,
-                    "pid file unreadable; cleaning stale files",
-                );
-            }
+                None => Err(error),
+            };
         }
-    }
+        Err(other) => return Err(other),
+    };
 
-    let lock = lock_existing_file(dir, paths, process_lock)?;
+    if let Some(pid) = super::read_pid(dir, paths.pid_path()) {
+        warn!(
+            target: PROCESS_TARGET,
+            pid,
+            "reclaimed stale daemon lock; removing recorded pid and health files",
+        );
+    }
     super::remove_file(dir, paths.pid_path())?;
     super::remove_file(dir, paths.health_path())?;
     Ok(lock)
+}
+
+/// Returns the recorded PID when it names a live process.
+///
+/// A zero or unreadable PID cannot identify a process, so neither is reported
+/// as live.
+fn live_recorded_pid(dir: &Dir, paths: &RuntimePaths) -> Result<Option<u32>, LaunchError> {
+    match super::read_pid(dir, paths.pid_path()) {
+        Some(pid) if super::check_process(pid)? => Ok(Some(pid)),
+        _ => Ok(None),
+    }
 }
 
 fn lock_existing_file(

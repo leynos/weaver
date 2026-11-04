@@ -2180,9 +2180,13 @@ race by locking a different inode. On Solaris, the child reacquires the
 process-associated lock after daemonization; the parent's lock holds until the
 parent exits.
 
-When startup finds a lock file without a live daemon PID, it takes the lock and
-removes stale PID and health files before proceeding. On normal guard cleanup,
-the PID and health files are removed while the persistent lock file is
+When startup finds an existing lock file, it tries to take the OS lock before
+consulting the recorded PID. A free lock is reclaimed and any stale PID and
+health files are removed, even when the recorded PID still names a live
+process, because that number may have been reused after the original daemon
+exited. A held lock is reported as already running when the recorded PID is
+live, and as already in progress when no live PID is recorded. On normal guard
+cleanup, the PID and health files are removed while the persistent lock file is
 retained. The `sha2` dependency derives endpoint identifiers, `rustix` provides
 Unix file-lock operations, and `windows-sys` exposes the Windows `LockFileEx`
 and `UnlockFileEx` APIs.

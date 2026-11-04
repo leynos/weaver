@@ -208,10 +208,6 @@ fn remove_file(dir: &Dir, path: &Path) -> Result<(), LaunchError> {
     with_runtime_file(dir, path, (), |d, name| d.remove_file(name))
 }
 
-fn runtime_file_exists(dir: &Dir, path: &Path) -> Result<bool, LaunchError> {
-    with_runtime_file(dir, path, false, |d, name| d.metadata(name).map(|_| true))
-}
-
 fn runtime_filename(path: &Path) -> Result<&Path, LaunchError> {
     path.file_name()
         .map(Path::new)

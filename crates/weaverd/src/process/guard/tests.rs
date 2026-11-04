@@ -211,11 +211,16 @@ fn stale_pid_is_reclaimed(
 }
 
 #[test]
-fn existing_pid_rejects_launch() -> Result<(), String> {
+fn held_lock_with_live_pid_rejects_launch() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
-    write_runtime_file(&paths, paths.lock_file_name(), b"")?;
+    let runtime_dir = open_runtime_dir(&paths)?;
+    let mut first_guard = ProcessGuard::acquire(runtime_dir, paths.clone())
+        .map_err(|error| format!("initial lock should be acquired: {error}"))?;
     let pid = std::process::id();
-    write_runtime_file(&paths, paths.pid_file_name(), format!("{pid}\n"))?;
+    first_guard
+        .write_pid(pid)
+        .map_err(|error| format!("pid write should succeed: {error}"))?;
+
     let runtime_dir = open_runtime_dir(&paths)?;
     match ProcessGuard::acquire(runtime_dir, paths) {
         Err(LaunchError::AlreadyRunning { pid: recorded }) => {
@@ -224,6 +229,26 @@ fn existing_pid_rejects_launch() -> Result<(), String> {
         }
         other => Err(format!("expected already-running error, got {other:?}")),
     }
+}
+
+#[test]
+fn unlocked_lock_with_live_pid_is_reclaimed() -> Result<(), String> {
+    let (_dir, paths) = build_paths()?;
+    write_runtime_file(&paths, paths.lock_file_name(), b"")?;
+    let pid = std::process::id();
+    write_runtime_file(&paths, paths.pid_file_name(), format!("{pid}\n"))?;
+
+    let runtime_dir = open_runtime_dir(&paths)?;
+    let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
+        .map_err(|error| format!("unlocked lock should be reclaimed: {error}"))?;
+    assert!(
+        !runtime_file_exists(&paths, paths.pid_file_name())?,
+        "stale pid file should be removed after reclaiming the lock",
+    );
+    guard
+        .write_pid(pid)
+        .map_err(|error| format!("pid write should succeed: {error}"))?;
+    Ok(())
 }
 
 #[test]

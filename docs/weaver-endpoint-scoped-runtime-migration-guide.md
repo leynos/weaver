@@ -53,7 +53,8 @@ List the files after the new daemon starts. The listing shows the default names
 or the endpoint-scoped names for the configured endpoint:
 
 ```sh
-ls "$XDG_RUNTIME_DIR/weaver"
+# Use the runtime directory identified above for the configured endpoint.
+ls "<runtime-dir>"
 ```
 
 A non-default endpoint produces three matching files such as
@@ -78,19 +79,26 @@ weaver daemon stop
 
 If `daemon stop` is unavailable, or the previous process cannot be reached that
 way, read the PID recorded by the previous release and stop it directly. The
-previous release wrote a shared `weaverd.pid` in the runtime directory
-regardless of the configured endpoint:
+previous release wrote a shared `weaverd.pid` in the runtime directory for the
+configured endpoint, which section 1 defines as the parent of the socket. It
+did not always use the default directory, so reading the default path for a
+non-default endpoint can return a missing file or the PID of a different daemon:
 
 ```sh
-# Read the PID written by the previous release.
-cat "$XDG_RUNTIME_DIR/weaver/weaverd.pid"
+# Read the PID written by the previous release. Use the runtime directory
+# identified in section 1, which is the parent of the configured socket.
+cat "<runtime-dir>/weaverd.pid"
 
-# Replace <pid> with the value printed above.
+# Confirm the recorded process owns the configured socket before signalling it.
+ss -xp | grep "<socket-path>"
+
+# Replace <pid> with the value printed above, once it matches the socket owner.
 kill <pid>
 ```
 
-Replace `<pid>` with the numeric PID. Confirm the process has exited before
-continuing.
+Replace `<pid>` with the numeric PID. Confirm that the process listed against
+the configured socket has that PID, and that it has exited after the signal,
+before continuing.
 
 ## 3. Upgrade and start the new version
 
