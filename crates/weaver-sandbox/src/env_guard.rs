@@ -8,9 +8,11 @@
 
 use std::{env, ffi::OsString};
 
+/// Removes one environment variable from the current process.
 #[inline]
 fn unset_env_var<K: AsRef<std::ffi::OsStr>>(key: K) { unsafe { env::remove_var(key) } }
 
+/// Sets one environment variable on the current process.
 #[inline]
 fn set_env_var<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, value: V) {
     unsafe { env::set_var(key, value) };
@@ -19,6 +21,7 @@ fn set_env_var<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, val
 /// Restores the parent process environment after `birdcage` strips variables.
 #[derive(Debug)]
 pub struct EnvGuard {
+    /// Environment captured before the sandbox stripped it.
     original: Vec<(OsString, OsString)>,
 }
 
@@ -31,6 +34,7 @@ impl EnvGuard {
         }
     }
 
+    /// Replaces the current environment with the captured snapshot.
     pub(crate) fn restore(&self) {
         // Clear current environment.
         for (key, _) in env::vars_os() {

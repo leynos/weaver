@@ -2043,6 +2043,50 @@ This guarantee is specific to `TestWorld::rebuild_host`; other crates
 (`weaverd`, `weaver-sandbox`, `weaver-cli`) have their own internal
 `TestWorld`-style harnesses that are not covered by this section.
 
+### 23.1 Capability sets and request dispatch
+
+`weaver-lsp-host` is split into four modules with a deliberate dependency
+direction:
+
+- `server` owns the `LanguageServer` trait and `ServerCapabilitySet`.
+- `capability` owns `CapabilityKind`, `CapabilitySource`, the per-language
+  `CapabilityMatrix` overrides, and `CapabilitySummary`.
+- `host` owns `LspHost`, `Session`, `CallContext`, and the dispatch helpers.
+- `adapter` provides the process-backed `LanguageServer` implementation.
+
+`server` and `capability` do not depend on `host`; adaptors implement the trait
+without knowing how negotiation or dispatch works, and `host` is the only
+module that combines the two.
+
+`ServerCapabilitySet` stores a `BTreeSet<CapabilityKind>` rather than one
+boolean per capability. New capabilities are added by extending
+`CapabilityKind` and adding a builder (`with_*`) plus accessor (`supports_*`)
+pair, so existing adaptors keep compiling and an unadvertised capability is
+unavailable by default. `supports(capability)` is the general query;
+`supports_definition()` and its siblings are thin conveniences used by the
+negotiation code.
+
+Every request routes through the same three stages:
+
+1. The public request method constructs a `CallContext` describing the
+   language, operation, and optional required capability. Capability-gated
+   requests reach it through `call_with_capability`, which pairs a `CallSpec`
+   (capability plus operation) with the context; notifications construct the
+   ungated context directly with `CallContext::for_operation`.
+2. `call_with_session` borrows the session and override matrix from
+   `session_mut`, initialises the server on first use, and then enforces the
+   capability: an unavailable capability returns
+   `LspHostError::CapabilityUnavailable` with the negotiation `source`.
+3. The closure runs against the server and any `LanguageServerError` is mapped
+   to `LspHostError::Server` carrying the operation that failed.
+
+Keeping the three stages separate means capability negotiation decisions live
+in exactly one function, and each public request method is a one-line
+composition rather than a copy of the checks. `session_mut` is private
+precisely so that no caller can hold a session borrow outside these stages;
+adding a public accessor would allow code to issue requests that bypass
+capability negotiation.
+
 ## 24 Act-refactor position parsing and byte-offset conversion
 
 The daemon-side `act refactor` implementation accepts user-facing source

@@ -21,14 +21,23 @@ use crate::{Config, SocketEndpoint};
 /// Canonical paths for runtime artefacts written by the daemon.
 #[derive(Debug, Clone)]
 pub struct RuntimePaths {
+    /// Directory holding the daemon lock, PID, and health snapshot.
     runtime_dir: PathBuf,
+    /// Path to the lock file guarding singleton startup.
     lock_path: PathBuf,
+    /// Path to the PID file.
     pid_path: PathBuf,
+    /// Path to the health snapshot.
     health_path: PathBuf,
 }
 
 impl RuntimePaths {
     /// Derives runtime paths from the shared configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RuntimePathsError`] when the configured socket has no parent
+    /// directory or the runtime directory cannot be created.
     pub fn from_config(config: &Config) -> Result<Self, RuntimePathsError> {
         let paths = Self::derive_paths(config)?;
         fs::create_dir_all(paths.runtime_dir()).map_err(|source| {
@@ -41,24 +50,34 @@ impl RuntimePaths {
     }
 
     /// Derives runtime paths without touching the filesystem.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RuntimePathsError`] when the configured socket has no parent
+    /// directory.
     pub fn from_config_readonly(config: &Config) -> Result<Self, RuntimePathsError> {
         Self::derive_paths(config)
     }
 
     /// Directory holding runtime artefacts.
+    #[must_use]
     pub fn runtime_dir(&self) -> &Path { self.runtime_dir.as_path() }
 
     /// Path to the lock file guarding singleton startup.
+    #[must_use]
     pub fn lock_path(&self) -> &Path { self.lock_path.as_path() }
 
     /// Path to the PID file.
+    #[must_use]
     pub fn pid_path(&self) -> &Path { self.pid_path.as_path() }
 
     /// Path to the health snapshot.
+    #[must_use]
     pub fn health_path(&self) -> &Path { self.health_path.as_path() }
 }
 
 impl RuntimePaths {
+    /// Derives the four runtime artefact paths from the configuration.
     fn derive_paths(config: &Config) -> Result<Self, RuntimePathsError> {
         let runtime_dir = runtime_directory(config)?;
         Ok(Self {
@@ -70,20 +89,25 @@ impl RuntimePaths {
     }
 }
 
+/// Resolves the directory that holds the daemon's runtime artefacts.
 fn runtime_directory(config: &Config) -> Result<PathBuf, RuntimePathsError> {
     match config.daemon_socket() {
-        SocketEndpoint::Unix { path } => {
-            match path.parent().filter(|parent| !parent.as_str().is_empty()) {
-                Some(parent) => Ok(parent.as_std_path().to_path_buf()),
-                None => Err(RuntimePathsError::MissingSocketParent {
-                    path: path.to_string(),
-                }),
-            }
-        }
+        SocketEndpoint::Unix { path } => path
+            .parent()
+            .filter(|parent| !parent.as_str().is_empty())
+            .map_or_else(
+                || {
+                    Err(RuntimePathsError::MissingSocketParent {
+                        path: path.to_string(),
+                    })
+                },
+                |parent| Ok(parent.as_std_path().to_path_buf()),
+            ),
         SocketEndpoint::Tcp { .. } => Ok(default_runtime_directory()),
     }
 }
 
+/// Resolves the runtime directory used when the socket is not a Unix path.
 fn default_runtime_directory() -> PathBuf {
     #[cfg(unix)]
     {
@@ -113,11 +137,16 @@ fn default_runtime_directory() -> PathBuf {
 pub enum RuntimePathsError {
     /// The socket path lacked a parent directory.
     #[error("socket path '{path}' has no parent directory")]
-    MissingSocketParent { path: String },
+    MissingSocketParent {
+        /// The socket path that has no parent.
+        path: String,
+    },
     /// Creating the runtime directory failed.
     #[error("failed to prepare runtime directory '{path}': {source}")]
     RuntimeDirectory {
+        /// The runtime directory that could not be prepared.
         path: PathBuf,
+        /// The underlying I/O error.
         #[source]
         source: std::io::Error,
     },

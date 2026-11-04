@@ -69,7 +69,7 @@ impl JsonRpcNotification {
     #[must_use]
     pub fn new(method: impl Into<String>, params: Option<Value>) -> Self {
         Self {
-            jsonrpc: "2.0".to_string(),
+            jsonrpc: "2.0".to_owned(),
             method: method.into(),
             params,
         }

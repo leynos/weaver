@@ -77,9 +77,13 @@ pub const DEFAULT_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
 /// pipe. The thread ends when the server's stdout closes, which happens when
 /// the process exits or is killed.
 pub struct StdioTransport {
+    /// Frames forwarded by the reader thread, in arrival order.
     frames: Receiver<Result<Vec<u8>, TransportError>>,
+    /// Buffered writer onto the server's stdin.
     writer: BufWriter<ChildStdin>,
+    /// How long a caller waits for one response.
     response_timeout: Duration,
+    /// Source of "now" used to compute the time left before a deadline.
     clock: Arc<dyn Clock>,
 }
 
@@ -361,8 +365,8 @@ mod tests {
             // An hour-long deadline on a clock that then jumps two hours: the
             // transport must answer from the clock, not wait the hour out.
             let clock = Arc::new(ManualClock::new());
-            let (mut child, transport) = spawn_transport("sh", &["-c", "cat > /dev/null"]);
-            let mut transport = transport.with_clock(Arc::clone(&clock) as Arc<dyn Clock>);
+            let (mut child, raw_transport) = spawn_transport("sh", &["-c", "cat > /dev/null"]);
+            let mut transport = raw_transport.with_clock(Arc::clone(&clock) as Arc<dyn Clock>);
             let deadline = Deadline::after(transport.now(), Duration::from_secs(3600))
                 .expect("an hour fits the clock");
             clock.advance(Duration::from_secs(7200));
