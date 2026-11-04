@@ -17,10 +17,14 @@ use crate::{
     command_surface::{CommandSurfaceRecord, DEFINITIONS_GET, find_read_only_command},
 };
 
+/// A CLI request normalised into the daemon's domain and operation form.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct CommandInvocation {
+    /// Capability domain the daemon dispatches on, such as `"observe"`.
     pub(crate) domain: String,
+    /// Operation name within `domain`, such as `"get-definition"`.
     pub(crate) operation: String,
+    /// Arguments forwarded verbatim to the daemon operation.
     pub(crate) arguments: Vec<String>,
 }
 
@@ -53,6 +57,13 @@ impl TryFrom<Cli> for CommandInvocation {
 }
 
 impl CommandInvocation {
+    /// Converts a structured `clap` subcommand into a daemon invocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns `AppError::MissingDomain` for subcommands without a daemon
+    /// mapping, and `AppError::MissingCommandSurfaceRecord` when the
+    /// command-surface table has no matching read-only record.
     fn try_from_structured_command(command: CliCommand) -> Result<Self, AppError> {
         match command {
             CliCommand::Definitions {
@@ -72,13 +83,14 @@ impl CommandInvocation {
     }
 }
 
+/// Builds the daemon invocation for `weaver definitions get`.
 fn definition_get_invocation(
     record: &CommandSurfaceRecord,
     args: DefinitionGetArgs,
 ) -> CommandInvocation {
     CommandInvocation {
-        domain: record.daemon_domain.to_string(),
-        operation: record.daemon_operation.to_string(),
+        domain: record.daemon_domain.to_owned(),
+        operation: record.daemon_operation.to_owned(),
         arguments: vec![
             String::from("--uri"),
             args.uri,
@@ -88,17 +100,24 @@ fn definition_get_invocation(
     }
 }
 
+/// The JSON payload sent to the daemon for one command execution.
 #[derive(Debug, Serialize)]
 pub(crate) struct CommandRequest {
+    /// The domain and operation the daemon should execute.
     pub(crate) command: CommandDescriptor,
+    /// Arguments forwarded verbatim to the daemon operation.
     pub(crate) arguments: Vec<String>,
+    /// Unified diff to apply, present only for `act apply-patch` requests.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) patch: Option<String>,
 }
 
+/// The address of a daemon operation inside a capability domain.
 #[derive(Debug, Serialize)]
 pub(crate) struct CommandDescriptor {
+    /// Capability domain, such as `"observe"`.
     pub(crate) domain: String,
+    /// Operation name within `domain`, such as `"get-definition"`.
     pub(crate) operation: String,
 }
 
@@ -124,6 +143,7 @@ impl CommandInvocation {
 }
 
 impl CommandRequest {
+    /// Builds an `act apply-patch` request from `invocation` and `patch`.
     pub(crate) fn with_patch(invocation: CommandInvocation, patch: String) -> Self {
         Self {
             patch: Some(patch),
@@ -131,6 +151,12 @@ impl CommandRequest {
         }
     }
 
+    /// Serialises the request as one JSON line and flushes the writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns `AppError::SerialiseRequest` if the request cannot be encoded as
+    /// JSON, and `AppError::SendRequest` if writing or flushing fails.
     pub(crate) fn write_jsonl<W>(&self, writer: &mut W) -> Result<(), AppError>
     where
         W: Write,

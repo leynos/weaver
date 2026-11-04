@@ -66,10 +66,8 @@ fn assert_startup_guidance_template(
     let mut buf = Vec::new();
     write_startup_guidance(&mut buf, error)?;
     let output = String::from_utf8(buf)?;
-    let expected_socket_hint = expected
-        .socket_hint
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| {
+    let expected_socket_hint = expected.socket_hint.map_or_else(
+        || {
             if cfg!(unix) {
                 String::from(concat!(
                     "  - Check whether the daemon is listening on ",
@@ -78,7 +76,9 @@ fn assert_startup_guidance_template(
             } else {
                 String::from("  - Check whether the daemon is listening on 127.0.0.1:9779")
             }
-        });
+        },
+        ToOwned::to_owned,
+    );
     let expected_next_command = if cfg!(unix) {
         "WEAVER_FOREGROUND=1 weaver daemon start"
     } else {
@@ -104,8 +104,7 @@ fn assert_startup_guidance_template(
     );
     ensure!(
         output.contains(expected_next_command),
-        "expected next command '{}' not found in output:\n{output}",
-        expected_next_command
+        "expected next command '{expected_next_command}' not found in output:\n{output}"
     );
     Ok(())
 }
@@ -114,7 +113,7 @@ fn assert_startup_guidance_template(
 fn write_actionable_guidance_produces_three_part_template() {
     let guidance = ActionableGuidance::new(
         "unknown domain 'foo'",
-        vec!["Valid domains: observe, act, verify".to_string()],
+        vec!["Valid domains: observe, act, verify".to_owned()],
         "weaver --help",
     );
 

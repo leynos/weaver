@@ -8,6 +8,8 @@ mod models;
 mod render;
 mod source;
 
+use std::fmt::Write as _;
+
 use weaver_daemon_types::UnknownOperationDetails;
 
 #[cfg(test)]
@@ -116,21 +118,29 @@ pub fn render_human_output(context: &OutputContext, data: &str) -> Option<String
     }
 }
 
+/// Accessors that project a typed item into location fields.
 struct LocationItemAccessors<FUri, FLine, FColumn> {
+    /// Produces the document URI for an item.
     uri: FUri,
+    /// Produces the 1-indexed line for an item.
     line: FLine,
+    /// Produces the 1-indexed column for an item.
     column: FColumn,
 }
 
+/// Labels applied when rendering a list of locations.
 struct LocationRenderOptions {
+    /// Message returned when the item list is empty.
     empty_message: &'static str,
+    /// Label attached to every rendered location.
     label: &'static str,
 }
 
+/// Renders typed items as source locations using the supplied accessors.
 fn render_location_items<T, FUri, FLine, FColumn>(
     items: Vec<T>,
-    options: LocationRenderOptions,
-    accessors: LocationItemAccessors<FUri, FLine, FColumn>,
+    options: &LocationRenderOptions,
+    accessors: &LocationItemAccessors<FUri, FLine, FColumn>,
 ) -> String
 where
     FUri: Fn(&T) -> String,
@@ -155,14 +165,15 @@ where
     render::render_locations(&locations)
 }
 
+/// Renders definition locations with the supplied labels.
 fn render_definition_locations(
     items: Vec<DefinitionLocation>,
-    options: LocationRenderOptions,
+    options: &LocationRenderOptions,
 ) -> String {
     render_location_items(
         items,
         options,
-        LocationItemAccessors {
+        &LocationItemAccessors {
             uri: |item: &DefinitionLocation| item.uri.clone(),
             line: |item: &DefinitionLocation| item.line,
             column: |item: &DefinitionLocation| item.column,
@@ -170,26 +181,30 @@ fn render_definition_locations(
     )
 }
 
+/// Renders definition locations for the `observe get-definition` command.
 fn render_definitions(definitions: Vec<DefinitionLocation>) -> String {
     render_definition_locations(
         definitions,
-        LocationRenderOptions {
+        &LocationRenderOptions {
             empty_message: "no definitions found\n",
             label: "definition",
         },
     )
 }
 
+/// Renders reference locations for the `observe find-references` command.
 fn render_references(response: ReferenceResponse) -> String {
     render_definition_locations(
         response.references,
-        LocationRenderOptions {
+        &LocationRenderOptions {
             empty_message: "no references found\n",
             label: "reference",
         },
     )
 }
 
+/// Renders diagnostics, falling back to the `--uri` argument when an entry
+/// omits its source.
 fn render_diagnostics(response: DiagnosticsResponse, context: &OutputContext) -> String {
     if response.diagnostics.is_empty() {
         return String::from("no diagnostics reported\n");
@@ -203,6 +218,7 @@ fn render_diagnostics(response: DiagnosticsResponse, context: &OutputContext) ->
     render::render_locations(&locations)
 }
 
+/// Renders verification failures reported by the safety harness.
 fn render_verification_failures(failures: Vec<VerificationFailure>) -> String {
     if failures.is_empty() {
         return String::from("no verification failures reported\n");
@@ -214,6 +230,7 @@ fn render_verification_failures(failures: Vec<VerificationFailure>) -> String {
     render::render_locations(&locations)
 }
 
+/// Renders a capability-resolution payload as human-readable lines.
 fn render_capability_resolution(resolution: CapabilityResolution) -> String {
     let details = resolution.details;
     let language = details.language.as_deref().unwrap_or("unknown");
@@ -230,12 +247,12 @@ fn render_capability_resolution(resolution: CapabilityResolution) -> String {
     };
 
     if let Some(reason) = details.refusal_reason.as_deref() {
-        rendered.push_str(&format!(" ({reason})"));
+        write!(rendered, " ({reason})").ok();
     }
     rendered.push('\n');
 
     if let Some(provider) = details.requested_provider.as_deref() {
-        rendered.push_str(&format!("requested provider: {provider}\n"));
+        writeln!(rendered, "requested provider: {provider}").ok();
     }
 
     for candidate in details.candidates {
@@ -244,26 +261,30 @@ fn render_capability_resolution(resolution: CapabilityResolution) -> String {
         } else {
             "rejected"
         };
-        rendered.push_str(&format!(
-            "candidate {outcome}: {} ({})\n",
+        writeln!(
+            rendered,
+            "candidate {outcome}: {} ({})",
             candidate.provider, candidate.reason
-        ));
+        )
+        .ok();
     }
 
     rendered
 }
 
+/// Renders an unknown-operation error with the operations the domain accepts.
 fn render_unknown_operation(details: UnknownOperationDetails) -> String {
     let mut rendered = format!(
         "error: unknown operation '{}' for domain '{}'\n\nAvailable operations:\n",
         details.operation, details.domain
     );
     for operation in details.known_operations {
-        rendered.push_str(&format!("  {operation}\n"));
+        writeln!(rendered, "  {operation}").ok();
     }
     rendered
 }
 
+/// Converts a diagnostic entry into a renderable source location.
 fn diagnostic_to_location(
     diagnostic: DiagnosticItem,
     fallback_uri: Option<&str>,
@@ -286,6 +307,7 @@ fn diagnostic_to_location(
     }
 }
 
+/// Converts a verification failure into a renderable source location.
 fn verification_failure_to_location(failure: VerificationFailure) -> SourceLocation {
     let label = if let Some(phase) = failure.phase.as_deref() {
         format!("{phase}: {}", failure.message)
@@ -305,93 +327,4 @@ fn verification_failure_to_location(failure: VerificationFailure) -> SourceLocat
 }
 
 #[cfg(test)]
-mod tests {
-    //! Unit tests for output format resolution and stream handling.
-
-    use rstest::rstest;
-
-    use super::*;
-
-    #[rstest]
-    #[case(OutputFormat::Auto, true, ResolvedOutputFormat::Human)]
-    #[case(OutputFormat::Auto, false, ResolvedOutputFormat::Json)]
-    #[case(OutputFormat::Human, true, ResolvedOutputFormat::Human)]
-    #[case(OutputFormat::Human, false, ResolvedOutputFormat::Human)]
-    #[case(OutputFormat::Json, true, ResolvedOutputFormat::Json)]
-    #[case(OutputFormat::Json, false, ResolvedOutputFormat::Json)]
-    fn resolves_output_format(
-        #[case] format: OutputFormat,
-        #[case] stdout_is_terminal: bool,
-        #[case] expected: ResolvedOutputFormat,
-    ) {
-        assert_eq!(format.resolve(stdout_is_terminal), expected);
-    }
-
-    #[test]
-    fn renders_capability_resolution_for_humans() {
-        let payload = r#"{
-  "status": "ok",
-  "type": "CapabilityResolution",
-  "details": {
-    "capability": "rename-symbol",
-    "language": "python",
-    "selected_provider": "rope",
-    "selection_mode": "automatic",
-    "outcome": "selected",
-    "candidates": [
-      {"provider": "rope", "accepted": true, "reason": "matched_language_and_capability"},
-      {"provider": "rust-analyzer", "accepted": false, "reason": "unsupported_language"}
-    ]
-  }
-}"#;
-        let context = OutputContext::new("act", "refactor", Vec::new());
-
-        let rendered = render_human_output(&context, payload).expect("rendered");
-
-        assert!(rendered.contains("rename-symbol automatic for python: selected rope"));
-        assert!(rendered.contains("candidate accepted: rope"));
-        assert!(rendered.contains("candidate rejected: rust-analyzer"));
-    }
-
-    #[test]
-    fn ignores_non_capability_json_in_capability_renderer() {
-        let context = OutputContext::new("act", "refactor", Vec::new());
-
-        let rendered = render_human_output(
-            &context,
-            r#"{"status":"error","type":"VerificationError","details":{"failures":[]}}"#,
-        )
-        .expect("rendered");
-
-        assert_eq!(rendered, "no verification failures reported\n");
-    }
-
-    #[test]
-    fn renders_unknown_operation_payload_for_humans() {
-        let context = OutputContext::new("observe", "nonexistent", Vec::new());
-        let payload = serde_json::to_string(&serde_json::json!({
-            "status": "error",
-            "type": UNKNOWN_OPERATION_TYPE,
-            "details": {
-                "domain": "observe",
-                "operation": "nonexistent",
-                "known_operations": [
-                    "get-definition",
-                    "find-references",
-                    "grep",
-                    "diagnostics",
-                    "call-hierarchy",
-                    "get-card"
-                ]
-            }
-        }))
-        .expect("unknown-operation payload");
-
-        let rendered = render_human_output(&context, &payload).expect("rendered");
-
-        assert!(rendered.contains("error: unknown operation 'nonexistent' for domain 'observe'"));
-        assert!(rendered.contains("Available operations:"));
-        assert!(rendered.contains("get-definition"));
-        assert!(rendered.contains("get-card"));
-    }
-}
+mod tests;

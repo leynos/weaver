@@ -11,6 +11,11 @@ use cap_std::fs::Dir;
 
 use crate::lifecycle::{error::LifecycleError, monitoring::HealthSnapshot};
 
+/// Generates an optional runtime-file reader with caller-supplied error mapping.
+///
+/// Each generated function reads `filename` from `dir`, returns `Ok(None)` when
+/// the file is absent or blank, and maps read and parse failures onto the
+/// supplied `LifecycleError` variants.
 macro_rules! define_reader {
     (
         $(#[$attr:meta])*

@@ -10,6 +10,7 @@ use weaver_config::Config;
 
 use crate::AppError;
 
+/// Source of loaded configuration for one CLI invocation.
 pub(crate) trait ConfigLoader {
     /// Loads configuration for the CLI.
     ///
@@ -22,11 +23,18 @@ pub(crate) trait ConfigLoader {
     fn load(&self, args: &[OsString]) -> Result<Config, AppError>;
 }
 
+/// Loads configuration through `ortho-config`.
 pub(crate) struct OrthoConfigLoader;
 
+/// What the argument splitter should do with one leading flag token.
 #[derive(Debug, Clone, Copy)]
 enum FlagAction {
-    Include { needs_value: bool },
+    /// Keep the flag as configuration input.
+    Include {
+        /// Whether the following token supplies the flag's value.
+        needs_value: bool,
+    },
+    /// Stop scanning; the token belongs to the command.
     Skip,
 }
 
@@ -37,6 +45,7 @@ impl ConfigLoader for OrthoConfigLoader {
 }
 
 impl OrthoConfigLoader {
+    /// Classifies one leading token as configuration input or command content.
     fn process_config_flag(argument: &OsStr) -> FlagAction {
         let argument_text = argument.to_string_lossy();
         if !argument_text.starts_with("--") {
@@ -44,7 +53,9 @@ impl OrthoConfigLoader {
         }
 
         let mut flag_parts = argument_text.splitn(2, '=');
-        let flag = flag_parts.next().unwrap();
+        let Some(flag) = flag_parts.next() else {
+            return FlagAction::Skip;
+        };
         let has_inline_value = flag_parts.next().is_some();
 
         if super::CONFIG_CLI_FLAGS.contains(&flag) {
@@ -57,28 +68,33 @@ impl OrthoConfigLoader {
     }
 }
 
+/// The leading arguments consumed as configuration plus the command offset.
 pub(crate) struct ConfigArgumentSplit {
+    /// Arguments handed to the configuration loader, including the program name.
     pub(crate) config_arguments: Vec<OsString>,
+    /// Index in the original argv where command parsing should resume.
     pub(crate) command_start: usize,
 }
 
+/// Separates leading configuration flags from the command arguments.
+///
+/// Configuration flags appearing after positional arguments are treated as
+/// command content, so the split stops at the first non-flag token.
 pub(crate) fn split_config_arguments(args: &[OsString]) -> ConfigArgumentSplit {
-    if args.is_empty() {
+    let Some(first) = args.first() else {
         return ConfigArgumentSplit {
             config_arguments: Vec::new(),
             command_start: 0,
         };
-    }
+    };
 
-    let mut filtered: Vec<OsString> = Vec::new();
-    filtered.push(args[0].clone());
+    let mut filtered: Vec<OsString> = vec![first.clone()];
 
     let mut command_start = 1usize;
     let mut index = 1usize;
     let mut pending_values = 0usize;
 
-    while index < args.len() {
-        let argument = &args[index];
+    while let Some(argument) = args.get(index) {
         if pending_values > 0 {
             filtered.push(argument.clone());
             pending_values -= 1;
@@ -108,6 +124,9 @@ pub(crate) fn split_config_arguments(args: &[OsString]) -> ConfigArgumentSplit {
     }
 }
 
+/// Builds the argv handed to `clap`: the program name plus command tokens.
+///
+/// Configuration flags are dropped so `clap` only sees the command surface.
 pub(crate) fn prepare_cli_arguments(
     args: &[OsString],
     split: &ConfigArgumentSplit,
@@ -116,8 +135,8 @@ pub(crate) fn prepare_cli_arguments(
     if let Some(first) = args.first() {
         cli_arguments.push(first.clone());
     }
-    if split.command_start < args.len() {
-        cli_arguments.extend(args[split.command_start..].iter().cloned());
+    if let Some(command_arguments) = args.get(split.command_start..) {
+        cli_arguments.extend(command_arguments.iter().cloned());
     }
     cli_arguments
 }
@@ -135,7 +154,7 @@ mod tests {
         let result = OrthoConfigLoader::process_config_flag(OsStr::new("--log-filter=debug"));
         match result {
             FlagAction::Include { needs_value } => assert!(!needs_value),
-            _ => panic!("expected include for known inline flag"),
+            FlagAction::Skip => panic!("expected include for known inline flag"),
         }
     }
 
@@ -144,7 +163,7 @@ mod tests {
         let result = OrthoConfigLoader::process_config_flag(OsStr::new("--log-filter"));
         match result {
             FlagAction::Include { needs_value } => assert!(needs_value),
-            _ => panic!("expected include for known separated flag"),
+            FlagAction::Skip => panic!("expected include for known separated flag"),
         }
     }
 
@@ -188,7 +207,9 @@ mod ordering_invariant {
             domain in prop_oneof![Just("observe"), Just("act"), Just("daemon")],
             operation in "[a-z-]{1,12}",
         ) {
-            let flag = CONFIG_FLAGS[flag_idx];
+            // The generated range excludes `CONFIG_FLAGS.len()`, so the default
+            // fallback is never taken; it keeps the lookup panic-free.
+            let flag = CONFIG_FLAGS.get(flag_idx).copied().unwrap_or_default();
             let args: Vec<OsString> = vec![
                 OsString::from("weaver"),
                 OsString::from(flag),
@@ -202,7 +223,7 @@ mod ordering_invariant {
                 .map(|s| s.to_string_lossy().into_owned())
                 .collect();
             prop_assert!(
-                config_str.iter().any(|value| value == flag),
+                config_str.iter().any(|entry| entry == flag),
                 "pre-domain flag {flag:?} not in config_arguments: {config_str:?}"
             );
         }
@@ -214,7 +235,9 @@ mod ordering_invariant {
             domain in prop_oneof![Just("observe"), Just("act"), Just("daemon")],
             operation in "[a-z-]{1,12}",
         ) {
-            let flag = CONFIG_FLAGS[flag_idx];
+            // The generated range excludes `CONFIG_FLAGS.len()`, so the default
+            // fallback is never taken; it keeps the lookup panic-free.
+            let flag = CONFIG_FLAGS.get(flag_idx).copied().unwrap_or_default();
             let args: Vec<OsString> = vec![
                 OsString::from("weaver"),
                 OsString::from(domain),
@@ -228,7 +251,7 @@ mod ordering_invariant {
                 .map(|s| s.to_string_lossy().into_owned())
                 .collect();
             prop_assert!(
-                !config_str.iter().any(|value| value == flag),
+                !config_str.iter().any(|entry| entry == flag),
                 "post-domain flag {flag:?} must NOT be in config_arguments: {config_str:?}"
             );
         }

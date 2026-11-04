@@ -20,21 +20,33 @@ use crate::{cli::Cli, command_ir, command_tree};
 #[path = "help_metadata.rs"]
 mod metadata;
 
+/// Clap identifier for the `--config-path` argument.
 const CONFIG_PATH_ARG_ID: &str = "config-path";
+/// Help heading under which configuration flags are listed.
 const CONFIG_HELP_HEADING: &str = "Options";
+/// Guidance appended to every help page explaining flag ordering.
 const ORDERING_CAVEAT: &str = "Config flags must appear before the command domain or structured \
                                subcommand to take effect; for example, `weaver daemon start \
                                --log-filter debug` is ignored because `--log-filter` appears \
                                after `start`.";
 
+/// Clap argument shape derived from one configuration field's metadata.
 struct ConfigFieldArgMetadata {
+    /// Clap argument identifier, taken from the configuration field name.
     name: String,
+    /// Long flag name.
     long: String,
+    /// Single-character short flag, when the field defines one.
     short: Option<char>,
+    /// Localised help text for the flag.
     help: &'static str,
+    /// Whether the flag accepts a value.
     takes_value: bool,
+    /// Whether the value may be omitted, leaving the default in place.
     value_optional: bool,
+    /// Whether the flag may be supplied more than once.
     multiple: bool,
+    /// Placeholder shown for the accepted value.
     value_name: Option<String>,
 }
 
@@ -59,12 +71,12 @@ pub(crate) enum HelpConstructionError {
 
 impl HelpConstructionError {
     /// Adds the help-construction context to a command metadata projection failure.
-    fn project_command_metadata(source: command_ir::ProjectionError) -> Self {
+    const fn project_command_metadata(source: command_ir::ProjectionError) -> Self {
         Self::ProjectCommandMetadata { source }
     }
 
     /// Adds the help-construction context to a Fluent catalogue loading failure.
-    pub(super) fn load_localisation_catalogue(source: FluentLocalizerError) -> Self {
+    pub(super) const fn load_localisation_catalogue(source: FluentLocalizerError) -> Self {
         Self::LoadLocalisationCatalogue { source }
     }
 }
@@ -116,7 +128,7 @@ pub fn write_help_for_args<W: Write>(
 }
 
 /// Assembles the augmented help command from the projected command metadata,
-/// the localisation resources, and the configuration fields OrthoConfig
+/// the localisation resources, and the configuration fields `OrthoConfig`
 /// exposes.
 ///
 /// The returned command is safe to render repeatedly; ordering caveats are
@@ -195,8 +207,8 @@ fn config_arg_from_metadata(field: ConfigFieldArgMetadata) -> Arg {
         .help_heading(CONFIG_HELP_HEADING)
         .global(true);
 
-    if let Some(short) = short {
-        arg = arg.short(short);
+    if let Some(short_flag) = short {
+        arg = arg.short(short_flag);
     }
 
     if takes_value {
@@ -211,8 +223,8 @@ fn config_arg_from_metadata(field: ConfigFieldArgMetadata) -> Arg {
                 .require_equals(true)
                 .default_missing_value("true");
         }
-        if let Some(value_name) = value_name {
-            arg = arg.value_name(value_name);
+        if let Some(placeholder) = value_name {
+            arg = arg.value_name(placeholder);
         }
     } else {
         arg = arg.action(ArgAction::SetTrue);
@@ -223,12 +235,12 @@ fn config_arg_from_metadata(field: ConfigFieldArgMetadata) -> Arg {
 
 /// Recursively appends the configuration-ordering caveat to help output.
 fn attach_ordering_caveat(command: Command) -> Command {
-    let command = command.mut_subcommands(attach_ordering_caveat);
-    let after_help = command.get_after_help().map_or_else(
-        || ORDERING_CAVEAT.to_string(),
+    let with_subcommands = command.mut_subcommands(attach_ordering_caveat);
+    let after_help = with_subcommands.get_after_help().map_or_else(
+        || ORDERING_CAVEAT.to_owned(),
         |existing| format!("{existing}\n\n{ORDERING_CAVEAT}"),
     );
-    command.after_help(after_help)
+    with_subcommands.after_help(after_help)
 }
 
 #[cfg(test)]
