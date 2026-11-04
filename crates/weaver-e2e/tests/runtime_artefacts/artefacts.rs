@@ -8,6 +8,7 @@ use std::{io::ErrorKind as IoErrorKind, path::Path, process::Output};
 use camino::Utf8PathBuf;
 use cap_std::fs::Dir;
 use nix::{
+    errno::Errno,
     sys::signal::{Signal, kill},
     unistd::Pid,
 };
@@ -161,9 +162,18 @@ pub(super) fn require_text(haystack: &str, needle: &str, context: &str) -> Scena
 }
 
 /// Reports whether a process with `pid` is still signalable.
-pub(super) fn process_is_alive(pid: u32) -> bool {
-    let Ok(raw) = i32::try_from(pid) else {
-        return false;
-    };
-    kill(Pid::from_raw(raw), None).is_ok()
+///
+/// The signal-0 probe cannot disturb the target, so it is safe to use as an
+/// existence check. Only the errors that mean "no such process" are reported
+/// as `Ok(false)`; a permission or argument failure says the probe itself was
+/// inconclusive, and returning `false` for those would let a scenario pass by
+/// claiming a live daemon had exited.
+pub(super) fn process_is_alive(pid: u32) -> ScenarioResult<bool> {
+    let raw = i32::try_from(pid)
+        .map_err(|_| format!("PID {pid} does not fit in a process identifier"))?;
+    match kill(Pid::from_raw(raw), None) {
+        Ok(()) => Ok(true),
+        Err(Errno::ESRCH | Errno::ECHILD) => Ok(false),
+        Err(error) => Err(format!("probe process {pid}: {error}")),
+    }
 }
