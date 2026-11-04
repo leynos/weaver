@@ -112,14 +112,20 @@ impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
     /// # Examples
     ///
     /// ```
-    /// use std::io::Cursor;
+    /// use std::{ffi::OsString, io::Cursor, process::ExitCode};
     ///
-    /// use weaver_cli::IoStreams;
+    /// use weaver_cli::{IoStreams, run};
     ///
     /// let mut stdin = Cursor::new(Vec::<u8>::new());
     /// let mut stdout = Vec::new();
     /// let mut stderr = Vec::new();
-    /// let _streams = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    /// let mut streams = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    /// let exit_code = run(
+    ///     [OsString::from("weaver"), OsString::from("--help")],
+    ///     &mut streams,
+    /// );
+    ///
+    /// assert_eq!(exit_code, ExitCode::SUCCESS);
     /// ```
     pub fn new(
         stdin: &'a mut R,
