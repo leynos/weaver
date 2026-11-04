@@ -17,8 +17,11 @@ use crate::{
     },
 };
 
+/// Guidance the preflight pass should emit for the supplied domain.
 enum DomainGuidanceToEmit {
+    /// The domain is known, but the invocation omitted an operation.
     MissingOperation(KnownDomain),
+    /// The domain is not one of the domains the CLI recognises.
     UnknownDomain,
 }
 
@@ -73,6 +76,10 @@ fn emit_domain_guidance<ErrWriter: Write>(
     preflight_result(written)
 }
 
+/// Decides which guidance, if any, the preflight pass should emit.
+///
+/// Returns `None` when the domain is known and an operation was supplied, in
+/// which case the invocation continues to configuration loading.
 fn domain_guidance(cli: &Cli, raw_domain: &str) -> Option<DomainGuidanceToEmit> {
     let operation_is_missing = cli
         .operation
@@ -92,7 +99,7 @@ fn domain_guidance(cli: &Cli, raw_domain: &str) -> Option<DomainGuidanceToEmit> 
 
 /// Converts the `written` flag into either `Ok(())` or
 /// `Err(AppError::PreflightGuidance)`.
-fn preflight_result(written: bool) -> Result<(), AppError> {
+const fn preflight_result(written: bool) -> Result<(), AppError> {
     if written {
         Err(AppError::PreflightGuidance)
     } else {
@@ -133,15 +140,15 @@ mod tests {
     impl WriteFailureScenario {
         fn domain(&self) -> Option<&str> {
             match self {
-                WriteFailureScenario::BareInvocation => None,
-                WriteFailureScenario::DomainGuidance => Some("unknown-domain"),
+                Self::BareInvocation => None,
+                Self::DomainGuidance => Some("unknown-domain"),
             }
         }
 
         fn operation(&self) -> Option<&str> {
             match self {
-                WriteFailureScenario::BareInvocation => None,
-                WriteFailureScenario::DomainGuidance => Some("status"),
+                Self::BareInvocation => None,
+                Self::DomainGuidance => Some("status"),
             }
         }
     }
@@ -184,8 +191,8 @@ mod tests {
             capabilities: false,
             output: OutputFormat::Auto,
             command: None,
-            domain: domain.map(str::to_string),
-            operation: operation.map(str::to_string),
+            domain: domain.map(str::to_owned),
+            operation: operation.map(str::to_owned),
             arguments: Vec::new(),
         }
     }
@@ -241,8 +248,11 @@ mod tests {
         }
 
         if let Some(needle) = scenario.expected_stderr_substring {
-            let stderr = String::from_utf8(stderr).expect("guidance must be valid UTF-8");
-            assert!(stderr.contains(needle), "stderr should contain {needle:?}");
+            let rendered = String::from_utf8(stderr).expect("guidance must be valid UTF-8");
+            assert!(
+                rendered.contains(needle),
+                "stderr should contain {needle:?}"
+            );
         } else {
             assert!(
                 stderr.is_empty(),

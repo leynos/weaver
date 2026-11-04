@@ -22,10 +22,10 @@ pub(super) fn spawn_daemon(
 ) -> Result<Child, LifecycleError> {
     let binary = resolve_daemon_binary(binary_override);
     let mut command = Command::new(&binary);
-    if config_arguments.len() > 1 {
+    if let Some(arguments) = config_arguments.get(1..) {
         // Skip argv[0], which is the binary name, and forward the remaining CLI
         // arguments verbatim to the daemon.
-        for arg in &config_arguments[1..] {
+        for arg in arguments {
             command.arg(arg);
         }
     }
@@ -39,6 +39,8 @@ pub(super) fn spawn_daemon(
         })
 }
 
+/// Resolves the daemon binary from an override, then `WEAVERD_BIN`, then the
+/// default `weaverd` name.
 fn resolve_daemon_binary(binary_override: Option<&OsStr>) -> OsString {
     binary_override
         .map(OsString::from)

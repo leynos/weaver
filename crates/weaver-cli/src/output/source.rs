@@ -7,13 +7,20 @@ use url::Url;
 /// A resolved or unresolved source location.
 #[derive(Debug, Clone)]
 pub(crate) struct SourceLocation {
+    /// Resolved reference used to find the source, or the failure placeholder.
     pub(crate) source: SourceReference,
+    /// 1-indexed position within the source, when known.
     pub(crate) position: SourcePosition,
+    /// Short label describing the location, such as `definition`.
     pub(crate) label: String,
 }
 
 impl SourceLocation {
-    pub(crate) fn unresolved(
+    /// Creates a location whose source could not be resolved.
+    ///
+    /// `reason` is retained and rendered so operators see why the source is
+    /// unavailable.
+    pub(crate) const fn unresolved(
         display: String,
         position: SourcePosition,
         label: String,
@@ -33,10 +40,16 @@ pub(crate) enum SourceReference {
     /// A local filesystem path.
     Path(PathBuf),
     /// A location that could not be resolved.
-    Unresolved { display: String, reason: String },
+    Unresolved {
+        /// Original text shown in place of a resolved path.
+        display: String,
+        /// Explanation of why resolution failed.
+        reason: String,
+    },
 }
 
 impl SourceReference {
+    /// Returns the text shown for this source in rendered output.
     pub(crate) fn display(&self) -> String {
         match self {
             Self::Path(path) => path.display().to_string(),
@@ -44,6 +57,7 @@ impl SourceReference {
         }
     }
 
+    /// Returns the filesystem path when this reference resolved to one.
     pub(crate) fn as_path(&self) -> Option<&Path> {
         match self {
             Self::Path(path) => Some(path.as_path()),
@@ -51,7 +65,8 @@ impl SourceReference {
         }
     }
 
-    pub(crate) fn reason(&self) -> Option<&str> {
+    /// Returns the resolution failure reason for unresolved sources.
+    pub(crate) const fn reason(&self) -> Option<&str> {
         match self {
             Self::Path(_) => None,
             Self::Unresolved { reason, .. } => Some(reason.as_str()),
@@ -62,11 +77,14 @@ impl SourceReference {
 /// Span information for a source location.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SourcePosition {
+    /// 1-indexed line number, when the producer supplied one.
     pub(crate) line: Option<u32>,
+    /// 1-indexed column number, when the producer supplied one.
     pub(crate) column: Option<u32>,
 }
 
 impl SourcePosition {
+    /// Creates a position from optional line and column numbers.
     pub(crate) const fn new(line: Option<u32>, column: Option<u32>) -> Self {
         Self { line, column }
     }
@@ -130,6 +148,12 @@ pub(crate) fn extract_uri_argument(arguments: &[String]) -> Option<String> {
     None
 }
 
+/// Converts a `file://` URI into a local filesystem path.
+///
+/// # Errors
+///
+/// Returns a human-readable reason when `uri` is malformed, uses a scheme other
+/// than `file`, or cannot be mapped to a local path.
 fn resolve_uri(uri: &str) -> Result<PathBuf, String> {
     let parsed = Url::parse(uri).map_err(|error| format!("invalid URI: {error}"))?;
     if parsed.scheme() != "file" {
@@ -137,7 +161,7 @@ fn resolve_uri(uri: &str) -> Result<PathBuf, String> {
     }
     parsed
         .to_file_path()
-        .map_err(|_| String::from("URI does not map to a local path"))
+        .map_err(|()| String::from("URI does not map to a local path"))
 }
 
 #[cfg(test)]

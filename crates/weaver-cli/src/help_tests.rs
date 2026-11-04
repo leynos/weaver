@@ -9,8 +9,8 @@ use super::*;
 /// sources, so tests can isolate how `config_field_arg` decides visibility.
 fn field_metadata(cli: Option<CliMetadata>) -> FieldMetadata {
     FieldMetadata {
-        name: "example_field".to_string(),
-        help_id: "example-help".to_string(),
+        name: "example_field".to_owned(),
+        help_id: "example-help".to_owned(),
         long_help_id: None,
         value: None,
         default: None,
@@ -29,9 +29,9 @@ fn field_metadata(cli: Option<CliMetadata>) -> FieldMetadata {
 /// only the `takes_value` shape they are exercising.
 fn cli_metadata(takes_value: bool) -> CliMetadata {
     CliMetadata {
-        long: Some("example-field".to_string()),
+        long: Some("example-field".to_owned()),
         short: Some('e'),
-        value_name: Some("VALUE".to_string()),
+        value_name: Some("VALUE".to_owned()),
         multiple: false,
         takes_value,
         value_optional: false,
@@ -105,7 +105,7 @@ fn config_field_arg_omits_hidden_or_unflagged_fields() {
 #[test]
 fn config_field_arg_uses_value_shape_without_enum_validation() {
     let mut cli = cli_metadata(true);
-    cli.possible_values = vec!["json".to_string(), "compact".to_string()];
+    cli.possible_values = vec!["json".to_owned(), "compact".to_owned()];
     let arg = config_field_arg(&field_metadata(Some(cli))).expect("arg should be visible");
     let matches = Command::new("test")
         .arg(arg)
@@ -123,7 +123,7 @@ fn config_field_arg_uses_value_shape_without_enum_validation() {
 #[test]
 fn config_field_arg_uses_help_id_metadata_for_help_text() {
     let mut field = field_metadata(Some(cli_metadata(true)));
-    field.help_id = "weaver-args-locale-help".to_string();
+    field.help_id = "weaver-args-locale-help".to_owned();
     let arg = config_field_arg(&field).expect("arg should be visible");
     let mut command = Command::new("test").arg(arg);
 
@@ -168,13 +168,16 @@ fn apply_arg_shape_supports_append_and_boolean_flags() {
         multiple: false,
         value_name: None,
     };
-    let matches = Command::new("test")
+    let switch_matches = Command::new("test")
         .arg(config_arg_from_metadata(switch))
         .try_get_matches_from(["test", "--switch-field"])
         .expect("switch flag should parse");
-    assert_eq!(matches.get_one::<bool>("switch_field").copied(), Some(true));
+    assert_eq!(
+        switch_matches.get_one::<bool>("switch_field").copied(),
+        Some(true)
+    );
 
-    let switch = ConfigFieldArgMetadata {
+    let rejecting_switch = ConfigFieldArgMetadata {
         name: "switch_field".to_owned(),
         long: "switch-field".to_owned(),
         short: None,
@@ -185,7 +188,7 @@ fn apply_arg_shape_supports_append_and_boolean_flags() {
         value_name: None,
     };
     let error = Command::new("test")
-        .arg(config_arg_from_metadata(switch))
+        .arg(config_arg_from_metadata(rejecting_switch))
         .try_get_matches_from(["test", "--switch-field", "value"])
         .expect_err("switch flag should reject a value");
     assert_eq!(error.kind(), ErrorKind::UnknownArgument);
@@ -222,12 +225,12 @@ fn optional_value_flags_accept_attached_values_and_render_them_as_optional() {
         Some("false")
     );
 
-    let matches = Command::new("test")
+    let omitted_matches = Command::new("test")
         .arg(arg.clone())
         .try_get_matches_from(["test", "--optional-switch"])
         .expect("an omitted optional value should mean true");
     assert_eq!(
-        matches
+        omitted_matches
             .get_one::<String>("optional_switch")
             .map(String::as_str),
         Some("true")
@@ -251,7 +254,7 @@ fn optional_value_flags_accept_attached_values_and_render_them_as_optional() {
 fn config_field_arg_propagates_optional_value_metadata() {
     let mut cli = cli_metadata(true);
     cli.value_optional = true;
-    cli.value_name = Some("BOOL".to_string());
+    cli.value_name = Some("BOOL".to_owned());
     let arg = config_field_arg(&field_metadata(Some(cli))).expect("arg should be visible");
     let mut command = Command::new("test").arg(arg);
 

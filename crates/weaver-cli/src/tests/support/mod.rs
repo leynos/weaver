@@ -136,7 +136,7 @@ impl TestWorld {
             ensure_relative_dirs(temp_dir.path(), parent)?;
         }
         let uri = Url::from_file_path(&path)
-            .map_err(|_| anyhow::anyhow!("failed to convert path to URI"))?
+            .map_err(|()| anyhow::anyhow!("failed to convert path to URI"))?
             .to_string();
         Ok((temp_dir, path, uri))
     }
@@ -175,7 +175,7 @@ impl TestWorld {
             &loader,
             daemon_binary,
             &localizer,
-            |invocation, context, output| self.lifecycle.handle(invocation, context, output),
+            |invocation, context, output| self.lifecycle.handle(&invocation, context, output),
         );
         self.exit_code = Some(exit);
         if let Some(daemon) = self.daemon.as_mut() {
@@ -208,8 +208,7 @@ impl TestWorld {
         let exit = self.exit_code.context("exit code recorded")?;
         ensure!(
             exit == ExitCode::from(expected),
-            "expected exit code {expected}, got {:?}",
-            exit
+            "expected exit code {expected}, got {exit:?}"
         );
         Ok(())
     }
@@ -218,8 +217,7 @@ impl TestWorld {
         let exit = self.exit_code.context("exit code recorded")?;
         ensure!(
             exit == ExitCode::FAILURE,
-            "expected failure exit code, got {:?}",
-            exit
+            "expected failure exit code, got {exit:?}"
         );
         Ok(())
     }
@@ -330,9 +328,9 @@ pub(super) fn decode_utf8(buffer: Vec<u8>, label: &str) -> Result<String> {
 
 pub(super) fn default_daemon_lines() -> Vec<String> {
     vec![
-        "{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"daemon says hello\"}".to_string(),
-        "{\"kind\":\"stream\",\"stream\":\"stderr\",\"data\":\"daemon complains\"}".to_string(),
-        "{\"kind\":\"exit\",\"status\":17}".to_string(),
+        "{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"daemon says hello\"}".to_owned(),
+        "{\"kind\":\"stream\",\"stream\":\"stderr\",\"data\":\"daemon complains\"}".to_owned(),
+        r#"{"kind":"exit","status":17}"#.to_owned(),
     ]
 }
 
@@ -348,7 +346,7 @@ pub(super) fn daemon_lines_for_stdout(payload: &str) -> anyhow::Result<Vec<Strin
     });
     Ok(vec![
         serde_json::to_string(&stream)?,
-        "{\"kind\":\"exit\",\"status\":0}".to_string(),
+        r#"{"kind":"exit","status":0}"#.to_owned(),
     ])
 }
 

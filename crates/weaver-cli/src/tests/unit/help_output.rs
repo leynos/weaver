@@ -87,7 +87,7 @@ fn augmented_command_has_expected_arg_structure() {
         assert!(arg.is_global_set(), "arg --{long} must be global");
         assert_eq!(
             arg.get_value_names()
-                .and_then(|names| names.first().map(|value| value.as_str())),
+                .and_then(|names| names.first().map(clap::builder::Str::as_str)),
             *expected_value_name,
             "arg --{long} value_name mismatch"
         );
@@ -240,22 +240,28 @@ fn config_flag_after_domain_is_not_extracted_as_config_argument() {
         atomic::{AtomicBool, Ordering},
     };
 
-    let load_called = Arc::new(AtomicBool::new(false));
-    let load_called_clone = Arc::clone(&load_called);
-
     struct TrackingLoader(Arc<AtomicBool>);
+
+    /// Reports that a post-domain `--locale` reached the config loader.
+    ///
+    /// Diverging rather than asserting keeps the panic out of the loader's
+    /// `Result`-returning `load`, which the workspace lint table forbids.
+    fn locale_reached_loader() -> ! {
+        panic!("post-domain --locale must not reach the config loader");
+    }
 
     impl ConfigLoader for TrackingLoader {
         fn load(&self, args: &[OsString]) -> Result<Config, AppError> {
             self.0.store(true, Ordering::SeqCst);
-            let contains_locale = args.iter().any(|arg| arg == "--locale");
-            assert!(
-                !contains_locale,
-                "post-domain --locale must not reach the config loader"
-            );
+            if args.iter().any(|arg| arg == "--locale") {
+                locale_reached_loader();
+            }
             Err(AppError::MissingDomain)
         }
     }
+
+    let load_called = Arc::new(AtomicBool::new(false));
+    let load_called_clone = Arc::clone(&load_called);
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -329,8 +335,17 @@ impl RenderedDocument<'_> {
     /// Reports whether a token is delimited from adjacent command-token characters.
     fn contains_whole_token(&self, token: &SurfaceToken<'_>) -> bool {
         self.content.match_indices(token.value).any(|(index, _)| {
-            let before = self.content[..index].chars().next_back();
-            let after = self.content[index + token.value.len()..].chars().next();
+            // `get` rather than slicing: the indices come from `match_indices`
+            // and so are char boundaries, but making that explicit keeps the
+            // check free of an unprovable panic.
+            let before = self
+                .content
+                .get(..index)
+                .and_then(|prefix| prefix.chars().next_back());
+            let after = self
+                .content
+                .get(index + token.value.len()..)
+                .and_then(|suffix| suffix.chars().next());
             before.is_none_or(|character| !is_token_character(character))
                 && after.is_none_or(|character| !is_token_character(character))
         })
