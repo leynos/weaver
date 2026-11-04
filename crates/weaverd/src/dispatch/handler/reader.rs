@@ -29,7 +29,11 @@ pub(super) fn read_request_line(
         if bytes_read == 0 {
             return Ok(finish_request_line(buffer));
         }
-        if append_request_chunk(&mut buffer, &chunk[..bytes_read])? {
+        // `read` never reports more bytes than the buffer can hold, so the
+        // checked slice always succeeds; defaulting to an empty chunk keeps the
+        // impossible case panic-free.
+        let filled_chunk = chunk.get(..bytes_read).unwrap_or_default();
+        if append_request_chunk(&mut buffer, filled_chunk)? {
             return Ok(Some(buffer));
         }
     }
@@ -39,7 +43,7 @@ pub(super) fn read_request_line(
 ///
 /// `DispatchError::RequestTooLarge` uses the size-specific rejection text so
 /// handler logs distinguish over-limit requests from generic I/O failures.
-pub(super) fn read_error_message(error: &DispatchError) -> &'static str {
+pub(super) const fn read_error_message(error: &DispatchError) -> &'static str {
     if matches!(error, DispatchError::RequestTooLarge { .. }) {
         "request rejected: size exceeded"
     } else {
@@ -52,18 +56,22 @@ fn read_with_retry(stream: &mut ConnectionStream, buf: &mut [u8]) -> io::Result<
     loop {
         match stream.read(buf) {
             Ok(n) => return Ok(n),
-            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
             Err(e) => return Err(e),
         }
     }
 }
 
+/// Distinguishes an empty read at EOF from a line that was fully buffered.
+///
+/// A disconnect before any byte arrives yields `None`; any buffered partial
+/// line is returned so the caller can attempt to parse it.
 fn finish_request_line(buffer: Vec<u8>) -> Option<Vec<u8>> {
     (!buffer.is_empty()).then_some(buffer)
 }
 
 /// Enforces the maximum request size limit.
-fn enforce_limit(size: usize) -> Result<(), DispatchError> {
+const fn enforce_limit(size: usize) -> Result<(), DispatchError> {
     if size > JSONL_REQUEST_MAX_LINE_BYTES {
         return Err(DispatchError::request_too_large(
             size,
@@ -73,13 +81,27 @@ fn enforce_limit(size: usize) -> Result<(), DispatchError> {
     Ok(())
 }
 
+/// Appends a chunk of request bytes and reports whether a newline was found.
+///
+/// Returns `Ok(true)` when the chunk completed the request line, including the
+/// terminating newline, and `Ok(false)` when more bytes are required. The
+/// accumulated size is checked against the request limit on both paths.
+///
+/// # Errors
+///
+/// Returns `DispatchError::RequestTooLarge` when the accumulated request body
+/// exceeds `JSONL_REQUEST_MAX_LINE_BYTES`.
 fn append_request_chunk(buffer: &mut Vec<u8>, chunk: &[u8]) -> Result<bool, DispatchError> {
     let Some(newline_pos) = chunk.iter().position(|byte| *byte == b'\n') else {
         buffer.extend_from_slice(chunk);
         enforce_limit(buffer.len())?;
         return Ok(false);
     };
-    buffer.extend_from_slice(&chunk[..=newline_pos]);
+    // `newline_pos` came from this chunk, so the inclusive slice is valid;
+    // the empty fallback keeps the impossible case panic-free.
+    if let Some(through_newline) = chunk.get(..=newline_pos) {
+        buffer.extend_from_slice(through_newline);
+    }
     enforce_limit(buffer.len())?;
     Ok(true)
 }

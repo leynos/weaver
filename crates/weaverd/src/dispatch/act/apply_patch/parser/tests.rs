@@ -17,7 +17,8 @@ fn parses_modify_operation() {
     );
     let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
     assert_eq!(ops.len(), 1);
-    match &ops[0] {
+    let operation = ops.first().expect("parse should yield one operation");
+    match operation {
         PatchOperation::Modify { path, blocks } => {
             assert_eq!(path.as_str(), "src/lib.rs");
             assert_eq!(blocks.len(), 1);
@@ -39,7 +40,8 @@ fn parses_create_operation() {
     );
     let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
     assert_eq!(ops.len(), 1);
-    match &ops[0] {
+    let operation = ops.first().expect("parse should yield one operation");
+    match operation {
         PatchOperation::Create { path, content } => {
             assert_eq!(path.as_str(), "src/new.rs");
             assert!(content.as_str().contains("fn hello()"));
@@ -61,7 +63,8 @@ fn create_operation_keeps_plus_prefixed_content() {
     );
     let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
     assert_eq!(ops.len(), 1);
-    match &ops[0] {
+    let operation = ops.first().expect("parse should yield one operation");
+    match operation {
         PatchOperation::Create { path, content } => {
             assert_eq!(path.as_str(), "src/new.rs");
             assert!(content.as_str().contains("+++hello"));
@@ -78,7 +81,8 @@ fn parses_delete_operation() {
     );
     let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
     assert_eq!(ops.len(), 1);
-    match &ops[0] {
+    let operation = ops.first().expect("parse should yield one operation");
+    match operation {
         PatchOperation::Delete { path } => {
             assert_eq!(path.as_str(), "src/remove.rs");
         }

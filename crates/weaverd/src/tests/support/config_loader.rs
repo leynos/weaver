@@ -57,7 +57,9 @@ impl TestConfigLoader {
             .lock()
             .map_err(|_| SocketPathError::MutexPoisoned)?;
         let path = dir.path().join("weaverd.sock");
-        Utf8PathBuf::from_path_buf(path).map_err(|path| SocketPathError::NonUtf8 { path })
+        Utf8PathBuf::from_path_buf(path).map_err(|non_utf8_path| SocketPathError::NonUtf8 {
+            path: non_utf8_path,
+        })
     }
 }
 

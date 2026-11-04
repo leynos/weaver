@@ -1,6 +1,7 @@
 //! Additional coverage for `observe graph-slice` response invariants.
 
 use rstest::rstest;
+use serde_json::Value;
 use tempfile::TempDir;
 use weaver_cards::DetailLevel;
 use weaver_lsp_host::{Language, ServerCapabilitySet};
@@ -18,11 +19,55 @@ use super::{
         prepare_request,
     },
 };
-use crate::dispatch::observe::test_support::{
-    StubLanguageServer,
-    markdown_hover,
-    semantic_backends_with_server,
+use crate::{
+    dispatch::observe::test_support::{
+        StubLanguageServer,
+        markdown_hover,
+        semantic_backends_with_server,
+    },
+    test_helpers::{ensure_same, ensure_same_ref, ensure_true},
 };
+
+/// Returns the `key` member of a JSON object, reporting a missing field.
+fn field<'a>(value: &'a Value, key: &str) -> Result<&'a Value, String> {
+    value
+        .get(key)
+        .ok_or_else(|| format!("missing field `{key}`"))
+}
+
+/// Returns the `key` member of a JSON object as an array.
+fn array_field<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>, String> {
+    value
+        .get(key)
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("field `{key}` is not an array"))
+}
+
+/// Returns the `key` member of a JSON object as a string.
+fn string_field<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("field `{key}` is not a string"))
+}
+
+/// Collects the `symbol.symbol_id` of every card, in card order.
+fn symbol_ids(cards: &[Value]) -> Result<Vec<&str>, String> {
+    cards
+        .iter()
+        .map(|card| field(card, "symbol").and_then(|symbol| string_field(symbol, "symbol_id")))
+        .collect()
+}
+
+/// Renders `count` distinct single-symbol functions as Rust source.
+fn render_functions(count: usize) -> String {
+    (0..count).fold(String::new(), |mut source, index| {
+        source.push_str("fn item_");
+        source.push_str(&index.to_string());
+        source.push_str("() {}\n");
+        source
+    })
+}
 
 #[rstest]
 fn enrichment_applies_lsp_provenance_when_detail_is_semantic() -> Result<(), String> {
@@ -57,33 +102,30 @@ fn enrichment_applies_lsp_provenance_when_detail_is_semantic() -> Result<(), Str
     assert_success_response(status, &payload);
 
     // The entry card provenance must include lsp_hover after semantic enrichment.
-    let cards = payload["cards"]
-        .as_array()
-        .expect("cards should be an array");
-    let entry_card = cards.first().expect("cards should include an entry card");
-    let provenance_sources = entry_card["provenance"]["sources"]
-        .as_array()
-        .expect("provenance.sources should be an array");
-    let source_names: Vec<&str> = provenance_sources
+    let cards = array_field(&payload, "cards")?;
+    let entry_card = cards.first().ok_or("cards should include an entry card")?;
+    let provenance = field(entry_card, "provenance")?;
+    let provenance_sources = array_field(provenance, "sources")?;
+    let source_names = provenance_sources
         .iter()
         .map(|value| {
             value
                 .as_str()
-                .expect("provenance.sources must contain only strings")
+                .ok_or("provenance.sources must contain only strings")
         })
-        .collect();
-    assert!(
-        source_names.contains(&"lsp_hover"),
-        "entry card provenance should include lsp_hover after semantic enrichment, got: \
-         {source_names:?}"
-    );
-    assert!(
-        !source_names.contains(&"tree_sitter_degraded_semantic"),
-        "entry card provenance should not contain tree_sitter_degraded_semantic after enrichment, \
-         got: {source_names:?}"
-    );
+        .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(())
+    ensure_true(
+        source_names.contains(&"lsp_hover"),
+        concat!(
+            "entry card provenance to include lsp_hover after semantic ",
+            "enrichment",
+        ),
+    )?;
+    ensure_true(
+        !source_names.contains(&"tree_sitter_degraded_semantic"),
+        "entry card provenance to drop tree_sitter_degraded_semantic",
+    )
 }
 
 #[rstest]
@@ -112,32 +154,10 @@ fn stable_card_order_produces_deterministic_results(
     assert_success_response(status_a, &payload_a);
     assert_success_response(status_b, &payload_b);
 
-    let cards_a = payload_a["cards"].as_array().expect("cards array");
-    let cards_b = payload_b["cards"].as_array().expect("cards array");
+    let ids_a = symbol_ids(array_field(&payload_a, "cards")?)?;
+    let ids_b = symbol_ids(array_field(&payload_b, "cards")?)?;
 
-    let ids_a: Vec<_> = cards_a
-        .iter()
-        .map(|card| {
-            card["symbol"]["symbol_id"]
-                .as_str()
-                .expect("card should include symbol.symbol_id")
-        })
-        .collect();
-    let ids_b: Vec<_> = cards_b
-        .iter()
-        .map(|card| {
-            card["symbol"]["symbol_id"]
-                .as_str()
-                .expect("card should include symbol.symbol_id")
-        })
-        .collect();
-
-    assert_eq!(
-        ids_a, ids_b,
-        "card order must be deterministic across repeated requests"
-    );
-
-    Ok(())
+    ensure_same_ref(&ids_a, &ids_b, "deterministic card order across requests")
 }
 
 #[rstest]
@@ -156,27 +176,18 @@ fn single_symbol_file_returns_one_card_with_empty_frontier(
 
     assert_success_response(status, &payload);
 
-    let cards = payload["cards"].as_array().expect("cards array");
-    assert_eq!(
-        cards.len(),
-        1,
-        "single-symbol file should produce exactly one card"
-    );
+    let cards = array_field(&payload, "cards")?;
+    ensure_same(cards.len(), 1, "single-symbol card count")?;
 
-    assert_eq!(
-        payload["spillover"]["truncated"], false,
-        "single-symbol file should not be truncated"
-    );
+    let spillover = field(&payload, "spillover")?;
+    ensure_same(
+        spillover.get("truncated").and_then(Value::as_bool),
+        Some(false),
+        "spillover.truncated",
+    )?;
 
-    let frontier = payload["spillover"]["frontier"]
-        .as_array()
-        .expect("frontier array");
-    assert!(
-        frontier.is_empty(),
-        "single-symbol file should have an empty spillover frontier"
-    );
-
-    Ok(())
+    let frontier = array_field(spillover, "frontier")?;
+    ensure_true(frontier.is_empty(), "empty spillover frontier")
 }
 
 #[rstest]
@@ -186,9 +197,7 @@ fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
     use super::MAX_SAME_FILE_DISCOVERY_POSITIONS;
 
     let (mut backends, temp_dir) = backends_fixture?;
-    let source = (0..=MAX_SAME_FILE_DISCOVERY_POSITIONS)
-        .map(|index| format!("fn item_{index}() {{}}\n"))
-        .collect::<String>();
+    let source = render_functions(MAX_SAME_FILE_DISCOVERY_POSITIONS + 1);
     let (status, payload) = dispatch_source(
         &mut backends,
         &SourceRequest {
@@ -209,13 +218,16 @@ fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
     )?;
 
     assert_success_response(status, &payload);
-    assert_eq!(payload["spillover"]["truncated"], true);
-    assert_eq!(
-        payload["spillover"]["frontier"]
-            .as_array()
-            .expect("frontier array")
-            .len(),
-        0
-    );
-    Ok(())
+
+    let spillover = field(&payload, "spillover")?;
+    ensure_same(
+        spillover.get("truncated").and_then(Value::as_bool),
+        Some(true),
+        "spillover.truncated",
+    )?;
+    let frontier_len = spillover
+        .get("frontier")
+        .and_then(Value::as_array)
+        .map(Vec::len);
+    ensure_same(frontier_len, Some(0), "spillover.frontier length")
 }

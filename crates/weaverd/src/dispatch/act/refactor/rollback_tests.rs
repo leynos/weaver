@@ -37,7 +37,7 @@ fn refused_runtime() -> RollbackRuntime {
 
 fn rope_python_runtime(execute_result: ExecuteResult) -> RollbackRuntime {
     selected_runtime(
-        SelectedResolution {
+        &SelectedResolution {
             capability: weaver_plugins::CapabilityId::RenameSymbol,
             language: "python",
             provider: "rope",
@@ -48,7 +48,7 @@ fn rope_python_runtime(execute_result: ExecuteResult) -> RollbackRuntime {
     )
 }
 
-fn run_failure_case(runtime: RollbackRuntime) -> Result<RollbackOutcome, String> {
+fn run_failure_case(runtime: &RollbackRuntime) -> Result<RollbackOutcome, String> {
     let workspace = TempDir::new().map_err(|e| format!("workspace: {e}"))?;
     let file = "notes.py";
     let file_path = workspace.path().join(file);
@@ -67,7 +67,7 @@ fn run_failure_case(runtime: RollbackRuntime) -> Result<RollbackOutcome, String>
         RefactorContext {
             backends: &mut backends,
             workspace_root: workspace.path(),
-            runtime: &runtime,
+            runtime,
         },
     )
     .map_err(|e| format!("dispatch should complete: {e}"))?;
@@ -93,7 +93,7 @@ fn assert_rollback_invariants(outcome: &RollbackOutcome, stderr_fragment: &str) 
 // replaced with an encapsulated metrics actor or registry.
 #[serial]
 fn refused_resolution_leaves_target_file_unchanged() -> Result<(), String> {
-    let outcome = run_failure_case(refused_runtime())?;
+    let outcome = run_failure_case(&refused_runtime())?;
     assert_rollback_invariants(&outcome, "unsupported_language");
     Ok(())
 }
@@ -103,7 +103,7 @@ fn refused_resolution_leaves_target_file_unchanged() -> Result<(), String> {
 // replaced with an encapsulated metrics actor or registry.
 #[serial]
 fn plugin_runtime_error_leaves_target_file_unchanged() -> Result<(), String> {
-    let outcome = run_failure_case(rope_python_runtime(ExecuteResult::MissingPlugin("rope")))?;
+    let outcome = run_failure_case(&rope_python_runtime(ExecuteResult::MissingPlugin("rope")))?;
     assert_rollback_invariants(&outcome, "act refactor failed");
     Ok(())
 }
@@ -113,7 +113,7 @@ fn plugin_runtime_error_leaves_target_file_unchanged() -> Result<(), String> {
 // replaced with an encapsulated metrics actor or registry.
 #[serial]
 fn successful_non_diff_response_leaves_target_file_unchanged() -> Result<(), String> {
-    let outcome = run_failure_case(rope_python_runtime(ExecuteResult::Success(
+    let outcome = run_failure_case(&rope_python_runtime(ExecuteResult::Success(
         PluginResponse::success(PluginOutput::Analysis {
             data: serde_json::json!({ "unexpected": true }),
         }),

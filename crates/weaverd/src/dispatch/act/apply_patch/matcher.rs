@@ -40,6 +40,7 @@ pub(crate) fn apply_search_replace(
     Ok(content)
 }
 
+/// Finds the next exact occurrence of `search` at or after `cursor`.
 fn find_exact(
     content: &FileContent,
     cursor: usize,
@@ -49,15 +50,17 @@ fn find_exact(
         cursor <= content.as_str().len(),
         "exact search cursor out of bounds"
     );
-    let content = content.as_str();
-    let search = search.as_str();
-    content[cursor..].find(search).map(|offset| {
+    let haystack = content.as_str();
+    let needle = search.as_str();
+    let tail = haystack.get(cursor..)?;
+    tail.find(needle).map(|offset| {
         let start = cursor + offset;
-        let end = start + search.len();
+        let end = start + needle.len();
         (start, end)
     })
 }
 
+/// Finds the next line-ending-insensitive occurrence at or after `cursor`.
 fn find_fuzzy(
     content: &FileContent,
     cursor: usize,
@@ -75,7 +78,7 @@ fn find_fuzzy(
     }
 
     let cursor_norm = normalized_content.orig_to_norm(cursor)?;
-    let haystack = &normalized_content.normalized[cursor_norm..];
+    let haystack = normalized_content.normalized.get(cursor_norm..)?;
     let offset = haystack.find(trimmed_search)?;
     let start_norm = cursor_norm + offset;
     let end_norm = start_norm + trimmed_search.len();
@@ -84,20 +87,22 @@ fn find_fuzzy(
     Some((start_orig, end_orig))
 }
 
+/// Trims spaces and tabs from both ends of `value`.
 fn trim_fuzzy_whitespace(value: &str) -> &str { value.trim_matches(|ch| ch == ' ' || ch == '\t') }
 
+/// Counts CRLF and LF occurrences and returns the dominant line ending.
 fn dominant_line_ending(content: &str) -> LineEnding {
     let mut crlf = 0;
     let mut lf = 0;
     let bytes = content.as_bytes();
     let mut idx = 0;
     while idx < bytes.len() {
-        if bytes[idx] == b'\r' && bytes.get(idx + 1) == Some(&b'\n') {
+        if bytes.get(idx) == Some(&b'\r') && bytes.get(idx + 1) == Some(&b'\n') {
             crlf += 1;
             idx += 2;
             continue;
         }
-        if bytes[idx] == b'\n' {
+        if bytes.get(idx) == Some(&b'\n') {
             lf += 1;
         }
         idx += 1;
@@ -122,19 +127,23 @@ pub(crate) fn normalise_line_endings(input: &str, line_ending: LineEnding) -> St
     }
 }
 
+/// Action describing how a character contributes to CRLF normalisation.
 enum CrlfAction {
+    /// Emits the borrowed text and consumes the following character.
     EmitAndSkip(&'static str),
+    /// Emits the borrowed text unchanged.
     Emit(&'static str),
+    /// Emits the supplied character unchanged.
     EmitChar(char),
 }
 
-/// Processes a single character for CRLF normalization and returns the action.
-fn process_char_for_crlf(ch: char, next_char: Option<char>) -> CrlfAction {
+/// Processes a single character for CRLF normalisation and returns the action.
+const fn process_char_for_crlf(ch: char, next_char: Option<char>) -> CrlfAction {
     match (ch, next_char) {
         ('\r', Some('\n')) => CrlfAction::EmitAndSkip("\r\n"),
         ('\r', _) => CrlfAction::Emit("\r"),
         ('\n', _) => CrlfAction::Emit("\r\n"),
-        (ch, _) => CrlfAction::EmitChar(ch),
+        (other, _) => CrlfAction::EmitChar(other),
     }
 }
 
@@ -152,6 +161,7 @@ fn calculate_crlf_capacity(input: &str) -> usize {
     extra
 }
 
+/// Rewrites every bare LF in `input` as CRLF, preserving existing pairs.
 fn normalise_line_endings_crlf(input: &str) -> String {
     let extra = calculate_crlf_capacity(input);
     // Phase 2: Build normalized output
@@ -171,13 +181,18 @@ fn normalise_line_endings_crlf(input: &str) -> String {
     output
 }
 
+/// Content normalised to LF line endings with index maps back to the original.
 struct NormalizedContent {
+    /// Text with each CRLF pair collapsed to a single LF.
     normalized: String,
+    /// Maps a normalised byte index to the original byte index.
     norm_to_orig: Vec<usize>,
+    /// Maps an original byte index to its normalised byte index.
     orig_to_norm: Vec<usize>,
 }
 
 impl NormalizedContent {
+    /// Builds a normalised view of `input` and both index maps.
     fn new(input: &str) -> Self {
         let mut normalized = String::with_capacity(input.len());
         let mut norm_to_orig = Vec::new();
@@ -205,7 +220,9 @@ impl NormalizedContent {
             normalized.push(ch);
             norm_index += 1;
         }
-        orig_to_norm[input.len()] = norm_index;
+        if let Some(end_entry) = orig_to_norm.get_mut(input.len()) {
+            *end_entry = norm_index;
+        }
         norm_to_orig.push(input.len());
 
         Self {
@@ -215,11 +232,14 @@ impl NormalizedContent {
         }
     }
 
+    /// Maps a normalised index to the original index, if in range.
     fn norm_to_orig(&self, index: usize) -> Option<usize> { self.norm_to_orig.get(index).copied() }
 
+    /// Maps an original index to the normalised index, if in range.
     fn orig_to_norm(&self, index: usize) -> Option<usize> { self.orig_to_norm.get(index).copied() }
 }
 
+/// Points the original indices of the LF half of a CRLF pair at `norm_index`.
 fn map_crlf_indices(orig_to_norm: &mut [usize], next_idx: usize, norm_index: usize) {
     let next_len = '\n'.len_utf8();
     for entry in orig_to_norm.iter_mut().skip(next_idx).take(next_len) {
@@ -284,8 +304,8 @@ mod tests {
         #[case] blocks: Vec<SearchReplaceBlock>,
         #[case] expected: &str,
     ) {
-        let original = FileContent::new(original);
-        let result = apply_search_replace(&path, &original, &blocks).expect("apply");
+        let original_content = FileContent::new(original);
+        let result = apply_search_replace(&path, &original_content, &blocks).expect("apply");
         assert_eq!(result.as_str(), expected);
     }
 
@@ -298,8 +318,11 @@ mod tests {
         let original = FileContent::new("content");
         let error = apply_search_replace(&path, &original, &blocks).expect_err("error");
         match error {
-            ApplyPatchError::SearchBlockNotFound { path, block_index } => {
-                assert_eq!(path.as_str(), "file.txt");
+            ApplyPatchError::SearchBlockNotFound {
+                path: error_path,
+                block_index,
+            } => {
+                assert_eq!(error_path.as_str(), "file.txt");
                 assert_eq!(block_index, 1);
             }
             other => panic!("unexpected error: {other:?}"),

@@ -78,7 +78,9 @@ pub(crate) trait RefactorPluginRuntime {
 
 /// Sandbox-backed runtime that resolves plugins from a registry.
 pub(crate) struct SandboxRefactorRuntime {
+    /// Registry of built-in refactor provider manifests.
     registry: PluginRegistry,
+    /// Runner that executes the resolved plugin inside a sandbox.
     runner: PluginRunner<SandboxExecutor>,
 }
 
@@ -125,6 +127,7 @@ impl RefactorPluginRuntime for SandboxRefactorRuntime {
 
 /// Runtime that reports an initialization error on every execution attempt.
 struct NoopRefactorRuntime {
+    /// Initialization error reported by every resolution and execution attempt.
     message: String,
 }
 
@@ -170,14 +173,18 @@ pub(crate) struct RefactorContext<'a> {
 
 /// Parameters required for provider resolution.
 struct ResolutionParams<'a> {
+    /// Runtime used to resolve the requested capability.
     runtime: &'a dyn RefactorPluginRuntime,
+    /// Capability derived from the requested refactoring operation.
     capability: CapabilityId,
+    /// Target file whose provider is being resolved.
     file_path: &'a std::path::Path,
+    /// Explicit provider requested by the operator, when present.
     provider_override: Option<&'a str>,
 }
 /// Resolves the provider for the refactor operation.
 fn resolve_provider_with_fallback(
-    params: ResolutionParams<'_>,
+    params: &ResolutionParams<'_>,
     args: &arguments::RefactorArgs,
     writer: &mut ResponseWriter<impl Write>,
 ) -> Result<Option<CapabilityResolutionEnvelope>, DispatchError> {
@@ -199,14 +206,17 @@ fn resolve_provider_with_fallback(
 
 /// Parameters required for plugin execution.
 struct ExecutionParams<'a> {
+    /// Runtime used to execute the resolved plugin.
     runtime: &'a dyn RefactorPluginRuntime,
+    /// Name of the provider chosen by capability resolution.
     selected_provider: &'a str,
+    /// Plugin request to execute.
     plugin_request: &'a PluginRequest,
 }
 
 /// Starts the semantic backend and handles the plugin response.
 fn handle_successful_execution<W: Write>(
-    response: PluginResponse,
+    response: &PluginResponse,
     writer: &mut ResponseWriter<W>,
     context: &mut RefactorContext<'_>,
 ) -> Result<DispatchResult, DispatchError> {
@@ -257,7 +267,8 @@ pub fn handle<W: Write>(
         provider_override: Some(args.provider.as_str()),
     };
 
-    let Some(resolution) = resolve_provider_with_fallback(resolution_params, &args, writer)? else {
+    let Some(resolution) = resolve_provider_with_fallback(&resolution_params, &args, writer)?
+    else {
         return Ok(DispatchResult::with_status(1));
     };
 
@@ -272,9 +283,15 @@ pub fn handle<W: Write>(
         plugin_request: &plugin_request,
     };
 
-    execute_plugin_and_handle_response(execution_params, &args, writer, &mut context)
+    execute_plugin_and_handle_response(&execution_params, &args, writer, &mut context)
 }
 
+/// Writes the capability resolution envelope as `JSON` to standard error.
+///
+/// # Errors
+///
+/// Returns an error when the envelope cannot be serialized or the response
+/// writer rejects the output.
 fn write_capability_resolution<W: Write>(
     writer: &mut ResponseWriter<W>,
     resolution: &CapabilityResolutionEnvelope,
@@ -283,6 +300,11 @@ fn write_capability_resolution<W: Write>(
     writer.write_stderr(format!("{json}\n"))
 }
 
+/// Warns when the operator used the deprecated `offset=` argument form.
+///
+/// # Errors
+///
+/// Returns an error when the response writer rejects the warning output.
 fn write_deprecated_offset_warning<W: Write>(
     args: &arguments::RefactorArgs,
     writer: &mut ResponseWriter<W>,
@@ -301,15 +323,19 @@ mod behaviour;
 #[cfg(test)]
 mod contract_tests;
 #[cfg(test)]
+mod positions_tests;
+#[cfg(test)]
 mod resolution_tests;
 #[cfg(test)]
 mod rollback_tests;
+#[cfg(test)]
+mod runtime_tests;
 #[cfg(test)]
 mod tests;
 
 /// Executes the plugin and handles the response.
 fn execute_plugin_and_handle_response<W: Write>(
-    params: ExecutionParams<'_>,
+    params: &ExecutionParams<'_>,
     args: &arguments::RefactorArgs,
     writer: &mut ResponseWriter<W>,
     context: &mut RefactorContext<'_>,
@@ -318,7 +344,7 @@ fn execute_plugin_and_handle_response<W: Write>(
         .runtime
         .execute(params.selected_provider, params.plugin_request)
     {
-        Ok(response) => handle_successful_execution(response, writer, context),
+        Ok(response) => handle_successful_execution(&response, writer, context),
         Err(error) => {
             write_execution_error(&error, params.selected_provider, args, writer)?;
             Ok(DispatchResult::with_status(1))

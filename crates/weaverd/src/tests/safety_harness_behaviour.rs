@@ -164,7 +164,7 @@ where
     }
     let state = cell.borrow();
     let Some(outcome) = state.outcome() else {
-        return Err("outcome should exist".to_string());
+        return Err("outcome should exist".to_owned());
     };
     assertion(outcome)
 }
@@ -172,7 +172,7 @@ where
 #[then("the transaction commits successfully")]
 fn then_commits(world: &SafetyHarnessWorldFixture) -> Result<(), String> {
     assert_outcome(world, |outcome| {
-        if outcome.as_ref().is_ok_and(|o| o.committed()) {
+        if outcome.as_ref().is_ok_and(TransactionOutcome::committed) {
             Ok(())
         } else {
             Err(format!("transaction should commit: {outcome:?}"))

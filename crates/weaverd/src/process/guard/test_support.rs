@@ -1,6 +1,12 @@
 //! Test support utilities for health event tracking.
 
-use super::{HEALTH_EVENTS, HashMap, Mutex, Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
+
+use super::health_events::HEALTH_EVENTS;
 
 fn storage() -> &'static Mutex<HashMap<PathBuf, Vec<&'static str>>> {
     HEALTH_EVENTS.get_or_init(|| Mutex::new(HashMap::new()))

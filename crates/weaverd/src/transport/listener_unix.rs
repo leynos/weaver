@@ -12,6 +12,7 @@ use weaver_config::SocketEndpoint;
 
 use super::{LISTENER_TARGET, ListenerError};
 
+/// Binds a Unix-domain listener after clearing any stale socket file.
 pub(super) fn bind_unix(path: &Path) -> Result<UnixListener, ListenerError> {
     ensure_bindable_unix_path(path)?;
     UnixListener::bind(path).map_err(|source| ListenerError::BindUnix {
@@ -20,6 +21,7 @@ pub(super) fn bind_unix(path: &Path) -> Result<UnixListener, ListenerError> {
     })
 }
 
+/// Verifies that `path` is absent or an already-stale Unix socket.
 fn ensure_bindable_unix_path(path: &Path) -> Result<(), ListenerError> {
     let (dir, filename) = socket_parent_dir(path)?;
     if !socket_path_exists(&dir, &filename, path)? {
@@ -29,6 +31,7 @@ fn ensure_bindable_unix_path(path: &Path) -> Result<(), ListenerError> {
     remove_stale_unix_socket(&dir, &filename, path)
 }
 
+/// Rejects an existing filesystem entry that is not a Unix socket.
 fn ensure_unix_socket_file(dir: &Dir, filename: &Path, path: &Path) -> Result<(), ListenerError> {
     let metadata =
         dir.symlink_metadata(filename)
@@ -45,6 +48,7 @@ fn ensure_unix_socket_file(dir: &Dir, filename: &Path, path: &Path) -> Result<()
     }
 }
 
+/// Removes a socket file when no live process is listening on it.
 fn remove_stale_unix_socket(dir: &Dir, filename: &Path, path: &Path) -> Result<(), ListenerError> {
     match UnixStream::connect(path) {
         Ok(_stream) => Err(ListenerError::UnixInUse {
@@ -68,6 +72,7 @@ fn remove_stale_unix_socket(dir: &Dir, filename: &Path, path: &Path) -> Result<(
     }
 }
 
+/// Returns true when `error` indicates a socket with no live listener.
 fn stale_unix_socket_error(error: &io::Error) -> bool {
     matches!(
         error.kind(),
@@ -75,6 +80,7 @@ fn stale_unix_socket_error(error: &io::Error) -> bool {
     )
 }
 
+/// Removes the socket file for a Unix endpoint, if one is present.
 pub(super) fn cleanup_unix_socket(endpoint: &SocketEndpoint) {
     let SocketEndpoint::Unix { path } = endpoint else {
         return;
@@ -94,6 +100,7 @@ pub(super) fn cleanup_unix_socket(endpoint: &SocketEndpoint) {
     }
 }
 
+/// Opens the parent directory capability and file name for a socket path.
 fn socket_parent_dir(path: &Path) -> Result<(Dir, PathBuf), ListenerError> {
     let parent = path.parent().ok_or_else(|| ListenerError::UnixMetadata {
         path: path.display().to_string(),
@@ -114,6 +121,7 @@ fn socket_parent_dir(path: &Path) -> Result<(Dir, PathBuf), ListenerError> {
     Ok((dir, PathBuf::from(filename)))
 }
 
+/// Returns whether `filename` exists within the socket's parent directory.
 fn socket_path_exists(dir: &Dir, filename: &Path, path: &Path) -> Result<bool, ListenerError> {
     match dir.symlink_metadata(filename) {
         Ok(_) => Ok(true),

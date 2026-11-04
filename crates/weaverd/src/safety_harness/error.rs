@@ -38,7 +38,7 @@ impl VerificationFailure {
 
     /// Attaches a location to this failure.
     #[must_use]
-    pub fn at_location(mut self, line: u32, column: u32) -> Self {
+    pub const fn at_location(mut self, line: u32, column: u32) -> Self {
         self.line = Some(line);
         self.column = Some(column);
         self
@@ -50,11 +50,11 @@ impl VerificationFailure {
 
     /// Optional line number (one-based for display).
     #[must_use]
-    pub fn line(&self) -> Option<u32> { self.line }
+    pub const fn line(&self) -> Option<u32> { self.line }
 
     /// Optional column number (one-based for display).
     #[must_use]
-    pub fn column(&self) -> Option<u32> { self.column }
+    pub const fn column(&self) -> Option<u32> { self.column }
 
     /// Human-readable message describing the problem.
     #[must_use]
@@ -150,6 +150,7 @@ pub enum SafetyHarnessError {
 
 impl SafetyHarnessError {
     /// Creates a file read error.
+    #[must_use]
     pub fn file_read(path: PathBuf, error: std::io::Error) -> Self {
         Self::FileReadError {
             path,
@@ -158,6 +159,7 @@ impl SafetyHarnessError {
     }
 
     /// Creates a file write error.
+    #[must_use]
     pub fn file_write(path: PathBuf, error: std::io::Error) -> Self {
         Self::FileWriteError {
             path,
@@ -166,6 +168,7 @@ impl SafetyHarnessError {
     }
 
     /// Creates a file delete error.
+    #[must_use]
     pub fn file_delete(path: PathBuf, error: std::io::Error) -> Self {
         Self::FileDeleteError {
             path,
