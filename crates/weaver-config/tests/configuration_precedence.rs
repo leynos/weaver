@@ -71,10 +71,10 @@ impl Harness {
     /// text through `SocketEndpoint` first. Non-TCP endpoints are rejected
     /// because the precedence scenarios only exercise transport over TCP.
     fn add_file_socket(&self, endpoint: &str) -> Result<(), String> {
-        let endpoint = endpoint
+        let parsed_endpoint = endpoint
             .parse::<SocketEndpoint>()
             .map_err(|error| format!("parse file socket endpoint: {error}"))?;
-        let SocketEndpoint::Tcp { host, port } = endpoint else {
+        let SocketEndpoint::Tcp { host, port } = parsed_endpoint else {
             return Err(String::from(
                 "precedence tests require a TCP socket endpoint",
             ));
@@ -119,9 +119,9 @@ impl Harness {
                 source.with_var(*key, value.clone())
             })
             .with_var(CONFIG_PATH_ENV, config_path.to_string_lossy().into_owned());
-        let environment = Arc::new(environment);
-        let discovery: SharedEnvSource = environment.clone();
-        let merge: SharedScanEnvSource = environment;
+        let shared_environment = Arc::new(environment);
+        let discovery: SharedEnvSource = shared_environment.clone();
+        let merge: SharedScanEnvSource = shared_environment;
         let arguments = std::iter::once(OsString::from("weaver"))
             .chain(self.cli.borrow().iter().cloned())
             .collect::<Vec<_>>();
@@ -211,9 +211,9 @@ fn given_environment_forces_rename(harness: &HarnessState) -> Result<(), String>
 
 #[when("the CLI sets the locale to \"{locale}\"")]
 fn when_cli_locale(harness: &HarnessState, locale: String) -> Result<(), String> {
-    let harness = configured_harness(harness)?;
-    harness.add_cli_arguments([OsString::from("--locale"), OsString::from(locale)]);
-    harness.resolve()
+    let configured = configured_harness(harness)?;
+    configured.add_cli_arguments([OsString::from("--locale"), OsString::from(locale)]);
+    configured.resolve()
 }
 
 #[when("the configuration loads")]
@@ -228,26 +228,26 @@ fn when_defaults_load(harness: &HarnessState) -> Result<(), String> {
 
 #[when("the environment sets the locale to \"{locale}\"")]
 fn when_invalid_environment_locale(harness: &HarnessState, locale: String) -> Result<(), String> {
-    let harness = configured_harness(harness)?;
-    harness.set_environment(LOCALE_ENV, locale);
-    harness.resolve()
+    let configured = configured_harness(harness)?;
+    configured.set_environment(LOCALE_ENV, locale);
+    configured.resolve()
 }
 
 #[when("the CLI sets the daemon socket to \"{endpoint}\"")]
 fn when_cli_socket(harness: &HarnessState, endpoint: String) -> Result<(), String> {
-    let harness = configured_harness(harness)?;
-    harness.add_cli_arguments([OsString::from("--daemon-socket"), OsString::from(endpoint)]);
-    harness.resolve()
+    let configured = configured_harness(harness)?;
+    configured.add_cli_arguments([OsString::from("--daemon-socket"), OsString::from(endpoint)]);
+    configured.resolve()
 }
 
 #[when("the CLI denies the Rust rename capability")]
 fn when_cli_denies_rename(harness: &HarnessState) -> Result<(), String> {
-    let harness = configured_harness(harness)?;
-    harness.add_cli_arguments([
+    let configured = configured_harness(harness)?;
+    configured.add_cli_arguments([
         OsString::from("--capability-overrides"),
         OsString::from("rust:observe.rename=deny"),
     ]);
-    harness.resolve()
+    configured.resolve()
 }
 
 #[then("loading the configuration resolves the locale to \"{locale}\"")]
@@ -311,7 +311,7 @@ fn then_rename_is_denied(harness: &HarnessState) -> Result<(), String> {
     Ok(())
 }
 
-/// Guards the harness's discovery isolation. OrthoConfig takes the first
+/// Guards the harness's discovery isolation. `OrthoConfig` takes the first
 /// existing candidate in selector, XDG, home, then project order, so an
 /// ambient configuration file would otherwise decide the defaults scenario.
 /// The harness pins `WEAVER_CONFIG_PATH` to its own empty file, which must

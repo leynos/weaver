@@ -20,6 +20,7 @@ use lsp_types::{
     Location,
     ReferenceParams,
     Uri,
+    WorkDoneProgressParams,
 };
 
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
@@ -171,7 +172,7 @@ impl LanguageServer for RecordingLanguageServer {
 
     fn did_open(&mut self, _params: DidOpenTextDocumentParams) -> Result<(), LanguageServerError> {
         self.handle_notification(CallKind::DidOpen, "didOpen", |responses| {
-            responses.document_sync.did_open_error.clone()
+            responses.document_sync.open.clone()
         })
     }
 
@@ -180,7 +181,7 @@ impl LanguageServer for RecordingLanguageServer {
         _params: DidChangeTextDocumentParams,
     ) -> Result<(), LanguageServerError> {
         self.handle_notification(CallKind::DidChange, "didChange", |responses| {
-            responses.document_sync.did_change_error.clone()
+            responses.document_sync.change.clone()
         })
     }
 
@@ -189,7 +190,7 @@ impl LanguageServer for RecordingLanguageServer {
         _params: DidCloseTextDocumentParams,
     ) -> Result<(), LanguageServerError> {
         self.handle_notification(CallKind::DidClose, "didClose", |responses| {
-            responses.document_sync.did_close_error.clone()
+            responses.document_sync.close.clone()
         })
     }
 
@@ -244,7 +245,9 @@ fn with_state<R, F>(shared: &Arc<Mutex<RecordingState>>, action: F) -> R
 where
     F: FnOnce(&mut RecordingState) -> R,
 {
-    let mut guard = shared.lock().unwrap_or_else(|poison| poison.into_inner());
+    let mut guard = shared
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     action(&mut guard)
 }
 
@@ -293,11 +296,11 @@ pub struct CallHierarchyResponses {
 #[derive(Debug, Clone, Default)]
 pub struct DocumentSyncErrors {
     /// Error raised when `did_open` is called.
-    pub did_open_error: Option<String>,
+    pub open: Option<String>,
     /// Error raised when `did_change` is called.
-    pub did_change_error: Option<String>,
+    pub change: Option<String>,
     /// Error raised when `did_close` is called.
-    pub did_close_error: Option<String>,
+    pub close: Option<String>,
 }
 
 #[derive(Debug)]
@@ -370,7 +373,7 @@ mod tests {
                     },
                     position: Position::new(0, 0),
                 },
-                work_done_progress_params: Default::default(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
             })
             .expect("hover should succeed");
 

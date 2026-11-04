@@ -29,7 +29,9 @@ pub type SandboxOutput = Output;
 
 /// Launches commands inside a restrictive sandbox.
 pub struct Sandbox {
+    /// Policy applied to every command launched through this sandbox.
     profile: SandboxProfile,
+    /// Reads the host's live thread count before each spawn.
     thread_counter: Box<dyn Fn() -> Result<usize, std::io::Error> + Send + Sync>,
 }
 
@@ -69,6 +71,12 @@ impl Sandbox {
     /// profile. When more than one thread exists in the current process the
     /// function returns [`SandboxError::MultiThreaded`] to avoid triggering the
     /// single-thread assertion enforced by `birdcage`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SandboxError::MultiThreaded`] when the host has more than one
+    /// thread, [`SandboxError::ThreadCountUnavailable`] when the thread count
+    /// cannot be read, and errors from program validation or `birdcage`.
     pub fn spawn(&self, command: SandboxCommand) -> Result<SandboxChild, SandboxError> {
         self.ensure_single_threaded()?;
         let program = Self::canonical_program(Path::new(command.get_program()))?;
@@ -87,6 +95,7 @@ impl Sandbox {
         Ok(child)
     }
 
+    /// Rejects a spawn when `birdcage`'s single-thread invariant would be broken.
     fn ensure_single_threaded(&self) -> Result<(), SandboxError> {
         let threads = (self.thread_counter)()
             .map_err(|source| SandboxError::ThreadCountUnavailable { source })?;
@@ -98,6 +107,7 @@ impl Sandbox {
         Ok(())
     }
 
+    /// Rejects a program that the profile does not authorise.
     fn ensure_program_whitelisted(&self, program: &Path) -> Result<(), SandboxError> {
         let authorised = self.profile.executable_paths_canonicalised()?;
         if authorised.iter().any(|p| p == program) {
@@ -108,6 +118,7 @@ impl Sandbox {
         })
     }
 
+    /// Builds the `birdcage` exceptions implied by the profile.
     fn collect_exceptions(&self, _program: &Path) -> Result<Vec<Exception>, SandboxError> {
         let mut exceptions = Vec::new();
         let read_only = self.profile.read_only_paths_canonicalised()?;
@@ -133,6 +144,7 @@ impl Sandbox {
         Ok(exceptions)
     }
 
+    /// Resolves an absolute program path, failing when it does not exist.
     fn canonical_program(program: &Path) -> Result<PathBuf, SandboxError> {
         if !program.is_absolute() {
             return Err(SandboxError::ProgramNotAbsolute(program.to_path_buf()));
@@ -142,10 +154,12 @@ impl Sandbox {
     }
 }
 
+/// Canonicalises each path, tolerating paths that do not exist yet.
 pub(crate) fn canonicalised_set(paths: &[PathBuf]) -> Result<Vec<PathBuf>, SandboxError> {
     paths.iter().map(|path| canonicalise(path, false)).collect()
 }
 
+/// Canonicalises `path`, optionally requiring that it exists.
 fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxError> {
     match fs::canonicalize(path) {
         Ok(resolved) => Ok(resolved),
@@ -165,6 +179,7 @@ fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxErr
     }
 }
 
+/// Rebuilds a non-existent path from its nearest existing ancestor.
 fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> {
     let Some(existing) = path.ancestors().find(|candidate| candidate.exists()) else {
         return Err(SandboxError::MissingPath {

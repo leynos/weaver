@@ -30,11 +30,7 @@ struct MyServer;
 
 impl LanguageServer for MyServer {
     fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
-        Ok(ServerCapabilitySet {
-            definition: false,
-            references: false,
-            diagnostics: false,
-        })
+        Ok(ServerCapabilitySet::new(false, false, false))
     }
 
     fn goto_definition(
@@ -78,6 +74,83 @@ impl LanguageServer for MyServer {
     ) -> Result<(), LanguageServerError> {
         Ok(())
     }
+
+    fn prepare_call_hierarchy(
+        &mut self,
+        _params: lsp_types::CallHierarchyPrepareParams,
+    ) -> Result<Option<Vec<lsp_types::CallHierarchyItem>>, LanguageServerError> {
+        Ok(None)
+    }
+
+    fn incoming_calls(
+        &mut self,
+        _params: lsp_types::CallHierarchyIncomingCallsParams,
+    ) -> Result<Option<Vec<lsp_types::CallHierarchyIncomingCall>>, LanguageServerError> {
+        Ok(None)
+    }
+
+    fn outgoing_calls(
+        &mut self,
+        _params: lsp_types::CallHierarchyOutgoingCallsParams,
+    ) -> Result<Option<Vec<lsp_types::CallHierarchyOutgoingCall>>, LanguageServerError> {
+        Ok(None)
+    }
+
+    fn hover(
+        &mut self,
+        _params: lsp_types::HoverParams,
+    ) -> Result<Option<lsp_types::Hover>, LanguageServerError> {
+        Ok(None)
+    }
 }
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+## Capability set representation
+
+`ServerCapabilitySet` no longer exposes one public boolean field per
+capability. It holds a private `BTreeSet<CapabilityKind>` of the capabilities a
+server advertised, plus the negotiated position encoding, and is built with
+chained calls:
+
+```rust
+use lsp_types::PositionEncodingKind;
+use weaver_lsp_host::{CapabilityKind, ServerCapabilitySet};
+
+let capabilities = ServerCapabilitySet::new(true, true, false)
+    .with_call_hierarchy(true)
+    .with_hover(true)
+    .with_position_encoding(Some(PositionEncodingKind::UTF8));
+
+assert!(capabilities.supports(CapabilityKind::CallHierarchy));
+assert!(capabilities.supports_hover());
+assert_eq!(
+    capabilities.position_encoding(),
+    Some(&PositionEncodingKind::UTF8)
+);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+### Why the capability model changed
+
+The host now negotiates five capabilities — `Definition`, `References`,
+`Diagnostics`, `CallHierarchy`, and `Hover` — and will negotiate more over
+time. A struct of public booleans forces a breaking change for each addition,
+and makes it easy for an adaptor to leave one flag at its default by accident.
+A set makes "not advertised" the only default state and keeps the supported
+capabilities and their queries in one place.
+
+### Migrating the capability model
+
+- Replace struct literals with
+  `ServerCapabilitySet::new(definition, references, diagnostics)`.
+- Chain `.with_call_hierarchy(...)`, `.with_hover(...)`, and
+  `.with_position_encoding(...)` for the remaining capabilities.
+- Replace field reads such as `set.definition` with
+  `set.supports(CapabilityKind::Definition)` or the corresponding
+  `supports_*()` accessor.
+
+Because the build-time flags are now additive, an adaptor that previously had
+no way to advertise call hierarchy or hover must opt in explicitly; the host
+treats an absent capability as unavailable and reports
+`CapabilitySource::MissingOnServer`.

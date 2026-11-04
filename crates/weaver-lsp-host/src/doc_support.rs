@@ -39,14 +39,7 @@ pub struct DocStubServer;
 
 impl LanguageServer for DocStubServer {
     fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
-        Ok(ServerCapabilitySet {
-            definition: false,
-            references: false,
-            diagnostics: false,
-            call_hierarchy: false,
-            hover: false,
-            position_encoding: None,
-        })
+        Ok(ServerCapabilitySet::new(false, false, false))
     }
 
     fn goto_definition(
