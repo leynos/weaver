@@ -1471,20 +1471,23 @@ endpoint identifier. A dedicated `ProcessGuard` claims the resulting lock file
 under the runtime directory before any work begins. The guard holds an advisory
 exclusive ownership lock on that persistent file, so a live owner cannot race a
 second daemon. If a pre-existing lock is actively owned, acquisition returns
-`LaunchError::StartupInProgress`; if it is not locked, the guard reclaims stale
-PID and health state and reuses the same lock inode. Clean shutdown retains the
-lock file and removes only the PID and health files, avoiding
-unlink-and-recreate races. This recovery covers termination after lock
-acquisition but before `write_pid`, and integration tests must prove that a
-subsequent launch recovers without permitting two live daemons. When a PID is
-recorded the guard probes the process using `kill(pid, 0)`. Live peers cause
-the launch to abort. Successful launches then background the daemon via
-`daemonize-me`, write the current PID, and publish a JSON health snapshot. Both
-artefacts are written atomically via a temporary file and rename, so readers
-never observe a truncated payload. The snapshot records the lifecycle state
-(`starting`, `ready`, `stopping`), the PID, and a UNIX timestamp, so external
-probes can consume the same readiness signal as the CLI. The endpoint-scoped
-naming and upgrade boundary are recorded in
+`LaunchError::StartupInProgress`, unless the recorded PID names a live process,
+in which case it returns `LaunchError::AlreadyRunning`. A lock that is not
+owned is reclaimed, together with its stale PID and health state, and the same
+lock inode is reused even when the recorded PID still names a live process,
+because the kernel may have reused that number. Clean shutdown retains the lock
+file and removes only the PID and health files, avoiding unlink-and-recreate
+races. This recovery covers termination after lock acquisition but before
+`write_pid`, and integration tests must prove that a subsequent launch recovers
+without permitting two live daemons. Only a lock that is actively owned causes
+the guard to probe the recorded PID using `kill(pid, 0)`; a live peer aborts
+the launch. Successful launches then background the daemon via `daemonize-me`,
+write the current PID, and publish a JSON health snapshot. Both artefacts are
+written atomically via a temporary file and rename, so readers never observe a
+truncated payload. The snapshot records the lifecycle state (`starting`,
+`ready`, `stopping`), the PID, and a UNIX timestamp, so external probes can
+consume the same readiness signal as the CLI. The endpoint-scoped naming and
+upgrade boundary are recorded in
 [ADR 0014](adrs/adr-0014-endpoint-scoped-runtime-artefacts.md). A daemon
 started by an older version with a non-default endpoint must be stopped before
 upgrading: legacy runtime files contain no endpoint identity, so the new CLI
