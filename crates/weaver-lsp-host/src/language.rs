@@ -18,7 +18,7 @@ pub enum Language {
 impl Language {
     /// Returns the lower-case identifier used in configuration overrides.
     #[must_use]
-    pub fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Rust => "rust",
             Self::Python => "python",
@@ -41,7 +41,7 @@ pub struct LanguageParseError(String);
 impl LanguageParseError {
     /// Returns the input that failed to parse.
     #[must_use]
-    pub fn input(&self) -> &str { self.0.as_str() }
+    pub const fn input(&self) -> &str { self.0.as_str() }
 }
 
 impl FromStr for Language {
@@ -53,7 +53,7 @@ impl FromStr for Language {
             "rust" => Ok(Self::Rust),
             "python" => Ok(Self::Python),
             "typescript" | "ts" => Ok(Self::TypeScript),
-            other => Err(LanguageParseError(other.to_string())),
+            other => Err(LanguageParseError(other.to_owned())),
         }
     }
 }

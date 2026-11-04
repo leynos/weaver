@@ -199,11 +199,19 @@ classDiagram
         +did_open(language: Language, params: DidOpenTextDocumentParams) Result~(), LspHostError~
         +did_change(language: Language, params: DidChangeTextDocumentParams) Result~(), LspHostError~
         +did_close(language: Language, params: DidCloseTextDocumentParams) Result~(), LspHostError~
-        -call_with_capability(context: CallContext, call: FnOnce) Result~T, LspHostError~
-        -call_on_server(language: Language, operation: HostOperation, call: FnOnce) Result~T, LspHostError~
-        -ensure_initialised(language: Language, session: Session, overrides: CapabilityMatrix)
-          Result~CapabilitySummary, LspHostError~
-        -session_mut(language: Language) Result~Session, LspHostError~
+        +prepare_call_hierarchy(language: Language, params: CallHierarchyPrepareParams)
+          Result~Option~Vec~CallHierarchyItem~~, LspHostError~
+        +incoming_calls(language: Language, params: CallHierarchyIncomingCallsParams)
+          Result~Vec~CallHierarchyIncomingCall~, LspHostError~
+        +outgoing_calls(language: Language, params: CallHierarchyOutgoingCallsParams)
+          Result~Vec~CallHierarchyOutgoingCall~, LspHostError~
+        +hover(language: Language, params: HoverParams) Result~Option~Hover~, LspHostError~
+        -call_with_capability(language: Language, spec: &CallSpec, call: FnOnce)
+          Result~T, LspHostError~
+        -call_with_session(context: &CallContext, call: FnOnce) Result~T, LspHostError~
+        -ensure_initialized(language: Language, session: &mut Session,
+          overrides: &CapabilityMatrix) Result~CapabilitySummary, LspHostError~
+        -session_mut(language: Language) Result~(&mut Session, &CapabilityMatrix), LspHostError~
     }
 
     class Session {
@@ -219,8 +227,16 @@ classDiagram
 
     class CallContext {
         -Language language
-        -CapabilityKind capability
+        -Option~CapabilityKind~ capability
         -HostOperation operation
+        +for_operation(language: Language, operation: HostOperation) CallContext
+        +with_capability(language: Language, operation: HostOperation,
+          capability: CapabilityKind) CallContext
+    }
+
+    class CallSpec {
+        +CapabilityKind capability
+        +HostOperation operation
     }
 
     class LanguageServer {
@@ -232,16 +248,29 @@ classDiagram
         +did_open(params: DidOpenTextDocumentParams) Result~(), LanguageServerError~
         +did_change(params: DidChangeTextDocumentParams) Result~(), LanguageServerError~
         +did_close(params: DidCloseTextDocumentParams) Result~(), LanguageServerError~
+        +prepare_call_hierarchy(params: CallHierarchyPrepareParams)
+          Result~Option~Vec~CallHierarchyItem~~, LanguageServerError~
+        +incoming_calls(params: CallHierarchyIncomingCallsParams)
+          Result~Option~Vec~CallHierarchyIncomingCall~~, LanguageServerError~
+        +outgoing_calls(params: CallHierarchyOutgoingCallsParams)
+          Result~Option~Vec~CallHierarchyOutgoingCall~~, LanguageServerError~
+        +hover(params: HoverParams) Result~Option~Hover~, LanguageServerError~
     }
 
     class ServerCapabilitySet {
-        -bool definition
-        -bool references
-        -bool diagnostics
+        -BTreeSet~CapabilityKind~ supported
+        -Option~PositionEncodingKind~ position_encoding
         +new(definition: bool, references: bool, diagnostics: bool) ServerCapabilitySet
+        +with_call_hierarchy(supported: bool) ServerCapabilitySet
+        +with_hover(supported: bool) ServerCapabilitySet
+        +with_position_encoding(encoding: Option~PositionEncodingKind~) ServerCapabilitySet
+        +supports(capability: CapabilityKind) bool
         +supports_definition() bool
         +supports_references() bool
         +supports_diagnostics() bool
+        +supports_call_hierarchy() bool
+        +supports_hover() bool
+        +position_encoding() Option~&PositionEncodingKind~
     }
 
     class LanguageServerError {
@@ -257,6 +286,8 @@ classDiagram
         Definition
         References
         Diagnostics
+        CallHierarchy
+        Hover
         +key() &str
     }
 
@@ -303,6 +334,13 @@ classDiagram
         Definition
         References
         Diagnostics
+        DidOpen
+        DidChange
+        DidClose
+        PrepareCallHierarchy
+        IncomingCalls
+        OutgoingCalls
+        Hover
     }
 
     class LspHostError {
@@ -325,6 +363,8 @@ classDiagram
     LspHost --> CapabilityMatrix : uses overrides
     LspHost --> CapabilitySummary : returns
     LspHost --> LspHostError : returns
+    LspHost ..> CallContext : dispatches with
+    LspHost ..> CallSpec : gates with
     Session --> SessionState : has
     Session --> LanguageServer : owns
     CapabilitySummary --> CapabilityState : aggregates
