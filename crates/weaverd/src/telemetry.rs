@@ -7,6 +7,7 @@ use tracing::{Subscriber, subscriber::SetGlobalDefaultError};
 use tracing_subscriber::{EnvFilter, fmt};
 use weaver_config::{Config, LogFormat};
 
+/// Guards against installing the global subscriber more than once.
 static TELEMETRY_GUARD: OnceCell<()> = OnceCell::new();
 
 /// Handle returned when telemetry has been initialised.
@@ -51,16 +52,23 @@ pub enum TelemetryError {
 pub fn initialise(config: &Config) -> Result<TelemetryHandle, TelemetryError> {
     TELEMETRY_GUARD
         .get_or_try_init(|| install_subscriber(config))
-        .map(|_| TelemetryHandle)
+        .map(|()| TelemetryHandle)
 }
 
+/// Installs the process-wide tracing subscriber described by `config`.
+///
+/// # Errors
+///
+/// Returns [`TelemetryError::Filter`] when the configured filter expression
+/// fails to parse, or [`TelemetryError::Subscriber`] when a global subscriber
+/// is already installed.
 fn install_subscriber(config: &Config) -> Result<(), TelemetryError> {
     let filter = EnvFilter::try_new(config.log_filter())
         .map_err(|error| TelemetryError::Filter(error.to_string()))?;
 
-    let builder = |filter: EnvFilter| {
+    let builder = |base_filter: EnvFilter| {
         fmt::Subscriber::builder()
-            .with_env_filter(filter)
+            .with_env_filter(base_filter)
             .with_target(true)
             .with_level(true)
             .with_thread_ids(false)

@@ -38,6 +38,7 @@ pub enum LaunchMode {
 }
 
 impl LaunchMode {
+    /// Selects the launch mode from the environment, defaulting to background.
     fn detect() -> Self {
         if env::var_os(FOREGROUND_ENV_VAR).is_some() {
             Self::Foreground
@@ -49,24 +50,36 @@ impl LaunchMode {
 
 /// Process-level collaborators needed to control daemon lifecycle.
 pub(crate) struct ProcessControl<D, S> {
+    /// Launch mode selected for this daemon run.
     pub(crate) mode: LaunchMode,
+    /// Strategy used to detach the process when running in the background.
     pub(crate) daemonizer: D,
+    /// Signal source that triggers an orderly shutdown.
     pub(crate) shutdown: S,
 }
 
 /// Service dependencies required to construct the daemon runtime.
 pub(crate) struct ServiceDeps<L> {
+    /// Configuration loader supplying the daemon's runtime configuration.
     pub(crate) loader: L,
+    /// Health reporter receiving lifecycle state transitions.
     pub(crate) reporter: Arc<dyn HealthReporter>,
 }
 
 /// Collaborators required to launch the daemon runtime.
 pub(crate) struct LaunchPlan<L, D, S> {
+    /// Process-level collaborators controlling daemon lifecycle.
     pub(crate) process: ProcessControl<D, S>,
+    /// Service dependencies required to construct the runtime.
     pub(crate) services: ServiceDeps<L>,
 }
 
 /// Runs the daemon using the production collaborators.
+///
+/// # Errors
+///
+/// Returns [`LaunchError`] when configuration loading, socket preparation,
+/// runtime directory creation, listener binding, or shutdown handling fails.
 pub fn run_daemon() -> Result<(), LaunchError> {
     let mode = LaunchMode::detect();
     let reporter = Arc::new(StructuredHealthReporter::new());

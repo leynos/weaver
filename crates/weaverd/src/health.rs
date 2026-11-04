@@ -9,8 +9,13 @@ use crate::{
     bootstrap::BootstrapError,
 };
 
+/// Tracing target shared by every health lifecycle event.
 const HEALTH_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::health");
 
+/// Emits a health lifecycle event at `info` or `error` level to `HEALTH_TARGET`.
+///
+/// The first token selects the level; the remaining tokens are forwarded as
+/// `tracing` event fields.
 macro_rules! health_event {
     (info, $($rest:tt)*) => {
         tracing::info!(target: HEALTH_TARGET, $($rest)*);
@@ -48,7 +53,7 @@ pub struct StructuredHealthReporter;
 impl StructuredHealthReporter {
     /// Builds a new reporter.
     #[must_use]
-    pub fn new() -> Self { Self }
+    pub const fn new() -> Self { Self }
 }
 
 impl HealthReporter for StructuredHealthReporter {

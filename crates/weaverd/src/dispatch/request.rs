@@ -85,9 +85,8 @@ fn trim_trailing_whitespace(bytes: &[u8]) -> &[u8] {
     let end = bytes
         .iter()
         .rposition(|b| !b.is_ascii_whitespace())
-        .map(|pos| pos + 1)
-        .unwrap_or(0);
-    &bytes[..end]
+        .map_or(0, |pos| pos + 1);
+    bytes.get(..end).unwrap_or(bytes)
 }
 
 #[cfg(test)]

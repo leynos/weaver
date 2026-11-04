@@ -56,9 +56,9 @@ pub(crate) fn write_source(
     temp_dir: &TempDir,
     file: SourceFile<'_>,
 ) -> Result<Utf8PathBuf, String> {
-    let path = temp_dir.path().join(file.name);
-    let path = Utf8PathBuf::from_path_buf(path)
-        .map_err(|path| format!("fixture path should be UTF-8: {path:?}"))?;
+    let raw_path = temp_dir.path().join(file.name);
+    let path = Utf8PathBuf::from_path_buf(raw_path)
+        .map_err(|invalid_path| format!("fixture path should be UTF-8: {invalid_path:?}"))?;
     test_fs::write(&path, file.content).map_err(|error| format!("write source: {error}"))?;
     Ok(path)
 }
@@ -97,12 +97,13 @@ pub(crate) fn response_payload(output: Vec<u8>) -> Result<Value, String> {
     let stream_line = response
         .lines()
         .next()
-        .ok_or_else(|| "stream line".to_string())?;
+        .ok_or_else(|| "stream line".to_owned())?;
     let envelope: Value =
         serde_json::from_str(stream_line).map_err(|error| format!("envelope: {error}"))?;
-    let data = envelope["data"]
-        .as_str()
-        .ok_or_else(|| "stdout data".to_string())?;
+    let data = envelope
+        .get("data")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "stdout data".to_owned())?;
     serde_json::from_str(data).map_err(|error| format!("payload: {error}"))
 }
 
@@ -128,11 +129,11 @@ pub(crate) fn dispatch_source(
     backends: &mut FusionBackends<SemanticBackendProvider>,
     temp_dir: &TempDir,
     file: SourceFile<'_>,
-    probe: CardProbe,
+    probe: &CardProbe,
 ) -> Result<(DispatchResult, Value), String> {
     let path = write_source(temp_dir, file)?;
     let uri = url::Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
+        .map_err(|()| "file uri".to_owned())?
         .to_string();
     let (line, column) = probe.position;
     let request = make_request(&uri, line, column, probe.detail)?;

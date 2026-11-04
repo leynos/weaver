@@ -6,8 +6,11 @@ use cap_std::fs::Dir;
 
 use super::{ApplyPatchError, types::FilePath};
 
+/// Patch path resolved against the workspace and checked for symlinks.
 pub(super) struct ValidatedPath {
+    /// Absolute path rooted at the workspace directory.
     pub(super) absolute: PathBuf,
+    /// Path relative to the workspace directory, used with [`Dir`].
     pub(super) relative: PathBuf,
 }
 
@@ -55,7 +58,10 @@ pub(super) fn resolve_path(
             }
             std::path::Component::CurDir => {}
             std::path::Component::RootDir => {
-                unreachable!("absolute paths are rejected before component validation");
+                return Err(ApplyPatchError::InvalidPath {
+                    path: path.clone(),
+                    reason: String::from("absolute paths are not allowed"),
+                });
             }
         }
     }

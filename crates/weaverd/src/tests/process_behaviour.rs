@@ -29,15 +29,15 @@ fn given_world(world: &ProcessWorld) -> Result<(), String> {
 
 #[when("the daemon starts in background mode")]
 fn when_daemon_starts_background(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world.borrow_mut().start_background()?;
+    let scenario = process_world(world)?;
+    scenario.borrow_mut().start_background()?;
     Ok(())
 }
 
 #[when("the daemon starts in foreground mode")]
 fn when_daemon_starts_foreground(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world
+    let scenario = process_world(world)?;
+    scenario
         .borrow_mut()
         .start_foreground(LaunchMode::Foreground, true)?;
     Ok(())
@@ -45,8 +45,10 @@ fn when_daemon_starts_foreground(world: &ProcessWorld) -> Result<(), String> {
 
 #[when("the daemon starts in foreground mode with invalid configuration")]
 fn when_daemon_starts_invalid(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world.borrow_mut().start_foreground_with_invalid_config()?;
+    let scenario = process_world(world)?;
+    scenario
+        .borrow_mut()
+        .start_foreground_with_invalid_config()?;
     Ok(())
 }
 
@@ -67,36 +69,38 @@ fn when_wait_for_ready(world: &ProcessWorld) -> Result<(), String> {
 #[when("the daemon run completes")]
 #[then("the daemon run completes")]
 fn daemon_run_completes(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world.borrow_mut().join_background()?;
+    let scenario = process_world(world)?;
+    scenario.borrow_mut().join_background()?;
     Ok(())
 }
 
 #[given("stale runtime artefacts exist")]
 fn given_stale_runtime(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world.borrow().write_stale_runtime()?;
+    let scenario = process_world(world)?;
+    scenario.borrow().write_stale_runtime()?;
     Ok(())
 }
 
 #[given("stale runtime artefacts with invalid pid exist")]
 fn given_stale_runtime_invalid(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world.borrow().write_stale_runtime_with_invalid_pid(99999)?;
+    let scenario = process_world(world)?;
+    scenario
+        .borrow()
+        .write_stale_runtime_with_invalid_pid(99999)?;
     Ok(())
 }
 
 #[given("a lock without a pid file exists")]
 fn given_lock_without_pid(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world.borrow().write_lock_without_pid()?;
+    let scenario = process_world(world)?;
+    scenario.borrow().write_lock_without_pid()?;
     Ok(())
 }
 
 #[then("daemonisation was requested")]
 fn then_daemonisation_requested(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world
+    let scenario = process_world(world)?;
+    scenario
         .borrow()
         .wait_for_condition(
             |state| state.daemonizer_calls() > 0,
@@ -107,8 +111,8 @@ fn then_daemonisation_requested(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the daemon wrote the lock file")]
 fn then_lock_file_exists(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world
+    let scenario = process_world(world)?;
+    scenario
         .borrow()
         .wait_for_condition(
             |state| test_fs::exists(state.lock_path()).is_ok_and(|exists| exists),
@@ -119,9 +123,9 @@ fn then_lock_file_exists(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the daemon wrote the pid file")]
 fn then_pid_file_exists(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
+    let scenario = process_world(world)?;
     {
-        let world_ref = world.borrow();
+        let world_ref = scenario.borrow();
         world_ref
             .wait_for_condition(
                 |state| test_fs::exists(state.pid_path()).is_ok_and(|exists| exists),
@@ -129,8 +133,8 @@ fn then_pid_file_exists(world: &ProcessWorld) -> Result<(), String> {
             )
             .map_err(|error| format!("pid file should be written: {error}"))?;
     }
-    let world = world.borrow();
-    let path = world.pid_path();
+    let borrowed = scenario.borrow();
+    let path = borrowed.pid_path();
     let content = test_fs::read_to_string(&path)
         .map_err(|error| format!("pid file should be readable: {error}"))?;
     let pid: u32 = content
@@ -147,14 +151,14 @@ fn then_pid_file_exists(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the daemon wrote the ready health snapshot")]
 fn then_health_ready(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
+    let scenario = process_world(world)?;
     {
-        let world_ref = world.borrow();
+        let world_ref = scenario.borrow();
         world_ref
             .wait_for_status("ready")
             .map_err(|error| format!("daemon should publish ready health snapshot: {error}"))?;
     }
-    let snapshot = world
+    let snapshot = scenario
         .borrow()
         .read_health()
         .map_err(|error| format!("health snapshot should parse: {error}"))?;
@@ -164,8 +168,8 @@ fn then_health_ready(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the daemon recorded the starting health snapshot")]
 fn then_health_starting(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world
+    let scenario = process_world(world)?;
+    scenario
         .borrow()
         .wait_for_condition(
             |state| state.saw_status("starting"),
@@ -176,8 +180,8 @@ fn then_health_starting(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the daemon wrote the stopping health snapshot")]
 fn then_health_stopping(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world
+    let scenario = process_world(world)?;
+    scenario
         .borrow()
         .wait_for_condition(
             |state| state.saw_status("stopping"),
@@ -188,18 +192,20 @@ fn then_health_stopping(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the runtime artefacts are removed")]
 fn then_runtime_removed(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    let world = world.borrow();
+    let scenario = process_world(world)?;
+    let borrowed = scenario.borrow();
     assert!(
-        !test_fs::exists(world.lock_path()).map_err(|error| format!("check lock file: {error}"))?,
+        !test_fs::exists(borrowed.lock_path())
+            .map_err(|error| format!("check lock file: {error}"))?,
         "lock file should be removed after shutdown",
     );
     assert!(
-        !test_fs::exists(world.pid_path()).map_err(|error| format!("check pid file: {error}"))?,
+        !test_fs::exists(borrowed.pid_path())
+            .map_err(|error| format!("check pid file: {error}"))?,
         "pid file should be removed after shutdown",
     );
     assert!(
-        !test_fs::exists(world.health_path())
+        !test_fs::exists(borrowed.health_path())
             .map_err(|error| format!("check health file: {error}"))?,
         "health file should be removed after shutdown",
     );
@@ -208,8 +214,8 @@ fn then_runtime_removed(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the stale runtime pid is replaced with the current process id")]
 fn then_stale_pid_replaced(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    let pid = world
+    let scenario = process_world(world)?;
+    let pid = scenario
         .borrow()
         .read_pid()
         .map_err(|error| format!("pid file should be readable: {error}"))?
@@ -224,9 +230,9 @@ fn then_stale_pid_replaced(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the lock file remains in place")]
 fn then_lock_remains(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
+    let scenario = process_world(world)?;
     assert!(
-        world.borrow().lock_exists()?,
+        scenario.borrow().lock_exists()?,
         "lock file should remain when launch is still in progress",
     );
     Ok(())
@@ -234,28 +240,30 @@ fn then_lock_remains(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("starting the daemon again fails with already running")]
 fn then_duplicate_start_fails(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world
+    let scenario = process_world(world)?;
+    scenario
         .borrow_mut()
         .start_foreground(LaunchMode::Foreground, false)
         .map_err(|error| format!("foreground start should complete: {error}"))?;
-    let binding = world.borrow();
+    let binding = scenario.borrow();
     let error = binding
         .last_error()
         .ok_or_else(|| String::from("expected a launch error when re-running daemon"))?;
     match error {
         LaunchError::AlreadyRunning { pid } => {
-            assert_eq!(pid, &std::process::id(), "pid should match current process");
+            if *pid != std::process::id() {
+                return Err(format!("pid should match current process, got: {pid}"));
+            }
         }
-        other => panic!("unexpected error: {other}"),
+        other => return Err(format!("unexpected error: {other}")),
     }
     Ok(())
 }
 
 #[then("the daemon run succeeds")]
 fn then_daemon_succeeds(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    let binding = world.borrow();
+    let scenario = process_world(world)?;
+    let binding = scenario.borrow();
     let result = binding
         .last_result()
         .ok_or_else(|| String::from("expected a recorded daemon result"))?;
@@ -275,8 +283,8 @@ fn then_daemon_fails_invalid_config(world: &ProcessWorld) -> Result<(), String> 
 
 #[then("waiting for readiness fails")]
 fn then_wait_ready_fails(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    let error = world
+    let scenario = process_world(world)?;
+    let error = scenario
         .borrow_mut()
         .take_wait_error()
         .ok_or_else(|| String::from("expected wait error to be recorded"))?;
@@ -295,19 +303,21 @@ fn assert_daemon_error_contains(
     let result = binding
         .last_result()
         .ok_or_else(|| String::from("expected a recorded daemon result"))?;
-    assert!(
-        result.is_err(),
-        "daemon run should fail, but got success: {result:?}",
-    );
+    if result.is_ok() {
+        return Err(format!(
+            "daemon run should fail, but got success: {result:?}"
+        ));
+    }
     let error_message = result
         .as_ref()
         .err()
         .ok_or_else(|| String::from("daemon run should fail, but got success"))?
         .to_string();
-    assert!(
-        error_message.contains(needle),
-        "expected error to contain '{needle}', got '{error_message}'",
-    );
+    if !error_message.contains(needle) {
+        return Err(format!(
+            "expected error to contain '{needle}', got '{error_message}'"
+        ));
+    }
     Ok(())
 }
 

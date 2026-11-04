@@ -44,7 +44,7 @@ impl BackendKindParseError {
 
     /// Returns the offending value that could not be parsed.
     #[must_use]
-    pub fn value(&self) -> &str { self.0.as_str() }
+    pub const fn value(&self) -> &str { self.0.as_str() }
 }
 
 impl FromStr for BackendKind {
@@ -66,6 +66,7 @@ impl FromStr for BackendKind {
 pub struct BackendStartupError {
     /// Kind of backend that failed.
     pub kind: BackendKind,
+    /// Explanation supplied by the backend implementation for the failure.
     message: String,
     /// Optional source error reported by the backend implementation.
     #[source]
@@ -99,20 +100,28 @@ impl BackendStartupError {
 
     /// Human-readable message describing the failure.
     #[must_use]
-    pub fn message(&self) -> &str { self.message.as_str() }
+    pub const fn message(&self) -> &str { self.message.as_str() }
 }
 
 /// Trait implemented by types capable of starting a backend.
 pub trait BackendProvider {
     /// Starts the specified backend using the resolved configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BackendStartupError`] when the provider cannot start the
+    /// requested backend.
     fn start_backend(&self, kind: BackendKind, config: &Config) -> Result<(), BackendStartupError>;
 }
 
 /// Registry that tracks which backends have already been started.
 #[derive(Debug)]
 pub struct FusionBackends<P> {
+    /// Resolved daemon configuration forwarded to the provider.
     config: Config,
+    /// Provider that performs the actual start-up work.
     provider: P,
+    /// Backends started successfully so far, used to avoid repeat work.
     started: HashSet<BackendKind>,
 }
 
@@ -129,15 +138,15 @@ impl<P> FusionBackends<P> {
 
     /// Returns a reference to the resolved configuration.
     #[must_use]
-    pub fn config(&self) -> &Config { &self.config }
+    pub const fn config(&self) -> &Config { &self.config }
 
     /// Returns a reference to the backend provider.
     #[must_use]
-    pub fn provider(&self) -> &P { &self.provider }
+    pub const fn provider(&self) -> &P { &self.provider }
 
     /// Returns a mutable reference to the backend provider.
     #[must_use]
-    pub fn provider_mut(&mut self) -> &mut P { &mut self.provider }
+    pub const fn provider_mut(&mut self) -> &mut P { &mut self.provider }
 
     /// Ensures the specified backend has been started.
     ///
@@ -148,6 +157,11 @@ impl<P> FusionBackends<P> {
     /// This favours eventual success for transient faults at the cost of
     /// possible retries and assumes providers classify identical failures
     /// deterministically.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BackendStartupError`] when the provider fails to start the
+    /// requested backend.
     pub fn ensure_started(&mut self, kind: BackendKind) -> Result<(), BackendStartupError>
     where
         P: BackendProvider,

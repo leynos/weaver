@@ -37,6 +37,7 @@ use crate::{
         },
         rust_analyzer_manifest,
     },
+    test_helpers::{ensure_same, ensure_true},
     tests::support::fs as test_fs,
 };
 
@@ -242,7 +243,7 @@ fn handler_rename_contract_parametrised(
     socket_dir: Result<TempDir, String>,
     #[case] case: RenameContractCase,
 ) -> Result<(), String> {
-    let socket_dir = socket_dir?;
+    let dir = socket_dir?;
     let (plugin_request, file_path, _response_stream) =
         dispatch_inspecting_rename(RenameDispatch {
             file: case.file,
@@ -250,77 +251,87 @@ fn handler_rename_contract_parametrised(
             language: case.language,
             position: case.position_argument,
             extra_args: case.extra_args,
-            socket_dir: &socket_dir,
+            socket_dir: &dir,
         })?;
     let expected_uri = file_uri(&file_path)?;
     let arguments = rename_arguments(&plugin_request);
 
-    assert_eq!(arguments.operation, "rename-symbol");
-    assert_eq!(arguments.uri.as_deref(), Some(expected_uri.as_str()));
-    assert_eq!(arguments.position.as_deref(), case.position);
-    assert!(!arguments.has_offset);
-    assert_eq!(arguments.new_name.as_deref(), case.new_name);
-    Ok(())
+    ensure_same(arguments.operation.as_str(), "rename-symbol", "operation")?;
+    ensure_same(
+        arguments.uri.as_deref(),
+        Some(expected_uri.as_str()),
+        "request URI",
+    )?;
+    ensure_same(arguments.position.as_deref(), case.position, "position")?;
+    ensure_true(!arguments.has_offset, "no offset flag")?;
+    ensure_same(arguments.new_name.as_deref(), case.new_name, "new name")
 }
 
 #[rstest]
 fn handler_rejects_conflicting_offset_and_position(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
-    let socket_dir = socket_dir?;
+    let dir = socket_dir?;
     let error = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
         language: "python",
         position: Some("1:5"),
         extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
-        socket_dir: &socket_dir,
+        socket_dir: &dir,
     })
     .expect_err("rename request should reject conflicting offset and position");
 
-    assert!(error.contains("must not supply both '--position' and deprecated 'offset='"));
-    Ok(())
+    ensure_true(
+        error.contains("must not supply both '--position' and deprecated 'offset='"),
+        "conflicting offset and position to be rejected",
+    )
 }
 
 #[rstest]
 fn handler_rejects_missing_position(socket_dir: Result<TempDir, String>) -> Result<(), String> {
-    let socket_dir = socket_dir?;
+    let dir = socket_dir?;
     let error = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
         language: "python",
         position: None,
         extra_args: vec![String::from("new_name=woven")],
-        socket_dir: &socket_dir,
+        socket_dir: &dir,
     })
     .expect_err("rename request should require --position");
 
-    assert!(error.contains("--position <line:col>"));
-    Ok(())
+    ensure_true(
+        error.contains("--position <line:col>"),
+        "missing position to be rejected",
+    )
 }
 
 #[rstest]
 fn handler_accepts_deprecated_offset_without_position(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
-    let socket_dir = socket_dir?;
+    let dir = socket_dir?;
     let (plugin_request, _, response_stream) = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
         language: "python",
         position: None,
         extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
-        socket_dir: &socket_dir,
+        socket_dir: &dir,
     })?;
 
     let args = plugin_request.arguments();
-    assert_eq!(
+    ensure_same(
         args.get("position").and_then(|value| value.as_str()),
-        Some("4")
-    );
-    assert!(!args.contains_key("offset"));
-    assert!(response_stream.contains("Warning: 'offset=' is deprecated"));
-    Ok(())
+        Some("4"),
+        "converted position",
+    )?;
+    ensure_true(!args.contains_key("offset"), "offset flag to be dropped")?;
+    ensure_true(
+        response_stream.contains("Warning: 'offset=' is deprecated"),
+        "deprecation warning",
+    )
 }
 
 #[test]

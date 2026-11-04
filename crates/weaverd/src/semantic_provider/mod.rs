@@ -14,6 +14,7 @@ use weaver_lsp_host::{Language, LspHost, adapter::ProcessLanguageServer};
 
 use crate::backends::{BackendKind, BackendProvider, BackendStartupError};
 
+/// Tracing target for semantic backend diagnostics.
 const BACKEND_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::backends::semantic");
 
 /// Error returned when the LSP host mutex is poisoned.
@@ -34,24 +35,23 @@ impl std::error::Error for LspHostPoisonedError {}
 /// first requested, using the capability matrix from configuration to apply
 /// capability overrides.
 pub struct SemanticBackendProvider {
+    /// Capability overrides applied when the LSP host is created.
     capability_matrix: CapabilityMatrix,
+    /// Tree-sitter extractor shared with card requests.
     card_extractor: TreeSitterCardExtractor,
+    /// Lazily initialised LSP host, guarded because starts may race.
     lsp_host: Mutex<Option<LspHost>>,
 }
 
 impl fmt::Debug for SemanticBackendProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let host_status = self
-            .lsp_host
-            .lock()
-            .map(|g| {
-                if g.is_some() {
-                    "initialized"
-                } else {
-                    "not initialized"
-                }
-            })
-            .unwrap_or("poisoned");
+        let host_status = self.lsp_host.lock().map_or("poisoned", |guard| {
+            if guard.is_some() {
+                "initialized"
+            } else {
+                "not initialized"
+            }
+        });
         f.debug_struct("SemanticBackendProvider")
             .field("capability_matrix", &self.capability_matrix)
             .field("card_extractor", &self.card_extractor)
@@ -90,7 +90,7 @@ impl SemanticBackendProvider {
 
     /// Returns the shared Tree-sitter card extractor.
     #[must_use]
-    pub fn card_extractor(&self) -> &TreeSitterCardExtractor { &self.card_extractor }
+    pub const fn card_extractor(&self) -> &TreeSitterCardExtractor { &self.card_extractor }
 
     /// Executes a closure with a reference to the initialized LSP host.
     ///

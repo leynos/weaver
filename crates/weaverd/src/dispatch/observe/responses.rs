@@ -179,15 +179,17 @@ mod tests {
             locations.len()
         );
         let expected_uri = uri.to_string();
-        for (i, (expected_line, expected_column)) in expected.iter().enumerate() {
-            assert_eq!(locations[i].uri, expected_uri, "location[{i}].uri mismatch");
+        for (index, (location, (expected_line, expected_column))) in
+            locations.iter().zip(expected.iter()).enumerate()
+        {
+            assert_eq!(location.uri, expected_uri, "location[{index}].uri mismatch");
             assert_eq!(
-                locations[i].line, *expected_line,
-                "location[{i}].line mismatch"
+                location.line, *expected_line,
+                "location[{index}].line mismatch"
             );
             assert_eq!(
-                locations[i].column, *expected_column,
-                "location[{i}].column mismatch"
+                location.column, *expected_column,
+                "location[{index}].column mismatch"
             );
         }
     }
@@ -197,13 +199,13 @@ mod tests {
         let response = GotoDefinitionResponse::Array(vec![]);
         let locations = extract_locations(response);
 
-        assert!(locations.is_empty());
+        assert_eq!(locations, Vec::new());
     }
 
     #[test]
     fn serializes_to_expected_json() {
         let location = DefinitionLocation {
-            uri: "file:///path.rs".to_string(),
+            uri: "file:///path.rs".to_owned(),
             line: 42,
             column: 17,
         };

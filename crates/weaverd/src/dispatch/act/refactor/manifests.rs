@@ -19,13 +19,19 @@ use super::plugin_paths::{
     RUST_ANALYZER_PLUGIN_VERSION,
 };
 
+/// Compile-time description of a built-in refactor provider.
 struct BuiltInProviderSpec {
+    /// Provider name registered with the plugin registry.
     name: &'static str,
+    /// Semantic version advertised in the provider manifest.
     version: &'static str,
+    /// Languages the provider accepts.
     languages: &'static [&'static str],
+    /// Optional execution timeout override, in seconds.
     timeout_secs: Option<u64>,
 }
 
+/// Provider specification for the rope Python refactoring plugin.
 const ROPE_PROVIDER_SPEC: BuiltInProviderSpec = BuiltInProviderSpec {
     name: ROPE_PLUGIN_NAME,
     version: ROPE_PLUGIN_VERSION,
@@ -33,6 +39,7 @@ const ROPE_PROVIDER_SPEC: BuiltInProviderSpec = BuiltInProviderSpec {
     timeout_secs: None,
 };
 
+/// Provider specification for the rust-analyzer Rust refactoring plugin.
 const RUST_ANALYZER_PROVIDER_SPEC: BuiltInProviderSpec = BuiltInProviderSpec {
     name: RUST_ANALYZER_PLUGIN_NAME,
     version: RUST_ANALYZER_PLUGIN_VERSION,
@@ -40,6 +47,7 @@ const RUST_ANALYZER_PROVIDER_SPEC: BuiltInProviderSpec = BuiltInProviderSpec {
     timeout_secs: Some(RUST_ANALYZER_PLUGIN_TIMEOUT_SECS),
 };
 
+/// Names of every built-in refactor provider, in canonical order.
 pub(crate) const BUILT_IN_PROVIDER_NAMES: &[&str] = &[ROPE_PLUGIN_NAME, RUST_ANALYZER_PLUGIN_NAME];
 
 /// Builds the default rope plugin manifest.
@@ -57,8 +65,9 @@ pub(crate) fn rust_analyzer_manifest(executable: PathBuf) -> PluginManifest {
 /// The slice is derived from the compile-time built-in provider catalogue and
 /// is used as the canonical source of valid provider names for `act refactor`
 /// argument validation.
-pub(crate) fn built_in_provider_names() -> &'static [&'static str] { BUILT_IN_PROVIDER_NAMES }
+pub(crate) const fn built_in_provider_names() -> &'static [&'static str] { BUILT_IN_PROVIDER_NAMES }
 
+/// Builds a rename-capable actuator manifest from `spec` and `executable`.
 fn manifest_from_spec(spec: &BuiltInProviderSpec, executable: PathBuf) -> PluginManifest {
     let metadata = PluginMetadata::new(spec.name, spec.version, PluginKind::Actuator);
     let manifest = PluginManifest::new(

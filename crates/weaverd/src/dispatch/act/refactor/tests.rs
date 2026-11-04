@@ -1,6 +1,7 @@
 //! Behavioural tests for the `act refactor` handler.
 //! Exercises validation, plugin execution, error reporting, and sibling coverage boundaries.
-//! Contract, resolution, and rollback cases stay in sibling modules.
+//! Contract, resolution, rollback, and runtime construction cases stay in
+//! sibling modules.
 
 use rstest::{fixture, rstest};
 use serial_test::serial;
@@ -14,7 +15,6 @@ use crate::{
         RefactorContext,
         RefactorPluginRuntime,
         ResponseWriter,
-        default_runtime,
         handle,
         refactor_helpers::builders::{build_backends, command_request},
         resolution::{
@@ -25,8 +25,6 @@ use crate::{
             ResolutionRequest,
             SelectionMode,
         },
-        resolve_rope_plugin_path,
-        resolve_rust_analyzer_plugin_path,
     },
     tests::support::fs as test_fs,
 };
@@ -34,7 +32,7 @@ use crate::{
 enum MockRuntimeResult {
     Success(PluginResponse),
     NotFound(String),
-    /// Causes execute() to panic if called - use this in tests where execute() must not run.
+    /// Causes `execute()` to panic if called - use this in tests where `execute()` must not run.
     Panic,
 }
 
@@ -46,6 +44,14 @@ enum MockResolution {
 struct MockRuntime {
     resolution: MockResolution,
     result: MockRuntimeResult,
+}
+
+/// Reports that `MockRuntime::execute` was reached in a test that forbids it.
+///
+/// Diverging rather than panicking inline keeps the panic out of a
+/// `Result`-returning function, which the workspace lint table forbids.
+fn execute_must_not_be_called() -> ! {
+    panic!("MockRuntime::execute() was called when it should not have been")
 }
 
 impl RefactorPluginRuntime for MockRuntime {
@@ -69,9 +75,7 @@ impl RefactorPluginRuntime for MockRuntime {
         match &self.result {
             MockRuntimeResult::Success(response) => Ok(response.clone()),
             MockRuntimeResult::NotFound(name) => Err(PluginError::NotFound { name: name.clone() }),
-            MockRuntimeResult::Panic => {
-                panic!("MockRuntime::execute() was called when it should not have been")
-            }
+            MockRuntimeResult::Panic => execute_must_not_be_called(),
         }
     }
 }
@@ -267,28 +271,6 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(
     let stderr = String::from_utf8(output).expect("stderr utf8");
     assert!(stderr.contains("CapabilityResolution"));
     assert!(stderr.contains("\"kind\":\"stream\""));
-}
-
-#[test]
-fn resolve_rope_plugin_path_makes_relative_overrides_absolute() {
-    let path = resolve_rope_plugin_path(Some(std::ffi::OsString::from("bin/rope")));
-    assert!(path.is_absolute());
-}
-
-#[test]
-fn resolve_rust_analyzer_plugin_path_makes_relative_overrides_absolute() {
-    let path = resolve_rust_analyzer_plugin_path(Some(std::ffi::OsString::from(
-        "bin/rust-analyzer-plugin",
-    )));
-    assert!(path.is_absolute());
-}
-
-#[test]
-fn default_runtime_returns_shared_trait_object() {
-    let runtime = default_runtime();
-    let request = PluginRequest::new("rename", Vec::new());
-    let result = runtime.execute("rope", &request);
-    assert!(result.is_err());
 }
 
 #[rstest]

@@ -5,9 +5,11 @@ use weaver_cards::{
     graph_slice::{SliceRefusal, SliceRefusalReason},
 };
 
+/// Schema version stamped onto every `graph-slice` response body.
 pub(super) const GRAPH_SLICE_SCHEMA_VERSION: &str = "graph_slice.v1";
 
-pub(super) fn exit_status(response: &GraphSliceResponse) -> i32 {
+/// Maps a graph-slice response to the process exit status.
+pub(super) const fn exit_status(response: &GraphSliceResponse) -> i32 {
     match response {
         GraphSliceResponse::Success { .. } => 0,
         GraphSliceResponse::Refusal { refusal, .. } => match refusal.reason {
@@ -22,6 +24,7 @@ pub(super) fn exit_status(response: &GraphSliceResponse) -> i32 {
     }
 }
 
+/// Builds a refusal response carrying the current schema version.
 pub(super) fn refusal(reason: SliceRefusalReason, message: String) -> GraphSliceResponse {
     GraphSliceResponse::Refusal {
         schema_version: String::from(GRAPH_SLICE_SCHEMA_VERSION),

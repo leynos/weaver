@@ -63,6 +63,6 @@ fn read_error_event_maps_all_dispatch_errors() {
     for (error, expected_event) in cases {
         let event = read_error_event(&error, &endpoint, &temp_dir);
         let value = serialize_structured_event(&event);
-        assert_eq!(value["event"], serde_json::json!(expected_event));
+        assert_eq!(value.get("event"), Some(&serde_json::json!(expected_event)));
     }
 }

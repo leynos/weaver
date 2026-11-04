@@ -2,12 +2,10 @@
 //! Full graph traversal is deferred to later roadmap items. For the schema milestone,
 //! this handler returns a deterministic same-file slice bounded by `max_cards`.
 
-use std::{
-    collections::BTreeMap,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, io::Write, path::Path};
 
+#[path = "graph_slice/source.rs"]
+mod source;
 #[path = "graph_slice/status.rs"]
 mod status;
 
@@ -24,13 +22,15 @@ use weaver_cards::{
     graph_slice::{SliceConstraints, SliceEntry, SliceRefusalReason, SpilloverCandidate},
 };
 
-use self::status::{GRAPH_SLICE_SCHEMA_VERSION, exit_status, refusal};
+use self::{
+    source::{read_slice_source, resolve_file_path},
+    status::{GRAPH_SLICE_SCHEMA_VERSION, exit_status, refusal},
+};
 use super::enrich::{self, EnrichmentOutcome};
 use crate::{
     backends::FusionBackends,
     dispatch::{
         errors::DispatchError,
-        filesystem,
         request::CommandRequest,
         response::ResponseWriter,
         router::DispatchResult,
@@ -38,8 +38,11 @@ use crate::{
     semantic_provider::SemanticBackendProvider,
 };
 
+/// Upper bound on same-file positions probed while discovering sibling cards.
 const MAX_SAME_FILE_DISCOVERY_POSITIONS: usize = 256;
 
+/// Renders the final path component, falling back to a placeholder when it is
+/// absent or not valid UTF-8.
 fn display_filename(path: &Path) -> &str {
     path.file_name()
         .and_then(|name| name.to_str())
@@ -105,7 +108,7 @@ fn build_response(
     )?;
     let (mut cards, spillover) = apply_card_budget(
         entry_card,
-        sibling_cards,
+        &sibling_cards,
         request.budget().max_cards(),
         discovery_capped,
     );
@@ -137,7 +140,9 @@ fn build_response(
 /// Bundles the filesystem path and source text for same-file slice operations.
 #[derive(Clone, Copy)]
 struct SliceDocument<'a> {
+    /// File the source text was read from.
     path: &'a Path,
+    /// Text extracted from `path`.
     source: &'a str,
 }
 /// Extracts sibling `SymbolCard` values from the same source file, bounded by the discovery cap.
@@ -185,8 +190,10 @@ fn extract_same_file_card(
         detail,
     }) {
         Ok(card) => Ok(Some(card)),
-        Err(CardExtractionError::NoSymbolAtPosition { .. })
-        | Err(CardExtractionError::UnsupportedLanguage { .. }) => Ok(None),
+        Err(
+            CardExtractionError::NoSymbolAtPosition { .. }
+            | CardExtractionError::UnsupportedLanguage { .. },
+        ) => Ok(None),
         Err(error @ CardExtractionError::PositionOutOfRange { .. }) => {
             Err(DispatchError::internal(format!(
                 "computed position {line}:{column} should be valid during same-file slice \
@@ -208,7 +215,10 @@ fn candidate_positions(source: &str) -> (Vec<(u32, u32)>, bool) {
         .lines()
         .enumerate()
         .filter_map(|(index, line)| {
-            first_non_whitespace_column(line).map(|column| ((index as u32) + 1, column))
+            // The 1-based line number is only representable while the index
+            // fits in `u32`; later lines are skipped rather than truncated.
+            let line_number = u32::try_from(index).ok()?.checked_add(1)?;
+            first_non_whitespace_column(line).map(|column| (line_number, column))
         })
         // Bound extraction work until later symbol-table discovery milestones.
         .take(MAX_SAME_FILE_DISCOVERY_POSITIONS + 1)
@@ -220,9 +230,8 @@ fn candidate_positions(source: &str) -> (Vec<(u32, u32)>, bool) {
 /// Returns the 1-based character column of the first non-whitespace character in `line`, or `None`
 /// if the line is blank.
 fn first_non_whitespace_column(line: &str) -> Option<u32> {
-    line.chars()
-        .position(|ch| !ch.is_whitespace())
-        .map(|index| (index as u32) + 1)
+    let index = line.chars().position(|ch| !ch.is_whitespace())?;
+    u32::try_from(index).ok()?.checked_add(1)
 }
 /// Defines a deterministic total order over `SymbolCard` values for reproducible slice output.
 fn stable_card_order(left: &SymbolCard, right: &SymbolCard) -> std::cmp::Ordering {
@@ -250,7 +259,7 @@ fn stable_card_order(left: &SymbolCard, right: &SymbolCard) -> std::cmp::Orderin
 /// Partitions cards into an included set and a spillover frontier according to `max_cards`.
 fn apply_card_budget(
     entry_card: SymbolCard,
-    sibling_cards: Vec<SymbolCard>,
+    sibling_cards: &[SymbolCard],
     max_cards: u32,
     discovery_capped: bool,
 ) -> (Vec<SymbolCard>, SliceSpillover) {
@@ -338,26 +347,6 @@ fn normalize_lsp_provenance(card: &mut SymbolCard) {
     {
         card.provenance.sources.push(String::from("lsp_hover"));
     }
-}
-/// Validates that `uri` uses the `file` scheme and converts it to a `PathBuf`.
-fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
-    if uri.scheme() != "file" {
-        return Err(DispatchError::invalid_arguments(format!(
-            "unsupported URI scheme '{}': expected a file URI",
-            uri.scheme()
-        )));
-    }
-    uri.to_file_path()
-        .map_err(|_| DispatchError::invalid_arguments("URI is not a valid file path"))
-}
-/// Reads the source file at `path`, mapping IO failures to invalid-arguments errors.
-fn read_slice_source(path: &Path) -> Result<String, DispatchError> {
-    filesystem::read_to_string(path).map_err(|error| {
-        DispatchError::invalid_arguments(format!(
-            "unable to read source file '{}': {error}",
-            display_filename(path)
-        ))
-    })
 }
 /// Converts a `CardExtractionError` into either a structured `GraphSliceResponse::Refusal` or a
 /// `DispatchError`.

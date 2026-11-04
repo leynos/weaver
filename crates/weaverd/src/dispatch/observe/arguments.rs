@@ -6,10 +6,12 @@
 
 use lsp_types::{
     GotoDefinitionParams,
+    PartialResultParams,
     Position,
     TextDocumentIdentifier,
     TextDocumentPositionParams,
     Uri,
+    WorkDoneProgressParams,
 };
 use weaver_lsp_host::Language;
 
@@ -65,11 +67,16 @@ impl GetDefinitionArgs {
             }
         }
 
-        let uri = uri.ok_or_else(|| DispatchError::invalid_arguments("missing required --uri"))?;
+        let required_uri =
+            uri.ok_or_else(|| DispatchError::invalid_arguments("missing required --uri"))?;
         let (line, column) = position
             .ok_or_else(|| DispatchError::invalid_arguments("missing required --position"))?;
 
-        Ok(Self { uri, line, column })
+        Ok(Self {
+            uri: required_uri,
+            line,
+            column,
+        })
     }
 
     /// Infers the language from the URI's file extension.
@@ -106,8 +113,8 @@ impl GetDefinitionArgs {
                     character: self.column.saturating_sub(1),
                 },
             },
-            work_done_progress_params: Default::default(),
-            partial_result_params: Default::default(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
         }
     }
 }
@@ -131,18 +138,22 @@ fn parse_uri(value: &str) -> Result<Uri, DispatchError> {
 
 /// Parses a position string in `LINE:COL` format.
 fn parse_position(value: &str) -> Result<(u32, u32), DispatchError> {
-    let parts: Vec<&str> = value.split(':').collect();
-    if parts.len() != 2 {
+    let Some((line_text, column_text)) = value.split_once(':') else {
+        return Err(DispatchError::invalid_arguments(format!(
+            "position must be LINE:COL, got: {value}"
+        )));
+    };
+    if column_text.contains(':') {
         return Err(DispatchError::invalid_arguments(format!(
             "position must be LINE:COL, got: {value}"
         )));
     }
 
-    let line: u32 = parts[0].parse().map_err(|_| {
-        DispatchError::invalid_arguments(format!("invalid line number: {}", parts[0]))
+    let line: u32 = line_text.parse().map_err(|_| {
+        DispatchError::invalid_arguments(format!("invalid line number: {line_text}"))
     })?;
-    let column: u32 = parts[1].parse().map_err(|_| {
-        DispatchError::invalid_arguments(format!("invalid column number: {}", parts[1]))
+    let column: u32 = column_text.parse().map_err(|_| {
+        DispatchError::invalid_arguments(format!("invalid column number: {column_text}"))
     })?;
 
     if line == 0 {
@@ -165,7 +176,7 @@ mod tests {
 
     use super::*;
 
-    fn args(items: &[&str]) -> Vec<String> { items.iter().map(|s| (*s).to_string()).collect() }
+    fn args(items: &[&str]) -> Vec<String> { items.iter().map(|s| (*s).to_owned()).collect() }
 
     /// Asserts that parsing the given arguments fails with `InvalidArguments`
     /// and the error message contains the expected substring.

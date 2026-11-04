@@ -32,9 +32,9 @@ fn given_failing_loader(world: &BootstrapWorld) -> Result<(), String> {
 
 #[given("a backend provider that fails for {backend}")]
 fn given_backend_failure(world: &BootstrapWorld, backend: String) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
+    let state = bootstrap_world(world)?;
     let kind = parse_backend(&backend)?;
-    world
+    state
         .borrow()
         .provider
         .fail_on(kind, "intentional test failure");
@@ -49,47 +49,47 @@ fn when_bootstrap_runs(world: &BootstrapWorld) -> Result<(), String> {
 
 #[when("the {backend} backend is requested")]
 fn when_backend_requested(world: &BootstrapWorld, backend: String) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
+    let state = bootstrap_world(world)?;
     let kind = parse_backend(&backend)?;
-    world.borrow_mut().request_backend(kind);
+    state.borrow_mut().request_backend(kind);
     Ok(())
 }
 
 #[when("the {backend} backend is requested again")]
 fn when_backend_requested_again(world: &BootstrapWorld, backend: String) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
+    let state = bootstrap_world(world)?;
     let kind = parse_backend(&backend)?;
-    world.borrow_mut().request_backend(kind);
+    state.borrow_mut().request_backend(kind);
     Ok(())
 }
 
 #[then("bootstrap succeeds")]
 fn then_bootstrap_succeeds(world: &BootstrapWorld) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
-    let world = world.borrow();
-    if world.bootstrap_error().is_some() {
-        return Err(format!("bootstrap error: {:?}", world.bootstrap_error()));
+    let state = bootstrap_world(world)?;
+    let scenario = state.borrow();
+    if scenario.bootstrap_error().is_some() {
+        return Err(format!("bootstrap error: {:?}", scenario.bootstrap_error()));
     }
-    if !world.daemon_started() {
-        return Err("daemon should have been initialised".to_string());
+    if !scenario.daemon_started() {
+        return Err("daemon should have been initialised".to_owned());
     }
     Ok(())
 }
 
 #[then("bootstrap fails")]
 fn then_bootstrap_fails(world: &BootstrapWorld) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
-    let world = world.borrow();
-    if world.bootstrap_error().is_none() {
-        return Err("bootstrap succeeded unexpectedly".to_string());
+    let state = bootstrap_world(world)?;
+    let scenario = state.borrow();
+    if scenario.bootstrap_error().is_none() {
+        return Err("bootstrap succeeded unexpectedly".to_owned());
     }
     Ok(())
 }
 
 #[then("no backend was started eagerly")]
 fn then_no_backend_started(world: &BootstrapWorld) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
-    let starts = world.borrow().backend_starts();
+    let state = bootstrap_world(world)?;
+    let starts = state.borrow().backend_starts();
     if !starts.is_empty() {
         return Err(format!("expected no backend starts, got {starts:?}"));
     }
@@ -98,21 +98,21 @@ fn then_no_backend_started(world: &BootstrapWorld) -> Result<(), String> {
 
 #[then("starting the backend fails")]
 fn then_backend_start_fails(world: &BootstrapWorld) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
-    let borrow = world.borrow();
+    let state = bootstrap_world(world)?;
+    let borrow = state.borrow();
     let result = borrow
         .backend_result()
         .ok_or_else(|| String::from("backend result missing"))?;
     if result.is_ok() {
-        return Err("backend start succeeded unexpectedly".to_string());
+        return Err("backend start succeeded unexpectedly".to_owned());
     }
     Ok(())
 }
 
 #[then("starting the backend succeeds")]
 fn then_backend_start_succeeds(world: &BootstrapWorld) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
-    let borrow = world.borrow();
+    let state = bootstrap_world(world)?;
+    let borrow = state.borrow();
     let result = borrow
         .backend_result()
         .ok_or_else(|| String::from("backend result missing"))?;
@@ -131,11 +131,11 @@ fn then_backend_start_succeeds(world: &BootstrapWorld) -> Result<(), String> {
 /// ```
 fn assert_event_recorded(
     world: &RefCell<TestWorld>,
-    event: HealthEvent,
+    event: &HealthEvent,
     message: &str,
 ) -> Result<(), String> {
     let events = world.borrow().reporter.events();
-    if !events.contains(&event) {
+    if !events.contains(event) {
         return Err(format!("{message}: {events:?}"));
     }
     Ok(())
@@ -144,22 +144,22 @@ fn assert_event_recorded(
 /// Parses the backend identifier and asserts the reporter observed the event.
 fn assert_backend_event<F>(
     world: &RefCell<TestWorld>,
-    backend: String,
+    backend: &str,
     event: F,
     message: &str,
 ) -> Result<(), String>
 where
     F: FnOnce(BackendKind) -> HealthEvent,
 {
-    let kind = parse_backend(&backend)?;
-    assert_event_recorded(world, event(kind), message)
+    let kind = parse_backend(backend)?;
+    assert_event_recorded(world, &event(kind), message)
 }
 
 #[then("the reporter recorded bootstrap start")]
 fn then_reporter_start(world: &BootstrapWorld) -> Result<(), String> {
     assert_event_recorded(
         bootstrap_world(world)?,
-        HealthEvent::BootstrapStarting,
+        &HealthEvent::BootstrapStarting,
         "bootstrap start event missing",
     )
 }
@@ -168,7 +168,7 @@ fn then_reporter_start(world: &BootstrapWorld) -> Result<(), String> {
 fn then_reporter_success(world: &BootstrapWorld) -> Result<(), String> {
     assert_event_recorded(
         bootstrap_world(world)?,
-        HealthEvent::BootstrapSucceeded,
+        &HealthEvent::BootstrapSucceeded,
         "bootstrap success event missing",
     )
 }
@@ -177,7 +177,7 @@ fn then_reporter_success(world: &BootstrapWorld) -> Result<(), String> {
 fn then_reporter_backend_start(world: &BootstrapWorld, backend: String) -> Result<(), String> {
     assert_backend_event(
         bootstrap_world(world)?,
-        backend,
+        &backend,
         HealthEvent::BackendStarting,
         "backend start event missing",
     )
@@ -187,7 +187,7 @@ fn then_reporter_backend_start(world: &BootstrapWorld, backend: String) -> Resul
 fn then_reporter_backend_ready(world: &BootstrapWorld, backend: String) -> Result<(), String> {
     assert_backend_event(
         bootstrap_world(world)?,
-        backend,
+        &backend,
         HealthEvent::BackendReady,
         "backend ready event missing",
     )
@@ -207,9 +207,9 @@ fn then_reporter_failure(world: &BootstrapWorld) -> Result<(), String> {
 
 #[then("the reporter recorded backend failure for {backend}")]
 fn then_reporter_backend_failure(world: &BootstrapWorld, backend: String) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
+    let state = bootstrap_world(world)?;
     let kind = parse_backend(&backend)?;
-    let events = world.borrow().reporter.events();
+    let events = state.borrow().reporter.events();
     let failed = events.iter().any(|event| {
         matches!(
             event,
@@ -229,9 +229,9 @@ fn then_reporter_backend_failure(world: &BootstrapWorld, backend: String) -> Res
 
 #[then("the backend was started exactly once for {backend}")]
 fn then_backend_started_once(world: &BootstrapWorld, backend: String) -> Result<(), String> {
-    let world = bootstrap_world(world)?;
+    let state = bootstrap_world(world)?;
     let kind = parse_backend(&backend)?;
-    let starts = world.borrow().backend_starts();
+    let starts = state.borrow().backend_starts();
     if starts.as_slice() != [kind] {
         return Err(format!(
             "expected single start for {kind:?}, got {starts:?}"
