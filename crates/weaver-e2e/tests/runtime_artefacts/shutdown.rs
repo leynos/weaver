@@ -61,7 +61,7 @@ pub(super) fn verify_endpoint_a_cleanup(scenario: &Scenario) -> ScenarioResult<(
 
 /// Verifies endpoint B survives endpoint A shutting down.
 pub(super) fn verify_endpoint_b_survives(scenario: &Scenario, pid_b: u32) -> ScenarioResult<()> {
-    if !process_is_alive(pid_b) {
+    if !process_is_alive(pid_b)? {
         return Err(format!("endpoint B daemon {pid_b} should still be running"));
     }
     let (stdout, _stderr) = scenario.status(Side::B)?;
@@ -100,7 +100,7 @@ pub(super) fn verify_unverified_process_is_not_signalled(
         "refusing to signal an unverified process",
         "refusal stderr",
     )?;
-    if !process_is_alive(pid_b) {
+    if !process_is_alive(pid_b)? {
         return Err(format!(
             "endpoint B daemon {pid_b} should survive the refused signal"
         ));
