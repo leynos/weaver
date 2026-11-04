@@ -168,8 +168,9 @@ fn assert_three_part_template(
         "error line must come before Next command"
     );
 
-    let alternatives_pos = stderr[error_pos..next_cmd_pos]
-        .find(expected_alternatives)
+    let alternatives_pos = stderr
+        .get(error_pos..next_cmd_pos)
+        .and_then(|between| between.find(expected_alternatives))
         .map(|relative| error_pos + relative);
     anyhow::ensure!(
         alternatives_pos.is_some(),

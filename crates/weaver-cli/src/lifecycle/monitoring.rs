@@ -79,7 +79,10 @@ pub(crate) enum HealthCheckOutcome {
     /// Daemon is ready; startup succeeded with the given snapshot.
     Ready(HealthSnapshot),
     /// Daemon reported stopping status; startup was aborted.
-    Aborted { path: std::path::PathBuf },
+    Aborted {
+        /// Health snapshot path that reported the stopping status.
+        path: std::path::PathBuf,
+    },
     /// No actionable snapshot yet; polling should continue.
     Continue,
 }
@@ -146,6 +149,15 @@ pub(super) fn wait_for_ready(
     })
 }
 
+/// Fails the wait when the spawned daemon exits with a non-zero status.
+///
+/// A clean exit marks the daemon as daemonized, after which PID matching is
+/// skipped and freshness is judged from the snapshot timestamp alone.
+///
+/// # Errors
+///
+/// Returns a `LifecycleError` when the child status cannot be queried or the
+/// daemon exits unsuccessfully.
 fn poll_spawned_child(
     child: &mut Child,
     runtime_dir: &std::path::Path,
@@ -172,6 +184,11 @@ fn poll_spawned_child(
     Ok(())
 }
 
+/// Converts a health check outcome into a snapshot, an error, or a continue signal.
+///
+/// # Errors
+///
+/// Returns `StartupAborted` when the daemon reported `stopping`.
 fn resolve_health_outcome(
     outcome: HealthCheckOutcome,
 ) -> Result<Option<HealthSnapshot>, LifecycleError> {
@@ -182,13 +199,16 @@ fn resolve_health_outcome(
     }
 }
 
+/// Chooses how long to sleep before the next readiness poll.
+///
+/// The sleep never extends past the deadline, so a nearly expired timeout still
+/// gets one short final poll instead of waiting longer than requested.
 fn next_poll_interval(deadline: Option<Instant>) -> Duration {
-    match deadline {
-        None => POLL_INTERVAL,
-        Some(limit) => limit
+    deadline.map_or(POLL_INTERVAL, |limit| {
+        limit
             .checked_duration_since(Instant::now())
-            .map_or(Duration::ZERO, |remaining| remaining.min(POLL_INTERVAL)),
-    }
+            .map_or(Duration::ZERO, |remaining| remaining.min(POLL_INTERVAL))
+    })
 }
 
 /// Context for monitoring daemon process startup.

@@ -17,8 +17,14 @@ use crate::{
 };
 
 /// Settings for rendering daemon output.
+///
+/// Both fields are cheap to copy, so handlers receive the settings by value
+/// without disturbing the borrow of the command context.
+#[derive(Clone, Copy)]
 pub(crate) struct OutputSettings<'a> {
+    /// Output format used to decide whether payloads are rendered for humans.
     pub(crate) format: ResolvedOutputFormat,
+    /// Command context consulted when rendering human-readable output.
     pub(crate) context: &'a OutputContext,
 }
 
@@ -26,7 +32,7 @@ pub(crate) struct OutputSettings<'a> {
 fn process_message<W, E, S>(
     message: DaemonMessage,
     io: &mut IoStreams<'_, S, W, E>,
-    settings: &OutputSettings<'_>,
+    settings: OutputSettings<'_>,
 ) -> Result<(), AppError>
 where
     S: Read,
@@ -37,19 +43,28 @@ where
         return Ok(());
     };
     let rendered = render_stream_payload(settings, &data);
-    forward_stream_payload(stream, rendered.as_deref().unwrap_or(&data), io)?;
+    forward_stream_payload(&stream, rendered.as_deref().unwrap_or(&data), io)?;
     Ok(())
 }
 
-fn render_stream_payload(settings: &OutputSettings<'_>, data: &str) -> Option<String> {
+/// Renders `data` as human-readable output when the format requests it.
+///
+/// Returns `None` for JSON output, which forwards the payload unchanged.
+fn render_stream_payload(settings: OutputSettings<'_>, data: &str) -> Option<String> {
     match settings.format {
         ResolvedOutputFormat::Human => render_human_output(settings.context, data),
         ResolvedOutputFormat::Json => None,
     }
 }
 
+/// Writes `payload` to the stream selected by `stream`.
+///
+/// # Errors
+///
+/// Returns [`AppError::ForwardResponse`] when writing to the target stream
+/// fails.
 fn forward_stream_payload<W, E, S>(
-    stream: StreamTarget,
+    stream: &StreamTarget,
     payload: &str,
     io: &mut IoStreams<'_, S, W, E>,
 ) -> Result<(), AppError>
@@ -86,6 +101,17 @@ where
     Ok(false)
 }
 
+/// Reads JSON Lines daemon messages until the exit message arrives.
+///
+/// Payloads are rendered or forwarded as they arrive, and the daemon's exit
+/// status is returned once the stream ends.
+///
+/// # Errors
+///
+/// Returns [`AppError::ReadResponse`] when reading from the connection fails,
+/// [`AppError::ParseMessage`] when a line is not a valid message,
+/// [`AppError::ForwardResponse`] when writing or flushing output fails, and
+/// [`AppError::MissingExit`] when the stream ends without an exit message.
 pub(crate) fn read_daemon_messages<R, W, E, S>(
     connection: &mut R,
     io: &mut IoStreams<'_, S, W, E>,
@@ -122,7 +148,7 @@ where
         if let DaemonMessage::Exit { status } = &message {
             exit_status = Some(*status);
         }
-        process_message(message, io, &settings)?;
+        process_message(message, io, settings)?;
         line.clear();
     }
 
@@ -132,16 +158,30 @@ where
     exit_status.ok_or(AppError::MissingExit)
 }
 
+/// One JSON Lines message emitted by the daemon.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum DaemonMessage {
-    Stream { stream: StreamTarget, data: String },
-    Exit { status: i32 },
+    /// A chunk of output that belongs on a stream.
+    Stream {
+        /// Destination stream for `data`.
+        stream: StreamTarget,
+        /// Payload text forwarded or rendered before writing.
+        data: String,
+    },
+    /// The daemon's final exit status.
+    Exit {
+        /// Process exit status reported by the daemon.
+        status: i32,
+    },
 }
 
+/// Destination stream named by a daemon stream message.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum StreamTarget {
+    /// Standard output of the CLI process.
     Stdout,
+    /// Standard error of the CLI process.
     Stderr,
 }

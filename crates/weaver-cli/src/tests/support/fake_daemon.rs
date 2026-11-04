@@ -39,7 +39,7 @@ impl FakeDaemon {
         let requests_clone = Arc::clone(&requests);
         let result_clone = Arc::clone(&result);
         let handle = thread::spawn(move || {
-            let outcome = Self::serve_client(listener, lines, requests_clone);
+            let outcome = Self::serve_client(&listener, &lines, &requests_clone);
             if let Ok(mut guard) = result_clone.lock() {
                 *guard = Some(outcome);
             }
@@ -78,16 +78,16 @@ impl FakeDaemon {
     }
 
     fn serve_client(
-        listener: TcpListener,
-        lines: Vec<String>,
-        requests: Arc<Mutex<Vec<String>>>,
+        listener: &TcpListener,
+        lines: &[String],
+        requests: &Arc<Mutex<Vec<String>>>,
     ) -> Result<()> {
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
-            match Self::accept_client(&listener, deadline)? {
+            match Self::accept_client(listener, deadline)? {
                 AcceptOutcome::Accepted(stream) => {
-                    Self::record_request(&stream, &requests)?;
-                    return Self::stream_responses(stream, &lines);
+                    Self::record_request(&stream, requests)?;
+                    return Self::stream_responses(stream, lines);
                 }
                 AcceptOutcome::Retry => {}
                 AcceptOutcome::TimedOut => return Err(anyhow!("accept deadline expired")),
@@ -137,7 +137,7 @@ impl FakeDaemon {
 impl Drop for FakeDaemon {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            let _ = handle.join();
+            drop(handle.join());
         }
     }
 }
@@ -158,16 +158,16 @@ pub(in crate::tests) trait TryCloneStream: Write {
 }
 
 impl TryCloneStream for TcpStream {
-    type Owned = TcpStream;
+    type Owned = Self;
 
-    fn try_clone(&self) -> io::Result<Self::Owned> { TcpStream::try_clone(self) }
+    fn try_clone(&self) -> io::Result<Self::Owned> { Self::try_clone(self) }
 }
 
 #[cfg(unix)]
 impl TryCloneStream for UnixStream {
-    type Owned = UnixStream;
+    type Owned = Self;
 
-    fn try_clone(&self) -> io::Result<Self::Owned> { UnixStream::try_clone(self) }
+    fn try_clone(&self) -> io::Result<Self::Owned> { Self::try_clone(self) }
 }
 
 /// Reads a request line from a stream and writes response lines.
@@ -195,19 +195,19 @@ pub(in crate::tests) fn write_lines(stream: &mut impl Write, lines: &[String]) -
 
 /// Accepts a TCP connection and responds with the given lines.
 pub(in crate::tests) fn accept_tcp_connection(
-    listener: TcpListener,
-    lines: Vec<String>,
+    listener: &TcpListener,
+    lines: &[String],
 ) -> Result<()> {
     let (stream, _) = listener.accept().context("accept tcp connection")?;
-    respond_to_request(stream, &lines)
+    respond_to_request(stream, lines)
 }
 
 /// Accepts a Unix socket connection and responds with the given lines.
 #[cfg(unix)]
 pub(in crate::tests) fn accept_unix_connection(
-    listener: std::os::unix::net::UnixListener,
-    lines: Vec<String>,
+    listener: &std::os::unix::net::UnixListener,
+    lines: &[String],
 ) -> Result<()> {
     let (stream, _) = listener.accept().context("accept unix connection")?;
-    respond_to_request(stream, &lines)
+    respond_to_request(stream, lines)
 }

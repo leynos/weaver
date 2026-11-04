@@ -46,6 +46,7 @@ impl ActionableGuidance {
     }
 }
 
+/// Removes a leading `"error: "` or `"error:"` prefix from `problem`.
 fn strip_error_prefix(problem: &str) -> &str {
     problem
         .strip_prefix("error: ")
@@ -53,16 +54,22 @@ fn strip_error_prefix(problem: &str) -> &str {
         .unwrap_or(problem)
 }
 
+/// Quotes `value` for a POSIX shell, escaping embedded single quotes.
 fn shell_quote(value: &str) -> String {
     let escaped = value.replace('\'', "'\\''");
     format!("'{escaped}'")
 }
 
+/// Quotes `value` for PowerShell, doubling embedded single quotes.
 fn powershell_quote(value: &str) -> String {
     let escaped = value.replace('\'', "''");
     format!("'{escaped}'")
 }
 
+/// Reports whether `binary` names an explicit path instead of a bare command.
+///
+/// Absolute paths and values carrying a parent directory bypass `PATH`
+/// resolution, which determines the verification command shown to the user.
 pub(crate) fn has_configured_binary_path(binary: &OsStr) -> bool {
     let path = Path::new(binary);
     path.is_absolute()
@@ -71,6 +78,7 @@ pub(crate) fn has_configured_binary_path(binary: &OsStr) -> bool {
             .is_some_and(|parent| !parent.as_os_str().is_empty())
 }
 
+/// Extracts the file name of `binary`, falling back to the whole value.
 fn launch_binary_name(binary: &OsStr) -> String {
     Path::new(binary)
         .file_name()
@@ -105,6 +113,7 @@ fn windows_binary_check_command(binary_str: &str, configured: bool) -> String {
     }
 }
 
+/// Builds the shell command that verifies the daemon binary is usable.
 fn launch_binary_check_command(binary: &OsStr) -> String {
     let binary_str = binary.to_string_lossy();
     let configured = has_configured_binary_path(binary);
@@ -120,6 +129,7 @@ fn launch_binary_check_command(binary: &OsStr) -> String {
     }
 }
 
+/// Builds the alternatives block shown when the daemon binary cannot launch.
 fn launch_binary_alternatives(binary: &OsStr) -> Vec<String> {
     let binary_name = launch_binary_name(binary);
     let verify_binary = if has_configured_binary_path(binary) {
@@ -129,15 +139,16 @@ fn launch_binary_alternatives(binary: &OsStr) -> Vec<String> {
     };
 
     vec![
-        "The daemon binary could not be found or executed.".to_string(),
+        "The daemon binary could not be found or executed.".to_owned(),
         String::new(),
-        "Valid alternatives:".to_string(),
+        "Valid alternatives:".to_owned(),
         verify_binary,
-        "  - Set WEAVERD_BIN to the full path to the daemon binary".to_string(),
+        "  - Set WEAVERD_BIN to the full path to the daemon binary".to_owned(),
     ]
 }
 
-fn default_daemon_socket() -> &'static str {
+/// The platform default daemon socket shown when no health path is known.
+const fn default_daemon_socket() -> &'static str {
     if cfg!(unix) {
         "$XDG_RUNTIME_DIR/weaver/weaverd.sock"
     } else {
@@ -145,7 +156,8 @@ fn default_daemon_socket() -> &'static str {
     }
 }
 
-fn startup_retry_command() -> &'static str {
+/// The command that retries daemon startup while showing its output.
+const fn startup_retry_command() -> &'static str {
     if cfg!(unix) {
         "WEAVER_FOREGROUND=1 weaver daemon start"
     } else {
@@ -153,7 +165,8 @@ fn startup_retry_command() -> &'static str {
     }
 }
 
-fn startup_output_hint() -> &'static str {
+/// The hint explaining how to capture daemon startup output.
+const fn startup_output_hint() -> &'static str {
     if cfg!(unix) {
         "  - Run with WEAVER_FOREGROUND=1 to see startup output"
     } else {
@@ -161,16 +174,20 @@ fn startup_output_hint() -> &'static str {
     }
 }
 
+/// Describes where to look for the daemon's health information.
 fn startup_socket_hint(path: Option<&Path>) -> String {
-    match path {
-        Some(path) => format!("  - Check health snapshot at {}", path.display()),
-        None => format!(
-            "  - Check whether the daemon is listening on {}",
-            default_daemon_socket()
-        ),
-    }
+    path.map_or_else(
+        || {
+            format!(
+                "  - Check whether the daemon is listening on {}",
+                default_daemon_socket()
+            )
+        },
+        |socket_path| format!("  - Check health snapshot at {}", socket_path.display()),
+    )
 }
 
+/// Builds guidance for a daemon binary that could not be spawned.
 fn launch_daemon_guidance(binary: &OsStr, runtime_dir: &Path) -> ActionableGuidance {
     let binary_str = binary.to_string_lossy();
     let problem = format!("failed to spawn daemon binary '{binary_str}'");
@@ -183,42 +200,45 @@ fn launch_daemon_guidance(binary: &OsStr, runtime_dir: &Path) -> ActionableGuida
     ActionableGuidance::new(problem, alternatives, next_command)
 }
 
+/// Builds guidance for a daemon that exited before reporting readiness.
 fn startup_failed_guidance(exit_status: Option<i32>, runtime_dir: &Path) -> ActionableGuidance {
     let problem = format!("daemon exited before reporting ready (status: {exit_status:?})");
     let health_path = runtime_dir.join("weaverd.health");
     let alternatives = vec![
-        "The daemon started but failed to become ready.".to_string(),
+        "The daemon started but failed to become ready.".to_owned(),
         String::new(),
-        "Valid alternatives:".to_string(),
-        "  - Check the daemon logs for errors".to_string(),
+        "Valid alternatives:".to_owned(),
+        "  - Check the daemon logs for errors".to_owned(),
         startup_socket_hint(Some(health_path.as_path())),
-        startup_output_hint().to_string(),
+        startup_output_hint().to_owned(),
     ];
     ActionableGuidance::new(problem, alternatives, startup_retry_command())
 }
 
+/// Builds guidance for a daemon that missed its readiness deadline.
 fn startup_timeout_guidance(health_path: &Path) -> ActionableGuidance {
-    let problem = "timed out waiting for daemon to become ready".to_string();
+    let problem = "timed out waiting for daemon to become ready".to_owned();
     let alternatives = vec![
-        "The daemon did not report ready within the timeout period.".to_string(),
+        "The daemon did not report ready within the timeout period.".to_owned(),
         String::new(),
-        "Valid alternatives:".to_string(),
-        "  - Check if the daemon is stuck or slow to start".to_string(),
+        "Valid alternatives:".to_owned(),
+        "  - Check if the daemon is stuck or slow to start".to_owned(),
         startup_socket_hint(Some(health_path)),
-        startup_output_hint().to_string(),
+        startup_output_hint().to_owned(),
     ];
     ActionableGuidance::new(problem, alternatives, startup_retry_command())
 }
 
+/// Builds guidance for a daemon that reported `stopping` before readiness.
 fn startup_aborted_guidance(path: &Path) -> ActionableGuidance {
-    let problem = "daemon reported 'stopping' before reaching ready".to_string();
+    let problem = "daemon reported 'stopping' before reaching ready".to_owned();
     let alternatives = vec![
-        "The daemon started but shut down before becoming ready.".to_string(),
+        "The daemon started but shut down before becoming ready.".to_owned(),
         String::new(),
-        "Valid alternatives:".to_string(),
-        "  - Check the health snapshot for shutdown reason".to_string(),
+        "Valid alternatives:".to_owned(),
+        "  - Check the health snapshot for shutdown reason".to_owned(),
         startup_socket_hint(Some(path)),
-        startup_output_hint().to_string(),
+        startup_output_hint().to_owned(),
     ];
     ActionableGuidance::new(problem, alternatives, startup_retry_command())
 }
@@ -238,7 +258,7 @@ pub(crate) fn write_actionable_guidance<W: Write>(
 
     // Part 2: Alternatives block
     for line in &guidance.alternatives {
-        writeln!(writer, "{}", line)?;
+        writeln!(writer, "{line}")?;
     }
     writeln!(writer)?;
 
@@ -281,7 +301,8 @@ pub(crate) fn write_bare_invocation_guidance<W: Write>(
 }
 
 /// Writes actionable guidance for lifecycle/startup errors.
-/// Per roadmap 2.3.3, provides installation checks and WEAVERD_BIN guidance.
+///
+/// Per roadmap 2.3.3, provides installation checks and `WEAVERD_BIN` guidance.
 pub(crate) fn write_startup_guidance<W: Write>(
     writer: &mut W,
     error: &LifecycleError,
@@ -300,10 +321,10 @@ pub(crate) fn write_startup_guidance<W: Write>(
         LifecycleError::StartupTimeout { health_path, .. } => startup_timeout_guidance(health_path),
         LifecycleError::StartupAborted { path } => startup_aborted_guidance(path),
         other => {
-            let problem = strip_error_prefix(&other.to_string()).to_string();
+            let problem = strip_error_prefix(&other.to_string()).to_owned();
             ActionableGuidance::new(
                 problem,
-                vec!["See error details above.".to_string()],
+                vec!["See error details above.".to_owned()],
                 "weaver daemon status",
             )
         }

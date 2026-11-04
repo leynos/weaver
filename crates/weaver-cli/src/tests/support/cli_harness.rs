@@ -32,9 +32,17 @@ pub(crate) const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
 /// intent obvious instead of repeating it four times.
 struct PanickingLoader;
 
+/// Reports that a short-circuiting CLI path reached the config loader.
+///
+/// Diverging rather than returning keeps the panic out of [`PanickingLoader`]'s
+/// `Result`-returning `load`, which the workspace lint table forbids.
+fn loader_must_not_be_called() -> ! {
+    panic!("this code path must not attempt configuration loading");
+}
+
 impl ConfigLoader for PanickingLoader {
     fn load(&self, _args: &[OsString]) -> Result<weaver_config::Config, AppError> {
-        panic!("this code path must not attempt configuration loading");
+        loader_must_not_be_called()
     }
 }
 
