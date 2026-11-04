@@ -19,7 +19,9 @@ use super::{
     types::{LifecycleContext, LifecycleInvocation},
 };
 
+/// Maximum time to wait for the daemon to report ready after an explicit start.
 pub(super) const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+/// Maximum time to wait for the daemon to report ready when auto-starting it.
 pub(super) const AUTO_START_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Validates that no extra arguments were provided to the lifecycle command.
@@ -123,11 +125,12 @@ mod tests {
         }
     }
 
-    /// Tests for try_auto_start_daemon failure paths using a nonexistent daemon binary.
+    /// Tests for `try_auto_start_daemon` failure paths using a nonexistent
+    /// daemon binary.
     ///
     /// Both cases verify that when the daemon binary doesn't exist:
     /// 1. The "Waiting for daemon start..." message is written to stderr
-    /// 2. A LaunchDaemon error is propagated
+    /// 2. A `LaunchDaemon` error is propagated
     #[rstest]
     fn try_auto_start_daemon_failure_behaviour(
         temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
@@ -163,12 +166,13 @@ mod tests {
         );
     }
 
-    /// Success path: try_auto_start_daemon spawns daemon and returns Ok when
+    /// Success path: `try_auto_start_daemon` spawns daemon and returns Ok when
     /// health snapshot indicates ready.
     ///
-    /// This test exercises the complete auto-start flow through try_auto_start_daemon:
-    /// prepare_runtime → spawn_daemon → wait_for_ready, verifying that the function
-    /// returns Ok(()) when the daemon becomes ready.
+    /// This test exercises the complete auto-start flow through
+    /// `try_auto_start_daemon`: `prepare_runtime` → `spawn_daemon` →
+    /// `wait_for_ready`, verifying that the function returns Ok(()) when the
+    /// daemon becomes ready.
     #[cfg(unix)]
     #[rstest]
     fn try_auto_start_daemon_succeeds_when_ready(
@@ -212,11 +216,12 @@ mod tests {
         );
     }
 
-    /// Timeout path: try_auto_start_daemon returns StartupTimeout when daemon
-    /// spawns but never becomes ready.
+    /// Timeout path: `try_auto_start_daemon` returns `StartupTimeout` when
+    /// daemon spawns but never becomes ready.
     ///
-    /// This test is marked #[ignore] because AUTO_START_TIMEOUT is 30 seconds.
-    /// It verifies the complete timeout flow through try_auto_start_daemon.
+    /// This test is marked `#[ignore]` because `AUTO_START_TIMEOUT` is 30
+    /// seconds. It verifies the complete timeout flow through
+    /// `try_auto_start_daemon`.
     #[cfg(unix)]
     #[ignore = "takes 30 seconds due to AUTO_START_TIMEOUT"]
     #[rstest]

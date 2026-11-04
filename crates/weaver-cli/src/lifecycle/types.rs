@@ -17,8 +17,11 @@ use crate::DaemonAction;
 /// Supported lifecycle commands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LifecycleCommand {
+    /// Start the daemon and wait for it to report readiness.
     Start,
+    /// Stop a running daemon.
     Stop,
+    /// Report the daemon's current status.
     Status,
 }
 
@@ -35,14 +38,18 @@ impl fmt::Display for LifecycleCommand {
 /// Invocation payload forwarded from the CLI runtime.
 #[derive(Debug, Clone)]
 pub struct LifecycleInvocation {
+    /// The lifecycle command requested by the operator.
     pub command: LifecycleCommand,
+    /// Trailing arguments supplied after the command.
     pub arguments: Vec<String>,
 }
 
 /// Shared configuration context available to lifecycle handlers.
 #[derive(Debug, Clone, Copy)]
 pub struct LifecycleContext<'a> {
+    /// The resolved daemon configuration for this invocation.
     pub config: &'a Config,
+    /// Raw configuration arguments forwarded when spawning the daemon.
     pub config_arguments: &'a [OsString],
     /// Optional override for the daemon binary path, primarily for testing.
     ///
@@ -53,19 +60,32 @@ pub struct LifecycleContext<'a> {
 
 /// Output handle abstracting over stdout/stderr writers.
 pub struct LifecycleOutput<W: Write, E: Write> {
+    /// Writer receiving lifecycle command output.
     pub stdout: W,
+    /// Writer receiving lifecycle diagnostics and guidance.
     pub stderr: E,
 }
 
 impl<W: Write, E: Write> LifecycleOutput<W, E> {
-    pub fn new(stdout: W, stderr: E) -> Self { Self { stdout, stderr } }
+    /// Bundles the output writers used by lifecycle handlers.
+    pub const fn new(stdout: W, stderr: E) -> Self { Self { stdout, stderr } }
 
+    /// Writes one formatted line to standard output and flushes it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LifecycleError::Io`] when the write or flush fails.
     pub fn stdout_line(&mut self, args: fmt::Arguments<'_>) -> Result<(), LifecycleError> {
         self.stdout.write_fmt(args).map_err(LifecycleError::Io)?;
         self.stdout.write_all(b"\n").map_err(LifecycleError::Io)?;
         self.stdout.flush().map_err(LifecycleError::Io)
     }
 
+    /// Writes one formatted line to standard error and flushes it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LifecycleError::Io`] when the write or flush fails.
     pub fn stderr_line(&mut self, args: fmt::Arguments<'_>) -> Result<(), LifecycleError> {
         self.stderr.write_fmt(args).map_err(LifecycleError::Io)?;
         self.stderr.write_all(b"\n").map_err(LifecycleError::Io)?;

@@ -150,6 +150,14 @@ fn canonical_sections() -> SectionsMetadata {
 /// prefixing each failure with its command path. Lengths are checked before
 /// zipping so missing or extra nodes fail with a readable path, not truncation.
 fn assert_canonical_command(expected: &DocMetadata, actual: &DocMetadata, path: &str) {
+    assert_canonical_identity(expected, actual, path);
+    assert_canonical_options(expected, actual, path);
+    assert_canonical_fields(expected, actual, path);
+    assert_canonical_subcommands(expected, actual, path);
+}
+
+/// Compares the identifying metadata shared by every command node.
+fn assert_canonical_identity(expected: &DocMetadata, actual: &DocMetadata, path: &str) {
     assert_eq!(actual.ir_version, expected.ir_version, "{path}.ir_version");
     assert_eq!(actual.app_name, expected.app_name, "{path}.app_name");
     assert_eq!(actual.bin_name, expected.bin_name, "{path}.bin_name");
@@ -158,10 +166,18 @@ fn assert_canonical_command(expected: &DocMetadata, actual: &DocMetadata, path: 
         actual.synopsis_id, expected.synopsis_id,
         "{path}.synopsis_id"
     );
+}
+
+/// Compares the optional sections and profiles attached to a command node.
+fn assert_canonical_options(expected: &DocMetadata, actual: &DocMetadata, path: &str) {
     assert_eq!(actual.sections, expected.sections, "{path}.sections");
     assert_eq!(actual.behaviour, expected.behaviour, "{path}.behaviour");
     assert_eq!(actual.profiles, expected.profiles, "{path}.profiles");
     assert_eq!(actual.windows, expected.windows, "{path}.windows");
+}
+
+/// Compares the projected fields of one command node, in order.
+fn assert_canonical_fields(expected: &DocMetadata, actual: &DocMetadata, path: &str) {
     assert_eq!(
         actual.fields.len(),
         expected.fields.len(),
@@ -172,6 +188,10 @@ fn assert_canonical_command(expected: &DocMetadata, actual: &DocMetadata, path: 
     {
         assert_eq!(actual_field, expected_field, "{path}.fields[{index}]");
     }
+}
+
+/// Recurses into the subcommands, excluding daemon passthrough nodes.
+fn assert_canonical_subcommands(expected: &DocMetadata, actual: &DocMetadata, path: &str) {
     assert_eq!(
         actual.subcommands.len(),
         expected.subcommands.len(),

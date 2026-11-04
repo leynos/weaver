@@ -59,6 +59,7 @@ impl OutputStream {
     }
 }
 
+#[derive(Clone, Copy)]
 struct OutputCheck {
     stream: OutputStream,
     assertion: OutputAssertion,
@@ -77,30 +78,30 @@ fn run_command_with_source_uri(
         .map_err(|error| anyhow::anyhow!("{error_msg}: {error}"))
 }
 
-fn assert_output(world: &RefCell<TestWorld>, expected: String, check: OutputCheck) -> Result<()> {
-    let world = world.borrow();
-    let actual = check.stream.text(&world)?;
+fn assert_output(world: &RefCell<TestWorld>, expected: &str, check: OutputCheck) -> Result<()> {
+    let state = world.borrow();
+    let actual = check.stream.text(&state)?;
     let output_name = check.stream.name();
-    let expected = expected.trim_matches('"');
-    let expected = match check.assertion {
-        OutputAssertion::Equals => expected.to_owned(),
+    let expected_trimmed = expected.trim_matches('"');
+    let expected_text = match check.assertion {
+        OutputAssertion::Equals => expected_trimmed.to_owned(),
         OutputAssertion::Contains | OutputAssertion::DoesNotContain => {
-            expected.replace("\\n", "\n")
+            expected_trimmed.replace("\\n", "\n")
         }
     };
 
     match check.assertion {
         OutputAssertion::Equals => ensure!(
-            actual == expected,
-            "{output_name} was {actual:?}, expected {expected:?}"
+            actual == expected_text,
+            "{output_name} was {actual:?}, expected {expected_text:?}"
         ),
         OutputAssertion::Contains => ensure!(
-            actual.contains(&expected),
-            "{output_name} {actual:?} did not contain {expected:?}"
+            actual.contains(&expected_text),
+            "{output_name} {actual:?} did not contain {expected_text:?}"
         ),
         OutputAssertion::DoesNotContain => ensure!(
-            !actual.contains(&expected),
-            "{output_name} {actual:?} unexpectedly contained {expected:?}"
+            !actual.contains(&expected_text),
+            "{output_name} {actual:?} unexpectedly contained {expected_text:?}"
         ),
     }
 
@@ -144,7 +145,7 @@ fn given_malformed_daemon(world: &RefCell<TestWorld>) -> Result<()> {
 #[given("a running fake daemon that closes without exit")]
 fn given_daemon_missing_exit(world: &RefCell<TestWorld>) -> Result<()> {
     world.borrow_mut().start_daemon_with_lines(vec![
-        "{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"partial\"}".to_string(),
+        r#"{"kind":"stream","stream":"stdout","data":"partial"}"#.to_owned(),
     ])
 }
 
@@ -168,16 +169,16 @@ fn given_auto_start_triggered(world: &RefCell<TestWorld>) {
 
 #[given("a source file named {filename}")]
 fn given_source_file(world: &RefCell<TestWorld>, filename: String) -> Result<()> {
-    let filename = filename.trim_matches('"');
+    let filename_trimmed = filename.trim_matches('"');
     world
         .borrow_mut()
-        .create_source_file(filename, SAMPLE_RUST_SOURCE)
+        .create_source_file(filename_trimmed, SAMPLE_RUST_SOURCE)
 }
 
 #[given("a missing source file named {filename}")]
 fn given_missing_source_file(world: &RefCell<TestWorld>, filename: String) -> Result<()> {
-    let filename = filename.trim_matches('"');
-    world.borrow_mut().create_missing_source(filename)
+    let filename_trimmed = filename.trim_matches('"');
+    world.borrow_mut().create_missing_source(filename_trimmed)
 }
 
 #[given("a running fake daemon emitting definition output")]
@@ -284,7 +285,7 @@ fn then_lifecycle_recorded(world: &RefCell<TestWorld>, operation: String) -> Res
 fn then_stdout_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
     assert_output(
         world,
-        expected,
+        &expected,
         OutputCheck {
             stream: OutputStream::Stdout,
             assertion: OutputAssertion::Equals,
@@ -296,7 +297,7 @@ fn then_stdout_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
 fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
     assert_output(
         world,
-        expected,
+        &expected,
         OutputCheck {
             stream: OutputStream::Stderr,
             assertion: OutputAssertion::Equals,
@@ -308,7 +309,7 @@ fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) -> Result<()> {
 fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<()> {
     assert_output(
         world,
-        snippet,
+        &snippet,
         OutputCheck {
             stream: OutputStream::Stderr,
             assertion: OutputAssertion::Contains,
@@ -320,7 +321,7 @@ fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<(
 fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<()> {
     assert_output(
         world,
-        snippet,
+        &snippet,
         OutputCheck {
             stream: OutputStream::Stdout,
             assertion: OutputAssertion::Contains,
@@ -330,8 +331,8 @@ fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) -> Result<(
 
 #[then("stdout contains the shared configuration flags")]
 fn then_stdout_contains_shared_config_flags(world: &RefCell<TestWorld>) -> Result<()> {
-    let world = world.borrow();
-    let text = world.stdout_text()?;
+    let state = world.borrow();
+    let text = state.stdout_text()?;
     for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
         ensure!(text.contains(flag), "stdout missing config flag {flag:?}");
     }
@@ -342,7 +343,7 @@ fn then_stdout_contains_shared_config_flags(world: &RefCell<TestWorld>) -> Resul
 fn then_stdout_does_not_contain(world: &RefCell<TestWorld>, snippet: String) -> Result<()> {
     assert_output(
         world,
-        snippet,
+        &snippet,
         OutputCheck {
             stream: OutputStream::Stdout,
             assertion: OutputAssertion::DoesNotContain,

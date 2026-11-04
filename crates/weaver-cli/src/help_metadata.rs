@@ -6,6 +6,7 @@ use ortho_config::{FluentLocalizer, Localizer, docs::DocMetadata};
 use super::HelpConstructionError;
 use crate::command_tree::{CommandNode, CommandSemantics};
 
+/// Embedded en-US Fluent catalogue used as the default localisation source.
 pub(super) const EN_US_MESSAGES: &str = include_str!("../locales/en-US/messages.ftl");
 
 /// Applies projected command metadata to the parser-shaped help command.
@@ -27,10 +28,10 @@ fn apply_node(
     node: &CommandNode,
     localizer: &dyn Localizer,
 ) -> Command {
-    let command = command.about(localizer.message(&metadata.about_id, None, node.summary));
-    let command = apply_arguments(command, metadata, node, localizer);
-    let command = apply_subcommands(command, metadata, node, localizer);
-    apply_passthrough_help(command, node, localizer)
+    let described = command.about(localizer.message(&metadata.about_id, None, node.summary));
+    let with_arguments = apply_arguments(described, metadata, node, localizer);
+    let with_subcommands = apply_subcommands(with_arguments, metadata, node, localizer);
+    apply_passthrough_help(with_subcommands, node, localizer)
 }
 
 /// Localizes projected long-flag help onto the matching clap arguments.
@@ -43,11 +44,11 @@ fn apply_arguments(
     for (argument, field) in node.arguments.iter().zip(&metadata.fields) {
         let help = localizer.message(&field.help_id, None, argument.help);
         let value_name = field.cli.as_ref().and_then(|cli| cli.value_name.clone());
-        command = command.mut_arg(argument.long, |arg| {
-            let arg = arg.help(help);
+        command = command.mut_arg(argument.long, |argument_command| {
+            let with_help = argument_command.help(help);
             match value_name {
-                Some(value_name) => arg.value_name(value_name),
-                None => arg,
+                Some(text) => with_help.value_name(text),
+                None => with_help,
             }
         });
     }
@@ -97,7 +98,11 @@ fn apply_passthrough_help(
     debug_assert_eq!(domains, crate::command_tree::domain_operations());
     for domain in crate::command_tree::domain_operations() {
         let summary = localizer.message(domain.summary_id, None, domain.summary);
-        output.push_str(&format!("\n  {} \u{2014} {summary}\n", domain.domain));
+        output.push_str("\n  ");
+        output.push_str(domain.domain);
+        output.push_str(" \u{2014} ");
+        output.push_str(&summary);
+        output.push('\n');
         for operations in domain.operations.chunks(3) {
             output.push_str("    ");
             output.push_str(&format_operation_row(operations));
@@ -122,10 +127,11 @@ fn append_structured_commands(
             let mut child_path = path.to_vec();
             child_path.push(child.verb);
             let summary = localizer.message(child.summary_id, None, child.summary);
-            output.push_str(&format!(
-                "  {} \u{2014} {summary}\n",
-                command_signature(&child_path, child),
-            ));
+            output.push_str("  ");
+            output.push_str(&command_signature(&child_path, child));
+            output.push_str(" \u{2014} ");
+            output.push_str(&summary);
+            output.push('\n');
             append_argument_help(output, child, localizer);
             append_structured_commands(output, child, &child_path, localizer);
         }
@@ -192,6 +198,7 @@ fn pad_to(row: &mut String, width: usize) {
 mod tests {
     //! Behavioural tests for recursive metadata application to rendered help.
 
+    use anyhow::ensure;
     use clap::CommandFactory;
     use ortho_config::{LocalizationArgs, Localizer};
 
@@ -228,8 +235,12 @@ mod tests {
         let mut command = apply_node(Cli::command(), &metadata, root, &localizer);
         command = apply_passthrough_help(command, root, &localizer);
 
-        assert_eq!(metadata.subcommands.len(), 2);
-        assert!(
+        ensure!(
+            metadata.subcommands.len() == 2,
+            "expected two projected subcommands, found {}",
+            metadata.subcommands.len()
+        );
+        ensure!(
             command.get_after_help().is_some_and(|help| help
                 .to_string()
                 .contains("Translated code-structure domain")),
@@ -244,10 +255,10 @@ mod tests {
             .expect("definitions get command should exist")
             .render_long_help()
             .to_string();
-        assert!(rendered_help.contains("Translated definition lookup summary"));
-        assert!(rendered_help.contains("Translated document URI argument"));
-        assert!(rendered_help.contains("Translated source position argument"));
-        assert!(
+        ensure!(rendered_help.contains("Translated definition lookup summary"));
+        ensure!(rendered_help.contains("Translated document URI argument"));
+        ensure!(rendered_help.contains("Translated source position argument"));
+        ensure!(
             rendered_help.contains("--position <LINE:COLUMN>"),
             "projected argument metadata must replace Clap's derived value placeholder"
         );
@@ -255,15 +266,15 @@ mod tests {
         let mut manpage = Vec::new();
         clap_mangen::Man::new(command).render(&mut manpage)?;
         let rendered_manpage = String::from_utf8(manpage)?;
-        assert!(
+        ensure!(
             rendered_manpage.contains("Translated definition lookup summary"),
             "manpage must consume recursively applied command metadata"
         );
-        assert!(
+        ensure!(
             rendered_manpage.contains("Translated document URI argument"),
             "manpage must consume recursively applied argument metadata"
         );
-        assert!(
+        ensure!(
             rendered_manpage.contains("Translated source position argument"),
             "manpage must consume recursively applied argument metadata"
         );

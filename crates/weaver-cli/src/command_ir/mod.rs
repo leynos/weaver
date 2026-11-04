@@ -1,4 +1,4 @@
-//! Projects Weaver's command surface into OrthoConfig documentation metadata.
+//! Projects Weaver's command surface into `OrthoConfig` documentation metadata.
 
 use ortho_config::docs::{
     CliMetadata,
@@ -26,7 +26,7 @@ pub(crate) enum ProjectionError {
     },
 }
 
-/// Projects Weaver's command tree into the OrthoConfig documentation IR.
+/// Projects Weaver's command tree into the `OrthoConfig` documentation IR.
 pub(crate) fn project(root: &CommandNode) -> Result<DocMetadata, ProjectionError> {
     project_node(root, 0)
 }
@@ -76,7 +76,7 @@ fn project_children(node: &CommandNode, depth: usize) -> Result<Vec<DocMetadata>
     }
 }
 
-/// Projects one command-tree argument into OrthoConfig field metadata.
+/// Projects one command-tree argument into `OrthoConfig` field metadata.
 fn field_metadata(argument: &CommandArgument) -> FieldMetadata {
     FieldMetadata {
         name: argument.long.to_owned(),
