@@ -3339,6 +3339,7 @@ dependencies = [
  "cap-std 4.0.3",
  "insta",
  "lsp-types",
+ "nix 0.31.3",
  "proptest",
  "rstest",
  "serde",
