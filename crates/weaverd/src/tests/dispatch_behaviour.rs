@@ -82,7 +82,7 @@ impl DispatchWorld {
         let mut reader = BufReader::new(stream);
         let mut line = String::new();
         while reader.read_line(&mut line).context("read response")? > 0 {
-            self.response_lines.push(line.trim().to_string());
+            self.response_lines.push(line.trim().to_owned());
             line.clear();
         }
         Ok(())
@@ -132,7 +132,7 @@ impl Drop for DispatchWorld {
     fn drop(&mut self) {
         if let Some(handle) = self.listener.take() {
             handle.shutdown();
-            let _ = handle.join();
+            drop(handle.join());
         }
     }
 }
@@ -177,9 +177,9 @@ fn when_malformed_request(world: &DispatchWorldFixture) -> Result<()> {
 
 #[when(r#"a request with unknown domain "{domain}" is sent"#)]
 fn when_unknown_domain(world: &DispatchWorldFixture, domain: String) -> Result<()> {
-    let domain = strip_quotes(&domain);
+    let domain_name = strip_quotes(&domain);
     dispatch_world(world)?.borrow_mut().send_request(&format!(
-        r#"{{"command":{{"domain":"{domain}","operation":"test"}}}}"#
+        r#"{{"command":{{"domain":"{domain_name}","operation":"test"}}}}"#
     ))
 }
 
@@ -189,10 +189,10 @@ fn when_unknown_operation(
     operation: String,
     domain: String,
 ) -> Result<()> {
-    let operation = strip_quotes(&operation);
-    let domain = strip_quotes(&domain);
+    let operation_name = strip_quotes(&operation);
+    let domain_name = strip_quotes(&domain);
     dispatch_world(world)?.borrow_mut().send_request(&format!(
-        r#"{{"command":{{"domain":"{domain}","operation":"{operation}"}}}}"#
+        r#"{{"command":{{"domain":"{domain_name}","operation":"{operation_name}"}}}}"#
     ))
 }
 
@@ -263,9 +263,47 @@ fn then_unknown_operation_payload_lists_known_operations(
         .borrow()
         .unknown_operation_payload()
         .context("unknown-operation payload should be present")?;
-    let domain = strip_quotes(&domain);
-    let operation = strip_quotes(&operation);
-    let expected = match domain {
+    let domain_name = strip_quotes(&domain);
+    let operation_name = strip_quotes(&operation);
+    let expected = expected_known_operations(domain_name)?;
+
+    ensure!(
+        payload.get("status").and_then(Value::as_str) == Some("error"),
+        "unexpected payload status: {payload}"
+    );
+    ensure!(
+        payload.get("type").and_then(Value::as_str) == Some(UNKNOWN_OPERATION_TYPE),
+        "unexpected payload type: {payload}"
+    );
+    ensure!(
+        detail(&payload, "domain").and_then(Value::as_str) == Some(domain_name),
+        "unexpected payload domain: {payload}"
+    );
+    ensure!(
+        detail(&payload, "operation").and_then(Value::as_str) == Some(operation_name),
+        "unexpected payload operation: {payload}"
+    );
+    ensure!(
+        detail(&payload, "known_operations") == Some(&expected),
+        "unexpected operations: {payload}"
+    );
+
+    let actual_operations = detail(&payload, "known_operations")
+        .and_then(Value::as_array)
+        .context("known_operations should be an array")?;
+    let expected_operations = expected
+        .as_array()
+        .context("expected operations should be an array")?;
+    ensure!(
+        actual_operations.len() == expected_operations.len(),
+        "unexpected operation count: {payload}"
+    );
+    Ok(())
+}
+
+/// Returns the operations the daemon should advertise for `domain`.
+fn expected_known_operations(domain: &str) -> Result<Value> {
+    Ok(match domain {
         "observe" => serde_json::json!([
             "get-definition",
             "find-references",
@@ -284,39 +322,12 @@ fn then_unknown_operation_payload_lists_known_operations(
         ]),
         "verify" => serde_json::json!(["diagnostics", "syntax"]),
         other => anyhow::bail!("unsupported domain {other}"),
-    };
+    })
+}
 
-    ensure!(
-        payload["status"] == "error",
-        "unexpected payload status: {payload}"
-    );
-    ensure!(
-        payload["type"] == UNKNOWN_OPERATION_TYPE,
-        "unexpected payload type: {payload}"
-    );
-    ensure!(
-        payload["details"]["domain"] == domain,
-        "unexpected payload domain: {payload}"
-    );
-    ensure!(
-        payload["details"]["operation"] == operation,
-        "unexpected payload operation: {payload}"
-    );
-    ensure!(
-        payload["details"]["known_operations"] == expected,
-        "unexpected operations: {payload}"
-    );
-    let actual_operations = payload["details"]["known_operations"]
-        .as_array()
-        .context("known_operations should be an array")?;
-    let expected_operations = expected
-        .as_array()
-        .context("expected operations should be an array")?;
-    ensure!(
-        actual_operations.len() == expected_operations.len(),
-        "unexpected operation count: {payload}"
-    );
-    Ok(())
+/// Reads `key` from the payload's `details` object.
+fn detail<'a>(payload: &'a Value, key: &str) -> Option<&'a Value> {
+    payload.get("details").and_then(|details| details.get(key))
 }
 
 #[then("the response includes an invalid arguments error")]

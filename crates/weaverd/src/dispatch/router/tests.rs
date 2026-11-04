@@ -38,9 +38,8 @@ fn build_router() -> Result<DomainRouter, String> {
 
 #[test]
 fn build_router_rejects_relative_workspace_root() {
-    let error = match DomainRouter::new(PathBuf::from("relative/workspace")) {
-        Ok(_) => panic!("relative workspace roots should be rejected"),
-        Err(error) => error,
+    let Err(error) = DomainRouter::new(PathBuf::from("relative/workspace")) else {
+        panic!("relative workspace roots should be rejected");
     };
 
     assert!(matches!(error, DispatchError::InvalidArguments { .. }));
@@ -153,10 +152,11 @@ fn rejects_unknown_operation(#[case] domain: &str, #[case] operation: &str) -> R
 
     let result = route_operation(&router, domain, operation, &mut backends)?;
 
-    assert!(matches!(
-        result,
-        Err(DispatchError::UnknownOperation { .. })
-    ));
+    if !matches!(result, Err(DispatchError::UnknownOperation { .. })) {
+        return Err(format!(
+            "{domain} {operation} should be rejected as an unknown operation"
+        ));
+    }
     Ok(())
 }
 
@@ -201,14 +201,38 @@ fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBack
     let response = String::from_utf8(output).expect("utf8");
     let stream_line = response.lines().next().expect("stream line");
     let envelope: serde_json::Value = serde_json::from_str(stream_line).expect("parse envelope");
-    assert_eq!(envelope["kind"], "stream");
-    assert_eq!(envelope["stream"], "stdout");
+    assert_eq!(
+        envelope
+            .pointer("/kind")
+            .and_then(serde_json::Value::as_str),
+        Some("stream")
+    );
+    assert_eq!(
+        envelope
+            .pointer("/stream")
+            .and_then(serde_json::Value::as_str),
+        Some("stdout")
+    );
 
-    let data_str = envelope["data"].as_str().expect("data string");
+    let data_str = envelope
+        .pointer("/data")
+        .and_then(serde_json::Value::as_str)
+        .expect("data string");
     let card: serde_json::Value = serde_json::from_str(data_str).expect("parse card");
-    assert_eq!(card["status"], "refusal");
-    assert_eq!(card["refusal"]["reason"], "position_out_of_range");
-    assert_eq!(card["refusal"]["requested_detail"], "structure");
+    assert_eq!(
+        card.pointer("/status").and_then(serde_json::Value::as_str),
+        Some("refusal")
+    );
+    assert_eq!(
+        card.pointer("/refusal/reason")
+            .and_then(serde_json::Value::as_str),
+        Some("position_out_of_range")
+    );
+    assert_eq!(
+        card.pointer("/refusal/requested_detail")
+            .and_then(serde_json::Value::as_str),
+        Some("structure")
+    );
 }
 
 #[rstest]

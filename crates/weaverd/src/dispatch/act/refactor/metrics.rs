@@ -14,12 +14,18 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// Number of rejected `--position LINE:COL` values.
 static POSITION_PARSE_ERROR_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// Number of failed line/column to byte-offset conversions.
 static POSITION_CONVERSION_ERROR_COUNT: AtomicU64 = AtomicU64::new(0);
 
 /// Records position parsing and conversion failures.
 pub(super) trait PositionMetrics {
+    /// Records one rejected `--position LINE:COL` value.
     fn increment_parse_error(&self);
+
+    /// Records one failed line/column to byte-offset conversion.
     fn increment_conversion_error(&self);
 }
 
@@ -64,6 +70,7 @@ impl PositionMetrics for NullPositionMetrics {
     fn increment_conversion_error(&self) {}
 }
 
+/// Increments `counter` and logs the new value under `counter_name`.
 fn increment_error_counter(counter: &AtomicU64, counter_name: &str) {
     let count = counter.fetch_add(1, Ordering::Relaxed).saturating_add(1);
     tracing::debug!(
@@ -91,7 +98,7 @@ fn reset_test_counters() {
 mod tests {
     //! Unit tests for position metrics implementations.
     //!
-    //! Tests that read or mutate the global AtomicU64 counters must be
+    //! Tests that read or mutate the global `AtomicU64` counters must be
     //! annotated with `#[serial]` to prevent data races when the test suite is
     //! executed with the default multi-threaded test runner.
     //! FIXME(`#148`): remove `#[serial]` once global statics are replaced with

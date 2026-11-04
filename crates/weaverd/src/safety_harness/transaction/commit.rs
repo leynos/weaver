@@ -29,17 +29,24 @@ pub(super) struct DeletePlan {
 /// Tracks files prepared for commit with their original content.
 #[derive(Debug)]
 struct PreparedFile {
+    /// Target path that the temporary file will replace on commit.
     path: PathBuf,
+    /// Temporary file holding the prepared content until rename.
     temp_path: PathBuf,
+    /// Original content captured for rollback.
     original: String,
+    /// Whether the target existed before the transaction began.
     existed: bool,
 }
 
 /// Tracks files committed during the transaction.
 #[derive(Debug)]
 struct CommittedFile {
+    /// Target path that has been committed.
     path: PathBuf,
+    /// Original content retained for rollback.
     original: String,
+    /// Whether the target existed before the transaction began.
     existed: bool,
 }
 
@@ -71,7 +78,7 @@ pub(super) struct CommitPlan<'a> {
 ///
 /// Rollback is best-effort: if a catastrophic failure occurs during rollback
 /// (e.g., disk removed), some files may remain in an inconsistent state.
-pub(super) fn commit_changes_with_deletes(plan: CommitPlan<'_>) -> Result<(), SafetyHarnessError> {
+pub(super) fn commit_changes_with_deletes(plan: &CommitPlan<'_>) -> Result<(), SafetyHarnessError> {
     // Phase 1: Prepare all files (write to temps)
     let mut prepared: Vec<PreparedFile> = Vec::new();
 
@@ -135,12 +142,14 @@ fn persist_prepared_files(
     Ok(committed)
 }
 
+/// Removes prepared temporary files left behind after a failed commit.
 fn cleanup_prepared_temp_files(dir: &Dir, prepared: &[PreparedFile]) {
     for prepared_file in prepared {
         cleanup_temp_file(dir, &prepared_file.temp_path);
     }
 }
 
+/// Removes a temporary file, treating an already-absent file as success.
 fn cleanup_temp_file(dir: &Dir, temp_path: &Path) {
     if let Err(err) = dir.remove_file(temp_path)
         && err.kind() != io::ErrorKind::NotFound
@@ -201,9 +210,9 @@ fn prepare_file(
             .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
         match write_temp_file(dir, temp_path.as_path(), content) {
             Ok(()) => return Ok(temp_path),
-            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
             Err(err) => {
-                let _ = dir.remove_file(temp_path.as_path());
+                drop(dir.remove_file(temp_path.as_path()));
                 return Err(SafetyHarnessError::file_write(path.to_path_buf(), err));
             }
         }
@@ -227,22 +236,22 @@ fn rollback_writes(dir: &Dir, workspace_root: &Path, committed: &[CommittedFile]
         let Ok(relative) = relative_workspace_path(&committed_file.path, workspace_root) else {
             continue;
         };
-        if !committed_file.existed {
-            // File was newly created, remove it
-            if let Err(err) = dir.remove_file(relative) {
-                warn!(
-                    path = %committed_file.path.display(),
-                    error = %err,
-                    "failed to rollback newly created file",
-                );
-            }
-        } else {
+        if committed_file.existed {
             // Restore original content (best effort)
             if let Err(err) = dir.write(relative, &committed_file.original) {
                 warn!(
                     path = %committed_file.path.display(),
                     error = %err,
                     "failed to rollback modified file",
+                );
+            }
+        } else {
+            // File was newly created, remove it
+            if let Err(err) = dir.remove_file(relative) {
+                warn!(
+                    path = %committed_file.path.display(),
+                    error = %err,
+                    "failed to rollback newly created file",
                 );
             }
         }
@@ -271,6 +280,7 @@ fn rollback_deletes_and_writes(
     rollback_writes(dir, workspace_root, committed);
 }
 
+/// Returns whether `path` exists inside the workspace capability.
 fn file_exists(dir: &Dir, workspace_root: &Path, path: &Path) -> Result<bool, SafetyHarnessError> {
     let relative = relative_workspace_path(path, workspace_root)
         .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
@@ -281,6 +291,7 @@ fn file_exists(dir: &Dir, workspace_root: &Path, path: &Path) -> Result<bool, Sa
     }
 }
 
+/// Writes `content` to a new temporary file and flushes it to disk.
 fn write_temp_file(dir: &Dir, temp_path: &Path, content: &str) -> io::Result<()> {
     let mut file = dir.open_with(temp_path, OpenOptions::new().write(true).create_new(true))?;
     file.write_all(content.as_bytes())?;
@@ -288,6 +299,7 @@ fn write_temp_file(dir: &Dir, temp_path: &Path, content: &str) -> io::Result<()>
     Ok(())
 }
 
+/// Builds a collision-resistant temporary path for `attempt` beside the target.
 fn unique_temp_path(relative: &Path, attempt: u8) -> io::Result<PathBuf> {
     let parent = relative.parent().unwrap_or_else(|| Path::new("."));
     let name = relative.file_name().ok_or_else(|| {
@@ -344,8 +356,8 @@ mod tests {
     fn cleanup_prepared_temp_files_handles_seeded_and_missing_temps(
         #[case] seed_temps: bool,
         workspace_dir: Result<(TempDir, Dir), String>,
-    ) -> Result<(), String> {
-        let (_tempdir, dir) = workspace_dir?;
+    ) {
+        let (_tempdir, dir) = workspace_dir.expect("create workspace fixture");
         let prepared = [
             prepared_file("first.txt", ".first.tmp"),
             prepared_file("second.txt", ".second.tmp"),
@@ -353,9 +365,9 @@ mod tests {
 
         if seed_temps {
             dir.write(".first.tmp", "first")
-                .map_err(|e| format!("write first temporary file: {e}"))?;
+                .expect("write first temporary file");
             dir.write(".second.tmp", "second")
-                .map_err(|e| format!("write second temporary file: {e}"))?;
+                .expect("write second temporary file");
         }
 
         cleanup_prepared_temp_files(&dir, &prepared);
@@ -368,6 +380,5 @@ mod tests {
             dir.metadata(".second.tmp"),
             Err(err) if err.kind() == io::ErrorKind::NotFound
         ));
-        Ok(())
     }
 }

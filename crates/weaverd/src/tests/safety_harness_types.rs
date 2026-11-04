@@ -1,4 +1,4 @@
-//! Domain-specific NewTypes for safety harness behavioural tests.
+//! Domain-specific `NewTypes` for safety harness behavioural tests.
 //!
 //! These types eliminate string-heavy function arguments and make the test
 //! domain model explicit and type-safe.
@@ -16,11 +16,11 @@ use derive_more::{AsRef, Deref};
 pub struct FileName(String);
 
 impl From<String> for FileName {
-    fn from(s: String) -> Self { Self(s.trim_matches('"').to_string()) }
+    fn from(s: String) -> Self { Self(s.trim_matches('"').to_owned()) }
 }
 
 impl From<&str> for FileName {
-    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_string()) }
+    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_owned()) }
 }
 
 impl FileName {
@@ -43,11 +43,11 @@ impl FromStr for FileName {
 pub struct FileContent(String);
 
 impl From<String> for FileContent {
-    fn from(s: String) -> Self { Self(s.trim_matches('"').to_string()) }
+    fn from(s: String) -> Self { Self(s.trim_matches('"').to_owned()) }
 }
 
 impl From<&str> for FileContent {
-    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_string()) }
+    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_owned()) }
 }
 
 impl FileContent {
@@ -70,11 +70,11 @@ impl FromStr for FileContent {
 pub struct TextPattern(String);
 
 impl From<String> for TextPattern {
-    fn from(s: String) -> Self { Self(s.trim_matches('"').to_string()) }
+    fn from(s: String) -> Self { Self(s.trim_matches('"').to_owned()) }
 }
 
 impl From<&str> for TextPattern {
-    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_string()) }
+    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_owned()) }
 }
 
 impl TextPattern {
@@ -94,11 +94,11 @@ impl FromStr for TextPattern {
 pub struct DiagnosticMessage(String);
 
 impl From<String> for DiagnosticMessage {
-    fn from(s: String) -> Self { Self(s.trim_matches('"').to_string()) }
+    fn from(s: String) -> Self { Self(s.trim_matches('"').to_owned()) }
 }
 
 impl From<&str> for DiagnosticMessage {
-    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_string()) }
+    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_owned()) }
 }
 
 impl DiagnosticMessage {

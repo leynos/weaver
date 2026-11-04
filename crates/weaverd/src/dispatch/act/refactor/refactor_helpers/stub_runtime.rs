@@ -70,11 +70,38 @@ fn refused_candidates(
         .collect()
 }
 
-fn provider_for_auto(mode: RoutingMode) -> &'static str {
+/// Resolution plan implied by one stub routing mode.
+///
+/// Keeping this total avoids an unreachable fallback: every mode states
+/// whether it selects a provider, and what refusal it reports otherwise.
+struct RoutingPlan {
+    provider: Option<&'static str>,
+    refusal_reason: RefusalReason,
+    candidate_reason: CandidateReason,
+}
+
+fn routing_plan(mode: RoutingMode) -> RoutingPlan {
     match mode {
-        RoutingMode::AutomaticPython => "rope",
-        RoutingMode::AutomaticRust => "rust-analyzer",
-        _ => unreachable!("provider_for_auto is only for automatic modes"),
+        RoutingMode::AutomaticPython => RoutingPlan {
+            provider: Some("rope"),
+            refusal_reason: RefusalReason::UnsupportedLanguage,
+            candidate_reason: CandidateReason::UnsupportedLanguage,
+        },
+        RoutingMode::AutomaticRust => RoutingPlan {
+            provider: Some("rust-analyzer"),
+            refusal_reason: RefusalReason::UnsupportedLanguage,
+            candidate_reason: CandidateReason::UnsupportedLanguage,
+        },
+        RoutingMode::UnsupportedLanguage => RoutingPlan {
+            provider: None,
+            refusal_reason: RefusalReason::UnsupportedLanguage,
+            candidate_reason: CandidateReason::UnsupportedLanguage,
+        },
+        RoutingMode::ExplicitProviderMismatch => RoutingPlan {
+            provider: None,
+            refusal_reason: RefusalReason::ExplicitProviderMismatch,
+            candidate_reason: CandidateReason::NotRequested,
+        },
     }
 }
 
@@ -97,35 +124,27 @@ impl RefactorPluginRuntime for StubRuntime {
             selection_mode,
         };
 
-        Ok(match self.routing {
-            mode @ (RoutingMode::AutomaticPython | RoutingMode::AutomaticRust) => {
+        let plan = routing_plan(self.routing);
+        Ok(plan.provider.map_or_else(
+            || {
+                refused_resolution(RefusedResolution {
+                    capability: request.capability(),
+                    language: language_name,
+                    requested_provider,
+                    selection_mode,
+                    refusal_reason: plan.refusal_reason,
+                    candidates: refused_candidates(requested_provider, plan.candidate_reason),
+                })
+            },
+            |provider| {
                 resolve_auto_language(
-                    auto_context,
+                    &auto_context,
                     language_name,
-                    provider_for_auto(mode),
+                    provider,
                     refused_candidates(requested_provider, CandidateReason::UnsupportedLanguage),
                 )
-            }
-            RoutingMode::UnsupportedLanguage => refused_resolution(RefusedResolution {
-                capability: request.capability(),
-                language: language_name,
-                requested_provider,
-                selection_mode,
-                refusal_reason: RefusalReason::UnsupportedLanguage,
-                candidates: refused_candidates(
-                    requested_provider,
-                    CandidateReason::UnsupportedLanguage,
-                ),
-            }),
-            RoutingMode::ExplicitProviderMismatch => refused_resolution(RefusedResolution {
-                capability: request.capability(),
-                language: language_name,
-                requested_provider,
-                selection_mode,
-                refusal_reason: RefusalReason::ExplicitProviderMismatch,
-                candidates: refused_candidates(requested_provider, CandidateReason::NotRequested),
-            }),
-        })
+            },
+        ))
     }
 
     fn execute(

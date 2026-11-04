@@ -64,7 +64,7 @@ impl DaemonMessage {
     }
 
     /// Creates an exit message with the given status code.
-    pub fn exit(status: i32) -> Self { Self::Exit { status } }
+    pub const fn exit(status: i32) -> Self { Self::Exit { status } }
 }
 
 /// Writer that serializes daemon messages to a stream.
@@ -72,27 +72,36 @@ impl DaemonMessage {
 /// The writer handles JSONL framing (appending newlines) and provides
 /// convenience methods for common message patterns.
 pub struct ResponseWriter<W> {
+    /// Destination stream that receives the framed JSONL payloads.
     writer: W,
 }
 
+/// JSON payload describing an unrecognized operation to the client.
 #[derive(Debug, Serialize)]
 struct UnknownOperationPayload<'a> {
+    /// Literal status marker rendered as `"error"` on the wire.
     status: &'static str,
+    /// Wire discriminator identifying the payload kind.
     #[serde(rename = "type")]
     kind: &'static str,
+    /// Structured detail naming the offending operation.
     details: UnknownOperationDetails<'a>,
 }
 
+/// Details of an unrecognized operation, including the operations that are known.
 #[derive(Debug, Serialize)]
 struct UnknownOperationDetails<'a> {
+    /// Domain in which the operation was requested.
     domain: &'a str,
+    /// Operation token supplied by the client.
     operation: &'a str,
+    /// Operations the domain recognizes.
     known_operations: &'a [&'static str],
 }
 
 impl<W: Write> ResponseWriter<W> {
     /// Creates a new response writer wrapping the given output stream.
-    pub fn new(writer: W) -> Self { Self { writer } }
+    pub const fn new(writer: W) -> Self { Self { writer } }
 
     /// Writes a daemon message as a JSONL line.
     ///
@@ -169,6 +178,12 @@ impl<W: Write> ResponseWriter<W> {
         self.write_exit(error.exit_status())
     }
 
+    /// Writes the structured unknown-operation error payload to stderr.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serializing the payload or writing it to the
+    /// response stream fails.
     fn write_unknown_operation_error(
         &mut self,
         domain: &str,
@@ -195,11 +210,14 @@ where
     T: DeserializeOwned,
 {
     let envelope: serde_json::Value = serde_json::from_str(line).ok()?;
-    if envelope["kind"] != "stream" || envelope["stream"] != "stderr" {
+    let kind = envelope.get("kind").and_then(serde_json::Value::as_str);
+    let stream = envelope.get("stream").and_then(serde_json::Value::as_str);
+    if kind != Some("stream") || stream != Some("stderr") {
         return None;
     }
-    envelope["data"]
-        .as_str()
+    envelope
+        .get("data")
+        .and_then(serde_json::Value::as_str)
         .and_then(|data| serde_json::from_str::<T>(data).ok())
 }
 
@@ -271,12 +289,25 @@ mod tests {
             .lines()
             .find_map(parse_stderr_json_payload::<serde_json::Value>)
             .expect("unknown-operation payload");
-        assert_eq!(payload["type"], UNKNOWN_OPERATION_TYPE);
-        assert_eq!(payload["details"]["domain"], "observe");
-        assert_eq!(payload["details"]["operation"], "bogus");
         assert_eq!(
-            payload["details"]["known_operations"],
-            serde_json::json!(["get-definition", "find-references"])
+            payload.pointer("/type").and_then(serde_json::Value::as_str),
+            Some(UNKNOWN_OPERATION_TYPE)
+        );
+        assert_eq!(
+            payload
+                .pointer("/details/domain")
+                .and_then(serde_json::Value::as_str),
+            Some("observe")
+        );
+        assert_eq!(
+            payload
+                .pointer("/details/operation")
+                .and_then(serde_json::Value::as_str),
+            Some("bogus")
+        );
+        assert_eq!(
+            payload.pointer("/details/known_operations"),
+            Some(&serde_json::json!(["get-definition", "find-references"]))
         );
         assert!(response.contains(r#""status":1"#));
     }

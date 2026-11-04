@@ -21,9 +21,16 @@ fn bootstrap_does_not_eagerly_start_backends() -> Result<(), String> {
     bootstrap_with(&loader, reporter.clone(), provider.clone()).expect("bootstrap should succeed");
 
     let events = reporter.events();
-    assert!(events.contains(&HealthEvent::BootstrapStarting));
-    assert!(events.contains(&HealthEvent::BootstrapSucceeded));
-    assert!(provider.recorded_starts().is_empty());
+    if !events.contains(&HealthEvent::BootstrapStarting) {
+        return Err(format!("missing bootstrap start event: {events:?}"));
+    }
+    if !events.contains(&HealthEvent::BootstrapSucceeded) {
+        return Err(format!("missing bootstrap success event: {events:?}"));
+    }
+    let starts = provider.recorded_starts();
+    if !starts.is_empty() {
+        return Err(format!("expected no backend starts, got: {starts:?}"));
+    }
     Ok(())
 }
 
@@ -38,10 +45,17 @@ fn ensure_backend_starts_on_demand() -> Result<(), String> {
     daemon
         .ensure_backend(BackendKind::Semantic)
         .expect("backend should start");
-    assert_eq!(provider.recorded_starts(), vec![BackendKind::Semantic]);
+    let starts = provider.recorded_starts();
+    if starts != vec![BackendKind::Semantic] {
+        return Err(format!("expected semantic backend start, got: {starts:?}"));
+    }
     let events = reporter.events();
-    assert!(events.contains(&HealthEvent::BackendStarting(BackendKind::Semantic)));
-    assert!(events.contains(&HealthEvent::BackendReady(BackendKind::Semantic)));
+    if !events.contains(&HealthEvent::BackendStarting(BackendKind::Semantic)) {
+        return Err(format!("missing backend start event: {events:?}"));
+    }
+    if !events.contains(&HealthEvent::BackendReady(BackendKind::Semantic)) {
+        return Err(format!("missing backend ready event: {events:?}"));
+    }
     Ok(())
 }
 
@@ -57,11 +71,16 @@ fn ensure_backend_propagates_failures() -> Result<(), String> {
     let error = daemon
         .ensure_backend(BackendKind::Relational)
         .expect_err("backend should fail");
-    assert_eq!(error.kind, BackendKind::Relational);
+    if error.kind != BackendKind::Relational {
+        return Err(format!("expected relational backend error, got: {error:?}"));
+    }
     let events = reporter.events();
-    assert!(events.contains(&HealthEvent::BackendFailed {
+    let failure_event = HealthEvent::BackendFailed {
         kind: BackendKind::Relational,
         message: "deliberate failure".to_owned(),
-    }));
+    };
+    if !events.contains(&failure_event) {
+        return Err(format!("missing backend failure event: {events:?}"));
+    }
     Ok(())
 }

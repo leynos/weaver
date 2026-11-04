@@ -28,22 +28,30 @@ use weaver_config::SocketEndpoint;
 use super::listener_unix::{bind_unix, cleanup_unix_socket};
 use super::{ConnectionHandler, ConnectionStream, LISTENER_TARGET, ListenerError};
 
+/// Delay before retrying an accept call that would block.
 const ACCEPT_BACKOFF: Duration = Duration::from_millis(25);
+/// Delay before retrying after an accept error.
 const ERROR_BACKOFF: Duration = Duration::from_millis(150);
+/// Maximum number of handler threads that may run concurrently.
 const MAX_HANDLER_THREADS: usize = 128;
+/// Read timeout applied to accepted connection streams.
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Listener that binds to a socket endpoint and spawns a background accept loop.
 #[derive(Debug)]
 pub(crate) struct SocketListener {
+    /// Endpoint the listener is bound to, used for cleanup.
     endpoint: SocketEndpoint,
+    /// Bound transport-specific listener.
     listener: ListenerKind,
 }
 
 /// Bound socket variants backed by TCP or Unix transports.
 #[derive(Debug)]
 enum ListenerKind {
+    /// Bound TCP listener.
     Tcp(TcpListener),
+    /// Bound Unix-domain listener.
     #[cfg(unix)]
     Unix(UnixListener),
 }
@@ -118,7 +126,7 @@ impl SocketListener {
             return Err(ListenerError::NonBlocking { source: error });
         }
         let shutdown_flag = Arc::clone(&shutdown);
-        let handle = thread::spawn(move || run_accept_loop(&mut self, shutdown_flag, handler));
+        let handle = thread::spawn(move || run_accept_loop(&mut self, &shutdown_flag, &handler));
         Ok(ListenerHandle {
             shutdown,
             handle: Some(handle),
@@ -137,7 +145,9 @@ impl Drop for SocketListener {
 ///
 /// Use this handle to signal shutdown and wait for the accept loop to stop.
 pub(crate) struct ListenerHandle {
+    /// Flag shared with the accept loop to request shutdown.
     shutdown: Arc<AtomicBool>,
+    /// Join handle for the background accept loop, if still running.
     handle: Option<thread::JoinHandle<()>>,
 }
 
@@ -149,14 +159,9 @@ impl ListenerHandle {
     ///
     /// Returns an error if the background thread panics.
     pub(crate) fn join(mut self) -> Result<(), ListenerError> {
-        if let Some(handle) = self.handle.take() {
-            match handle.join() {
-                Ok(()) => Ok(()),
-                Err(_) => Err(ListenerError::ThreadPanic),
-            }
-        } else {
-            Ok(())
-        }
+        self.handle.take().map_or(Ok(()), |handle| {
+            handle.join().map_err(|_| ListenerError::ThreadPanic)
+        })
     }
 }
 
@@ -174,12 +179,16 @@ impl Drop for ListenerHandle {
     }
 }
 
+/// Tracks and caps the number of concurrently active handler threads.
 struct HandlerLimiter {
+    /// Number of handler permits currently held.
     active: Arc<AtomicUsize>,
+    /// Maximum number of permits that may be held at once.
     max: usize,
 }
 
 impl HandlerLimiter {
+    /// Creates a limiter that admits at most `max` concurrent handlers.
     fn new(max: usize) -> Self {
         Self {
             active: Arc::new(AtomicUsize::new(0)),
@@ -187,6 +196,7 @@ impl HandlerLimiter {
         }
     }
 
+    /// Attempts to reserve a handler slot, returning `None` at capacity.
     fn try_acquire(&self) -> Option<HandlerPermit> {
         let mut current = self.active.load(Ordering::SeqCst);
         loop {
@@ -206,22 +216,26 @@ impl HandlerLimiter {
     }
 }
 
+/// Permit that releases a handler slot when dropped.
 struct HandlerPermit {
+    /// Counter shared with the limiter that issued this permit.
     active: Arc<AtomicUsize>,
 }
 
 impl HandlerPermit {
-    fn new(active: Arc<AtomicUsize>) -> Self { Self { active } }
+    /// Creates a permit tied to the limiter's active-handler counter.
+    const fn new(active: Arc<AtomicUsize>) -> Self { Self { active } }
 }
 
 impl Drop for HandlerPermit {
     fn drop(&mut self) { self.active.fetch_sub(1, Ordering::SeqCst); }
 }
 
+/// Runs the blocking accept loop until the shutdown flag is set.
 fn run_accept_loop(
     listener: &mut SocketListener,
-    shutdown: Arc<AtomicBool>,
-    handler: Arc<dyn ConnectionHandler>,
+    shutdown: &Arc<AtomicBool>,
+    handler: &Arc<dyn ConnectionHandler>,
 ) {
     info!(
         target: LISTENER_TARGET,
@@ -231,7 +245,7 @@ fn run_accept_loop(
     let mut last_error = None::<io::ErrorKind>;
     let limiter = HandlerLimiter::new(MAX_HANDLER_THREADS);
     while !shutdown.load(Ordering::SeqCst) {
-        if let Some(delay) = handle_accept_cycle(listener, &handler, &limiter, &mut last_error) {
+        if let Some(delay) = handle_accept_cycle(listener, handler, &limiter, &mut last_error) {
             thread::sleep(delay);
         }
     }
@@ -240,6 +254,7 @@ fn run_accept_loop(
     cleanup_unix_socket(&listener.endpoint);
 }
 
+/// Performs one accept attempt and returns the delay to apply before retrying.
 fn handle_accept_cycle(
     listener: &mut SocketListener,
     handler: &Arc<dyn ConnectionHandler>,
@@ -247,24 +262,28 @@ fn handle_accept_cycle(
     last_error: &mut Option<io::ErrorKind>,
 ) -> Option<Duration> {
     match accept_connection(listener) {
-        Ok(Some(stream)) => handle_accepted_stream(stream, handler, limiter, last_error),
+        Ok(Some(stream)) => {
+            handle_accepted_stream(stream, handler, limiter, last_error);
+            None
+        }
         Ok(None) => Some(ACCEPT_BACKOFF),
-        Err(error) => handle_accept_error(error, last_error),
+        Err(error) => Some(handle_accept_error(&error, last_error)),
     }
 }
 
+/// Spawns a handler for an accepted stream, or drops it at capacity.
 fn handle_accepted_stream(
     stream: ConnectionStream,
     handler: &Arc<dyn ConnectionHandler>,
     limiter: &HandlerLimiter,
     last_error: &mut Option<io::ErrorKind>,
-) -> Option<Duration> {
+) {
     *last_error = None;
     if let Some(permit) = limiter.try_acquire() {
-        let handler = Arc::clone(handler);
+        let connection_handler = Arc::clone(handler);
         thread::spawn(move || {
             let _permit = permit;
-            handler.handle(stream);
+            connection_handler.handle(stream);
         });
     } else {
         warn!(
@@ -273,13 +292,10 @@ fn handle_accepted_stream(
             "listener at capacity, dropping connection"
         );
     }
-    None
 }
 
-fn handle_accept_error(
-    error: io::Error,
-    last_error: &mut Option<io::ErrorKind>,
-) -> Option<Duration> {
+/// Logs a new accept error kind and returns the retry delay.
+fn handle_accept_error(error: &io::Error, last_error: &mut Option<io::ErrorKind>) -> Duration {
     let kind = error.kind();
     if *last_error != Some(kind) {
         warn!(
@@ -289,7 +305,7 @@ fn handle_accept_error(
         );
     }
     *last_error = Some(kind);
-    Some(ERROR_BACKOFF)
+    ERROR_BACKOFF
 }
 
 /// Configures a TCP stream for blocking operation with read timeout.
@@ -319,6 +335,7 @@ fn handle_accept_result<T, A>(
     }
 }
 
+/// Accepts one pending connection, returning `None` when none is ready.
 fn accept_connection(listener: &mut SocketListener) -> Result<Option<ConnectionStream>, io::Error> {
     match &listener.listener {
         ListenerKind::Tcp(tcp) => handle_accept_result(tcp.accept(), configure_tcp_stream),
@@ -327,16 +344,17 @@ fn accept_connection(listener: &mut SocketListener) -> Result<Option<ConnectionS
     }
 }
 
+/// Resolves `host` and `port` and binds a TCP listener to the first address.
 fn bind_tcp(host: &str, port: u16) -> Result<TcpListener, ListenerError> {
     let mut addrs = (host, port)
         .to_socket_addrs()
         .map_err(|source| ListenerError::Resolve {
-            host: host.to_string(),
+            host: host.to_owned(),
             port,
             source,
         })?;
     let addr = addrs.next().ok_or_else(|| ListenerError::ResolveEmpty {
-        host: host.to_string(),
+        host: host.to_owned(),
         port,
     })?;
     TcpListener::bind(addr).map_err(|source| ListenerError::BindTcp { addr, source })

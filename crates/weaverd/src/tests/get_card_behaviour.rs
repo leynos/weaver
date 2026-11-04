@@ -94,7 +94,7 @@ impl GetCardWorld {
         Ok(())
     }
 
-    fn send_get_card(&mut self, request_params: GetCardRequest<'_>) -> Result<()> {
+    fn send_get_card(&mut self, request_params: &GetCardRequest<'_>) -> Result<()> {
         let uri = self
             .uris
             .get(request_params.key)
@@ -131,7 +131,7 @@ impl GetCardWorld {
             .context("read response")?
             > 0
         {
-            self.response_lines.push(line_buffer.trim().to_string());
+            self.response_lines.push(line_buffer.trim().to_owned());
             line_buffer.clear();
         }
         Ok(())
@@ -235,7 +235,7 @@ fn given_empty_python_fixture(world: &GetCardWorldFixture) -> Result<()> {
 fn when_request_rust_fixture(world: &GetCardWorldFixture) -> Result<()> {
     get_card_world(world)?
         .borrow_mut()
-        .send_get_card(GetCardRequest {
+        .send_get_card(&GetCardRequest {
             key: "rust",
             line: 2,
             column: 4,
@@ -248,7 +248,7 @@ fn when_request_rust_fixture(world: &GetCardWorldFixture) -> Result<()> {
 fn when_request_rust_fixture_semantic(world: &GetCardWorldFixture) -> Result<()> {
     get_card_world(world)?
         .borrow_mut()
-        .send_get_card(GetCardRequest {
+        .send_get_card(&GetCardRequest {
             key: "rust",
             line: 2,
             column: 4,
@@ -261,7 +261,7 @@ fn when_request_rust_fixture_semantic(world: &GetCardWorldFixture) -> Result<()>
 fn when_request_unsupported_fixture(world: &GetCardWorldFixture) -> Result<()> {
     get_card_world(world)?
         .borrow_mut()
-        .send_get_card(GetCardRequest {
+        .send_get_card(&GetCardRequest {
             key: "text",
             line: 1,
             column: 1,
@@ -274,7 +274,7 @@ fn when_request_unsupported_fixture(world: &GetCardWorldFixture) -> Result<()> {
 fn when_request_empty_fixture(world: &GetCardWorldFixture) -> Result<()> {
     get_card_world(world)?
         .borrow_mut()
-        .send_get_card(GetCardRequest {
+        .send_get_card(&GetCardRequest {
             key: "empty",
             line: 1,
             column: 1,
@@ -301,10 +301,10 @@ fn when_rewrite_rust_fixture(world: &GetCardWorldFixture, name: String) -> Resul
 #[then(r#"the stdout response contains "{fragment}""#)]
 fn then_stdout_contains(world: &GetCardWorldFixture, fragment: String) -> Result<()> {
     let state = get_card_world(world)?;
-    let fragment = fragment.trim_matches('"');
+    let expected_fragment = fragment.trim_matches('"');
     assert!(
-        state.borrow().stdout_contains(fragment),
-        "expected stdout to contain {fragment:?}, got {:?}",
+        state.borrow().stdout_contains(expected_fragment),
+        "expected stdout to contain {expected_fragment:?}, got {:?}",
         state.borrow().response_lines
     );
     Ok(())
@@ -338,10 +338,10 @@ fn then_both_responses_identical(world: &GetCardWorldFixture) -> Result<()> {
 #[then(r#"the latest stdout response contains "{fragment}""#)]
 fn then_latest_stdout_contains(world: &GetCardWorldFixture, fragment: String) -> Result<()> {
     let state = get_card_world(world)?;
-    let fragment = fragment.trim_matches('"');
+    let expected_fragment = fragment.trim_matches('"');
     assert!(
-        state.borrow().latest_stdout_contains(fragment),
-        "expected latest stdout to contain {fragment:?}, got {:?}",
+        state.borrow().latest_stdout_contains(expected_fragment),
+        "expected latest stdout to contain {expected_fragment:?}, got {:?}",
         state.borrow().response_lines
     );
     Ok(())

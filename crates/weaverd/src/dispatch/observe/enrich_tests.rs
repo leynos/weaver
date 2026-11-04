@@ -11,6 +11,7 @@ use super::{
         assert_enrichment_degrades,
         assert_lsp_info,
         check_utf16_offset,
+        ensure,
         run_non_ascii_enrichment,
         rust_card,
     },
@@ -41,8 +42,14 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() -> Result<(), St
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
 
-    assert_eq!(outcome, EnrichmentOutcome::Enriched);
-    assert!(backends.is_started(BackendKind::Semantic));
+    ensure(
+        outcome == EnrichmentOutcome::Enriched,
+        format!("expected enriched outcome, got {outcome:?}"),
+    )?;
+    ensure(
+        backends.is_started(BackendKind::Semantic),
+        "expected the semantic backend to be started",
+    )?;
 
     let lsp = card.lsp.expect("card should contain LSP enrichment");
     assert_lsp_info(
@@ -93,10 +100,13 @@ impl DegradedServerCase {
 fn try_lsp_enrichment_degrades(#[case] case: DegradedServerCase) -> Result<(), String> {
     let (server, should_start_backend) = case.build();
     let (backends, _dir) = assert_enrichment_degrades(server)?;
-    assert_eq!(
-        backends.is_started(BackendKind::Semantic),
-        should_start_backend
-    );
+    ensure(
+        backends.is_started(BackendKind::Semantic) == should_start_backend,
+        format!(
+            "expected semantic backend started={should_start_backend}, got {}",
+            backends.is_started(BackendKind::Semantic)
+        ),
+    )?;
     Ok(())
 }
 
@@ -156,8 +166,8 @@ fn handles_empty_hover_contents() {
 
     let info = parse_hover_response(&hover);
 
-    assert!(info.hover.is_empty());
-    assert!(info.type_info.is_empty());
+    assert_eq!(info.hover, "");
+    assert_eq!(info.type_info, "");
     assert!(!info.deprecated);
 }
 
@@ -244,7 +254,10 @@ fn try_lsp_enrichment_with_non_ascii_source() -> Result<(), String> {
     let caps = ServerCapabilitySet::new(false, false, false).with_hover(true);
     let character = run_non_ascii_enrichment(caps)?;
     // 'é' saves one position: byte offset 12 → UTF-16 offset 11
-    assert_eq!(character, 11);
+    ensure(
+        character == 11,
+        format!("expected UTF-16 character 11, got {character}"),
+    )?;
     Ok(())
 }
 
@@ -255,6 +268,9 @@ fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() -> Result<(), Stri
         .with_position_encoding(Some(lsp_types::PositionEncodingKind::UTF8));
     let character = run_non_ascii_enrichment(caps)?;
     // UTF-8 negotiated: byte offset 12 is passed through unchanged
-    assert_eq!(character, 12);
+    ensure(
+        character == 12,
+        format!("expected UTF-8 character 12, got {character}"),
+    )?;
     Ok(())
 }

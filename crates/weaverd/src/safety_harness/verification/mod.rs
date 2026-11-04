@@ -101,6 +101,10 @@ pub trait SyntacticLock: Send + Sync {
 /// reporting any new errors or high-severity warnings.
 pub trait SemanticLock: Send + Sync {
     /// Validates that no new errors were introduced by the changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the semantic backend is unavailable.
     fn validate(
         &self,
         context: &VerificationContext,
@@ -150,8 +154,8 @@ mod tests {
         let mut ctx = VerificationContext::new();
         let path = PathBuf::from("/test.rs");
 
-        ctx.add_original(path.clone(), "fn main() {}".to_string());
-        ctx.add_modified(path.clone(), "fn main() { todo!() }".to_string());
+        ctx.add_original(path.clone(), "fn main() {}".to_owned());
+        ctx.add_modified(path.clone(), "fn main() { todo!() }".to_owned());
 
         assert_eq!(
             ctx.original(&path).map(String::as_str),

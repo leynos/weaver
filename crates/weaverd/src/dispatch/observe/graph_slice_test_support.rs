@@ -41,9 +41,9 @@ pub(crate) fn write_source(
     name: &str,
     content: &str,
 ) -> Result<Utf8PathBuf, String> {
-    let path = temp_dir.path().join(name);
-    let path = Utf8PathBuf::from_path_buf(path)
-        .map_err(|path| format!("fixture path should be UTF-8: {path:?}"))?;
+    let raw_path = temp_dir.path().join(name);
+    let path = Utf8PathBuf::from_path_buf(raw_path)
+        .map_err(|rejected| format!("fixture path should be UTF-8: {rejected:?}"))?;
     test_fs::write(&path, content).map_err(|error| error.to_string())?;
     Ok(path)
 }
@@ -69,13 +69,13 @@ pub(crate) fn response_payload(output: Vec<u8>) -> Result<Value, String> {
                 envelope
                     .get("data")
                     .and_then(|value| value.as_str())
-                    .ok_or_else(|| "stdout data".to_string())?
+                    .ok_or_else(|| "stdout data".to_owned())?
                     .to_owned(),
             );
             break;
         }
     }
-    let data = stdout_data.ok_or_else(|| "no stdout envelope".to_string())?;
+    let data = stdout_data.ok_or_else(|| "no stdout envelope".to_owned())?;
     serde_json::from_str(&data).map_err(|error| format!("payload: {error}"))
 }
 
@@ -85,7 +85,6 @@ pub(crate) fn detail_value(detail: DetailLevel) -> &'static str {
         DetailLevel::Signature => "signature",
         DetailLevel::Structure => "structure",
         DetailLevel::Semantic => "semantic",
-        DetailLevel::Full => "full",
         _ => "full",
     }
 }
@@ -113,7 +112,7 @@ pub(crate) struct SourceRequest<'a> {
 pub(crate) fn prepare_request(source: &SourceRequest<'_>) -> Result<CommandRequest, String> {
     let path = write_source(source.temp_dir, source.filename, source.content)?;
     let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
+        .map_err(|()| "file uri".to_owned())?
         .to_string();
     let mut arguments = vec!["--uri", uri.as_str()];
     arguments.extend_from_slice(source.arguments);

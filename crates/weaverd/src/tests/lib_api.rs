@@ -24,9 +24,16 @@ fn bootstrap_with_reexport_initialises_daemon() -> Result<(), String> {
         .map_err(|error| format!("bootstrap should succeed: {error}"))?;
 
     let events = reporter.events();
-    assert!(events.contains(&HealthEvent::BootstrapStarting));
-    assert!(events.contains(&HealthEvent::BootstrapSucceeded));
-    assert!(provider.recorded_starts().is_empty());
+    if !events.contains(&HealthEvent::BootstrapStarting) {
+        return Err(format!("missing bootstrap start event: {events:?}"));
+    }
+    if !events.contains(&HealthEvent::BootstrapSucceeded) {
+        return Err(format!("missing bootstrap success event: {events:?}"));
+    }
+    let starts = provider.recorded_starts();
+    if !starts.is_empty() {
+        return Err(format!("expected no backend starts, got: {starts:?}"));
+    }
     Ok(())
 }
 
@@ -41,6 +48,9 @@ fn daemon_reexport_controls_backends() -> Result<(), String> {
     daemon
         .ensure_backend(BackendKind::Semantic)
         .map_err(|error| format!("backend should start: {error}"))?;
-    assert_eq!(provider.recorded_starts(), vec![BackendKind::Semantic]);
+    let starts = provider.recorded_starts();
+    if starts != vec![BackendKind::Semantic] {
+        return Err(format!("expected semantic backend start, got: {starts:?}"));
+    }
     Ok(())
 }
