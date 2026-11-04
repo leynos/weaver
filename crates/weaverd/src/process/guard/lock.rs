@@ -290,14 +290,17 @@ fn unlock_windows_file(file: &File) -> io::Result<()> {
 }
 
 fn is_lock_unavailable(error: &io::Error) -> bool {
-    if error.kind() == io::ErrorKind::WouldBlock {
-        return true;
-    }
+    let is_would_block = error.kind() == io::ErrorKind::WouldBlock;
     #[cfg(target_os = "solaris")]
-    if error.raw_os_error() == Some(nix::errno::Errno::EACCES as i32) {
-        return true;
+    {
+        // Solaris reports a held `fcntl` lock as `EACCES` rather than
+        // `EWOULDBLOCK`.
+        is_would_block || error.raw_os_error() == Some(nix::errno::Errno::EACCES as i32)
     }
-    false
+    #[cfg(not(target_os = "solaris"))]
+    {
+        is_would_block
+    }
 }
 
 pub(super) fn acquire_process_lock(paths: &RuntimePaths) -> Result<ProcessLock, LaunchError> {
