@@ -27,7 +27,7 @@ pub(super) fn atomic_write(dir: &Dir, filename: &Path, contents: &[u8]) -> io::R
         let temp_name = unique_temp_name(filename, attempt)?;
         match write_temp_file(dir, temp_name.as_path(), contents) {
             Ok(()) => return persist_temp_file(dir, temp_name.as_path(), filename),
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
             Err(error) => {
                 dir.remove_file(temp_name.as_path()).ok();
                 return Err(error);
@@ -40,6 +40,10 @@ pub(super) fn atomic_write(dir: &Dir, filename: &Path, contents: &[u8]) -> io::R
     ))
 }
 
+/// Creates a fresh temporary file and writes `contents` to it.
+///
+/// The file is created exclusively, so an existing temporary name is reported
+/// as [`io::ErrorKind::AlreadyExists`] rather than truncated.
 fn write_temp_file(dir: &Dir, temp_name: &Path, contents: &[u8]) -> io::Result<()> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
@@ -54,6 +58,7 @@ fn write_temp_file(dir: &Dir, temp_name: &Path, contents: &[u8]) -> io::Result<(
     Ok(())
 }
 
+/// Renames the temporary file over `filename`, removing it if the rename fails.
 fn persist_temp_file(dir: &Dir, temp_name: &Path, filename: &Path) -> io::Result<()> {
     let write_result = dir.rename(temp_name, dir, filename);
     if write_result.is_err() {
@@ -62,6 +67,10 @@ fn persist_temp_file(dir: &Dir, temp_name: &Path, filename: &Path) -> io::Result
     write_result
 }
 
+/// Builds a hidden temporary name derived from the clock, process, and attempt.
+///
+/// The attempt counter lets the caller retry when a colliding name already
+/// exists.
 fn unique_temp_name(filename: &Path, attempt: u8) -> io::Result<PathBuf> {
     let name = filename.file_name().ok_or_else(|| {
         io::Error::new(

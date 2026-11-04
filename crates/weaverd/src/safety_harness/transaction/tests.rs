@@ -30,10 +30,9 @@ fn failure_scenario_builder() -> Result<TransactionTestBuilder, String> {
 }
 
 /// Asserts that the file at the given path contains "hello world".
-fn assert_file_unchanged(path: &Path) -> Result<(), String> {
-    let content = read_file(path)?;
+fn assert_file_unchanged(path: &Path) {
+    let content = read_file(path).expect("read file");
     assert_eq!(content, "hello world");
-    Ok(())
 }
 
 /// Tests lock failure scenarios, eliminating duplication between syntactic and semantic tests.
@@ -53,7 +52,7 @@ where
     let outcome = result.map_err(|e| format!("should succeed: {e}"))?;
 
     verify_outcome(&outcome);
-    assert_file_unchanged(&path)?;
+    assert_file_unchanged(&path);
     Ok(())
 }
 
@@ -108,7 +107,7 @@ impl TransactionTestBuilder {
     /// Creates a file with the given content and adds it to the tracked files.
     fn with_file(mut self, name: &str, content: &str) -> Result<Self, String> {
         let path = temp_file(&self.dir, name, content).map_err(|e| format!("temp file: {e}"))?;
-        self.files.push((path, content.to_string()));
+        self.files.push((path, content.to_owned()));
         Ok(self)
     }
 
@@ -121,7 +120,11 @@ impl TransactionTestBuilder {
 
     /// Adds a replacement edit for the file at the given index.
     fn with_replacement_edit(mut self, file_idx: usize, replacement: LineReplacement) -> Self {
-        let path = self.files[file_idx].0.clone();
+        let path = self
+            .files
+            .get(file_idx)
+            .map(|(path, _)| path.clone())
+            .expect("file index should exist");
         let edit = FileEdit::with_edits(
             path,
             vec![TextEdit::from_positions(
@@ -136,19 +139,28 @@ impl TransactionTestBuilder {
 
     /// Adds an insert edit for the file at the given index.
     fn with_insert_edit(mut self, file_idx: usize, text: &str) -> Self {
-        let path = self.files[file_idx].0.clone();
+        let path = self
+            .files
+            .get(file_idx)
+            .map(|(path, _)| path.clone())
+            .expect("file index should exist");
         let edit = FileEdit::with_edits(path, vec![TextEdit::insert_at(Position::new(0, 0), text)]);
         self.edits.push(edit);
         self
     }
 
     /// Returns a reference to a file path by index.
-    fn file_path(&self, idx: usize) -> &PathBuf { &self.files[idx].0 }
+    fn file_path(&self, idx: usize) -> &PathBuf {
+        self.files
+            .get(idx)
+            .map(|(path, _)| path)
+            .expect("file index should exist")
+    }
 
     /// Executes the transaction with the given locks and returns the outcome.
     ///
-    /// The builder is consumed but the TempDir is returned to keep the files alive.
-    /// The TempDir is always returned, even on error.
+    /// The builder is consumed but the `TempDir` is returned to keep the files alive.
+    /// The `TempDir` is always returned, even on error.
     fn execute_with_locks(
         self,
         syntactic: &dyn SyntacticLock,
@@ -166,44 +178,47 @@ impl TransactionTestBuilder {
 }
 
 #[test]
-fn empty_transaction_returns_no_changes() -> Result<(), String> {
+fn empty_transaction_returns_no_changes() {
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::passing();
     let transaction = EditTransaction::new(&syntactic, &semantic);
-    let dir = TempDir::new().map_err(|e| format!("create temp dir: {e}"))?;
-    let workspace_dir = open_workspace_dir(dir.path())?;
+    let dir = TempDir::new().expect("create temp dir");
+    let workspace_dir = open_workspace_dir(dir.path()).expect("open workspace dir");
 
     let outcome = transaction
         .execute(&workspace_dir, dir.path())
-        .map_err(|e| format!("should succeed: {e}"))?;
+        .expect("should succeed");
     assert!(matches!(outcome, TransactionOutcome::NoChanges));
-    Ok(())
 }
 
 #[test]
-fn successful_transaction_commits_changes() -> Result<(), String> {
-    let builder = TransactionTestBuilder::new()?
-        .with_file("test.txt", "hello world")?
+fn successful_transaction_commits_changes() {
+    let builder = TransactionTestBuilder::new()
+        .expect("create builder")
+        .with_file("test.txt", "hello world")
+        .expect("add file")
         .with_replacement_edit(0, LineReplacement::from_start(5, "greetings"));
 
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::passing();
 
-    let (result, paths, _dir) = builder.execute_with_locks(&syntactic, &semantic)?;
-    let outcome = result.map_err(|e| format!("should succeed: {e}"))?;
+    let (result, paths, _dir) = builder
+        .execute_with_locks(&syntactic, &semantic)
+        .expect("execute transaction");
+    let outcome = result.expect("should succeed");
 
     assert!(outcome.committed());
     assert_eq!(outcome.files_modified(), Some(1));
 
-    let content = read_file(&paths[0])?;
+    let path = paths.first().expect("should have one path");
+    let content = read_file(path).expect("read modified file");
     assert_eq!(content, "greetings world");
-    Ok(())
 }
 
 #[rstest]
 #[case::syntactic(LockFailureKind::Syntactic)]
 #[case::semantic(LockFailureKind::Semantic)]
-fn lock_failure_prevents_commit(#[case] kind: LockFailureKind) -> Result<(), String> {
+fn lock_failure_prevents_commit(#[case] kind: LockFailureKind) {
     let configure_locks = |path: PathBuf| -> (ConfigurableSyntacticLock, ConfigurableSemanticLock) {
         let failures = vec![VerificationFailure::new(path, "test error")];
         match kind {
@@ -233,59 +248,64 @@ fn lock_failure_prevents_commit(#[case] kind: LockFailureKind) -> Result<(), Str
         }
     };
 
-    test_lock_failure(configure_locks, verify_outcome)
+    test_lock_failure(configure_locks, verify_outcome).expect("scenario should succeed");
 }
 
 #[test]
-fn semantic_backend_error_propagates() -> Result<(), String> {
-    let builder = failure_scenario_builder()?;
+fn semantic_backend_error_propagates() {
+    let builder = failure_scenario_builder().expect("build failure scenario");
     let path = builder.file_path(0).clone();
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::unavailable("LSP crashed");
 
-    let (result, _, _dir) = builder.execute_with_locks(&syntactic, &semantic)?;
+    let (result, _, _dir) = builder
+        .execute_with_locks(&syntactic, &semantic)
+        .expect("execute transaction");
     assert!(result.is_err());
     assert!(matches!(
         result.expect_err("should propagate backend error"),
         SafetyHarnessError::SemanticBackendUnavailable { .. }
     ));
-    assert_file_unchanged(&path)
+    assert_file_unchanged(&path);
 }
 
 #[test]
-fn handles_new_file_creation() -> Result<(), String> {
-    let builder = TransactionTestBuilder::new()?
+fn handles_new_file_creation() {
+    let builder = TransactionTestBuilder::new()
+        .expect("create builder")
         .with_new_file_path("new_file.txt")
         .with_insert_edit(0, "new content");
 
     // Path doesn't exist yet
-    assert!(!file_exists(builder.file_path(0))?);
+    assert!(!file_exists(builder.file_path(0)).expect("check file existence"));
 
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::passing();
 
-    let (result, paths, _dir) = builder.execute_with_locks(&syntactic, &semantic)?;
-    let outcome = result.map_err(|e| format!("should succeed: {e}"))?;
+    let (result, paths, _dir) = builder
+        .execute_with_locks(&syntactic, &semantic)
+        .expect("execute transaction");
+    let outcome = result.expect("should succeed");
 
     assert!(outcome.committed());
 
-    let content = read_file(&paths[0])?;
+    let path = paths.first().expect("should have one path");
+    let content = read_file(path).expect("read new file");
     assert_eq!(content, "new content");
-    Ok(())
 }
 
 #[test]
-fn handles_multiple_files() -> Result<(), String> {
-    let dir = TempDir::new().map_err(|e| format!("create temp dir: {e}"))?;
-    let path1 = temp_file(&dir, "file1.txt", "aaa")?;
-    let path2 = temp_file(&dir, "file2.txt", "bbb")?;
+fn handles_multiple_files() {
+    let dir = TempDir::new().expect("create temp dir");
+    let path1 = temp_file(&dir, "file1.txt", "aaa").expect("create file1");
+    let path2 = temp_file(&dir, "file2.txt", "bbb").expect("create file2");
 
     let edit1 = FileEdit::with_edits(
         path1.clone(),
         vec![TextEdit::from_positions(
             Position::new(0, 0),
             Position::new(0, 3),
-            "AAA".to_string(),
+            "AAA".to_owned(),
         )],
     );
     let edit2 = FileEdit::with_edits(
@@ -293,7 +313,7 @@ fn handles_multiple_files() -> Result<(), String> {
         vec![TextEdit::from_positions(
             Position::new(0, 0),
             Position::new(0, 3),
-            "BBB".to_string(),
+            "BBB".to_owned(),
         )],
     );
 
@@ -303,13 +323,12 @@ fn handles_multiple_files() -> Result<(), String> {
     let mut transaction = EditTransaction::new(&syntactic, &semantic);
     transaction.add_edits([edit1, edit2]);
 
-    let workspace_dir = open_workspace_dir(dir.path())?;
+    let workspace_dir = open_workspace_dir(dir.path()).expect("open workspace dir");
     let outcome = transaction
         .execute(&workspace_dir, dir.path())
-        .map_err(|e| format!("should succeed: {e}"))?;
+        .expect("should succeed");
     assert_eq!(outcome.files_modified(), Some(2));
 
-    assert_eq!(read_file(&path1)?, "AAA");
-    assert_eq!(read_file(&path2)?, "BBB");
-    Ok(())
+    assert_eq!(read_file(&path1).expect("read file1"), "AAA");
+    assert_eq!(read_file(&path2).expect("read file2"), "BBB");
 }

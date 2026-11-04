@@ -30,6 +30,19 @@ pub(crate) struct ExpectedLspInfo<'a> {
     pub(crate) deprecated: bool,
 }
 
+/// Returns `Err` carrying `message` unless `condition` holds.
+///
+/// Fallible tests use this instead of assertions so a failed expectation
+/// reports the observed value without panicking from a `Result`-returning
+/// function.
+pub(crate) fn ensure(condition: bool, message: impl Into<String>) -> Result<(), String> {
+    if condition {
+        Ok(())
+    } else {
+        Err(message.into())
+    }
+}
+
 /// Asserts that LSP info matches expected values.
 pub(crate) fn assert_lsp_info(info: &LspInfo, expected: &ExpectedLspInfo<'_>) {
     assert_eq!(info.source, expected.source, "source mismatch");
@@ -52,11 +65,11 @@ pub(crate) fn check_utf16_offset(
     use crate::dispatch::observe::enrich::byte_col_to_utf16;
     let byte_col_u32 =
         u32::try_from(byte_col).map_err(|error| format!("byte_col must fit in u32: {error}"))?;
-    assert_eq!(
-        byte_col_to_utf16(line, byte_col_u32),
-        expected,
-        "byte_col_to_utf16({line:?}, {byte_col}) expected {expected:?}"
-    );
+    let actual = byte_col_to_utf16(line, byte_col_u32);
+    ensure(
+        actual == expected,
+        format!("byte_col_to_utf16({line:?}, {byte_col}) expected {expected:?}, got {actual:?}"),
+    )?;
     Ok(())
 }
 
@@ -95,14 +108,19 @@ pub(crate) fn assert_enrichment_degrades(
 ) -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
     let source = "// comment\nfn greet(name: &str) -> usize { 0 }";
     let (outcome, backends, card, dir) = run_enrichment_with_server(server, source)?;
-    assert_eq!(outcome, EnrichmentOutcome::Degraded);
-    assert!(card.lsp.is_none());
+    ensure(
+        outcome == EnrichmentOutcome::Degraded,
+        format!("expected degraded enrichment, got {outcome:?}"),
+    )?;
+    ensure(card.lsp.is_none(), "expected card.lsp to remain unset")?;
     // Verify that degradation leaves provenance unchanged
-    assert_eq!(
-        card.provenance.sources,
-        vec![String::from("tree_sitter")],
-        "degradation should not modify provenance"
-    );
+    ensure(
+        card.provenance.sources == vec![String::from("tree_sitter")],
+        format!(
+            "degradation should not modify provenance; got {:?}",
+            card.provenance.sources
+        ),
+    )?;
     Ok((backends, dir))
 }
 
@@ -173,11 +191,14 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> Res
     );
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
-    assert_eq!(outcome, EnrichmentOutcome::Enriched);
-    assert!(
+    ensure(
+        outcome == EnrichmentOutcome::Enriched,
+        format!("expected enriched outcome, got {outcome:?}"),
+    )?;
+    ensure(
         card.lsp.is_some(),
-        "card.lsp should be populated on success"
-    );
+        "card.lsp should be populated on success",
+    )?;
 
     let hover_params = hover_params_ref
         .lock()
@@ -185,7 +206,13 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> Res
     let params = hover_params
         .as_ref()
         .ok_or("hover should have been called")?;
-    assert_eq!(params.text_document_position_params.position.line, 0);
+    ensure(
+        params.text_document_position_params.position.line == 0,
+        format!(
+            "expected hover request on line 0, got {}",
+            params.text_document_position_params.position.line
+        ),
+    )?;
 
     Ok(params.text_document_position_params.position.character)
 }

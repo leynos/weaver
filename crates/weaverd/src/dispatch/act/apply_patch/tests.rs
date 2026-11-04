@@ -18,26 +18,34 @@ fn temp_dir() -> Result<TempDir, String> {
 
 #[rstest]
 fn resolve_path_rejects_parent_dir(temp_dir: Result<TempDir, String>) -> Result<(), String> {
-    let temp_dir = temp_dir?;
+    let workspace_temp_dir = temp_dir?;
     let workspace_dir =
-        cap_std::fs::Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
+        cap_std::fs::Dir::open_ambient_dir(workspace_temp_dir.path(), cap_std::ambient_authority())
             .map_err(|error| format!("open workspace dir: {error}"))?;
     let result = resolve_path(
         &workspace_dir,
-        temp_dir.path(),
+        workspace_temp_dir.path(),
         &FilePath::new("../escape.txt"),
     );
-    assert!(result.is_err(), "parent traversal should fail");
+    if result.is_ok() {
+        return Err(String::from("parent traversal should fail"));
+    }
     Ok(())
 }
 
 #[rstest]
 fn executor_rejects_empty_patch(temp_dir: Result<TempDir, String>) -> Result<(), String> {
-    let temp_dir = temp_dir?;
+    let workspace_temp_dir = temp_dir?;
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::passing();
-    let executor = ApplyPatchExecutor::new(temp_dir.path().to_path_buf(), &syntactic, &semantic);
+    let executor = ApplyPatchExecutor::new(
+        workspace_temp_dir.path().to_path_buf(),
+        &syntactic,
+        &semantic,
+    );
     let error = executor.execute("").expect_err("should fail");
-    assert!(matches!(error, ApplyPatchFailure::Patch(_)));
-    Ok(())
+    match error {
+        ApplyPatchFailure::Patch(_) => Ok(()),
+        other => Err(format!("expected a patch failure, got {other:?}")),
+    }
 }

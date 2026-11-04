@@ -29,7 +29,7 @@ pub struct SystemDaemonizer;
 
 impl SystemDaemonizer {
     /// Builds a new system daemoniser.
-    pub fn new() -> Self { Self }
+    pub const fn new() -> Self { Self }
 }
 
 impl Daemonizer for SystemDaemonizer {

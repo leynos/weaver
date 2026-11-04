@@ -38,7 +38,11 @@ impl RecordingBackendProvider {
 }
 
 impl BackendProvider for RecordingBackendProvider {
-    fn start_backend(&self, kind: BackendKind, config: &Config) -> Result<(), BackendStartupError> {
+    fn start_backend(
+        &self,
+        kind: BackendKind,
+        _config: &Config,
+    ) -> Result<(), BackendStartupError> {
         let failure = {
             let mut state = self
                 .state
@@ -50,8 +54,6 @@ impl BackendProvider for RecordingBackendProvider {
         if let Some(message) = failure {
             return Err(BackendStartupError::new(kind, message));
         }
-        // Touch the configuration in tests to ensure it is fully initialised.
-        let _ = config.log_filter();
         Ok(())
     }
 }

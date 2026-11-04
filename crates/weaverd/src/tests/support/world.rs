@@ -80,9 +80,8 @@ impl TestWorld {
 
     /// Requests the specified backend via the daemon handle.
     pub fn request_backend(&mut self, kind: BackendKind) {
-        let daemon = match self.daemon.as_mut() {
-            Some(daemon) => daemon,
-            None => return,
+        let Some(daemon) = self.daemon.as_mut() else {
+            return;
         };
         self.backend_result = Some(daemon.ensure_backend(kind));
     }

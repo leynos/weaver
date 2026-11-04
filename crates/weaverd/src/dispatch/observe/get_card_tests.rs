@@ -37,6 +37,20 @@ mod semantic_tests;
 
 type BackendsFixture = Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>;
 
+/// Returns `Err` carrying `message` unless `condition` holds.
+fn ensure(condition: bool, message: impl Into<String>) -> Result<(), String> {
+    if condition {
+        Ok(())
+    } else {
+        Err(message.into())
+    }
+}
+
+/// Reads a nested JSON field, returning `None` when any level is absent.
+fn json_at<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
+    path.iter().try_fold(value, |node, key| node.get(*key))
+}
+
 #[derive(Clone)]
 struct RefusalCase<'a> {
     file: SourceFile<'a>,
@@ -70,7 +84,7 @@ fn dispatch_cached_pair(
         },
     )?;
     let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
+        .map_err(|()| "file uri".to_owned())?
         .to_string();
     let request = make_request(&uri, 1, 4, detail)?;
 
@@ -88,24 +102,43 @@ fn dispatch_cached_pair(
     })
 }
 
-/// Asserts a repeated request was served from the card cache.
+/// Checks a repeated request was served from the card cache.
 macro_rules! assert_cached_request_reuse {
     ($reuse:expr, $detail:expr) => {{
-        let reuse = $reuse;
-        let detail: DetailLevel = $detail;
-        assert_eq!(reuse.first_status, 0);
-        assert_eq!(reuse.second_status, 0);
-        assert_eq!(
-            reuse.first_payload["card"]["provenance"]["extracted_at"],
-            reuse.second_payload["card"]["provenance"]["extracted_at"]
-        );
-        assert_eq!(reuse.hits, 1);
-        assert_eq!(reuse.misses, 1);
-        if detail >= DetailLevel::Semantic {
-            assert_eq!(
-                reuse.first_payload["card"]["lsp"],
-                reuse.second_payload["card"]["lsp"]
-            );
+        let cached = $reuse;
+        let detail_level: DetailLevel = $detail;
+        ensure(
+            cached.first_status == 0,
+            format!("expected first status 0, got {}", cached.first_status),
+        )?;
+        ensure(
+            cached.second_status == 0,
+            format!("expected second status 0, got {}", cached.second_status),
+        )?;
+        ensure(
+            json_at(
+                &cached.first_payload,
+                &["card", "provenance", "extracted_at"],
+            ) == json_at(
+                &cached.second_payload,
+                &["card", "provenance", "extracted_at"],
+            ),
+            "expected identical extraction timestamps",
+        )?;
+        ensure(
+            cached.hits == 1,
+            format!("expected one cache hit, got {}", cached.hits),
+        )?;
+        ensure(
+            cached.misses == 1,
+            format!("expected one cache miss, got {}", cached.misses),
+        )?;
+        if detail_level >= DetailLevel::Semantic {
+            ensure(
+                json_at(&cached.first_payload, &["card", "lsp"])
+                    == json_at(&cached.second_payload, &["card", "lsp"]),
+                "expected identical LSP payloads",
+            )?;
         }
     }};
 }
@@ -126,15 +159,25 @@ fn handle_returns_success_for_supported_rust_symbol(
             content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = \
                       name.len();\n    count\n}\n",
         },
-        CardProbe {
+        &CardProbe {
             position: (2, 4),
             detail: DetailLevel::Structure,
         },
     )?;
 
-    assert_eq!(result.status, 0);
-    assert_eq!(payload["status"], "success");
-    assert_eq!(payload["card"]["symbol"]["ref"]["name"], "greet");
+    ensure(
+        result.status == 0,
+        format!("expected success status, got {}", result.status),
+    )?;
+    ensure(
+        json_at(&payload, &["status"]).and_then(serde_json::Value::as_str) == Some("success"),
+        format!("expected a success payload status; got {payload}"),
+    )?;
+    ensure(
+        json_at(&payload, &["card", "symbol", "ref", "name"]).and_then(serde_json::Value::as_str)
+            == Some("greet"),
+        format!("expected the greet card; got {payload}"),
+    )?;
     Ok(())
 }
 
@@ -189,23 +232,34 @@ fn handle_returns_structured_refusals(
         &mut fusion,
         &dir,
         case.file,
-        CardProbe {
+        &CardProbe {
             position: (case.line, case.column),
             detail: DetailLevel::Structure,
         },
     )?;
 
-    assert_eq!(result.status, 1);
-    assert_eq!(payload["status"], "refusal");
-    assert_eq!(payload["refusal"]["reason"], expected_reason);
-    let message = payload["refusal"]["message"]
-        .as_str()
+    ensure(
+        result.status == 1,
+        format!("expected refusal status, got {}", result.status),
+    )?;
+    ensure(
+        json_at(&payload, &["status"]).and_then(serde_json::Value::as_str) == Some("refusal"),
+        format!("expected a refusal payload status; got {payload}"),
+    )?;
+    ensure(
+        json_at(&payload, &["refusal", "reason"]) == Some(&expected_reason),
+        format!("expected refusal reason {expected_reason}; got {payload}"),
+    )?;
+    let message = json_at(&payload, &["refusal", "message"])
+        .and_then(serde_json::Value::as_str)
         .ok_or_else(|| String::from("refusal message should be a string"))?;
-    assert!(
+    ensure(
         message.contains(case.expected_message_substring),
-        "expected message '{message}' to contain '{}'",
-        case.expected_message_substring
-    );
+        format!(
+            "expected message '{message}' to contain '{}'",
+            case.expected_message_substring
+        ),
+    )?;
     Ok(())
 }
 
@@ -223,8 +277,14 @@ fn handle_rejects_non_file_uri(backends: BackendsFixture) -> Result<(), String> 
         Err(error) => error,
     };
 
-    assert!(matches!(error, DispatchError::InvalidArguments { .. }));
-    assert!(error.to_string().contains("unsupported URI scheme"));
+    ensure(
+        matches!(error, DispatchError::InvalidArguments { .. }),
+        format!("expected an invalid-arguments error; got {error}"),
+    )?;
+    ensure(
+        error.to_string().contains("unsupported URI scheme"),
+        format!("expected an unsupported URI scheme error; got {error}"),
+    )?;
     Ok(())
 }
 
@@ -271,7 +331,7 @@ fn handle_invalidates_stale_revisions_when_file_changes(
         },
     )?;
     let uri = Url::from_file_path(&path)
-        .map_err(|()| "file uri".to_string())?
+        .map_err(|()| "file uri".to_owned())?
         .to_string();
     let request = make_request(&uri, 1, 4, DetailLevel::Structure)?;
 
@@ -282,12 +342,25 @@ fn handle_invalidates_stale_revisions_when_file_changes(
     let extractor = fusion.provider().card_extractor();
     let stats = extractor.cache_stats();
 
-    assert_eq!(extractor.cache_len(), 1);
-    assert_eq!(stats.hits, 0);
-    assert_eq!(stats.misses, 2);
-    assert_ne!(
-        first_payload["card"]["symbol"]["ref"]["name"],
-        second_payload["card"]["symbol"]["ref"]["name"]
-    );
+    ensure(
+        extractor.cache_len() == 1,
+        format!("expected one cached card, got {}", extractor.cache_len()),
+    )?;
+    ensure(
+        stats.hits == 0,
+        format!("expected no cache hits, got {}", stats.hits),
+    )?;
+    ensure(
+        stats.misses == 2,
+        format!("expected two cache misses, got {}", stats.misses),
+    )?;
+    ensure(
+        json_at(&first_payload, &["card", "symbol", "ref", "name"])
+            != json_at(&second_payload, &["card", "symbol", "ref", "name"]),
+        format!(
+            "expected the rewritten symbol to change the payload; first={first_payload}, \
+             second={second_payload}"
+        ),
+    )?;
     Ok(())
 }
