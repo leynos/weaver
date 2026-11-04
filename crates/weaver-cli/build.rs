@@ -20,7 +20,10 @@ mod help;
 
 /// Generates the package manual page from the shared augmented help command.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _runtime_help_writer = help::write_help_for_args::<Vec<u8>>;
+    // Reference the runtime help writer so the build script fails to compile
+    // if its signature changes, without executing it at build time.
+    const _: fn(&[std::ffi::OsString], &mut Vec<u8>) -> Result<(), help::HelpWriteError> =
+        help::write_help_for_args::<Vec<u8>>;
 
     // Regenerate the manual page when the CLI or metadata changes.
     println!("cargo:rerun-if-changed=src/cli.rs");

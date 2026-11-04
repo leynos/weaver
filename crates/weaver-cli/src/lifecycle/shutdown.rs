@@ -21,7 +21,9 @@ use super::{
     utils::open_runtime_dir,
 };
 
+/// Maximum time to wait for the daemon to release its PID file and socket.
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
+/// Interval between shutdown polls.
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 
 /// Waits for the daemon to shut down within the timeout period.

@@ -44,7 +44,7 @@ impl TestLifecycle {
     /// Handles a lifecycle invocation, recording it and returning a queued result.
     pub fn handle<W: Write, E: Write>(
         &self,
-        invocation: LifecycleInvocation,
+        invocation: &LifecycleInvocation,
         _context: LifecycleContext<'_>,
         _output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, LifecycleError> {
@@ -68,10 +68,10 @@ impl TestLifecycle {
 #[fixture]
 pub(crate) fn temp_paths() -> Result<(TempDir, RuntimePaths)> {
     let dir = TempDir::new().context("create temporary directory for test fixture")?;
-    let socket = dir.path().join("daemon.sock");
-    let socket = socket.to_string_lossy().to_string();
+    let socket_path = dir.path().join("daemon.sock");
+    let socket_endpoint = socket_path.to_string_lossy().to_string();
     let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket),
+        daemon_socket: SocketEndpoint::unix(socket_endpoint),
         ..Config::default()
     };
     let paths = RuntimePaths::from_config(&config)

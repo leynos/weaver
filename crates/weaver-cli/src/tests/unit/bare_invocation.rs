@@ -154,11 +154,17 @@ fn write_bare_help_produces_english(#[case] use_fluent: bool) {
 
 #[test]
 fn config_only_invocation_emits_bare_help() {
+    /// Reports that the config-only path reached the config loader.
+    ///
+    /// Diverging rather than returning keeps the panic out of the loader's
+    /// `Result`-returning `load`, which the workspace lint table forbids.
+    fn must_not_load() -> ! {
+        panic!("config-only bare invocation must not attempt configuration loading");
+    }
+
     struct PanickingConfigOnlyLoader;
     impl ConfigLoader for PanickingConfigOnlyLoader {
-        fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-            panic!("config-only bare invocation must not attempt configuration loading");
-        }
+        fn load(&self, _args: &[OsString]) -> Result<Config, AppError> { must_not_load() }
     }
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();

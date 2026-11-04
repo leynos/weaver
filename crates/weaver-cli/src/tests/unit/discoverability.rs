@@ -88,13 +88,13 @@ fn assert_three_part_guidance(
 #[test]
 fn fluent_missing_operation_guidance_has_single_error_prefix() {
     let localizer = fluent_localizer().expect("embedded Fluent catalogue must parse");
-    let mut output = Vec::new();
+    let mut buffer = Vec::new();
 
-    let emitted = write_missing_operation_guidance(&mut output, &localizer, KnownDomain::Observe)
+    let emitted = write_missing_operation_guidance(&mut buffer, &localizer, KnownDomain::Observe)
         .expect("guidance write must succeed");
 
     assert!(emitted, "known domain should emit guidance");
-    let output = String::from_utf8(output).expect("guidance must be valid UTF-8");
+    let output = String::from_utf8(buffer).expect("guidance must be valid UTF-8");
     assert_three_part_guidance(
         &output,
         "error: operation required for domain 'observe'",
@@ -107,13 +107,13 @@ fn fluent_missing_operation_guidance_has_single_error_prefix() {
 #[test]
 fn fluent_unknown_domain_guidance_has_single_error_prefix() {
     let localizer = fluent_localizer().expect("embedded Fluent catalogue must parse");
-    let mut output = Vec::new();
+    let mut buffer = Vec::new();
 
-    let emitted = write_unknown_domain_guidance(&mut output, &localizer, "unknown-domain")
+    let emitted = write_unknown_domain_guidance(&mut buffer, &localizer, "unknown-domain")
         .expect("guidance write must succeed");
 
     assert!(emitted, "unknown domain should emit guidance");
-    let output = String::from_utf8(output).expect("guidance must be valid UTF-8");
+    let output = String::from_utf8(buffer).expect("guidance must be valid UTF-8");
     assert_three_part_guidance(
         &output,
         "error: unknown domain 'unknown-domain'",
@@ -126,13 +126,13 @@ fn fluent_unknown_domain_guidance_has_single_error_prefix() {
 #[test]
 fn fluent_unknown_domain_guidance_uses_unique_suggestion_when_available() {
     let localizer = fluent_localizer().expect("embedded Fluent catalogue must parse");
-    let mut output = Vec::new();
+    let mut buffer = Vec::new();
 
-    let emitted = write_unknown_domain_guidance(&mut output, &localizer, "obsrve")
+    let emitted = write_unknown_domain_guidance(&mut buffer, &localizer, "obsrve")
         .expect("guidance write must succeed");
 
     assert!(emitted, "unknown domain should emit guidance");
-    let output = String::from_utf8(output).expect("guidance must be valid UTF-8");
+    let output = String::from_utf8(buffer).expect("guidance must be valid UTF-8");
     assert!(
         output.contains("Did you mean 'observe'?"),
         "unique suggestion should be rendered: {output}"
