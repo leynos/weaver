@@ -1543,22 +1543,44 @@ that both `run_graph_slice` and `run_get_card` build on. It resolves the
 callers render it themselves, with the ephemeral daemon endpoint and any
 temporary fixture path already replaced by stable placeholders.
 
-### 19.2 Resolving the `weaver` binary
+### 19.2 Resolving the `weaver` and `weaverd` binaries
 
 `run_cli` locates the CLI binary via `resolve_or_build_weaver_binary_path()` in
-`crates/weaver-e2e/tests/support/weaver_binary.rs`. This resolver exists because
-`assert_cmd`'s usual `CARGO_BIN_EXE_weaver` environment lookup only works from
-the crate that owns the binary (`weaver-cli`); it is never set when tests run
-from `weaver-e2e`. The resolver first checks the target directory and the
-`CARGO_BIN_EXE_weaver` environment variable, then, on a cold cache, shells out
-to `cargo build -p weaver-cli --bin weaver` and writes the resulting artefacts
-into the workspace target directory.
+`crates/weaver-e2e/tests/support/weaver_binary.rs`. The daemon harness locates
+its binary through the sibling module
+`crates/weaver-e2e/tests/support/weaverd_binary.rs`. Both resolvers exist
+because `assert_cmd`'s usual `CARGO_BIN_EXE_*` environment lookup only works
+from the crate that owns the binary (`weaver-cli` or `weaverd`); Cargo never
+sets either variable when the tests run from `weaver-e2e`.
 
-The outcome — success or failure — is memoized in a process-wide `OnceLock`, so
-the build runs at most once per test process and concurrent test threads cannot
-race to spawn competing builds. This cache is per process, not per test run: a
-failed build poisons every remaining test in that binary, and the next
-`cargo test` invocation starts afresh.
+The resolution rules are shared. A private `WorkspaceBinary` value names each
+target's executable stem, owning Cargo package, and Cargo-provided environment
+variable; `weaver` maps to package `weaver-cli` with `CARGO_BIN_EXE_weaver`, and
+`weaverd` maps to package `weaverd` with `CARGO_BIN_EXE_weaverd`. Probes run
+in this order:
+
+1. the `CARGO_BIN_EXE_*` variable, if it names an existing regular file;
+2. the directory holding the running test executable, with a trailing `deps`
+   segment stripped, which is the active Cargo target directory;
+3. the conventional `<workspace root>/target/debug/<binary>` location.
+
+When no candidate exists, the resolver shells out to
+`cargo build -p <package> --bin <binary>`, writing artefacts into the workspace
+target directory, then probes the same two filesystem candidates again. An
+existence probe distinguishes "absent" from "unreadable": only
+`ErrorKind::NotFound` reports the candidate as missing, while any other
+metadata failure is returned as an error, so an inaccessible binary never
+triggers a build that cannot fix it.
+
+Each binary's outcome — success or failure — is memoized in its own process-wide
+`OnceLock`, so the build runs at most once per test process and concurrent
+test threads cannot race to spawn competing builds. This cache is per process,
+not per test run: a failed build poisons every remaining test in that binary,
+and the next `cargo test` invocation starts afresh. Failures name the binary,
+the build's exit status when the build ran and exited non-zero, and the two
+candidate paths that were checked when a successful build still left no
+executable behind.
+
 `crates/weaver-e2e/tests/test_support/daemon_harness.rs` re-exports a thin
 wrapper of the same name, `resolve_or_build_weaver_binary_path`, adapting the
 `Result<&'static Path, &'static str>` return type to `io::Result<PathBuf>` for
@@ -2266,6 +2288,26 @@ Unix hosts. Unlike the daemon unit tests, it derives the expected artefact
 names through the public `RuntimePaths` API rather than the `test-support`
 helpers, so the assertions exercise the same surface a user's configuration
 reaches.
+
+The scenario starts two daemons on two non-default Unix endpoints that share
+one runtime directory, then checks endpoint isolation end to end. It first
+asserts that the two endpoints derive distinct lock, PID, and health names.
+After both daemons are running it writes legacy `weaverd.pid` and
+`weaverd.health` decoys into the shared directory and confirms that
+`weaver status` reports the endpoint-scoped PID rather than the decoy. Stopping
+endpoint A must remove A's PID and health files while retaining A's persistent
+lock, and must leave endpoint B's daemon running with its artefacts intact. The
+scenario then removes B's PID file and confirms that `weaver stop` refuses to
+signal a reachable socket it cannot verify, before stopping B normally and
+checking the same cleanup contract. A `DaemonGuard` sends `SIGTERM` to any
+daemon still recorded as running when the test unwinds, so a failed assertion
+does not leak processes.
+
+The scenario's process probes use the `nix` crate, declared as a Unix-only
+development dependency in `crates/weaver-e2e/Cargo.toml` under
+`[target.'cfg(unix)'.dev-dependencies]` with the `signal` feature enabled. That
+feature supplies both the signal-0 existence probe and the `SIGTERM` cleanup
+path; the dependency is scoped to Unix targets because the whole module is.
 
 ## 26 Dispatch lifecycle observability internals
 
