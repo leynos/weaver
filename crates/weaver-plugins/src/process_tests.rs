@@ -18,8 +18,10 @@ fn exit_status(code: i32) -> std::process::ExitStatus { std::process::ExitStatus
 /// Builds a sample I/O error for the message templates.
 fn sample_error() -> io::Error { io::Error::other("kill failed") }
 
-// The status text is produced by `ExitStatus`'s own `Display` impl, which is
-// platform-specific; the structure around it is what this crate owns.
+// The status text itself comes from `ExitStatus`'s own `Display` impl and is
+// platform-specific, so the expected message is built with `format!` from the
+// same value. That pins every crate-owned byte without hard-coding the
+// platform's rendering.
 #[cfg(unix)]
 #[test]
 fn describe_wait_reports_the_status_after_a_successful_kill() {
@@ -27,13 +29,9 @@ fn describe_wait_reports_the_status_after_a_successful_kill() {
 
     let message = describe_wait(Ok(status));
 
-    assert!(
-        message.starts_with("terminated timed-out process with status "),
-        "unexpected prefix: {message}"
-    );
-    assert!(
-        message.ends_with(&status.to_string()),
-        "expected the observed status in: {message}"
+    assert_eq!(
+        message,
+        format!("terminated timed-out process with status {status}")
     );
 }
 
@@ -54,13 +52,12 @@ fn describe_failed_kill_reports_a_process_that_had_already_exited() {
 
     let message = describe_failed_kill(&sample_error(), Ok(Some(status)));
 
-    assert!(
-        message.starts_with("failed to kill timed-out process: kill failed;"),
-        "unexpected prefix: {message}"
-    );
-    assert!(
-        message.contains(&format!("already exited with status {status}")),
-        "expected the observed status in: {message}"
+    assert_eq!(
+        message,
+        format!(
+            "failed to kill timed-out process: kill failed; process had already exited with \
+             status {status}"
+        )
     );
 }
 
