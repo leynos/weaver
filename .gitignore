@@ -18,3 +18,4 @@ __pycache__/
 .claude/
 *.swp
 *.swo
+*.snap.new

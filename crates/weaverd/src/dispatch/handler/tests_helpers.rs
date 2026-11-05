@@ -8,7 +8,7 @@ use std::{
     collections::BTreeMap,
     io::{BufRead, BufReader, Write},
     net::{SocketAddr, TcpListener, TcpStream},
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
     thread::{self, JoinHandle},
 };
 
@@ -179,6 +179,22 @@ where
     }
 }
 
+/// Keeps a second dispatcher registered for the lifetime of the process.
+///
+/// `tracing_core` optimises its callsite-interest rebuilds while exactly one
+/// dispatcher is registered: instead of unioning the interest of every live
+/// dispatcher, it asks only the rebuilding thread's current dispatcher. When a
+/// daemon test thread performs that rebuild, the answer comes from the global
+/// telemetry subscriber, which filters `dispatch` events out and so marks the
+/// callsites `never`. Events emitted later by a harness server thread are then
+/// discarded before any subscriber sees them, which makes capture assertions
+/// fail intermittently depending on test scheduling.
+///
+/// Holding a second dispatcher alive keeps the dispatcher count above one, so
+/// every rebuild takes the general path and folds in the recording layer's
+/// interest as well.
+static SECOND_DISPATCHER: LazyLock<Dispatch> = LazyLock::new(|| Dispatch::new(Registry::default()));
+
 /// Runs `action` while recording all emitted tracing events.
 ///
 /// Use this helper when asserting on structured dispatch logging without wiring
@@ -198,6 +214,7 @@ where
 /// assert_eq!(events.len(), 1);
 /// ```
 pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
+    LazyLock::force(&SECOND_DISPATCHER);
     let events = Arc::new(Mutex::new(Vec::new()));
     let subscriber = Registry::default().with(RecordingLayer {
         events: Arc::clone(&events),
@@ -250,4 +267,46 @@ pub(crate) fn harness(
         server_handle,
         _temp_dir: temp_dir,
     })
+}
+
+/// Emits the callsite that [`second_dispatcher_keeps_a_callsite_registered_under_capture`]
+/// protects.
+///
+/// Keeping the emission in one function matters: each `tracing` macro
+/// invocation is its own callsite, so two invocations would register two
+/// callsites and never exercise the register-then-reuse sequence the workaround
+/// depends on.
+fn emit_interest_probe() {
+    tracing::info!(target: "dispatch", event = "interest_probe", "interest probe");
+}
+
+/// Proves that [`SECOND_DISPATCHER`] is what keeps concurrent capture working.
+///
+/// The probe callsite is registered for the first time while the thread-local
+/// default is [`Dispatch::none`], which reproduces the daemon-test scheduling
+/// that motivated the workaround. With `SECOND_DISPATCHER` alive,
+/// `tracing_core` folds every registered dispatcher into the interest rebuild,
+/// so the callsite stays recordable; without it, the rebuild consults only the
+/// no-op thread default and marks the callsite `never`, which makes the second
+/// emission below unobservable. Removing the workaround therefore fails this
+/// test rather than only making other tests flaky.
+#[test]
+fn second_dispatcher_keeps_a_callsite_registered_under_capture() {
+    let events = capture_events(|| {
+        dispatcher::with_default(&Dispatch::none(), emit_interest_probe);
+        emit_interest_probe();
+    });
+
+    let captured = events.iter().any(|event| {
+        event.target == "dispatch"
+            && event
+                .fields
+                .get("event")
+                .is_some_and(|value| value == "interest_probe")
+    });
+
+    assert!(
+        captured,
+        "expected the emission through the recording dispatcher to be captured"
+    );
 }
