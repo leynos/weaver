@@ -9,6 +9,7 @@ use std::{
 };
 
 use cap_std::fs::Dir;
+use mockable::DefaultEnv;
 use weaver_config::RuntimePaths;
 
 use super::{
@@ -79,6 +80,7 @@ pub(crate) fn try_auto_start_daemon<E: Write>(
         context.config_arguments,
         context.daemon_binary,
         runtime_dir.as_path(),
+        &DefaultEnv,
     )?;
     let started_at = SystemTime::now();
     wait_for_ready(&paths, &mut child, started_at, AUTO_START_TIMEOUT)?;

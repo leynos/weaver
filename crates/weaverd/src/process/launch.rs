@@ -1,11 +1,11 @@
 //! Supervises daemon launch sequencing and runtime orchestration.
 
 use std::{
-    env,
     io,
     sync::{Arc, Mutex},
 };
 
+use mockable::{DefaultEnv, Env};
 use tracing::info;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::RuntimePaths;
@@ -38,9 +38,22 @@ pub enum LaunchMode {
 }
 
 impl LaunchMode {
-    /// Selects the launch mode from the environment, defaulting to background.
-    fn detect() -> Self {
-        if env::var_os(FOREGROUND_ENV_VAR).is_some() {
+    /// Selects the launch mode from an injected environment reader.
+    ///
+    /// Absence of the foreground variable is the normal case and selects
+    /// [`Self::Background`]; the value itself is never inspected, so setting the
+    /// variable to an empty string still requests the foreground.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mockable::DefaultEnv;
+    /// use weaverd::LaunchMode;
+    ///
+    /// let mode = LaunchMode::detect(&DefaultEnv);
+    /// ```
+    pub fn detect(env: &impl Env) -> Self {
+        if env.os_string(FOREGROUND_ENV_VAR).is_some() {
             Self::Foreground
         } else {
             Self::Background
@@ -81,7 +94,7 @@ pub(crate) struct LaunchPlan<L, D, S> {
 /// Returns [`LaunchError`] when configuration loading, socket preparation,
 /// runtime directory creation, listener binding, or shutdown handling fails.
 pub fn run_daemon() -> Result<(), LaunchError> {
-    let mode = LaunchMode::detect();
+    let mode = LaunchMode::detect(&DefaultEnv);
     let reporter = Arc::new(StructuredHealthReporter::new());
     let daemonizer = SystemDaemonizer::new();
     let shutdown = SystemShutdownSignal::new(SHUTDOWN_TIMEOUT);
@@ -130,8 +143,10 @@ where
             }
         })?;
     let mut guard = ProcessGuard::acquire(runtime_dir, runtime_paths)?;
+    // The working directory is process state rather than an environment
+    // variable, so `Env` has no accessor for it and this stays a direct call.
     let workspace_root =
-        env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
+        std::env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
     if matches!(mode, LaunchMode::Background) {
         daemonizer.daemonize(guard.paths())?;
     }
@@ -173,3 +188,7 @@ where
     );
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "launch_tests.rs"]
+mod launch_tests;

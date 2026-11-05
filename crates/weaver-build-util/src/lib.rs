@@ -1,7 +1,6 @@
 //! Build-time utilities shared across Weaver build scripts.
 
 use std::{
-    env,
     io,
     process,
     sync::atomic::{AtomicU64, Ordering},
@@ -10,6 +9,7 @@ use std::{
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::fs::Dir;
+use mockable::Env;
 use time::{OffsetDateTime, format_description::well_known::Iso8601};
 
 /// Date substituted when `SOURCE_DATE_EPOCH` is unset or unusable, so man
@@ -77,20 +77,26 @@ pub fn manual_date(source_date_epoch: Option<&str>, warnings: &mut Vec<String>) 
     })
 }
 
-/// Convenience wrapper around [`manual_date`] that reads `SOURCE_DATE_EPOCH` from the environment.
+/// Convenience wrapper around [`manual_date`] that reads `SOURCE_DATE_EPOCH` from an
+/// injected environment reader.
+///
+/// Taking the reader as a parameter keeps build scripts free of ambient
+/// environment access, so the same policy that governs runtime code applies to
+/// them.
 ///
 /// # Examples
 /// ```no_run
+/// use mockable::DefaultEnv;
 /// use weaver_build_util::manual_date_from_env;
 ///
 /// let mut warnings = Vec::new();
-/// let date = manual_date_from_env(&mut warnings);
+/// let date = manual_date_from_env(&DefaultEnv, &mut warnings);
 ///
 /// // When SOURCE_DATE_EPOCH is unset, the fallback date is used.
 /// println!("{date}");
 /// ```
-pub fn manual_date_from_env(warnings: &mut Vec<String>) -> String {
-    let source_date_epoch = env::var("SOURCE_DATE_EPOCH").ok();
+pub fn manual_date_from_env(env: &impl Env, warnings: &mut Vec<String>) -> String {
+    let source_date_epoch = env.string("SOURCE_DATE_EPOCH");
     manual_date(source_date_epoch.as_deref(), warnings)
 }
 

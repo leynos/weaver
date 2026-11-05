@@ -4,23 +4,26 @@
 //! daemon process with appropriate configuration arguments.
 
 use std::{
-    env,
     ffi::{OsStr, OsString},
+    path::Path,
     process::{Child, Command, Stdio},
 };
+
+use mockable::Env;
 
 use super::error::LifecycleError;
 
 /// Spawns the daemon process with the given configuration arguments.
 ///
 /// Uses the binary override if provided, otherwise falls back to `WEAVERD_BIN`
-/// environment variable or the default `weaverd` binary name.
+/// from the injected environment reader, or the default `weaverd` binary name.
 pub(super) fn spawn_daemon(
     config_arguments: &[OsString],
     binary_override: Option<&OsStr>,
-    runtime_dir: &std::path::Path,
+    runtime_dir: &Path,
+    env: &impl Env,
 ) -> Result<Child, LifecycleError> {
-    let binary = resolve_daemon_binary(binary_override);
+    let binary = resolve_daemon_binary(binary_override, env);
     let mut command = Command::new(&binary);
     if let Some(arguments) = config_arguments.get(1..) {
         // Skip argv[0], which is the binary name, and forward the remaining CLI
@@ -41,10 +44,13 @@ pub(super) fn spawn_daemon(
 
 /// Resolves the daemon binary from an override, then `WEAVERD_BIN`, then the
 /// default `weaverd` name.
-fn resolve_daemon_binary(binary_override: Option<&OsStr>) -> OsString {
+///
+/// `WEAVERD_BIN` is read as an OS string rather than as UTF-8, so a binary name
+/// that is not valid Unicode still resolves instead of silently falling back.
+fn resolve_daemon_binary(binary_override: Option<&OsStr>, env: &impl Env) -> OsString {
     binary_override
         .map(OsString::from)
-        .or_else(|| env::var_os("WEAVERD_BIN"))
+        .or_else(|| env.os_string("WEAVERD_BIN"))
         .unwrap_or_else(|| OsString::from("weaverd"))
 }
 
@@ -54,14 +60,18 @@ mod tests {
 
     use std::path::PathBuf;
 
+    use mockable::MockEnv;
+
     use super::*;
 
     #[test]
     fn spawn_daemon_uses_binary_override() {
+        let env = MockEnv::new();
         let result = spawn_daemon(
             &[],
             Some(OsStr::new("/test/custom/weaverd")),
-            std::path::Path::new("/tmp"),
+            Path::new("/tmp"),
+            &env,
         );
         assert!(result.is_err());
         let error = result.expect_err("expected spawn failure");
@@ -80,23 +90,32 @@ mod tests {
 
     #[test]
     fn resolve_daemon_binary_uses_override() {
-        let resolved = resolve_daemon_binary(Some(OsStr::new("/custom/daemon")));
+        let env = MockEnv::new();
+        let resolved = resolve_daemon_binary(Some(OsStr::new("/custom/daemon")), &env);
         assert_eq!(resolved, OsString::from("/custom/daemon"));
     }
 
     #[test]
+    fn resolve_daemon_binary_uses_environment_when_no_override() {
+        let mut env = MockEnv::new();
+        env.expect_os_string()
+            .withf(|key| key == "WEAVERD_BIN")
+            .returning(|_| Some(OsString::from("/env/weaverd")));
+
+        let resolved = resolve_daemon_binary(None, &env);
+        assert_eq!(resolved, OsString::from("/env/weaverd"));
+    }
+
+    #[test]
     fn resolve_daemon_binary_falls_back_to_default() {
-        // When no override is provided, falls back to WEAVERD_BIN or "weaverd".
-        let resolved = resolve_daemon_binary(None);
-        // WEAVERD_BIN may be set in the environment; accept either outcome.
-        if let Some(weaverd_bin) = env::var_os("WEAVERD_BIN") {
-            assert_eq!(resolved, weaverd_bin, "expected WEAVERD_BIN value");
-        } else {
-            assert_eq!(
-                resolved,
-                OsString::from("weaverd"),
-                "expected default binary name"
-            );
-        }
+        let mut env = MockEnv::new();
+        env.expect_os_string().returning(|_| None);
+
+        let resolved = resolve_daemon_binary(None, &env);
+        assert_eq!(
+            resolved,
+            OsString::from("weaverd"),
+            "expected default binary name"
+        );
     }
 }
