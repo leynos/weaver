@@ -1,10 +1,9 @@
 //! Build script: generate the CLI manual page into target/generated-man/<target>/<profile> for
 //! release packaging.
 
-use std::env;
-
 use camino::Utf8PathBuf;
 use clap_mangen::Man;
+use mockable::{DefaultEnv, Env};
 use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_man_page};
 
 #[path = "src/cli.rs"]
@@ -42,20 +41,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=TARGET");
     println!("cargo:rerun-if-env-changed=PROFILE");
 
+    // All environment reads in this build script go through one injected
+    // reader, so the workspace's ban on ambient `std::env` access applies to
+    // build scripts as well as runtime code.
+    let env = DefaultEnv;
+
     // The top-level page documents the entire command interface.
     let cmd = help::try_command()?;
     let default_name = cmd
         .get_bin_name()
         .unwrap_or_else(|| cmd.get_name())
         .to_owned();
-    let binary_name = env::var("CARGO_BIN_NAME").unwrap_or(default_name);
+    let binary_name = env.string("CARGO_BIN_NAME").unwrap_or(default_name);
 
-    let version = env::var("CARGO_PKG_VERSION").map_err(|_| {
+    let version = env.string("CARGO_PKG_VERSION").ok_or_else(|| {
         "CARGO_PKG_VERSION must be set by Cargo; cannot render manual page without it."
     })?;
 
     let mut warnings = Vec::new();
-    let date = manual_date_from_env(&mut warnings);
+    let date = manual_date_from_env(&env, &mut warnings);
     for warning in warnings {
         println!("cargo:warning={warning}");
     }
@@ -70,9 +74,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Packagers expect man pages under target/generated-man/<target>/<profile>.
     // Man page generation is pure file output, so it works during cross-compilation.
-    let target = env::var("TARGET").unwrap_or_else(|_| "unknown-target".into());
-    let profile = env::var("PROFILE").unwrap_or_else(|_| "unknown-profile".into());
-    let out_dir_env = env::var_os("OUT_DIR").and_then(|path| path.to_str().map(Utf8PathBuf::from));
+    let target = env
+        .string("TARGET")
+        .unwrap_or_else(|| "unknown-target".into());
+    let profile = env
+        .string("PROFILE")
+        .unwrap_or_else(|| "unknown-profile".into());
+    let out_dir_env = env
+        .path_buf("OUT_DIR")
+        .and_then(|path| Utf8PathBuf::from_path_buf(path).ok());
     let out_dir = out_dir_for_target_profile(&target, &profile, out_dir_env.as_deref());
     write_man_page(&buf, &out_dir, &page_name)?;
 
