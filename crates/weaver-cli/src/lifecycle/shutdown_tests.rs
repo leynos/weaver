@@ -19,11 +19,11 @@ use crate::{
 #[test]
 fn signal_daemon_fails_for_nonexistent_pid() {
     // PID 99999999 is extremely unlikely to exist on any system.
-    let result = signal_daemon(99999999);
+    let result = signal_daemon(99_999_999);
     let Err(LifecycleError::SignalFailed { pid, source }) = result else {
         panic!("expected SignalFailed, got {result:?}");
     };
-    assert_eq!(pid, 99999999);
+    assert_eq!(pid, 99_999_999);
     // ESRCH (No such process) is the expected error.
     assert_eq!(source.raw_os_error(), Some(libc::ESRCH));
 }
@@ -34,7 +34,7 @@ fn signal_daemon_fails_for_init_process_permission_denied() {
     // Skip this test when running as root to avoid sending SIGTERM to PID 1.
     // SAFETY: geteuid() is always safe to call.
     if unsafe { libc::geteuid() } == 0 {
-        eprintln!("skipping test: running as root");
+        tracing::info!("skipping test: running as root");
         return;
     }
 
@@ -115,11 +115,11 @@ fn wait_for_shutdown_succeeds_when_pid_and_socket_disappear(
     shutdown_thread.join().expect("shutdown thread");
 }
 
-/// Tests that wait_for_shutdown propagates socket probe errors.
+/// Tests that `wait_for_shutdown` propagates socket probe errors.
 ///
 /// When a socket probe fails with an error other than the "availability" errors
-/// (ConnectionRefused, NotFound, AddrNotAvailable), the error should be
-/// propagated as SocketProbe rather than being swallowed.
+/// (`ConnectionRefused`, `NotFound`, `AddrNotAvailable`), the error should be
+/// propagated as `SocketProbe` rather than being swallowed.
 #[cfg(unix)]
 #[rstest]
 fn wait_for_shutdown_propagates_socket_probe_errors(
@@ -141,12 +141,12 @@ fn wait_for_shutdown_propagates_socket_probe_errors(
     assert!(ep.contains("definitely.invalid"));
 }
 
-/// Tests that wait_for_shutdown returns ShutdownTimeout when conditions persist.
+/// Tests that `wait_for_shutdown` returns `ShutdownTimeout` when conditions persist.
 ///
-/// This test takes 10 seconds to run (the SHUTDOWN_TIMEOUT constant) and is
+/// This test takes 10 seconds to run (the `SHUTDOWN_TIMEOUT` constant) and is
 /// therefore marked `#[ignore]`. Run with `cargo test -- --ignored` to execute.
 #[rstest]
-#[ignore]
+#[ignore = "takes 10 seconds due to SHUTDOWN_TIMEOUT"]
 fn wait_for_shutdown_times_out_when_conditions_persist(
     temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
 ) {
@@ -182,7 +182,7 @@ fn signal_daemon_succeeds_for_child_process() {
     let mut child = match Command::new("sleep").arg("60").spawn() {
         Ok(child) => child,
         Err(e) if e.kind() == ErrorKind::NotFound => {
-            eprintln!("skipping test: sleep command not found");
+            tracing::info!("skipping test: sleep command not found");
             return;
         }
         Err(e) => panic!("failed to spawn sleep process: {e}"),

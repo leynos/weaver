@@ -19,23 +19,29 @@ pub(crate) mod bare_help {
     //! The fallback values must match `locales/en-US/messages.ftl`; the
     //! `fluent_and_fallback_outputs_are_identical` test guards against drift.
 
+    /// Fluent key and English fallback for the missing-domain error.
     pub(crate) const COMMAND_DOMAIN_REQUIRED: (&str, &str) = (
         "weaver-bare-help-command-domain-required",
         "command domain must be provided",
     );
+    /// Fluent key and English fallback for the usage line.
     pub(crate) const USAGE: (&str, &str) = (
         "weaver-bare-help-usage",
         "Usage: weaver <DOMAIN> <OPERATION> [ARG]...",
     );
+    /// Fluent key and English fallback for the domain list heading.
     pub(crate) const HEADER: (&str, &str) = ("weaver-bare-help-header", "Domains:");
+    /// Fluent key and English fallback for the `observe` domain description.
     pub(crate) const OBSERVE: (&str, &str) = (
         "weaver-bare-help-domain-observe",
         "observe   Query code structure and relationships",
     );
+    /// Fluent key and English fallback for the `act` domain description.
     pub(crate) const ACT: (&str, &str) = (
         "weaver-bare-help-domain-act",
         "act       Perform code modifications",
     );
+    /// Fluent key and English fallback for the `verify` domain description.
     pub(crate) const VERIFY: (&str, &str) = (
         "weaver-bare-help-domain-verify",
         "verify    Validate code correctness",

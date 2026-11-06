@@ -80,7 +80,7 @@ fn serialises_apply_patch_request_with_patch_payload() {
         "}\n",
         ">>>>>>> REPLACE\n",
     );
-    let request = CommandRequest::with_patch(invocation, patch.to_string());
+    let request = CommandRequest::with_patch(invocation, patch.to_owned());
     let mut buffer: Vec<u8> = Vec::new();
     request
         .write_jsonl(&mut buffer)
@@ -126,7 +126,7 @@ fn command_invocation_validation(
     #[case] domain: Option<String>,
     #[case] operation: Option<String>,
     #[case] expected_error: &str,
-    #[case] _description: &str,
+    #[case] description: &str,
 ) {
     let cli = Cli {
         capabilities: false,
@@ -140,9 +140,11 @@ fn command_invocation_validation(
     let error = CommandInvocation::try_from(cli).expect_err("validation must fail");
 
     match expected_error {
-        "MissingDomain" => assert!(matches!(error, AppError::MissingDomain)),
-        "MissingOperation" => assert!(matches!(error, AppError::MissingOperation)),
-        other => panic!("unexpected expected_error marker: {}", other),
+        "MissingDomain" => assert!(matches!(error, AppError::MissingDomain), "{description}"),
+        "MissingOperation" => {
+            assert!(matches!(error, AppError::MissingOperation), "{description}");
+        }
+        other => panic!("unexpected expected_error marker: {other}"),
     }
 }
 
@@ -192,8 +194,8 @@ fn test_read_daemon_messages(input: Vec<u8>) -> (Result<i32, AppError>, Vec<u8>,
 fn read_daemon_messages_errors_without_exit() {
     let input = b"{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"hi\"}\n".to_vec();
     let (error, stdout, _stderr) = test_read_daemon_messages(input);
-    let error = error.expect_err("expected missing-exit error");
-    assert!(matches!(error, AppError::MissingExit));
+    let missing_exit = error.expect_err("expected missing-exit error");
+    assert!(matches!(missing_exit, AppError::MissingExit));
     let stdout_text = decode_utf8(stdout, "stdout").expect("decode stdout");
     assert_eq!(stdout_text, "hi");
 }
@@ -205,8 +207,8 @@ fn read_daemon_messages_warns_after_empty_lines() {
         payload.extend_from_slice(b"\n");
     }
     let (error, _stdout, stderr) = test_read_daemon_messages(payload);
-    let error = error.expect_err("expected missing-exit error");
-    assert!(matches!(error, AppError::MissingExit));
+    let missing_exit = error.expect_err("expected missing-exit error");
+    assert!(matches!(missing_exit, AppError::MissingExit));
     let warning = decode_utf8(stderr, "stderr").expect("decode stderr");
     assert!(warning.contains("Warning: received"));
 }
@@ -214,8 +216,8 @@ fn read_daemon_messages_warns_after_empty_lines() {
 #[test]
 fn read_daemon_messages_fails_on_malformed_json() {
     let (error, _stdout, _stderr) = test_read_daemon_messages(Vec::from("this is not json\n"));
-    let error = error.expect_err("expected parse-message error");
-    assert!(matches!(error, AppError::ParseMessage(_)));
+    let parse_error = error.expect_err("expected parse-message error");
+    assert!(matches!(parse_error, AppError::ParseMessage(_)));
 }
 
 #[test]
@@ -279,8 +281,8 @@ fn run_with_loader_filters_configuration_arguments() {
         ]
     );
 
-    assert!(!stderr.is_empty());
-    assert!(stdout.is_empty());
+    assert_ne!(stderr, Vec::<u8>::new());
+    assert_eq!(stdout, Vec::<u8>::new());
 }
 
 fn test_daemon_connection<F>(setup_listener: F) -> Result<()>
@@ -326,7 +328,8 @@ fn connect_successfully_establishes_tcp_connection() {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind listener");
         let port = listener.local_addr().expect("listener local addr").port();
 
-        let handle = thread::spawn(move || accept_tcp_connection(listener, default_daemon_lines()));
+        let handle =
+            thread::spawn(move || accept_tcp_connection(&listener, &default_daemon_lines()));
 
         (SocketEndpoint::tcp("127.0.0.1", port), handle)
     })
@@ -349,7 +352,7 @@ fn connect_supports_unix_sockets() {
         let listener = UnixListener::bind(&socket_path_for_listener).expect("bind unix socket");
 
         let handle =
-            thread::spawn(move || accept_unix_connection(listener, default_daemon_lines()));
+            thread::spawn(move || accept_unix_connection(&listener, &default_daemon_lines()));
 
         (SocketEndpoint::unix(socket_display), handle)
     })
@@ -364,13 +367,13 @@ fn connect_supports_unix_sockets() {
 fn is_daemon_not_running_classifies_errors(
     #[case] kind: io::ErrorKind,
     #[case] expected: bool,
-    #[case] _description: &str,
+    #[case] description: &str,
 ) {
     let error = AppError::Connect {
         endpoint: String::from("test:1234"),
         source: io::Error::new(kind, "test error"),
     };
-    assert_eq!(is_daemon_not_running(&error), expected);
+    assert_eq!(is_daemon_not_running(&error), expected, "{description}");
 }
 #[test]
 fn is_daemon_not_running_rejects_non_connect_errors() {

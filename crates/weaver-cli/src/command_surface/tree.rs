@@ -62,9 +62,10 @@ pub(crate) struct CommandNode {
     /// Runtime parsing model for the node.
     pub(crate) semantics: CommandSemantics,
     /// Nested command nodes in display order.
-    pub(crate) children: &'static [CommandNode],
+    pub(crate) children: &'static [Self],
 }
 
+/// Arguments accepted by `definitions get`.
 const DEFINITIONS_GET_ARGUMENTS: &[CommandArgument] = &[
     CommandArgument {
         long: "uri",
@@ -82,6 +83,7 @@ const DEFINITIONS_GET_ARGUMENTS: &[CommandArgument] = &[
     },
 ];
 
+/// Child nodes of the `definitions` command.
 const DEFINITIONS_CHILDREN: &[CommandNode] = &[CommandNode {
     resource_path: &["definitions"],
     verb: "get",
@@ -92,6 +94,7 @@ const DEFINITIONS_CHILDREN: &[CommandNode] = &[CommandNode {
     children: &[],
 }];
 
+/// Child nodes of the `daemon` command.
 const DAEMON_CHILDREN: &[CommandNode] = &[
     CommandNode {
         resource_path: &["daemon"],
@@ -122,6 +125,7 @@ const DAEMON_CHILDREN: &[CommandNode] = &[
     },
 ];
 
+/// Operations accepted by the `observe` domain.
 const OBSERVE_OPERATIONS: &[&str] = &[
     "get-definition",
     "find-references",
@@ -132,6 +136,7 @@ const OBSERVE_OPERATIONS: &[&str] = &[
     "graph-slice",
 ];
 
+/// Operations accepted by the `act` domain.
 const ACT_OPERATIONS: &[&str] = &[
     "rename-symbol",
     "apply-edits",
@@ -140,8 +145,10 @@ const ACT_OPERATIONS: &[&str] = &[
     "refactor",
 ];
 
+/// Operations accepted by the `verify` domain.
 const VERIFY_OPERATIONS: &[&str] = &["diagnostics", "syntax"];
 
+/// Legacy domain and operation pairings accepted at the root.
 const DOMAIN_OPERATIONS: &[DomainOperations] = &[
     DomainOperations {
         domain: "observe",
@@ -163,6 +170,8 @@ const DOMAIN_OPERATIONS: &[DomainOperations] = &[
     },
 ];
 
+/// Top-level command nodes in display order.
+/// Root of Weaver's command surface.
 const ROOT_CHILDREN: &[CommandNode] = &[
     CommandNode {
         resource_path: &["definitions"],
@@ -195,6 +204,7 @@ const ROOT_CHILDREN: &[CommandNode] = &[
     },
 ];
 
+/// Root of Weaver's command surface.
 const ROOT: CommandNode = CommandNode {
     resource_path: &[],
     verb: "weaver",
@@ -209,4 +219,5 @@ const ROOT: CommandNode = CommandNode {
 pub(crate) const fn root() -> &'static CommandNode { &ROOT }
 
 /// Returns the canonical legacy domain-operation catalogue.
+#[must_use]
 pub const fn domain_operations() -> &'static [DomainOperations] { DOMAIN_OPERATIONS }

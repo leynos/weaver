@@ -43,8 +43,12 @@ fn projection_preserves_the_structured_command_hierarchy_without_passthrough() {
             .collect::<Vec<_>>(),
         ["definitions", "daemon"],
     );
+    let definitions = metadata
+        .subcommands
+        .first()
+        .expect("projection must expose the definitions command");
     assert_eq!(
-        metadata.subcommands[0]
+        definitions
             .subcommands
             .iter()
             .map(|node| node.app_name.as_str())
@@ -57,7 +61,14 @@ fn projection_preserves_the_structured_command_hierarchy_without_passthrough() {
 fn projection_preserves_required_definition_arguments() {
     let metadata =
         project(command_tree::root()).expect("the built-in command tree should be bounded");
-    let definitions_get = &metadata.subcommands[0].subcommands[0];
+    let definitions = metadata
+        .subcommands
+        .first()
+        .expect("projection must expose the definitions command");
+    let definitions_get = definitions
+        .subcommands
+        .first()
+        .expect("projection must expose the definitions get command");
 
     assert_eq!(
         definitions_get
@@ -104,7 +115,7 @@ fn hand_assembled_argument_metadata_matches_the_upstream_derive() {
     assert_eq!(hand_assembled, derived.fields);
 }
 
-/// Rebuilds the field metadata the OrthoConfig derive would emit for a
+/// Rebuilds the field metadata the `OrthoConfig` derive would emit for a
 /// fixture argument, so the hand-assembled projection can be compared against
 /// the real derive. Returns `None` when the argument has no CLI metadata.
 fn derived_field(long: &'static str, value_name: Option<&'static str>) -> Option<FieldMetadata> {
@@ -269,9 +280,15 @@ fn generated_tree(depth: usize, branching: usize, label: &'static str) -> &'stat
     }
 
     let children = (0..branching)
-        .map(|index| *generated_tree(depth - 1, branching, LABELS[index]))
+        .map(|index| {
+            let child_label = LABELS
+                .get(index)
+                .copied()
+                .expect("branching must stay within the LABELS fixtures");
+            *generated_tree(depth - 1, branching, child_label)
+        })
         .collect::<Vec<_>>();
-    let children = Box::leak(children.into_boxed_slice());
+    let child_nodes = Box::leak(children.into_boxed_slice());
 
     Box::leak(Box::new(CommandNode {
         resource_path: &[],
@@ -280,7 +297,7 @@ fn generated_tree(depth: usize, branching: usize, label: &'static str) -> &'stat
         summary: "generated command",
         arguments: &[],
         semantics: CommandSemantics::Structured,
-        children,
+        children: child_nodes,
     }))
 }
 

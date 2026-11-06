@@ -90,6 +90,12 @@ where
     }
 }
 
+/// Connects to the daemon, starting it once when it is not running.
+///
+/// # Errors
+///
+/// Returns the failure [`ExitCode`] when the connection cannot be established,
+/// including when auto-start or the retry after startup fails.
 fn connect_or_start_daemon<E: Write>(
     context: LifecycleContext<'_>,
     stderr: &mut E,
@@ -139,6 +145,13 @@ pub(crate) fn build_request<R: Read>(
     }
 }
 
+/// Rejects requests whose JSON Lines encoding exceeds the transport limit.
+///
+/// # Errors
+///
+/// Returns [`AppError::SerialiseRequest`] when the request cannot be encoded,
+/// and [`AppError::RequestTooLarge`] when the encoded line, including the
+/// newline terminator, exceeds [`JSONL_REQUEST_MAX_LINE_BYTES`].
 fn enforce_request_line_limit(request: &CommandRequest) -> Result<(), AppError> {
     let json_len = serde_json::to_vec(request)
         .map_err(AppError::SerialiseRequest)?
@@ -165,6 +178,13 @@ fn write_error_and_fail<W: Write>(stderr: &mut W, error: impl std::fmt::Display)
     ExitCode::FAILURE
 }
 
+/// Starts the daemon and retries the socket connection once.
+///
+/// Emits startup guidance to `stderr` when the daemon cannot be started.
+///
+/// # Errors
+///
+/// Returns the failure [`ExitCode`] when startup or the retry fails.
 fn start_and_retry_daemon<E: Write>(
     context: LifecycleContext<'_>,
     stderr: &mut E,
@@ -264,6 +284,11 @@ mod tests {
         }
     }
 
+    /// Returns [`MAX_PATCH_BYTES`] as a `usize` for buffer sizing.
+    fn max_patch_bytes_usize() -> usize {
+        usize::try_from(MAX_PATCH_BYTES).expect("patch size limit must fit in usize")
+    }
+
     #[test]
     fn non_patch_invocation_does_not_read_stdin() {
         let mut stdin = Cursor::new(b"should not be read".to_vec());
@@ -279,7 +304,7 @@ mod tests {
     #[test]
     fn non_patch_invocation_rejects_oversized_jsonl_request() {
         let invocation = observe_status_invocation_with_argument(argument_with_jsonl_len(
-            MAX_PATCH_BYTES as usize + 1,
+            max_patch_bytes_usize() + 1,
         ));
         let mut stdin = Cursor::new(b"should not be read".to_vec());
         let result = build_request(invocation, &mut stdin);
@@ -297,11 +322,11 @@ mod tests {
         ExpectedPatchRequest::MissingPatchInput
     )]
     #[case::accepts_request_at_jsonl_size_limit(
-        patch_with_jsonl_len(MAX_PATCH_BYTES as usize),
+        patch_with_jsonl_len(max_patch_bytes_usize()),
         ExpectedPatchRequest::Ok
     )]
     #[case::returns_error_for_oversized_jsonl_request(
-        patch_with_jsonl_len(MAX_PATCH_BYTES as usize + 1),
+        patch_with_jsonl_len(max_patch_bytes_usize() + 1),
         ExpectedPatchRequest::Oversized
     )]
     fn apply_patch_stdin_cases(#[case] input: Vec<u8>, #[case] expected: ExpectedPatchRequest) {
@@ -313,7 +338,7 @@ mod tests {
             ExpectedPatchRequest::Ok => {
                 let request = result.expect("patch input should build a request");
                 assert_eq!(request.patch.as_deref(), Some(expected_patch.as_str()));
-                assert!(request_jsonl_len(&request) <= MAX_PATCH_BYTES as usize);
+                assert!(request_jsonl_len(&request) <= max_patch_bytes_usize());
             }
             ExpectedPatchRequest::MissingPatchInput => {
                 assert!(matches!(result, Err(AppError::MissingPatchInput)));
@@ -327,7 +352,7 @@ mod tests {
     proptest! {
         #[test]
         fn patch_at_or_below_limit_returns_only_expected_outcomes(
-            size in 1usize..=(MAX_PATCH_BYTES as usize)
+            size in 1usize..=max_patch_bytes_usize()
         ) {
             let mut stdin = Cursor::new(vec![b'x'; size]);
             let result = build_request(apply_patch_invocation(), &mut stdin);

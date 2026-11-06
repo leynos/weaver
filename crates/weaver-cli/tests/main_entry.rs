@@ -294,13 +294,13 @@ fn generated_man_page_contains_all_shared_config_flags() {
     let man_pages = ["debug", "release"]
         .map(|profile| format!("target/generated-man/{target}/{profile}/weaver.1"));
 
-    let content = man_pages.iter().find_map(|path| {
+    let man_page = man_pages.iter().find_map(|path| {
         workspace
             .read_to_string(path)
             .ok()
-            .map(|content| (path, content))
+            .map(|contents| (path, contents))
     });
-    let Some((man_page_path, content)) = content else {
+    let Some((man_page_path, content)) = man_page else {
         panic!("generated man page weaver.1 not found for target {target}");
     };
 
