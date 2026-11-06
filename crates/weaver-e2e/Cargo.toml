@@ -5,7 +5,6 @@ version.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-weaver-graph = { path = "../weaver-graph" }
 weaver-lsp-host = { path = "../weaver-lsp-host" }
 weaver-syntax = { path = "../weaver-syntax" }
 lsp-types = { workspace = true }
@@ -22,6 +21,7 @@ rstest = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
 url = { workspace = true }
+weaver-graph = { path = "../weaver-graph" }
 weaver-cli = { path = "../weaver-cli" }
 weaver-cards = { path = "../weaver-cards" }
 weaver-config = { path = "../weaver-config" }

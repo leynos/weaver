@@ -113,11 +113,16 @@ fn default_runtime_directory() -> PathBuf {
 pub enum RuntimePathsError {
     /// The socket path lacked a parent directory.
     #[error("socket path '{path}' has no parent directory")]
-    MissingSocketParent { path: String },
+    MissingSocketParent {
+        /// The socket path that has no parent.
+        path: String,
+    },
     /// Creating the runtime directory failed.
     #[error("failed to prepare runtime directory '{path}': {source}")]
     RuntimeDirectory {
+        /// The runtime directory that could not be prepared.
         path: PathBuf,
+        /// The underlying I/O error.
         #[source]
         source: std::io::Error,
     },

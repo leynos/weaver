@@ -28,7 +28,8 @@ global-timeout = "15m"
 max-threads = 1
 
 [[profile.default.overrides]]
-# `load_manifest` runs the renderer example through `cargo`, and both
+# `load_manifest` runs the renderer example through `cargo`, the
+# `missing_docs_policy` contract drives `trybuild`, and both
 # `compile_time` binaries (weaver-docs-gate and weaver-plugins) compile
 # fixtures. The end-to-end binaries can also run `cargo build` to find the
 # `weaver` binary, but only when it is missing and at most once per process, so
@@ -37,6 +38,6 @@ max-threads = 1
 # Measured on CI: 26 s, 39 s and 85 s for the three slowest of these tests.
 # An instrumented from-scratch build is slower, so the allowance is five
 # 120-second periods (600 s), which the coverage job's limit still covers.
-filter = 'binary(=load_manifest) | binary(=compile_time)'
+filter = 'binary(=load_manifest) | binary(=compile_time) | binary(=missing_docs_policy)'
 test-group = "nested-cargo-builds"
 slow-timeout = { period = "120s", terminate-after = 5 }

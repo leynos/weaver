@@ -51,6 +51,7 @@ impl Sandbox {
         }
     }
 
+    /// Creates a sandbox with the supplied profile and a stub thread counter.
     #[cfg(test)]
     pub fn with_thread_counter_for_tests(
         profile: SandboxProfile,
