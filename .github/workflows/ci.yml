@@ -124,10 +124,8 @@ jobs:
         # setup-rust exports `RUSTFLAGS`, which displaces the configuration's
         # sources, so the step composes the standard flags onto it as the
         # Makefile does.
-        env:
-          STANDARD_RUSTFLAGS: -Zthreads=8 -Clink-arg=-fuse-ld=mold
         run: >-
-          RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }$STANDARD_RUSTFLAGS"
+          RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Zthreads=8 -Clink-arg=-fuse-ld=mold"
           cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
       - name: Install Whitaker
         uses: leynos/shared-actions/.github/actions/install-whitaker@5a99aed78ce68dcebd3052b75c31e6f173162b1e # shared-actions 5a99aed7 (whitaker-installer 0.2.11)
