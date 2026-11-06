@@ -41,7 +41,7 @@ impl RefactorPluginRuntime for RollbackRuntime {
 }
 
 pub(crate) fn selected_runtime(
-    config: SelectedResolution<'_>,
+    config: &SelectedResolution<'_>,
     execute_result: ExecuteResult,
 ) -> RollbackRuntime {
     RollbackRuntime {

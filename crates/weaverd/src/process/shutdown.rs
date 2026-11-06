@@ -32,12 +32,13 @@ pub enum ShutdownError {
 /// Shutdown listener that waits for termination signals.
 #[derive(Debug, Clone)]
 pub struct SystemShutdownSignal {
+    /// Configured shutdown budget, reported in milliseconds when a signal arrives.
     timeout: Duration,
 }
 
 impl SystemShutdownSignal {
     /// Builds a signal listener with the configured timeout budget.
-    pub fn new(timeout: Duration) -> Self { Self { timeout } }
+    pub const fn new(timeout: Duration) -> Self { Self { timeout } }
 }
 
 impl ShutdownSignal for SystemShutdownSignal {

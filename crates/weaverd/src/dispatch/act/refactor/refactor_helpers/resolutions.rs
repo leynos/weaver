@@ -29,7 +29,7 @@ pub(crate) struct SelectedResolution<'a> {
     pub(crate) requested_provider: Option<&'a str>,
 }
 
-pub(crate) fn selected_resolution(config: SelectedResolution<'_>) -> CapabilityResolutionEnvelope {
+pub(crate) fn selected_resolution(config: &SelectedResolution<'_>) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
         capability: config.capability,
         language: Some(String::from(config.language)),
@@ -74,27 +74,30 @@ pub(crate) struct AutoResolutionContext<'a> {
 }
 
 pub(crate) fn resolve_auto_language(
-    context: AutoResolutionContext<'_>,
+    context: &AutoResolutionContext<'_>,
     language_name: Option<&'static str>,
     provider: &'static str,
     candidates: Vec<CandidateEvaluation>,
 ) -> CapabilityResolutionEnvelope {
-    if let Some(language) = language_name {
-        selected_resolution(SelectedResolution {
-            capability: context.capability,
-            language,
-            provider,
-            selection_mode: context.selection_mode,
-            requested_provider: context.requested_provider,
-        })
-    } else {
-        refused_resolution(RefusedResolution {
-            capability: context.capability,
-            language: None,
-            requested_provider: context.requested_provider,
-            selection_mode: context.selection_mode,
-            refusal_reason: RefusalReason::UnsupportedLanguage,
-            candidates,
-        })
-    }
+    language_name.map_or_else(
+        || {
+            refused_resolution(RefusedResolution {
+                capability: context.capability,
+                language: None,
+                requested_provider: context.requested_provider,
+                selection_mode: context.selection_mode,
+                refusal_reason: RefusalReason::UnsupportedLanguage,
+                candidates,
+            })
+        },
+        |language| {
+            selected_resolution(&SelectedResolution {
+                capability: context.capability,
+                language,
+                provider,
+                selection_mode: context.selection_mode,
+                requested_provider: context.requested_provider,
+            })
+        },
+    )
 }

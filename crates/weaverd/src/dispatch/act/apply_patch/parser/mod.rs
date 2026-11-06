@@ -5,19 +5,27 @@ use crate::dispatch::act::apply_patch::{
     types::{DiffHeaderLine, FilePath, PatchOperation, PatchText},
 };
 
+mod paths;
 mod state;
 
-use self::state::{CreateContentCapture, SearchReplaceParser};
+use self::{
+    paths::parse_diff_paths,
+    state::{CreateContentCapture, SearchReplaceParser},
+};
 
 /// Line processing context containing type and position information.
 struct LineInfo {
+    /// Classification of the current line.
     line_type: LineType,
+    /// Byte offset where the line begins within the chunk.
     start: usize,
+    /// Byte offset just past the line, including its newline.
     end: usize,
 }
 
 impl LineInfo {
-    fn new(line_type: LineType, start: usize, end: usize) -> Self {
+    /// Bundles the classification and byte range of one source line.
+    const fn new(line_type: LineType, start: usize, end: usize) -> Self {
         Self {
             line_type,
             start,
@@ -28,12 +36,15 @@ impl LineInfo {
 
 /// Mutable parser state for search/replace operations.
 struct ParserState<'a> {
+    /// Operation mode inferred so far.
     mode: &'a mut OperationMode,
+    /// Accumulator for `SEARCH`/`REPLACE` blocks.
     search_replace: &'a mut SearchReplaceParser,
 }
 
 impl<'a> ParserState<'a> {
-    fn new(mode: &'a mut OperationMode, search_replace: &'a mut SearchReplaceParser) -> Self {
+    /// Creates the state view used while processing one marker line.
+    const fn new(mode: &'a mut OperationMode, search_replace: &'a mut SearchReplaceParser) -> Self {
         Self {
             mode,
             search_replace,
@@ -41,20 +52,44 @@ impl<'a> ParserState<'a> {
     }
 }
 
+/// Parses a patch stream into the operations it describes.
+///
+/// # Errors
+///
+/// Returns [`ApplyPatchError::EmptyPatch`] or [`ApplyPatchError::BinaryPatch`]
+/// when the input is empty or contains NUL bytes, and forwards parsing errors
+/// from [`split_operations`] and [`parse_operation`].
 pub(crate) fn parse_patch(patch: &PatchText) -> Result<Vec<PatchOperation>, ApplyPatchError> {
-    let patch = patch.as_str();
-    if patch.trim().is_empty() {
+    let text = patch.as_str();
+    if text.trim().is_empty() {
         return Err(ApplyPatchError::EmptyPatch);
     }
-    if patch.as_bytes().contains(&0) {
+    if text.as_bytes().contains(&0) {
         return Err(ApplyPatchError::BinaryPatch);
     }
 
-    let chunks = split_operations(patch)?;
+    let chunks = split_operations(text)?;
     chunks.into_iter().map(parse_operation).collect()
 }
 
+/// Splits `patch` into one chunk per `diff --git` header.
+///
+/// # Errors
+///
+/// Returns [`ApplyPatchError::MissingDiffHeader`] when no header line is found.
 fn split_operations(patch: &str) -> Result<Vec<&str>, ApplyPatchError> {
+    let offsets = header_offsets(patch);
+    if offsets.is_empty() {
+        return Err(ApplyPatchError::MissingDiffHeader);
+    }
+    Ok(slice_at_offsets(patch, &offsets))
+}
+
+/// Returns the byte offset of every `diff --git` header outside a SEARCH block.
+///
+/// A header inside a `<<<<<<< SEARCH` / `>>>>>>> REPLACE` block is literal
+/// patch content, not a chunk boundary, so it must not be recorded.
+fn header_offsets(patch: &str) -> Vec<usize> {
     let mut offsets = Vec::new();
     let mut offset = 0;
     let mut in_search_replace = false;
@@ -70,28 +105,36 @@ fn split_operations(patch: &str) -> Result<Vec<&str>, ApplyPatchError> {
         }
         offset += line.len();
     }
-
-    if offsets.is_empty() {
-        return Err(ApplyPatchError::MissingDiffHeader);
-    }
-
-    let mut chunks = Vec::new();
-    for (index, start) in offsets.iter().enumerate() {
-        let end = offsets.get(index + 1).copied().unwrap_or(patch.len());
-        chunks.push(&patch[*start..end]);
-    }
-
-    Ok(chunks)
+    offsets
 }
 
+/// Slices `patch` at consecutive `offsets`, ending at end of input.
+fn slice_at_offsets<'a>(patch: &'a str, offsets: &[usize]) -> Vec<&'a str> {
+    offsets
+        .iter()
+        .enumerate()
+        .filter_map(|(index, start)| {
+            let end = offsets.get(index + 1).copied().unwrap_or(patch.len());
+            patch.get(*start..end)
+        })
+        .collect()
+}
+
+/// Parses a single `diff --git` chunk into one patch operation.
+///
+/// # Errors
+///
+/// Returns a parse error when the chunk header is invalid, a `SEARCH` block
+/// cannot be matched, or the captured operation fails validation.
 fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
-    let (path, mut offset) = parse_header(chunk)?;
-    let path = FilePath::new(path);
+    let (path_text, mut offset) = parse_header(chunk)?;
+    let path = FilePath::new(path_text);
     let mut mode = OperationMode::Unknown;
     let mut search_replace = SearchReplaceParser::new();
     let mut create_capture = CreateContentCapture::new();
 
-    for line in chunk[offset..].split_inclusive('\n') {
+    let remainder = chunk.get(offset..).unwrap_or_default();
+    for line in remainder.split_inclusive('\n') {
         let line_start = offset;
         let line_end = offset + line.len();
         let trimmed = trim_line(line);
@@ -102,8 +145,8 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
             line_type,
             LineType::SearchMarker | LineType::Separator | LineType::ReplaceMarker
         ) {
-            let state = ParserState::new(&mut mode, &mut search_replace);
-            if handle_search_replace_marker(&line_info, state, chunk, &path)? {
+            let mut state = ParserState::new(&mut mode, &mut search_replace);
+            if handle_search_replace_marker(&line_info, &mut state, chunk, &path)? {
                 offset = line_info.end;
                 continue;
             }
@@ -130,10 +173,15 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
 }
 
 /// Handles SEARCH/REPLACE marker lines without mutating the cursor offset.
+///
+/// # Errors
+///
+/// Returns [`ApplyPatchError::UnclosedReplaceBlock`] when a replace marker
+/// cannot be recorded.
 // Required to pass explicit marker context without threading local structs.
 fn handle_search_replace_marker(
     line_info: &LineInfo,
-    state: ParserState<'_>,
+    state: &mut ParserState<'_>,
     chunk: &str,
     path: &FilePath,
 ) -> Result<bool, ApplyPatchError> {
@@ -171,10 +219,15 @@ fn detect_mode_transition(trimmed: &str, current: OperationMode) -> OperationMod
 }
 
 /// Validates line types that may raise parse errors.
+///
+/// # Errors
+///
+/// Returns [`ApplyPatchError::InvalidDiffHeader`] when a `diff --git` header
+/// line appears in a position where it cannot be parsed.
 fn validate_line_type(line_type: LineType, trimmed: &str) -> Result<(), ApplyPatchError> {
     if line_type == LineType::DiffHeader {
         return Err(ApplyPatchError::InvalidDiffHeader {
-            line: trimmed.to_string(),
+            line: trimmed.to_owned(),
         });
     }
     Ok(())
@@ -194,6 +247,13 @@ fn handle_mode_specific_capture(
     }
 }
 
+/// Parses the leading `diff --git` header and returns its path and end offset.
+///
+/// # Errors
+///
+/// Returns [`ApplyPatchError::MissingDiffHeader`] when the chunk is empty and
+/// [`ApplyPatchError::InvalidDiffHeader`] when the header or its paths are
+/// malformed.
 fn parse_header(chunk: &str) -> Result<(String, usize), ApplyPatchError> {
     if chunk.is_empty() {
         return Err(ApplyPatchError::MissingDiffHeader);
@@ -207,7 +267,7 @@ fn parse_header(chunk: &str) -> Result<(String, usize), ApplyPatchError> {
     let trimmed = trim_line(line);
     if !trimmed.starts_with("diff --git ") {
         return Err(ApplyPatchError::InvalidDiffHeader {
-            line: trimmed.to_string(),
+            line: trimmed.to_owned(),
         });
     }
 
@@ -217,17 +277,26 @@ fn parse_header(chunk: &str) -> Result<(String, usize), ApplyPatchError> {
     Ok((path, line_end))
 }
 
+/// Classification of a trimmed patch line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LineType {
+    /// The `<<<<<<< SEARCH` marker opening a search block.
     SearchMarker,
+    /// The `=======` separator between search and replace text.
     Separator,
+    /// The `>>>>>>> REPLACE` marker closing a replace block.
     ReplaceMarker,
+    /// A `@@` hunk header line.
     HunkHeader,
+    /// A `diff --git` header line.
     DiffHeader,
+    /// A line beginning with `+` inside a create hunk.
     CreateContent,
+    /// Any other line that carries no parsing meaning.
     Other,
 }
 
+/// Classifies a trimmed patch line by its marker prefix.
 fn classify_line(trimmed: &str) -> LineType {
     if trimmed == "<<<<<<< SEARCH" {
         LineType::SearchMarker
@@ -246,6 +315,13 @@ fn classify_line(trimmed: &str) -> LineType {
     }
 }
 
+/// Converts the accumulated parser state into a single patch operation.
+///
+/// # Errors
+///
+/// Returns [`ApplyPatchError::MissingSearchReplace`] when a modify operation
+/// captured no blocks, and forwards create validation errors. Returns
+/// [`ApplyPatchError::MissingDiffHeader`] when the mode stayed unknown.
 fn construct_operation(
     mode: OperationMode,
     path: FilePath,
@@ -269,101 +345,32 @@ fn construct_operation(
     }
 }
 
+/// Strips trailing CR and LF bytes from `line`.
 fn trim_line(line: &str) -> &str { line.trim_end_matches(['\n', '\r']) }
 
-fn parse_diff_paths(line: &str) -> Result<(String, String), ApplyPatchError> {
-    let remainder =
-        line.strip_prefix("diff --git ")
-            .ok_or_else(|| ApplyPatchError::InvalidDiffHeader {
-                line: line.to_string(),
-            })?;
-    let mut chars = remainder.chars().peekable();
-    let mut tokens = Vec::new();
-
-    while tokens.len() < 2 {
-        let token = parse_next_token(&mut chars, line)?;
-        let Some(token) = token else {
-            break;
-        };
-        if !token.is_empty() {
-            tokens.push(token);
-        }
-    }
-
-    let [first, second] =
-        <[String; 2]>::try_from(tokens).map_err(|_| ApplyPatchError::InvalidDiffHeader {
-            line: line.to_string(),
-        })?;
-    Ok((first, second))
-}
-
-fn parse_next_token(
-    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
-    line: &str,
-) -> Result<Option<String>, ApplyPatchError> {
-    consume_whitespace(chars);
-    let next = match chars.peek().copied() {
-        Some(next) => next,
-        None => return Ok(None),
-    };
-    if next == '"' {
-        chars.next();
-        read_quoted_token(chars, line).map(Some)
-    } else {
-        Ok(Some(read_unquoted_token(chars)))
-    }
-}
-
-fn consume_whitespace(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) {
-    while matches!(chars.peek(), Some(ch) if ch.is_whitespace()) {
-        chars.next();
-    }
-}
-
-fn read_quoted_token(
-    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
-    line: &str,
-) -> Result<String, ApplyPatchError> {
-    let mut value = String::new();
-    for ch in chars.by_ref() {
-        if ch == '"' {
-            return Ok(value);
-        }
-        value.push(ch);
-    }
-    Err(ApplyPatchError::InvalidDiffHeader {
-        line: line.to_string(),
-    })
-}
-
-fn read_unquoted_token(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
-    let mut value = String::new();
-    while let Some(ch) = chars.peek().copied() {
-        if ch.is_whitespace() {
-            break;
-        }
-        value.push(ch);
-        chars.next();
-    }
-    value
-}
-
+/// Removes a leading `b/` or `b\` prefix from a diff path.
 fn strip_b_prefix(path: &str) -> String {
     path.strip_prefix("b/")
         .or_else(|| path.strip_prefix("b\\"))
         .unwrap_or(path)
-        .to_string()
+        .to_owned()
 }
 
+/// Mode inferred from the diff markers seen so far.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OperationMode {
+    /// No mode-bearing marker has been seen yet.
     Unknown,
+    /// The chunk modifies an existing file.
     Modify,
+    /// The chunk creates a new file.
     Create,
+    /// The chunk deletes an existing file.
     Delete,
 }
 
 impl OperationMode {
+    /// Promotes the current mode to `next`, keeping an established mode.
     const fn promote(self, next: Self) -> Self {
         match (self, next) {
             (Self::Unknown, other) => other,

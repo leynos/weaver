@@ -3,7 +3,10 @@
 //! Extracted from the step definitions so both files stay within the project's
 //! file-length limit and the world can be reused by future suites.
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use tempfile::TempDir;
 
@@ -89,10 +92,10 @@ impl SafetyHarnessWorld {
         let path = name.to_path(self.temp_dir.path());
         test_fs::write(&path, content.as_bytes())
             .map_err(|error| format!("write content: {error}"))?;
-        let name_str = name.as_str().to_string();
+        let name_str = name.as_str().to_owned();
         self.files.insert(name_str.clone(), path);
         self.original_content
-            .insert(name_str.clone(), content.as_str().to_string());
+            .insert(name_str.clone(), content.as_str().to_owned());
         self.current_file = Some(name_str);
         Ok(())
     }
@@ -129,29 +132,55 @@ impl SafetyHarnessWorld {
         new: &TextPattern,
     ) -> Result<(), String> {
         let path = self.file_path(name);
-        let content =
-            if test_fs::exists(&path).map_err(|error| format!("check file existence: {error}"))? {
-                test_fs::read_to_string(&path).map_err(|error| format!("read file: {error}"))?
-            } else {
-                String::new()
-            };
+        let content = Self::read_existing_or_empty(&path)?;
 
-        // Find the position of the old text
-        if let Some(pos) = content.find(old.as_str()) {
-            let line = content[..pos].matches('\n').count() as u32;
-            let line_start = content[..pos].rfind('\n').map_or(0, |i| i + 1);
-            let column = (pos - line_start) as u32;
-            let old_end_col = column + old.len() as u32;
-
-            let edit = TextEdit::from_positions(
-                Position::new(line, column),
-                Position::new(line, old_end_col),
-                new.as_str().to_string(),
-            );
-            let file_edit = FileEdit::with_edits(path, vec![edit]);
-            self.pending_edits.push(file_edit);
+        // `find` reports a byte offset at a character boundary, so the text
+        // before it can always be sliced safely.
+        if let Some(offset) = content.find(old.as_str()) {
+            let (start, end) = Self::replacement_range(&content, offset, old.len())?;
+            let edit = TextEdit::from_positions(start, end, new.as_str().to_owned());
+            self.pending_edits
+                .push(FileEdit::with_edits(path, vec![edit]));
         }
         Ok(())
+    }
+
+    /// Reads `path`, treating a file that does not exist as empty content.
+    ///
+    /// Replacement edits may target a file the scenario creates earlier in the
+    /// same transaction, so a missing file is a normal state rather than an
+    /// error.
+    fn read_existing_or_empty(path: &Path) -> Result<String, String> {
+        if test_fs::exists(path).map_err(|error| format!("check file existence: {error}"))? {
+            test_fs::read_to_string(path).map_err(|error| format!("read file: {error}"))
+        } else {
+            Ok(String::new())
+        }
+    }
+
+    /// Computes the start and end positions of the match at `offset`.
+    ///
+    /// Positions are one-line ranges because the harness only replaces text
+    /// that stays on the line where it was found.
+    fn replacement_range(
+        content: &str,
+        offset: usize,
+        old_len: usize,
+    ) -> Result<(Position, Position), String> {
+        let prefix = content
+            .get(..offset)
+            .ok_or_else(|| String::from("matched position should be a character boundary"))?;
+        let line = u32::try_from(prefix.matches('\n').count())
+            .map_err(|error| format!("line index should fit in u32: {error}"))?;
+        let line_start = prefix.rfind('\n').map_or(0, |index| index + 1);
+        let column = u32::try_from(offset - line_start)
+            .map_err(|error| format!("column index should fit in u32: {error}"))?;
+        let match_len = u32::try_from(old_len)
+            .map_err(|error| format!("replacement length should fit in u32: {error}"))?;
+        let end_column = column
+            .checked_add(match_len)
+            .ok_or_else(|| String::from("column offset should not overflow"))?;
+        Ok((Position::new(line, column), Position::new(line, end_column)))
     }
 
     /// Adds an edit that creates a new file with content.
@@ -160,7 +189,7 @@ impl SafetyHarnessWorld {
         let edit = TextEdit::insert_at(Position::new(0, 0), content.as_str());
         let file_edit = FileEdit::with_edits(path.clone(), vec![edit]);
         self.pending_edits.push(file_edit);
-        self.files.insert(name.as_str().to_string(), path);
+        self.files.insert(name.as_str().to_owned(), path);
     }
 
     /// Executes the transaction with pending edits.

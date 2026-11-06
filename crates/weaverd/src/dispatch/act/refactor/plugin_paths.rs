@@ -34,10 +34,13 @@ pub(super) fn resolve_rust_analyzer_plugin_path(raw_override: Option<OsString>) 
     resolve_plugin_path(raw_override, DEFAULT_RUST_ANALYZER_PLUGIN_PATH)
 }
 
+/// Resolves an optional override, falling back to `default_path`, to an
+/// absolute path.
+///
+/// A relative result is joined onto the process working directory; when that
+/// directory cannot be read the relative path is returned unchanged.
 fn resolve_plugin_path(raw_override: Option<OsString>, default_path: &str) -> PathBuf {
-    let candidate = raw_override
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(default_path));
+    let candidate = raw_override.map_or_else(|| PathBuf::from(default_path), PathBuf::from);
     if candidate.is_absolute() {
         return candidate;
     }

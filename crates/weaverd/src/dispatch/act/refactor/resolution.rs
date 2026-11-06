@@ -26,16 +26,19 @@ pub(crate) const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
 /// Machine-readable routing rationale.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct CapabilityResolutionEnvelope {
+    /// Serialized status string, `"ok"` on success and `"error"` on refusal.
     status: &'static str,
+    /// Envelope discriminator, serialized under the `"type"` key.
     #[serde(rename = "type")]
     kind: &'static str,
+    /// Routing decision carried by the envelope.
     details: CapabilityResolutionDetails,
 }
 
 impl CapabilityResolutionEnvelope {
     /// Builds an envelope from a routing decision.
     #[must_use]
-    pub(crate) fn from_details(details: CapabilityResolutionDetails) -> Self {
+    pub(crate) const fn from_details(details: CapabilityResolutionDetails) -> Self {
         let status = if details.selected_provider.is_some() {
             "ok"
         } else {
@@ -56,17 +59,25 @@ impl CapabilityResolutionEnvelope {
 /// Detailed routing decision captured as data.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct CapabilityResolutionDetails {
+    /// Capability the daemon attempted to route.
     pub(crate) capability: CapabilityId,
+    /// Inferred language name, absent when inference failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) language: Option<String>,
+    /// Explicit provider override supplied by the operator, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) requested_provider: Option<String>,
+    /// Provider chosen by routing, absent when routing was refused.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) selected_provider: Option<String>,
+    /// Whether the operator or the daemon chose the provider.
     pub(crate) selection_mode: SelectionMode,
+    /// High-level result of the routing decision.
     pub(crate) outcome: ResolutionOutcome,
+    /// Reason routing was refused, absent on success.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) refusal_reason: Option<RefusalReason>,
+    /// Per-candidate evaluation in registry order.
     pub(crate) candidates: Vec<CandidateEvaluation>,
 }
 
@@ -115,8 +126,11 @@ pub(crate) enum RefusalReason {
 /// Candidate-by-candidate explanation of the routing choice.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct CandidateEvaluation {
+    /// Registered name of the evaluated plugin.
     pub(crate) provider: String,
+    /// Whether this candidate was selected for the request.
     pub(crate) accepted: bool,
+    /// Why the candidate was accepted or rejected.
     pub(crate) reason: CandidateReason,
 }
 
@@ -139,8 +153,11 @@ pub(crate) enum CandidateReason {
 /// Resolver input for a single capability request.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ResolutionRequest<'a> {
+    /// Capability the caller wants to route.
     capability: CapabilityId,
+    /// File whose extension determines the inferred language.
     target_file: &'a Path,
+    /// Operator-supplied provider override, if any.
     explicit_provider: Option<&'a str>,
 }
 
@@ -190,7 +207,7 @@ pub(crate) fn resolve_provider(
     let candidates = sorted_capability_manifests(registry, request.capability);
     let requested_provider = request.explicit_provider.map(String::from);
 
-    let Some(language) = language else {
+    let Some(supported_language) = language else {
         return refused(
             RoutingContext {
                 capability: request.capability,
@@ -210,27 +227,32 @@ pub(crate) fn resolve_provider(
         return resolve_explicit_provider(
             registry,
             provider_name,
-            ExplicitProviderContext {
+            &ExplicitProviderContext {
                 capability: request.capability,
-                language,
+                language: supported_language,
                 candidates: &candidates,
             },
         );
     }
 
-    resolve_automatic_provider(request.capability, language, candidates)
+    resolve_automatic_provider(request.capability, supported_language, &candidates)
 }
 
+/// Inputs shared by the explicit-provider routing path.
 struct ExplicitProviderContext<'a> {
+    /// Capability being routed.
     capability: CapabilityId,
+    /// Language inferred from the target file.
     language: SupportedLanguage,
+    /// Capability manifests sorted by provider name.
     candidates: &'a [&'a PluginManifest],
 }
 
+/// Routes to an operator-named provider, recording each candidate evaluation.
 fn resolve_explicit_provider(
     registry: &PluginRegistry,
     provider_name: &str,
-    context: ExplicitProviderContext<'_>,
+    context: &ExplicitProviderContext<'_>,
 ) -> CapabilityResolutionEnvelope {
     let mut found_in_candidates = false;
     let mut selected_provider: Option<String> = None;
@@ -293,10 +315,11 @@ fn resolve_explicit_provider(
     }
 }
 
+/// Chooses the highest-priority provider that supports the inferred language.
 fn resolve_automatic_provider(
     capability: CapabilityId,
     language: SupportedLanguage,
-    candidates: Vec<&PluginManifest>,
+    candidates: &[&PluginManifest],
 ) -> CapabilityResolutionEnvelope {
     let matching: Vec<&PluginManifest> = candidates
         .iter()
@@ -325,8 +348,7 @@ fn resolve_automatic_provider(
     let selected_name = matching
         .iter()
         .min_by_key(|manifest| provider_rank(manifest.name(), language))
-        .map(|manifest| manifest.name())
-        .unwrap_or("unreachable");
+        .map_or("unreachable", |manifest| manifest.name());
 
     let evaluations = candidates
         .iter()
@@ -353,6 +375,7 @@ fn resolve_automatic_provider(
     })
 }
 
+/// Returns the registry's capability manifests sorted by provider name.
 fn sorted_capability_manifests(
     registry: &PluginRegistry,
     capability: CapabilityId,

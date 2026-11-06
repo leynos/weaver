@@ -5,7 +5,7 @@ use std::{io::Write, net::TcpStream, thread};
 use rstest::rstest;
 
 use super::{
-    tests_helpers::{backend_manager, create_listener},
+    tests_helpers::{backend_manager, create_listener, ensure},
     *,
 };
 use crate::transport::ConnectionStream;
@@ -36,11 +36,11 @@ fn receive_request_from_bytes(
     request: &[u8],
 ) -> Result<Result<(Vec<u8>, CommandRequest), ReadRequestError>, String> {
     let (listener, addr) = create_listener()?;
-    let request = request.to_vec();
+    let request_bytes = request.to_vec();
     let sender = thread::spawn(move || -> Result<(), String> {
         let mut stream = TcpStream::connect(addr).map_err(|error| format!("connect: {error}"))?;
         stream
-            .write_all(&request)
+            .write_all(&request_bytes)
             .map_err(|error| format!("write request: {error}"))?;
         stream.flush().map_err(|error| format!("flush: {error}"))?;
         Ok(())
@@ -49,8 +49,8 @@ fn receive_request_from_bytes(
     let (stream, _) = listener
         .accept()
         .map_err(|error| format!("accept: {error}"))?;
-    let mut stream = ConnectionStream::Tcp(stream);
-    let result = handler.receive_request(&mut stream);
+    let mut connection = ConnectionStream::Tcp(stream);
+    let result = handler.receive_request(&mut connection);
     sender
         .join()
         .map_err(|error| format!("join sender: {error:?}"))??;
@@ -66,9 +66,15 @@ fn receive_request_accepts_valid_request() -> Result<(), String> {
     )?
     .map_err(|error| format!("receive request: {error:?}"))?;
 
-    assert_eq!(result.1.domain(), "observe");
-    assert_eq!(result.1.operation(), "get-card");
-    assert!(!result.0.is_empty());
+    ensure(
+        result.1.domain() == "observe",
+        format!("expected domain observe, got {}", result.1.domain()),
+    )?;
+    ensure(
+        result.1.operation() == "get-card",
+        format!("expected operation get-card, got {}", result.1.operation()),
+    )?;
+    ensure(!result.0.is_empty(), "expected non-empty response bytes")?;
     Ok(())
 }
 
@@ -90,24 +96,33 @@ fn receive_request_rejects_bad_requests(
     let result = receive_request_from_bytes(&handler, &payload)?;
 
     match expected {
-        ExpectedDispatchError::MalformedJsonl => assert!(matches!(
-            result,
-            Err(ReadRequestError::BadRequest(
-                DispatchError::MalformedJsonl { .. }
-            ))
-        )),
-        ExpectedDispatchError::InvalidStructure => assert!(matches!(
-            result,
-            Err(ReadRequestError::BadRequest(
-                DispatchError::InvalidStructure { .. }
-            ))
-        )),
-        ExpectedDispatchError::RequestTooLarge => assert!(matches!(
-            result,
-            Err(ReadRequestError::BadRequest(
-                DispatchError::RequestTooLarge { .. }
-            ))
-        )),
+        ExpectedDispatchError::MalformedJsonl => ensure(
+            matches!(
+                result,
+                Err(ReadRequestError::BadRequest(
+                    DispatchError::MalformedJsonl { .. }
+                ))
+            ),
+            "expected a malformed JSONL rejection",
+        )?,
+        ExpectedDispatchError::InvalidStructure => ensure(
+            matches!(
+                result,
+                Err(ReadRequestError::BadRequest(
+                    DispatchError::InvalidStructure { .. }
+                ))
+            ),
+            "expected an invalid-structure rejection",
+        )?,
+        ExpectedDispatchError::RequestTooLarge => ensure(
+            matches!(
+                result,
+                Err(ReadRequestError::BadRequest(
+                    DispatchError::RequestTooLarge { .. }
+                ))
+            ),
+            "expected a request-too-large rejection",
+        )?,
     }
     Ok(())
 }

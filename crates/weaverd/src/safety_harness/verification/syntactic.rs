@@ -40,6 +40,7 @@ use crate::safety_harness::{error::VerificationFailure, locks::SyntacticLockResu
 /// ```
 #[derive(Debug)]
 pub struct TreeSitterSyntacticLockAdapter {
+    /// Underlying Tree-sitter lock that performs per-file parsing.
     inner: TreeSitterSyntacticLock,
 }
 
@@ -166,8 +167,12 @@ mod tests {
         let failures = result.failures().expect("should have failures");
 
         assert!(!failures.is_empty(), "should have at least one failure");
-        assert!(failures[0].line().is_some(), "failure should have line");
-        assert!(failures[0].column().is_some(), "failure should have column");
+        let first_failure = failures.first().expect("should have a failure");
+        assert!(first_failure.line().is_some(), "failure should have line");
+        assert!(
+            first_failure.column().is_some(),
+            "failure should have column"
+        );
     }
 
     // ---- Pass-through tests (parameterised) ----

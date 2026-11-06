@@ -92,7 +92,7 @@ impl Drop for ListenerWorld {
     fn drop(&mut self) {
         if let Some(handle) = self.listener.take() {
             handle.shutdown();
-            let _ = handle.join();
+            drop(handle.join());
         }
         self.reserved = None;
     }

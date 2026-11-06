@@ -5,17 +5,14 @@ use std::env;
 use camino::Utf8PathBuf;
 use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_man_page};
 
+/// Reads `OUT_DIR` when Cargo supplies it as valid UTF-8.
 fn cargo_out_dir() -> Option<Utf8PathBuf> {
-    match env::var_os("OUT_DIR") {
-        Some(path) => match path.to_str() {
-            Some(utf8) => Some(Utf8PathBuf::from(utf8)),
-            None => {
-                println!("cargo:warning=OUT_DIR was non-UTF-8; skipping OUT_DIR staging");
-                None
-            }
-        },
-        None => None,
+    let path = env::var_os("OUT_DIR")?;
+    if let Some(utf8) = path.to_str() {
+        return Some(Utf8PathBuf::from(utf8));
     }
+    println!("cargo:warning=OUT_DIR was non-UTF-8; skipping OUT_DIR staging");
+    None
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -70,10 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(ref extra_dir_path) = out_dir_env
         && let Err(err) = write_man_page(man_page.as_bytes(), extra_dir_path, &page_name)
     {
-        println!(
-            "cargo:warning=Failed to stage manual page in OUT_DIR ({}): {err}",
-            extra_dir_path
-        );
+        println!("cargo:warning=Failed to stage manual page in OUT_DIR ({extra_dir_path}): {err}");
     }
 
     Ok(())

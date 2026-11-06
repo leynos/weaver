@@ -86,10 +86,11 @@ fn missing_pid_file_refuses_reacquire() -> Result<(), String> {
     let runtime_dir = open_runtime_dir(&paths)?;
     match ProcessGuard::acquire(runtime_dir, paths.clone()) {
         Err(LaunchError::StartupInProgress { .. }) => {
-            assert!(
-                runtime_file_exists(&paths, "weaverd.lock")?,
-                "lock should remain whilst startup is in progress",
-            );
+            if !runtime_file_exists(&paths, "weaverd.lock")? {
+                return Err(String::from(
+                    "lock should remain whilst startup is in progress",
+                ));
+            }
             Ok(())
         }
         other => Err(format!("expected startup-in-progress error, got {other:?}")),
@@ -108,8 +109,7 @@ fn stale_pid_is_reclaimed(
     let seeded_pid = read_runtime_file(&paths, "weaverd.pid")?;
     if seeded_pid != pid {
         return Err(format!(
-            "unexpected seeded pid content: expected {:?}, got {:?}",
-            pid, seeded_pid
+            "unexpected seeded pid content: expected {pid:?}, got {seeded_pid:?}"
         ));
     }
     if write_health {
@@ -119,11 +119,10 @@ fn stale_pid_is_reclaimed(
     let runtime_dir = open_runtime_dir(&paths)?;
     let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
         .map_err(|error| format!("stale runtime should be reclaimed: {error}"))?;
-    if write_health {
-        assert!(
-            !runtime_file_exists(&paths, "weaverd.health")?,
+    if write_health && runtime_file_exists(&paths, "weaverd.health")? {
+        return Err(String::from(
             "stale health file should be removed before reacquiring",
-        );
+        ));
     }
     guard
         .write_pid(42)
@@ -140,7 +139,11 @@ fn existing_pid_rejects_launch() -> Result<(), String> {
     let runtime_dir = open_runtime_dir(&paths)?;
     match ProcessGuard::acquire(runtime_dir, paths) {
         Err(LaunchError::AlreadyRunning { pid: recorded }) => {
-            assert_eq!(recorded, pid, "pid should match recorded process");
+            if recorded != pid {
+                return Err(format!(
+                    "pid should match recorded process: expected {pid}, got {recorded}"
+                ));
+            }
             Ok(())
         }
         other => Err(format!("expected already-running error, got {other:?}")),
@@ -152,10 +155,9 @@ fn health_snapshot_is_written_with_newline() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
     let _guard = setup_guard_with_health(&paths, HealthState::Ready)?;
     let content = read_runtime_file(&paths, "weaverd.health")?;
-    assert!(
-        content.ends_with('\n'),
-        "health snapshot should end with newline"
-    );
+    if !content.ends_with('\n') {
+        return Err(String::from("health snapshot should end with newline"));
+    }
     Ok(())
 }
 
@@ -163,10 +165,11 @@ fn health_snapshot_is_written_with_newline() -> Result<(), String> {
 fn health_snapshot_records_event() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
     let _guard = setup_guard_with_health(&paths, HealthState::Starting)?;
-    assert_eq!(
-        test_support::health_events(paths.health_path()),
-        vec!["starting"],
-        "health events should capture written statuses",
-    );
+    let events = test_support::health_events(paths.health_path());
+    if events != vec!["starting"] {
+        return Err(format!(
+            "health events should capture written statuses, got {events:?}"
+        ));
+    }
     Ok(())
 }

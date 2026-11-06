@@ -13,6 +13,7 @@ use lsp_types::{
     Position,
     TextDocumentIdentifier,
     TextDocumentPositionParams,
+    WorkDoneProgressParams,
 };
 use tracing::debug;
 use weaver_cards::{CardLanguage, LspInfo, SymbolCard};
@@ -68,19 +69,17 @@ fn build_hover_params(
     {
         start.column
     } else {
-        match compute_utf16_character(source, start.line, start.column) {
-            Some(offset) => offset,
-            None => {
-                debug!(
-                    target: DISPATCH_TARGET,
-                    uri = uri_str,
-                    line = start.line,
-                    byte_column = start.column,
-                    "LSP enrichment degraded: failed to compute UTF-16 character offset"
-                );
-                return None;
-            }
-        }
+        let Some(offset) = compute_utf16_character(source, start.line, start.column) else {
+            debug!(
+                target: DISPATCH_TARGET,
+                uri = uri_str,
+                line = start.line,
+                byte_column = start.column,
+                "LSP enrichment degraded: failed to compute UTF-16 character offset"
+            );
+            return None;
+        };
+        offset
     };
 
     Some(HoverParams {
@@ -91,7 +90,7 @@ fn build_hover_params(
                 character,
             },
         },
-        work_done_progress_params: Default::default(),
+        work_done_progress_params: WorkDoneProgressParams::default(),
     })
 }
 
@@ -109,16 +108,13 @@ pub fn try_lsp_enrichment(
     source: &str,
     backends: &mut FusionBackends<SemanticBackendProvider>,
 ) -> EnrichmentOutcome {
-    let language = match to_lsp_language(card.symbol.symbol_ref.language) {
-        Some(lang) => lang,
-        None => {
-            debug!(
-                target: DISPATCH_TARGET,
-                card_language = ?card.symbol.symbol_ref.language,
-                "LSP enrichment degraded: card language cannot be mapped to an LSP host language"
-            );
-            return EnrichmentOutcome::Degraded;
-        }
+    let Some(language) = to_lsp_language(card.symbol.symbol_ref.language) else {
+        debug!(
+            target: DISPATCH_TARGET,
+            card_language = ?card.symbol.symbol_ref.language,
+            "LSP enrichment degraded: card language cannot be mapped to an LSP host language"
+        );
+        return EnrichmentOutcome::Degraded;
     };
 
     if backends.ensure_started(BackendKind::Semantic).is_err() {
@@ -129,14 +125,12 @@ pub fn try_lsp_enrichment(
         return EnrichmentOutcome::Degraded;
     }
 
-    let params = match build_hover_params(card, source, language, backends) {
-        Some(p) => p,
-        None => return EnrichmentOutcome::Degraded,
+    let Some(params) = build_hover_params(card, source, language, backends) else {
+        return EnrichmentOutcome::Degraded;
     };
 
-    let hover = match get_hover(language, params, backends) {
-        Some(hover) => hover,
-        _ => return EnrichmentOutcome::Degraded,
+    let Some(hover) = get_hover(language, params, backends) else {
+        return EnrichmentOutcome::Degraded;
     };
 
     card.lsp = Some(parse_hover_response(&hover));
@@ -154,7 +148,7 @@ fn parse_hover_response(hover: &lsp_types::Hover) -> LspInfo {
         })
         .unwrap_or("")
         .trim()
-        .to_string();
+        .to_owned();
     let deprecated = hover_text.lines().any(is_deprecation_marker);
 
     LspInfo {
@@ -209,6 +203,7 @@ fn initialize_and_get_capabilities(
     }
 }
 
+/// Requests hover information, mapping any host or provider failure to `None`.
 fn get_hover(
     language: Language,
     params: HoverParams,
@@ -237,6 +232,7 @@ fn get_hover(
         .flatten()
 }
 
+/// Reports whether a line begins a deprecation notice in a hover response.
 fn is_deprecation_marker(line: &str) -> bool {
     let trimmed = line.trim();
     let lower = trimmed.to_ascii_lowercase();
@@ -276,19 +272,19 @@ fn compute_utf16_character(source: &str, line: u32, byte_column: u32) -> Option<
 ///
 /// Returns `None` when the offset is out of range or not on a char boundary.
 fn byte_col_to_utf16(line_text: &str, byte_col: u32) -> Option<u32> {
-    let byte_col = byte_col as usize;
+    let byte_offset = byte_col as usize;
 
-    if byte_col > line_text.len() {
+    if byte_offset > line_text.len() {
         return None;
     }
 
     // Check if the byte offset is on a valid char boundary
-    if !line_text.is_char_boundary(byte_col) {
+    if !line_text.is_char_boundary(byte_offset) {
         return None;
     }
 
-    let prefix = &line_text[..byte_col];
-    let utf16_count = prefix.encode_utf16().count() as u32;
+    let prefix = line_text.get(..byte_offset)?;
+    let utf16_count = u32::try_from(prefix.encode_utf16().count()).ok()?;
 
     Some(utf16_count)
 }

@@ -16,8 +16,12 @@ use crate::{
     semantic_provider::SemanticBackendProvider,
 };
 
+/// Forwards a plugin response to the client, applying returned diffs.
+///
+/// A failed plugin response is reported as a dispatch status of `1`; a
+/// successful response is only accepted when it carries diff output.
 pub(super) fn handle_plugin_response<W: Write>(
-    response: PluginResponse,
+    response: &PluginResponse,
     writer: &mut ResponseWriter<W>,
     backends: &mut FusionBackends<SemanticBackendProvider>,
     workspace_root: &Path,
@@ -50,6 +54,7 @@ pub(super) fn handle_plugin_response<W: Write>(
     }
 }
 
+/// Re-dispatches a returned diff through the `act apply-patch` handler.
 fn forward_diff_to_apply_patch<W: Write>(
     patch: &str,
     writer: &mut ResponseWriter<W>,
