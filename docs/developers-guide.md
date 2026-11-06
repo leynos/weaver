@@ -151,11 +151,16 @@ a longer allowance than the default:
 
 The end-to-end binaries can also run `cargo build` to find the `weaver` binary,
 but only when it is missing and at most once per process, so they stay in the
-default pool. `tests/workflow_contracts/nextest_config_test.py` reads the file
-with `tomllib` and checks the group, the override and the timeouts; it starts no
-`cargo`. The Concordat `nested-cargo-nextest` rule (NC-004, NC-005) holds the
-same property from outside. A new test binary that starts a compiler joins the
-override's `filter`.
+default pool. nextest runs each case in its own process, so on a clean tree a
+narrowed run such as `cargo nextest run -p weaver-e2e` could start several
+fallback builds that contend for Cargo's locks. Build the binary first with
+`cargo build -p weaver-cli --bin weaver`; the workspace-wide `make test` run
+builds it with the other targets before any test starts.
+`tests/workflow_contracts/nextest_config_test.py` reads the file with `tomllib`
+and checks the group, the override and the timeouts; it starts no `cargo`. The
+Concordat `nested-cargo-nextest` rule (NC-004, NC-005) holds the same property
+from outside. A new test binary that starts a compiler joins the override's
+`filter`.
 
 ## 4 Workspace lint policy
 
