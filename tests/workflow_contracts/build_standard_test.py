@@ -45,7 +45,7 @@ RUSTFLAGS_RE = re.compile(r'RUSTFLAGS="([^"]*)"')
 #: replacing either.
 INHERITED = "--cfg inherited_from_caller"
 #: Words that mark a command whose RUSTFLAGS the contract reads.
-COMMAND_WORDS = ("cargo", "whitaker")
+COMMAND_WORDS = ("cargo",)
 #: Makefile targets that build for development. A command in one either
 #: assigns RUSTFLAGS with the standard flags or assigns none and so takes the
 #: configuration's.
@@ -120,6 +120,8 @@ def _make_rustflags(
         for line in result.stdout.replace("\\\n", " ").splitlines()
         # An `echo` of a tool's path names it without running it.
         if any(word in line for word in COMMAND_WORDS)
+        # Whitaker assigns its own flags and takes neither standard flag.
+        and "whitaker" not in line
         and line.split(maxsplit=1)[:1] not in (["echo"], ["printf"])
     ]
     assert commands, f"`make -n {target}` runs no cargo command"
@@ -322,3 +324,4 @@ def test_coverage_and_release_add_neither_flag(
         assert flags == shlex.split(inherited or ""), (
             f"`make {target}` assigns {flags}, not the caller's {inherited!r}"
         )
+

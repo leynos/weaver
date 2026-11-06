@@ -86,7 +86,7 @@ jobs:
       - name: Install uv
         # The same pin the estate's other consumers use. It runs on Node 24, and
         # with no Python dependency manifest to key a cache on, caching is off.
-        uses: astral-sh/setup-uv@4bc6759c82322ff7efa28de54a45404ca6869912
+        uses: astral-sh/setup-uv@0a73d6eb01c0201c8fc84847d0f4425b704ad66d
         with:
           enable-cache: false
       - name: Spelling (en-GB-oxendict)
@@ -124,10 +124,8 @@ jobs:
         # setup-rust exports `RUSTFLAGS`, which displaces the configuration's
         # sources, so the step composes the standard flags onto it as the
         # Makefile does.
-        env:
-          STANDARD_RUSTFLAGS: -Zthreads=8 -Clink-arg=-fuse-ld=mold
         run: >-
-          RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }$STANDARD_RUSTFLAGS"
+          RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Zthreads=8 -Clink-arg=-fuse-ld=mold"
           cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
       - name: Install Whitaker
         uses: leynos/shared-actions/.github/actions/install-whitaker@5a99aed78ce68dcebd3052b75c31e6f173162b1e # shared-actions 5a99aed7 (whitaker-installer 0.2.11)

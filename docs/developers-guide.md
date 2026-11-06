@@ -56,9 +56,10 @@ gets it:
 
 Cargo applies a single `rustflags` source rather than merging them, and an
 assigned `RUSTFLAGS` replaces every source. So each source repeats the frontend
-flag, and the Makefile restates both flags through `standard_rustflags` for the
-targets that assign `RUSTFLAGS` (`test`, every `lint` command, `typecheck`, and
-`build`), adding them to any `RUSTFLAGS` the recipe inherits (setup-rust
+flag, and the Makefile restates both flags through `STANDARD_RUSTFLAGS` for the
+targets that assign `RUSTFLAGS` (`test`, the `lint` rustdoc and Clippy commands,
+`typecheck`, and `build`; the Whitaker command in `lint` assigns only
+`-D warnings`), adding them to any `RUSTFLAGS` the recipe inherits (setup-rust
 exports one in CI) rather than replacing it. `make release` assigns the
 inherited `RUSTFLAGS`, which is empty when the caller exports none, and so adds
 neither standard flag (it does not remove one the caller exports); a bare
@@ -66,25 +67,24 @@ neither standard flag (it does not remove one the caller exports); a bare
 Cargo does not select `rustflags` by profile, so release artefacts come from
 `make release` or CI, whose coverage and release actions run under their own
 `RUSTFLAGS`. The Makefile adds `mold` only when both the host and the
-compilation targets are Linux. Each recipe line reads its own targets from the
-arguments it passes: every explicit `--target X` or `--target=X` before any
-standalone `--` (at the start, the middle or the end of the arguments) is one
-target, because Cargo builds for all of them (Whitaker's own arguments follow
-its `--`, so it reads those), and with none the command takes
-`CARGO_BUILD_TARGET`. A mixed set, such as one Linux and one macOS target, omits
-`mold` for every member, Linux ones included, because one `RUSTFLAGS` value
-serves the whole command. A command that passes no flags, such as the doctests
-or `cargo doc`, uses `CARGO_BUILD_TARGET` alone. The CI job installs `mold`
-before the boundary manifest gate, which composes the same flags onto its
-`RUSTFLAGS`, and `make lint`. `tests/workflow_contracts/build_standard_test.py`
-holds the configuration and the Makefile recipes to this,
-`build_standard_ci_test.py` holds the install order (including the coverage
-lane, which `coverage-main.yml:coverage-upload` satisfies with `setup-rust`'s
-`install-mold: 'true'` input before `generate-coverage`, because the trybuild
-cases link scratch crates with `mold`) and the boundary gate's composed flags,
-and `build_standard_warnings_test.py` holds the default warning policy, and
-`build_standard_target_test.py` checks each command's target selection against
-its own arguments. Every dry run starts from `build_standard_env.py`'s
+compilation target are Linux. Make reads the target from `CARGO_BUILD_TARGET`
+(unset names the host, `host-tuple` is the host's own triple, and an Android
+triple is not Linux for `mold`). A `--target` passed through `TEST_FLAGS`,
+`CARGO_FLAGS` or `CLIPPY_FLAGS` is invisible to Make, so set
+`CARGO_BUILD_TARGET` as well when cross-compiling. A local Linux build needs
+`mold` on the `PATH` and a GCC driver of 12.1 or newer (or select clang with
+`CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang`); an empty `RUSTFLAGS`
+skips the linker flag. The CI job installs `mold` before the boundary manifest
+gate, which composes the same flags onto its `RUSTFLAGS`, and `make lint`.
+`tests/workflow_contracts/build_standard_test.py` holds the configuration and
+the Makefile recipes to this, `build_standard_ci_test.py` holds the install
+order (including the coverage lane, which `coverage-main.yml:coverage-upload`
+satisfies with `setup-rust`'s `install-mold: 'true'` input before
+`generate-coverage`, because the trybuild cases link scratch crates with
+`mold`) and the boundary gate's composed flags, and
+`build_standard_warnings_test.py` holds the default warning policy, and
+`build_standard_target_test.py` checks the target selection against
+`CARGO_BUILD_TARGET`. Every dry run starts from `build_standard_env.py`'s
 controlled environment, which removes the caller's exported targets, flag sets
 and Make options, and `build_standard_env_test.py` holds each helper to it.
 
@@ -130,6 +130,37 @@ holds the configuration to it:
 Debug data is off, so a debugger sees no variables in a development build. Set
 `CARGO_PROFILE_DEV_DEBUG=2` for a debugging session, and `make release` or a
 `--release` build for anything that ships.
+
+### 3.3 Tests that start a compiler
+
+Some tests start a child `cargo` or `rustc` of their own: the `weaver-docs-gate`
+`load_manifest` binary runs the renderer example through `cargo`, and both
+`compile_time` binaries (`weaver-docs-gate` and `weaver-plugins`) build
+fixtures. Run beside each other they contend for Cargo's package-cache and
+build-directory locks, and a cold build then looks like a hang.
+`.config/nextest.toml` therefore puts those binaries in the
+`nested-cargo-builds` test group, which runs one test at a time, and gives them
+a longer allowance than the default:
+
+- The default profile warns after 60 seconds and terminates a test after 180
+  seconds (three periods), and the whole run after 15 minutes, which is below
+  the coverage job's own limit.
+- The `nested-cargo-builds` group terminates after 600 seconds (five
+  120-second periods). On CI the slowest of these tests took 26, 39 and 85
+  seconds; an instrumented from-scratch build is slower.
+
+The end-to-end binaries can also run `cargo build` to find the `weaver` binary,
+but only when it is missing and at most once per process, so they stay in the
+default pool. nextest runs each case in its own process, so on a clean tree a
+narrowed run such as `cargo nextest run -p weaver-e2e` could start several
+fallback builds that contend for Cargo's locks. Build the binary first with
+`cargo build -p weaver-cli --bin weaver`; the workspace-wide `make test` run
+builds it with the other targets before any test starts.
+`tests/workflow_contracts/nextest_config_test.py` reads the file with `tomllib`
+and checks the group, the override and the timeouts; it starts no `cargo`. The
+Concordat `nested-cargo-nextest` rule (NC-004, NC-005) holds the same property
+from outside. A new test binary that starts a compiler joins the override's
+`filter`.
 
 ## 4 Workspace lint policy
 

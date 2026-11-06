@@ -1,20 +1,43 @@
-# Nextest terminates a test after three slow periods, which is 180 seconds by
-# default. That budget suits unit and behavioural tests, but the `compile_time`
-# suites and the `missing_docs_policy` contract drive `trybuild`, which compiles
-# a downstream crate and its whole dependency tree from inside the test
-# process. The coverage job performs that build under instrumentation, so these
-# suites run an order of magnitude longer than an ordinary test and the default
-# budget expires while the fixture is still compiling. Give that family a
-# budget sized for a from-scratch build, while still terminating a genuinely
-# hung test.
+# cargo-nextest configuration for Weaver.
+#
+# Scope: every `cargo nextest` invocation, including `make test` and the
+# coverage lane. nextest does not run doctests, which `make test` runs
+# separately with `cargo test --doc`.
+#
+# Policy: no blanket retries. A test that fails intermittently is a defect to
+# diagnose, not to paper over with re-runs.
 
-[test-groups]
-trybuild = { max-threads = 1 }
+[profile.default]
+# Surface hangs without failing legitimately slow suites. Warn after 60 s and
+# terminate a test that has run for three warning periods (180 s), the limit
+# CI applied before this file existed. This governs every test no override
+# matches; none of them starts a compiler.
+slow-timeout = { period = "60s", terminate-after = 3 }
+# The whole run, kept below the coverage job's 20-minute limit and its cargo
+# watchdog so nextest reports the overrun itself rather than the job being
+# cancelled. Measured: the workspace's 1,558 tests took 234 s on CI.
+global-timeout = "15m"
+
+[test-groups.nested-cargo-builds]
+# These tests start a child `cargo` or `rustc` of their own: the trybuild
+# suites, a downstream-crate build, and the manifest renderer example. Each
+# pays for Cargo's package-cache and build-directory locks and for compiler
+# work inside its own allowance, so run beside each other they block on the
+# same locks and a cold build looks like a hang. One at a time, each is bounded
+# by its own work.
+max-threads = 1
 
 [[profile.default.overrides]]
-filter = 'binary(compile_time) | binary(missing_docs_policy)'
-test-group = 'trybuild'
-
-[[profile.default.overrides]]
-filter = 'binary(compile_time) | binary(missing_docs_policy)'
+# `load_manifest` runs the renderer example through `cargo`, the
+# `missing_docs_policy` contract drives `trybuild`, and both
+# `compile_time` binaries (weaver-docs-gate and weaver-plugins) compile
+# fixtures. The end-to-end binaries can also run `cargo build` to find the
+# `weaver` binary, but only when it is missing and at most once per process, so
+# they stay in the default pool.
+#
+# Measured on CI: 26 s, 39 s and 85 s for the three slowest of these tests.
+# An instrumented from-scratch build is slower, so the allowance is five
+# 120-second periods (600 s), which the coverage job's limit still covers.
+filter = 'binary(=load_manifest) | binary(=compile_time) | binary(=missing_docs_policy)'
+test-group = "nested-cargo-builds"
 slow-timeout = { period = "120s", terminate-after = 5 }
