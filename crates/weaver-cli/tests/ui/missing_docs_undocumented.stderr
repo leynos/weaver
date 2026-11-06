@@ -1,0 +1,11 @@
+error: missing documentation for a struct
+ --> tests/ui/missing_docs_undocumented.rs:4:1
+  |
+4 | pub struct Undocumented;
+  | ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+note: the lint level is defined here
+ --> tests/ui/missing_docs_undocumented.rs:2:9
+  |
+2 | #![deny(missing_docs)]
+  |         ^^^^^^^^^^^^

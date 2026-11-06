@@ -13,7 +13,9 @@ const HELPER_SRC: &str = include_str!("../src/dispatch/act/refactor/refactor_hel
 
 /// Returns `refactor_helpers.rs` without its in-file lint compliance tests.
 fn refactor_helpers_source() -> &'static str {
-    &HELPER_SRC[..HELPER_SRC.rfind("#[cfg(test)]").unwrap_or(HELPER_SRC.len())]
+    HELPER_SRC
+        .split_once("#[cfg(test)]")
+        .map_or(HELPER_SRC, |(before_tests, _)| before_tests)
 }
 
 /// Returns whether `source` contains `pattern` after stripping whitespace.

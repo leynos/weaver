@@ -164,10 +164,27 @@ from outside. A new test binary that starts a compiler joins the override's
 
 ## 4 Workspace lint policy
 
-The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates
-that opt into `[lints] workspace = true` must therefore document their private
-items as well as their public API. The existing `missing_docs` rustc lint
-continues to deny undocumented public items.
+The workspace lint tables include Rust and Clippy rules, but Cargo applies them
+to a package only when that package's manifest opts in with
+
+```toml
+[lints]
+workspace = true
+```
+
+That setting brings in the full workspace Clippy policy, including
+`clippy::missing_docs_in_private_items`, and the Rust rules, including
+`missing_docs`. A member without the opt-in is silently exempt from all of it,
+so the opt-in is the whole enforcement mechanism.
+
+Every member crate carries the opt-in. The `weaver-cli` compile-time test
+`tests/missing_docs_policy.rs` checks each member manifest, checks that the
+workspace table still denies `missing_docs`, and uses `trybuild` fixtures to
+pin the accepted and rejected `missing_docs` diagnostics. When a new member is
+added to the workspace, add it to that test's package list as well.
+
+Do not reintroduce a crate-local `[lints.rust]` or `[lints.clippy]` overrides
+in a member manifest: they split the policy, and the test cannot see them.
 
 ## 5 Workflow pins and Dependabot
 
