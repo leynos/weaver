@@ -57,8 +57,9 @@ gets it:
 Cargo applies a single `rustflags` source rather than merging them, and an
 assigned `RUSTFLAGS` replaces every source. So each source repeats the frontend
 flag, and the Makefile restates both flags through `STANDARD_RUSTFLAGS` for the
-targets that assign `RUSTFLAGS` (`test`, every `lint` command, `typecheck`, and
-`build`), adding them to any `RUSTFLAGS` the recipe inherits (setup-rust
+targets that assign `RUSTFLAGS` (`test`, the `lint` rustdoc and Clippy commands,
+`typecheck`, and `build`; the Whitaker command in `lint` assigns only
+`-D warnings`), adding them to any `RUSTFLAGS` the recipe inherits (setup-rust
 exports one in CI) rather than replacing it. `make release` assigns the
 inherited `RUSTFLAGS`, which is empty when the caller exports none, and so adds
 neither standard flag (it does not remove one the caller exports); a bare
@@ -70,15 +71,18 @@ compilation target are Linux. Make reads the target from `CARGO_BUILD_TARGET`
 (unset names the host, `host-tuple` is the host's own triple, and an Android
 triple is not Linux for `mold`). A `--target` passed through `TEST_FLAGS`,
 `CARGO_FLAGS` or `CLIPPY_FLAGS` is invisible to Make, so set
-`CARGO_BUILD_TARGET` as well when cross-compiling. The CI job installs `mold`
-before the boundary manifest gate, which composes the same flags onto its
-`RUSTFLAGS`, and `make lint`. `tests/workflow_contracts/build_standard_test.py`
-holds the configuration and the Makefile recipes to this,
-`build_standard_ci_test.py` holds the install order (including the coverage
-lane, which `coverage-main.yml:coverage-upload` satisfies with `setup-rust`'s
-`install-mold: 'true'` input before `generate-coverage`, because the trybuild
-cases link scratch crates with `mold`) and the boundary gate's composed flags,
-and `build_standard_warnings_test.py` holds the default warning policy, and
+`CARGO_BUILD_TARGET` as well when cross-compiling. A local Linux build needs
+`mold` on the `PATH` and a GCC driver of 12.1 or newer (or select clang with
+`CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang`); an empty `RUSTFLAGS`
+skips the linker flag. The CI job installs `mold` before the boundary manifest
+gate, which composes the same flags onto its `RUSTFLAGS`, and `make lint`.
+`tests/workflow_contracts/build_standard_test.py` holds the configuration and
+the Makefile recipes to this, `build_standard_ci_test.py` holds the install
+order (including the coverage lane, which `coverage-main.yml:coverage-upload`
+satisfies with `setup-rust`'s `install-mold: 'true'` input before
+`generate-coverage`, because the trybuild cases link scratch crates with
+`mold`) and the boundary gate's composed flags, and
+`build_standard_warnings_test.py` holds the default warning policy, and
 `build_standard_target_test.py` checks each command's target selection against
 its own arguments. Every dry run starts from `build_standard_env.py`'s
 controlled environment, which removes the caller's exported targets, flag sets

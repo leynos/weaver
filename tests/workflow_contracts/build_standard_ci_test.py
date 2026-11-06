@@ -212,8 +212,14 @@ def test_the_boundary_gate_composes_the_standard_flags() -> None:
     assert job is not None, f"no `{BOUNDARY_STEP}` step"
     (step,) = [s for s in job["steps"] if s.get("name") == BOUNDARY_STEP]
     run = str(step.get("run", ""))
-    assert THREADS_FLAG in run, f"`{BOUNDARY_STEP}` lost {THREADS_FLAG}"
-    assert LINKER_FLAG in run, f"`{BOUNDARY_STEP}` lost `mold`"
-    assert re.search(r'RUSTFLAGS="\$\{RUSTFLAGS:\+\$RUSTFLAGS \}[^"]+"\s+cargo', run), (
-        f"`{BOUNDARY_STEP}` does not compose the inherited RUSTFLAGS: {run}"
-    )
+    match = re.search(r'RUSTFLAGS="\$\{RUSTFLAGS:\+\$RUSTFLAGS \}([^"]+)"\s+cargo', run)
+    assert match, f"`{BOUNDARY_STEP}` does not compose the inherited RUSTFLAGS: {run}"
+    composed = match.group(1).split()
+    makefile = (ROOT / "Makefile").read_text("utf-8")
+    for variable in ("STANDARD_THREADS_FLAG", "STANDARD_MOLD_FLAG"):
+        default = re.search(rf"^{variable}\s*\?=\s*(\S+)\s*$", makefile, re.MULTILINE)
+        assert default, f"the Makefile defines no {variable}"
+        assert default.group(1) in composed, (
+            f"`{BOUNDARY_STEP}` composes {composed}, which lacks the Makefile's "
+            f"{variable} default {default.group(1)}"
+        )
