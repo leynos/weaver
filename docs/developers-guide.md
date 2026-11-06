@@ -136,10 +136,11 @@ Debug data is off, so a debugger sees no variables in a development build. Set
 The `weaver-e2e` binary support builds `weaver` with `cargo build --frozen`:
 the committed `Cargo.lock` and the dependency cache are required, so the nested
 build neither resolves nor reaches the index while it holds the package-cache
-lock. The CI job runs `cargo fetch --locked` as its first Cargo step after
-`setup-rust` (before the boundary manifest gate), which fails the job if the
-lock and the cache disagree. Run `cargo fetch --locked` once before running the
-e2e tests offline.
+lock. The CI job runs `cargo fetch --locked` right after `setup-rust` and
+before the boundary manifest gate, lint and the coverage run, which fails the
+job if the lock and the cache disagree (the earlier formatting step runs
+`cargo fmt`, which does not touch the lock). Run `cargo fetch --locked` once
+before running the e2e tests offline.
 
 Some tests start a child `cargo` or `rustc` of their own: the `weaver-docs-gate`
 `load_manifest` binary runs the renderer example through `cargo`, and both
