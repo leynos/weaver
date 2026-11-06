@@ -211,10 +211,9 @@ def test_the_boundary_gate_composes_the_standard_flags() -> None:
     job = _job_with_step(BOUNDARY_STEP)
     assert job is not None, f"no `{BOUNDARY_STEP}` step"
     (step,) = [s for s in job["steps"] if s.get("name") == BOUNDARY_STEP]
-    env = " ".join(str(value) for value in (step.get("env") or {}).values())
-    assert THREADS_FLAG in env, f"`{BOUNDARY_STEP}` lost {THREADS_FLAG}"
-    assert LINKER_FLAG in env, f"`{BOUNDARY_STEP}` lost `mold`"
     run = str(step.get("run", ""))
-    assert re.search(r'RUSTFLAGS="\$\{RUSTFLAGS:\+\$RUSTFLAGS \}\$\w+"\s+cargo', run), (
+    assert THREADS_FLAG in run, f"`{BOUNDARY_STEP}` lost {THREADS_FLAG}"
+    assert LINKER_FLAG in run, f"`{BOUNDARY_STEP}` lost `mold`"
+    assert re.search(r'RUSTFLAGS="\$\{RUSTFLAGS:\+\$RUSTFLAGS \}[^"]+"\s+cargo', run), (
         f"`{BOUNDARY_STEP}` does not compose the inherited RUSTFLAGS: {run}"
     )

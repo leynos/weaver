@@ -56,7 +56,7 @@ gets it:
 
 Cargo applies a single `rustflags` source rather than merging them, and an
 assigned `RUSTFLAGS` replaces every source. So each source repeats the frontend
-flag, and the Makefile restates both flags through `standard_rustflags` for the
+flag, and the Makefile restates both flags through `STANDARD_RUSTFLAGS` for the
 targets that assign `RUSTFLAGS` (`test`, every `lint` command, `typecheck`, and
 `build`), adding them to any `RUSTFLAGS` the recipe inherits (setup-rust
 exports one in CI) rather than replacing it. `make release` assigns the
@@ -66,15 +66,11 @@ neither standard flag (it does not remove one the caller exports); a bare
 Cargo does not select `rustflags` by profile, so release artefacts come from
 `make release` or CI, whose coverage and release actions run under their own
 `RUSTFLAGS`. The Makefile adds `mold` only when both the host and the
-compilation targets are Linux. Each recipe line reads its own targets from the
-arguments it passes: every explicit `--target X` or `--target=X` before any
-standalone `--` (at the start, the middle or the end of the arguments) is one
-target, because Cargo builds for all of them (Whitaker's own arguments follow
-its `--`, so it reads those), and with none the command takes
-`CARGO_BUILD_TARGET`. A mixed set, such as one Linux and one macOS target, omits
-`mold` for every member, Linux ones included, because one `RUSTFLAGS` value
-serves the whole command. A command that passes no flags, such as the doctests
-or `cargo doc`, uses `CARGO_BUILD_TARGET` alone. The CI job installs `mold`
+compilation target are Linux. Make reads the target from `CARGO_BUILD_TARGET`
+(unset names the host, `host-tuple` is the host's own triple, and an Android
+triple is not Linux for `mold`). A `--target` passed through `TEST_FLAGS`,
+`CARGO_FLAGS` or `CLIPPY_FLAGS` is invisible to Make, so set
+`CARGO_BUILD_TARGET` as well when cross-compiling. The CI job installs `mold`
 before the boundary manifest gate, which composes the same flags onto its
 `RUSTFLAGS`, and `make lint`. `tests/workflow_contracts/build_standard_test.py`
 holds the configuration and the Makefile recipes to this,
