@@ -114,6 +114,10 @@ jobs:
           merman-version: '0.7.0'
       - name: Mermaid lint
         run: make nixie
+      - name: Fetch locked dependencies
+        # Warm the package cache once, failing the job if it cannot be warmed, so
+        # the tests that start their own cargo resolve nothing under its lock.
+        run: cargo fetch --locked
       - name: Install mold linker
         # The boundary manifest gate and `make lint` add the build standard's
         # mold flag, so the linker must be present before the first of them.
@@ -131,10 +135,6 @@ jobs:
         uses: leynos/shared-actions/.github/actions/install-whitaker@5a99aed78ce68dcebd3052b75c31e6f173162b1e # shared-actions 5a99aed7 (whitaker-installer 0.2.11)
         with:
           cranelift: true
-      - name: Fetch locked dependencies
-        # Warm the package cache once, failing the job if it cannot be warmed, so
-        # the tests that start their own cargo resolve nothing under its lock.
-        run: cargo fetch --locked
       - name: Lint
         run: make lint
       - name: Workflow contract tests
