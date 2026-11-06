@@ -131,6 +131,37 @@ Debug data is off, so a debugger sees no variables in a development build. Set
 `CARGO_PROFILE_DEV_DEBUG=2` for a debugging session, and `make release` or a
 `--release` build for anything that ships.
 
+### 3.3 Tests that start a compiler
+
+Some tests start a child `cargo` or `rustc` of their own: the `weaver-docs-gate`
+`load_manifest` binary runs the renderer example through `cargo`, and both
+`compile_time` binaries (`weaver-docs-gate` and `weaver-plugins`) build
+fixtures. Run beside each other they contend for Cargo's package-cache and
+build-directory locks, and a cold build then looks like a hang.
+`.config/nextest.toml` therefore puts those binaries in the
+`nested-cargo-builds` test group, which runs one test at a time, and gives them
+a longer allowance than the default:
+
+- The default profile warns after 60 seconds and terminates a test after 180
+  seconds (three periods), and the whole run after 15 minutes, which is below
+  the coverage job's own limit.
+- The `nested-cargo-builds` group terminates after 600 seconds (five
+  120-second periods). On CI the slowest of these tests took 26, 39 and 85
+  seconds; an instrumented from-scratch build is slower.
+
+The end-to-end binaries can also run `cargo build` to find the `weaver` binary,
+but only when it is missing and at most once per process, so they stay in the
+default pool. nextest runs each case in its own process, so on a clean tree a
+narrowed run such as `cargo nextest run -p weaver-e2e` could start several
+fallback builds that contend for Cargo's locks. Build the binary first with
+`cargo build -p weaver-cli --bin weaver`; the workspace-wide `make test` run
+builds it with the other targets before any test starts.
+`tests/workflow_contracts/nextest_config_test.py` reads the file with `tomllib`
+and checks the group, the override and the timeouts; it starts no `cargo`. The
+Concordat `nested-cargo-nextest` rule (NC-004, NC-005) holds the same property
+from outside. A new test binary that starts a compiler joins the override's
+`filter`.
+
 ## 4 Workspace lint policy
 
 The workspace lint table denies `clippy::missing_docs_in_private_items`. Crates
