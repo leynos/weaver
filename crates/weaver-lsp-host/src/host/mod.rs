@@ -20,6 +20,9 @@ use lsp_types::{
     Uri,
 };
 
+mod call_context;
+
+use self::call_context::{CallContext, CallSpec};
 use crate::{
     capability::{CapabilityKind, CapabilitySummary, resolve_capabilities},
     errors::{HostOperation, LspHostError},
@@ -27,49 +30,26 @@ use crate::{
     server::{LanguageServer, LanguageServerError},
 };
 
+/// A registered language server and the state of its initialisation.
 struct Session {
+    /// Server process handle used to dispatch requests.
     server: Box<dyn LanguageServer>,
+    /// Whether capability negotiation has completed.
     state: SessionState,
 }
 
+/// Lifecycle state of a registered language server session.
 enum SessionState {
+    /// The server has been registered but not yet initialized.
     Pending,
-    Ready { summary: CapabilitySummary },
+    /// Capabilities have been negotiated with the server.
+    Ready {
+        /// Capabilities resolved for this language.
+        summary: CapabilitySummary,
+    },
 }
 
-struct CallSpec {
-    capability: CapabilityKind,
-    operation: HostOperation,
-}
-
-struct CallContext {
-    language: Language,
-    operation: HostOperation,
-    capability: Option<CapabilityKind>,
-}
-
-impl CallContext {
-    fn for_operation(language: Language, operation: HostOperation) -> Self {
-        Self {
-            language,
-            operation,
-            capability: None,
-        }
-    }
-
-    fn with_capability(
-        language: Language,
-        operation: HostOperation,
-        capability: CapabilityKind,
-    ) -> Self {
-        Self {
-            language,
-            operation,
-            capability: Some(capability),
-        }
-    }
-}
-
+/// Generates a capability-gated host method that forwards to a server method.
 macro_rules! lsp_method {
     (
         $(#[$meta:meta])* $vis:vis fn $name:ident(
@@ -82,14 +62,20 @@ macro_rules! lsp_method {
             $server_method:ident
         }
     ) => {
-        $(#[$meta])* $vis fn $name(
+        $(#[$meta])*
+        ///
+        /// # Errors
+        ///
+        /// Returns [`LspHostError`] when the language is unknown, the server
+        /// cannot be initialised, or the capability is disabled.
+        $vis fn $name(
             &mut self,
             language: Language,
             $param: $pty,
         ) -> $ret {
             self.call_with_capability(
                 language,
-                CallSpec {
+                &CallSpec {
                     capability: $cap,
                     operation: $op,
                 },
@@ -99,6 +85,7 @@ macro_rules! lsp_method {
     };
 }
 
+/// Generates a host method that forwards a notification to a server method.
 macro_rules! lsp_notification {
     (
         $(#[$meta:meta])* $vis:vis fn $name:ident(
@@ -110,7 +97,13 @@ macro_rules! lsp_notification {
             $server_method:ident
         }
     ) => {
-        $(#[$meta])* $vis fn $name(
+        $(#[$meta])*
+        ///
+        /// # Errors
+        ///
+        /// Returns [`LspHostError`] when the language is unknown, the server
+        /// cannot be initialised, or the notification is rejected.
+        $vis fn $name(
             &mut self,
             language: Language,
             $param: $pty,
@@ -122,7 +115,9 @@ macro_rules! lsp_notification {
 
 /// Orchestrates multiple language servers and applies capability overrides.
 pub struct LspHost {
+    /// Capability overrides applied on top of each server's own advertisement.
     overrides: weaver_config::CapabilityMatrix,
+    /// Sessions keyed by the language they serve.
     sessions: HashMap<Language, Session>,
 }
 
@@ -137,6 +132,11 @@ impl LspHost {
     }
 
     /// Registers a server for the given language.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LspHostError`] when a server is already registered for
+    /// `language`.
     pub fn register_language(
         &mut self,
         language: Language,
@@ -157,12 +157,13 @@ impl LspHost {
     }
 
     /// Initializes the language server and returns the resolved capability summary.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LspHostError`] when the language is unknown or the server fails
+    /// to initialise.
     pub fn initialize(&mut self, language: Language) -> Result<CapabilitySummary, LspHostError> {
-        let overrides = &self.overrides;
-        let session = self
-            .sessions
-            .get_mut(&language)
-            .ok_or_else(|| LspHostError::unknown(language))?;
+        let (session, overrides) = self.session_mut(language)?;
         Self::ensure_initialized(language, session, overrides)
     }
 
@@ -218,7 +219,7 @@ impl LspHost {
 
     lsp_notification!(
         /// Notifies the server that a document has been opened with in-memory content.
-        #[doc = include_str!("../docs/did_open.md")]
+        #[doc = include_str!("../../docs/did_open.md")]
         pub fn did_open(
             &mut self,
             language: Language,
@@ -231,7 +232,7 @@ impl LspHost {
 
     lsp_notification!(
         /// Notifies the server that a document has changed with in-memory content.
-        #[doc = include_str!("../docs/did_change.md")]
+        #[doc = include_str!("../../docs/did_change.md")]
         pub fn did_change(
             &mut self,
             language: Language,
@@ -244,7 +245,7 @@ impl LspHost {
 
     lsp_notification!(
         /// Notifies the server that a document has been closed.
-        #[doc = include_str!("../docs/did_close.md")]
+        #[doc = include_str!("../../docs/did_close.md")]
         pub fn did_close(
             &mut self,
             language: Language,
@@ -310,28 +311,21 @@ impl LspHost {
         }
     );
 
-    fn call_with_context<F, T>(&mut self, context: CallContext, call: F) -> Result<T, LspHostError>
-    where
-        F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
-    {
-        self.call_with_session(context, call)
-    }
-
+    /// Dispatches a capability-gated call against the session for `language`.
     fn call_with_capability<F, T>(
         &mut self,
         language: Language,
-        spec: CallSpec,
+        spec: &CallSpec,
         call: F,
     ) -> Result<T, LspHostError>
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
-        self.call_with_context(
-            CallContext::with_capability(language, spec.operation, spec.capability),
-            call,
-        )
+        let context = CallContext::with_capability(language, spec.operation, spec.capability);
+        self.call_with_session(&context, call)
     }
 
+    /// Dispatches an ungated call against the session for `language`.
     fn call_on_server<F, T>(
         &mut self,
         language: Language,
@@ -341,18 +335,16 @@ impl LspHost {
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
-        self.call_with_context(CallContext::for_operation(language, operation), call)
+        let context = CallContext::for_operation(language, operation);
+        self.call_with_session(&context, call)
     }
 
-    fn call_with_session<F, T>(&mut self, context: CallContext, call: F) -> Result<T, LspHostError>
+    /// Ensures the session is initialized, enforces capabilities, then calls it.
+    fn call_with_session<F, T>(&mut self, context: &CallContext, call: F) -> Result<T, LspHostError>
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
-        let overrides = &self.overrides;
-        let session = self
-            .sessions
-            .get_mut(&context.language)
-            .ok_or_else(|| LspHostError::unknown(context.language))?;
+        let (session, overrides) = self.session_mut(context.language)?;
         let summary = Self::ensure_initialized(context.language, session, overrides)?;
         if let Some(capability) = context.capability {
             let state = summary.state(capability);
@@ -369,6 +361,22 @@ impl LspHost {
             .map_err(|source| LspHostError::server(context.language, context.operation, source))
     }
 
+    /// Borrows the session for `language` and the override matrix together.
+    ///
+    /// A single lookup keeps both disjoint borrows inside one method.
+    fn session_mut(
+        &mut self,
+        language: Language,
+    ) -> Result<(&mut Session, &weaver_config::CapabilityMatrix), LspHostError> {
+        let overrides = &self.overrides;
+        let session = self
+            .sessions
+            .get_mut(&language)
+            .ok_or_else(|| LspHostError::unknown(language))?;
+        Ok((session, overrides))
+    }
+
+    /// Initializes `session` on first use and returns its capability summary.
     fn ensure_initialized(
         language: Language,
         session: &mut Session,
@@ -381,7 +389,7 @@ impl LspHost {
                     LspHostError::server(language, HostOperation::Initialise, source)
                 })?;
 
-                let summary = resolve_capabilities(language, capabilities, overrides);
+                let summary = resolve_capabilities(language, &capabilities, overrides);
                 session.state = SessionState::Ready {
                     summary: summary.clone(),
                 };

@@ -20,6 +20,7 @@ pub struct LspServerConfig {
 }
 
 impl LspServerConfig {
+    /// Builds a configuration with no working directory and the default timeout.
     fn default_config(command: impl Into<PathBuf>, args: Vec<String>) -> Self {
         Self {
             command: command.into(),
@@ -39,13 +40,13 @@ impl LspServerConfig {
     ///
     /// Expects `pyrefly` to be available in PATH.
     #[must_use]
-    pub fn python_default() -> Self { Self::default_config("pyrefly", vec!["lsp".to_string()]) }
+    pub fn python_default() -> Self { Self::default_config("pyrefly", vec!["lsp".to_owned()]) }
 
     /// Default configuration for TypeScript (`tsgo --lsp`).
     ///
     /// Expects `tsgo` to be available in PATH.
     #[must_use]
-    pub fn typescript_default() -> Self { Self::default_config("tsgo", vec!["--lsp".to_string()]) }
+    pub fn typescript_default() -> Self { Self::default_config("tsgo", vec!["--lsp".to_owned()]) }
 
     /// Returns the default configuration for a given language.
     #[must_use]
@@ -96,7 +97,7 @@ mod tests {
             config.args,
             expected_args
                 .iter()
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<_>>()
         );
     }
