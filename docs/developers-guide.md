@@ -83,8 +83,8 @@ satisfies with `setup-rust`'s `install-mold: 'true'` input before
 `generate-coverage`, because the trybuild cases link scratch crates with
 `mold`) and the boundary gate's composed flags, and
 `build_standard_warnings_test.py` holds the default warning policy, and
-`build_standard_target_test.py` checks each command's target selection against
-its own arguments. Every dry run starts from `build_standard_env.py`'s
+`build_standard_target_test.py` checks the target selection against
+`CARGO_BUILD_TARGET`. Every dry run starts from `build_standard_env.py`'s
 controlled environment, which removes the caller's exported targets, flag sets
 and Make options, and `build_standard_env_test.py` holds each helper to it.
 
