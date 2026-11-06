@@ -316,7 +316,10 @@ fn workspace_root() -> Result<PathBuf, String> {
 fn run_workspace_build() -> Result<BuildOutcome, String> {
     let status = Command::new("cargo")
         .current_dir(workspace_root()?)
-        .args(["build", "-p", "weaver-cli", "--bin", "weaver"])
+        // `--frozen`: the workspace lock is committed and the gate fetches first,
+        // so this nested build must not resolve or reach the index while it holds
+        // the shared package-cache lock.
+        .args(["build", "--frozen", "-p", "weaver-cli", "--bin", "weaver"])
         .status()
         .map_err(|error| format!("failed to build workspace weaver binary: {error}"))?;
 
