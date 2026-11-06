@@ -56,6 +56,10 @@ readers can find the source of truth without scanning the whole tree.
   library](adrs/adr-0013-adopt-the-shared-cv005-contract-library.md)
   - Accepted decision to run the pinned shared `cv005-contracts` check instead
     of a local copy of the CV-005 contract.
+- [Architectural decision record (ADR) 0014: Endpoint-scoped daemon runtime
+  artefacts](adrs/adr-0014-endpoint-scoped-runtime-artefacts.md)
+  - Accepted decision for endpoint-derived runtime filenames and the
+    pre-upgrade stop requirement for older daemons.
 - [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md)
   - Generated matrix classifying every command-contract roadmap task as an
     OrthoConfig consumer, temporary wrapper, pending dependency, or deliberate
@@ -142,6 +146,10 @@ readers can find the source of truth without scanning the whole tree.
 - [Weaver `act refactor` rename position migration guide](weaver-act-refactor-rename-position-migration-guide.md)
   - Migration notes for moving `act refactor` rename from `offset=` to
     `--position LINE:COL`.
+- [Weaver endpoint-scoped runtime artefact migration
+  guide](weaver-endpoint-scoped-runtime-migration-guide.md)
+  - Migration notes for endpoint-derived lock, PID, and health filenames and
+    the pre-upgrade stop requirement for older daemons.
 - [Weaver LSP host v0.1.0 migration guide](weaver-lsp-host-v0.1.0-migration-guide.md)
   - Migration details for Language Server Protocol (LSP) host capability and
     API changes.

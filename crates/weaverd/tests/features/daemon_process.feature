@@ -11,7 +11,7 @@ Feature: Daemon process management
     When shutdown is triggered
     Then the daemon wrote the stopping health snapshot
     And the daemon run completes
-    Then the runtime artefacts are removed
+    Then the runtime state is cleaned up
 
   Scenario: Duplicate start fails while daemon is running
     Given a fresh daemon process world
@@ -25,7 +25,7 @@ Feature: Daemon process management
     When shutdown is triggered
     Then the daemon wrote the stopping health snapshot
     And the daemon run completes
-    Then the runtime artefacts are removed
+    Then the runtime state is cleaned up
 
   Scenario: Stale runtime artefacts are reclaimed
     Given a fresh daemon process world
@@ -33,7 +33,7 @@ Feature: Daemon process management
     When the daemon starts in foreground mode
     Then the daemon run succeeds
     And the stale runtime pid is replaced with the current process id
-    And the runtime artefacts are removed
+    And the runtime state is cleaned up
 
   Scenario: Stale runtime artefacts with invalid pid are reclaimed
     Given a fresh daemon process world
@@ -41,14 +41,14 @@ Feature: Daemon process management
     When the daemon starts in foreground mode
     Then the daemon run succeeds
     And the stale runtime pid is replaced with the current process id
-    And the runtime artefacts are removed
+    And the runtime state is cleaned up
 
-  Scenario: Missing pid file indicates startup in progress
+  Scenario: Terminated launch before PID write recovers
     Given a fresh daemon process world
-    And a lock without a pid file exists
+    And a prior launch terminated after acquiring the lock
     When the daemon starts in foreground mode
-    Then the daemon run fails with launch already in progress
-    And the lock file remains in place
+    Then the daemon run succeeds
+    And the runtime state is cleaned up
 
   Scenario: Invalid configuration fails the daemon run
     Given a fresh daemon process world

@@ -121,6 +121,8 @@ where
         env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
     if matches!(mode, LaunchMode::Background) {
         daemonizer.daemonize(guard.paths())?;
+        #[cfg(target_os = "solaris")]
+        guard.after_daemonize()?;
     }
     let pid = std::process::id();
     guard.write_pid(pid)?;
@@ -141,7 +143,7 @@ where
             backend_manager,
             workspace_root,
             config.daemon_socket().to_string(),
-            guard.paths().runtime_dir().to_path_buf(),
+            guard.paths().clone(),
         )
         .map_err(|error| LaunchError::WorkspaceRoot {
             source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),

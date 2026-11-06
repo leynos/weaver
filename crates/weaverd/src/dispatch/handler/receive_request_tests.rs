@@ -3,6 +3,7 @@
 use std::{io::Write, net::TcpStream, thread};
 
 use rstest::rstest;
+use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
 use super::{
     tests_helpers::{backend_manager, create_listener},
@@ -21,11 +22,17 @@ fn receive_request_handler() -> Result<(DispatchConnectionHandler, tempfile::Tem
     let temp_dir = tempfile::TempDir::new().map_err(|error| format!("temp dir: {error}"))?;
     let workspace_root = temp_dir.path().join("workspace");
     let endpoint = temp_dir.path().join("weaverd-test/socket.sock");
+    let config = Config {
+        daemon_socket: SocketEndpoint::unix(endpoint.to_string_lossy().into_owned()),
+        ..Config::default()
+    };
+    let runtime_paths = RuntimePaths::from_config_readonly(&config)
+        .map_err(|error| format!("derive runtime paths: {error}"))?;
     let handler = DispatchConnectionHandler::new(
         backend_manager()?.manager(),
         workspace_root,
         endpoint.to_string_lossy().into_owned(),
-        temp_dir.path().to_path_buf(),
+        runtime_paths,
     )
     .map_err(|error| format!("create handler: {error}"))?;
     Ok((handler, temp_dir))

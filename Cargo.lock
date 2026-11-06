@@ -3296,6 +3296,7 @@ dependencies = [
  "rstest-bdd-macros",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "strum",
  "tempfile",
  "thiserror 2.0.21",
@@ -3338,6 +3339,7 @@ dependencies = [
  "cap-std 4.0.3",
  "insta",
  "lsp-types",
+ "nix 0.31.3",
  "proptest",
  "rstest",
  "serde",
@@ -3510,6 +3512,7 @@ dependencies = [
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",
+ "rustix 1.1.4",
  "serde",
  "serde_json",
  "serial_test",
@@ -3518,6 +3521,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tracing",
  "tracing-subscriber",
+ "trybuild",
  "url",
  "weaver-build-util",
  "weaver-cards",
@@ -3527,6 +3531,7 @@ dependencies = [
  "weaver-plugins",
  "weaver-syntax",
  "weaver-test-macros",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
