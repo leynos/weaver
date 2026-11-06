@@ -15,6 +15,7 @@ use arguments::parse_refactor_args;
 use manifests::{rope_manifest, rust_analyzer_manifest};
 use metrics::AtomicPositionMetrics;
 pub(crate) use metrics::{position_conversion_error_count, position_parse_error_count};
+use mockable::{DefaultEnv, Env};
 use plugin_paths::{
     ROPE_PLUGIN_PATH_ENV,
     RUST_ANALYZER_PLUGIN_PATH_ENV,
@@ -85,20 +86,20 @@ pub(crate) struct SandboxRefactorRuntime {
 }
 
 impl SandboxRefactorRuntime {
-    /// Builds the runtime from environment configuration.
+    /// Builds the runtime from an injected environment reader.
     ///
     /// # Errors
     ///
     /// Returns an error description if plugin registration fails.
-    pub fn from_environment() -> Result<Self, String> {
+    pub fn from_environment(env: &impl Env) -> Result<Self, String> {
         let mut registry = PluginRegistry::new();
-        let rope_executable = resolve_rope_plugin_path(std::env::var_os(ROPE_PLUGIN_PATH_ENV));
+        let rope_executable = resolve_rope_plugin_path(env.os_string(ROPE_PLUGIN_PATH_ENV));
         registry
             .register(rope_manifest(rope_executable))
             .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
 
         let rust_analyzer_executable =
-            resolve_rust_analyzer_plugin_path(std::env::var_os(RUST_ANALYZER_PLUGIN_PATH_ENV));
+            resolve_rust_analyzer_plugin_path(env.os_string(RUST_ANALYZER_PLUGIN_PATH_ENV));
         registry
             .register(rust_analyzer_manifest(rust_analyzer_executable))
             .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
@@ -155,7 +156,7 @@ impl RefactorPluginRuntime for NoopRefactorRuntime {
 /// Constructs the default refactor plugin runtime for daemon dispatch.
 #[must_use]
 pub(crate) fn default_runtime() -> Arc<dyn RefactorPluginRuntime + Send + Sync> {
-    match SandboxRefactorRuntime::from_environment() {
+    match SandboxRefactorRuntime::from_environment(&DefaultEnv) {
         Ok(runtime) => Arc::new(runtime),
         Err(message) => Arc::new(NoopRefactorRuntime { message }),
     }

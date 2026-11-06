@@ -6,6 +6,7 @@
 
 use std::{io::Write, process::ExitCode, time::SystemTime};
 
+use mockable::DefaultEnv;
 use weaver_config::{RuntimePaths, SocketEndpoint};
 
 use super::{
@@ -67,6 +68,7 @@ impl SystemLifecycle {
             context.config_arguments,
             context.daemon_binary,
             paths.runtime_dir(),
+            &DefaultEnv,
         )?;
         let started_at = SystemTime::now();
         let snapshot = wait_for_ready(&paths, &mut child, started_at, STARTUP_TIMEOUT)?;

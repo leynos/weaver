@@ -8,6 +8,9 @@ mod jsonrpc;
 mod process;
 mod text_edits;
 
+#[cfg(test)]
+mod tests;
+
 use std::{
     io::BufWriter,
     process::{Child, ChildStdin, Command, Stdio},
@@ -16,6 +19,7 @@ use std::{
 };
 
 use lsp_types::{DidOpenTextDocumentParams, TextDocumentItem, Uri, WorkspaceEdit};
+use mockable::Env;
 use serde_json::json;
 use tempfile::TempDir;
 use weaver_plugins::protocol::FilePayload;
@@ -49,7 +53,38 @@ const RENAME_REQUEST_ID: i64 = 2;
 const SHUTDOWN_REQUEST_ID: i64 = 3;
 
 /// Adapter implementation that delegates rename operations to rust-analyzer.
-pub struct RustAnalyzerLspAdapter;
+///
+/// The server binary is resolved once, when the adapter is built, rather than on
+/// every rename. The plugin starts one short-lived server per request today, so
+/// the difference is small; resolving at construction keeps the ambient
+/// environment read on the single path that owns the process boundary.
+#[derive(Clone, Debug)]
+pub struct RustAnalyzerLspAdapter {
+    /// Server executable to launch, already resolved from the environment.
+    binary: String,
+}
+
+impl RustAnalyzerLspAdapter {
+    /// Builds an adapter for the server named by an environment reader.
+    ///
+    /// The override variable is consulted first and ignored when blank, so an
+    /// operator clearing the variable by exporting an empty value still gets the
+    /// default binary rather than a confusing spawn failure.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use mockable::DefaultEnv;
+    /// use weaver_plugin_rust_analyzer::RustAnalyzerLspAdapter;
+    ///
+    /// let adapter = RustAnalyzerLspAdapter::from_env(&DefaultEnv);
+    /// ```
+    pub fn from_env(env: &impl Env) -> Self {
+        Self {
+            binary: resolve_rust_analyzer_binary(env),
+        }
+    }
+}
 
 /// Temporary single-file crate staged on disk for rust-analyzer to analyse.
 struct PreparedWorkspace {
@@ -96,7 +131,7 @@ impl RustAnalyzerAdapter for RustAnalyzerLspAdapter {
         new_name: &str,
     ) -> Result<String, RustAnalyzerAdapterError> {
         let prepared = prepare_workspace(file)?;
-        let mut process = start_rust_analyzer(&prepared)?;
+        let mut process = start_rust_analyzer(&prepared, &self.binary)?;
         let rename_inputs = RenameInputs {
             file,
             offset,
@@ -170,8 +205,8 @@ fn prepare_workspace(file: &FilePayload) -> Result<PreparedWorkspace, RustAnalyz
 /// plugin's own stdout must stay a clean channel.
 fn start_rust_analyzer(
     prepared: &PreparedWorkspace,
+    binary: &str,
 ) -> Result<RustAnalyzerProcess, RustAnalyzerAdapterError> {
-    let binary = resolve_rust_analyzer_binary();
     let mut child = Command::new(binary)
         .current_dir(prepared.workspace.path())
         .stdin(Stdio::piped())
@@ -331,9 +366,8 @@ fn parse_position_encoding(
 
 /// Picks the server binary, preferring a non-blank override from
 /// [`RUST_ANALYZER_BINARY_ENV`] over [`RUST_ANALYZER_BINARY`].
-fn resolve_rust_analyzer_binary() -> String {
-    std::env::var(RUST_ANALYZER_BINARY_ENV)
-        .ok()
+fn resolve_rust_analyzer_binary(env: &impl Env) -> String {
+    env.string(RUST_ANALYZER_BINARY_ENV)
         .map(|candidate| candidate.trim().to_owned())
         .filter(|candidate| !candidate.is_empty())
         .unwrap_or_else(|| String::from(RUST_ANALYZER_BINARY))

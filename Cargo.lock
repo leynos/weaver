@@ -114,7 +114,7 @@ dependencies = [
  "anstyle",
  "bstr",
  "libc",
- "predicates",
+ "predicates 3.1.4",
  "predicates-core",
  "predicates-tree",
  "wait-timeout",
@@ -654,6 +654,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "either"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
+
+[[package]]
 name = "encode_unicode"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -729,6 +735,15 @@ name = "find-msvc-tools"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e0f1c7c3a72c66fd80abe965175f7523475c0489a87d3ff9d6e8c87d87a9d2d"
+
+[[package]]
+name = "float-cmp"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "float-cmp"
@@ -1294,6 +1309,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
+name = "itertools"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1413,6 +1437,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "mockable"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "696033a748f67c97f2169b29b428fbab0d12317707cede1ca62fcb786e80b7fe"
+dependencies = [
+ "mockall 0.11.4",
+ "tracing",
+]
+
+[[package]]
+name = "mockall"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c84490118f2ee2d74570d114f3d0493cbf02790df303d2707606c3e14e07c96"
+dependencies = [
+ "cfg-if",
+ "downcast",
+ "fragile",
+ "lazy_static",
+ "mockall_derive 0.11.4",
+ "predicates 2.1.5",
+ "predicates-tree",
+]
+
+[[package]]
 name = "mockall"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1421,9 +1470,21 @@ dependencies = [
  "cfg-if",
  "downcast",
  "fragile",
- "mockall_derive",
- "predicates",
+ "mockall_derive 0.15.0",
+ "predicates 3.1.4",
  "predicates-tree",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22ce75669015c4f47b289fd4d4f56e894e4c96003ffdf3ac51313126f94c6cbb"
+dependencies = [
+ "cfg-if",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -1735,13 +1796,27 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
 name = "predicates"
+version = "2.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
+dependencies = [
+ "difflib",
+ "float-cmp 0.9.0",
+ "itertools",
+ "normalize-line-endings",
+ "predicates-core",
+ "regex",
+]
+
+[[package]]
+name = "predicates"
 version = "3.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ada8f2932f28a27ee7b70dd6c1c39ea0675c55a36879ab92f3a715eaa1e63cfe"
 dependencies = [
  "anstyle",
  "difflib",
- "float-cmp",
+ "float-cmp 0.10.0",
  "normalize-line-endings",
  "predicates-core",
  "regex",
@@ -2535,6 +2610,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
 dependencies = [
  "proc-macro2",
+ "quote",
  "unicode-ident",
 ]
 
@@ -3216,6 +3292,7 @@ version = "0.1.0"
 dependencies = [
  "camino",
  "cap-std 4.0.3",
+ "mockable",
  "tempfile",
  "time",
 ]
@@ -3254,8 +3331,9 @@ dependencies = [
  "clap_mangen",
  "insta",
  "libc",
+ "mockable",
  "ortho_config",
- "predicates",
+ "predicates 3.1.4",
  "proptest",
  "rstest",
  "rstest-bdd",
@@ -3399,7 +3477,7 @@ dependencies = [
  "anyhow",
  "camino",
  "cap-std 4.0.3",
- "mockall",
+ "mockall 0.15.0",
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",
@@ -3418,7 +3496,8 @@ dependencies = [
  "camino",
  "cap-std 4.0.3",
  "lsp-types",
- "mockall",
+ "mockable",
+ "mockall 0.15.0",
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",
@@ -3436,7 +3515,7 @@ name = "weaver-plugins"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "mockall",
+ "mockall 0.15.0",
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",
@@ -3470,7 +3549,7 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "insta",
- "predicates",
+ "predicates 3.1.4",
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",
@@ -3504,7 +3583,8 @@ dependencies = [
  "dirs",
  "insta",
  "lsp-types",
- "mockall",
+ "mockable",
+ "mockall 0.15.0",
  "nix 0.31.3",
  "once_cell",
  "ortho_config",

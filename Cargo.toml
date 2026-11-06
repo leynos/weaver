@@ -37,6 +37,7 @@ icu_locale_core = { version = "2.2", features = ["alloc"] }
 insta = "1.41"
 lru = "0.19"
 lsp-types = "0.97"
+mockable = "3.0.0"
 mockall = "0.15.0"
 metrics = "0.24"
 once_cell = "1.19"

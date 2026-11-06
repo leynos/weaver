@@ -186,6 +186,51 @@ added to the workspace, add it to that test's package list as well.
 Do not reintroduce a crate-local `[lints.rust]` or `[lints.clippy]` overrides
 in a member manifest: they split the policy, and the test cannot see them.
 
+### 4.1 Environment access and injection seams
+
+Process environment reads go through an injected `mockable::Env` reader, never
+through `std::env` directly. The workspace's eventual ban on ambient
+environment access can only be enforced once every call-site takes its reader
+as a parameter, so the seam is what makes the lint policy expressible at all.
+
+**Ownership boundary.** A function that needs an environment value takes
+`env: &impl Env` and reads what it needs. Composition boundaries — `main`,
+`run_daemon`, `default_runtime`, the lifecycle controller and the build scripts
+— construct `mockable::DefaultEnv` once and pass a reference down. Nothing
+below a composition boundary reaches for the process environment itself.
+
+**Accessor choice follows the data shape, not convenience.**
+
+| Accessor    | Returns                    | Use when                                                                             |
+| ----------- | -------------------------- | ------------------------------------------------------------------------------------ |
+| `string`    | `Option<String>`           | the value must be UTF-8, and absence and non-Unicode are the same answer             |
+| `os_string` | `Option<OsString>`         | a path or binary name that must survive non-Unicode values, such as `WEAVERD_BIN`    |
+| `path_buf`  | `Option<PathBuf>`          | the value is a path and nothing else                                                 |
+| `raw`       | `Result<String, VarError>` | absence and non-Unicode must stay distinguishable, as in `weaverd`'s `OUT_DIR` probe |
+
+Choosing `string` for a value that is legitimately an OS string silently
+discards a non-Unicode value and falls back to a default; choosing `raw` where
+`string` suffices adds a match for no benefit.
+
+**Tests inject instead of mutating.** Use `mockable::MockEnv` with `expect_*`
+and `returning` to fix one outcome per test, rather than reading the ambient
+environment and accepting either branch. `MockEnv` lives behind the crate's
+`mock` feature, so it belongs in `dev-dependencies`. Direct
+`std::env::{set_var, remove_var}` in tests is forbidden: it mutates shared
+process state and races other tests in the same binary.
+
+**Build scripts follow the same rule.** `weaver-cli/build.rs`,
+`weaverd/build.rs` and `weaver-build-util` take their reader as a parameter for
+the same reason; a ban that exempted build scripts would leave the largest
+ambient reads in the tree untouched.
+
+The one deliberate exception is `crates/weaver-sandbox/src/env_guard.rs`, which
+snapshots and restores the parent environment around `birdcage`'s own
+environment stripping. It calls `unsafe { env::set_var / env::remove_var }`
+because `birdcage` 0.8.1 mutates the parent process environment before forking
+and offers no per-child environment API. Any replacement for that guard has to
+change the sandbox API, not the call-site.
+
 ## 5 Workflow pins and Dependabot
 
 Dependabot checks both ecosystems (`github-actions` and `cargo`) daily. The
