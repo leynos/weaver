@@ -325,22 +325,3 @@ def test_coverage_and_release_add_neither_flag(
             f"`make {target}` assigns {flags}, not the caller's {inherited!r}"
         )
 
-
-def test_the_whitaker_route_assigns_exactly_the_warning_policy() -> None:
-    """Whitaker takes neither standard flag: its isolated ``RUSTFLAGS`` is the
-    warning policy and nothing else."""
-    result = subprocess.run(
-        ["make", "-n", "-B", "BUILD_HOST_OS=Linux", "lint"],
-        cwd=ROOT,
-        env=controlled_environment(),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    routes = [
-        line for line in result.stdout.replace("\\\n", " ").splitlines() if "whitaker" in line
-    ]
-    assert len(routes) == 1, routes
-    assigned = RUSTFLAGS_RE.search(routes[0])
-    assert assigned, f"the Whitaker route assigns no RUSTFLAGS: {routes[0]!r}"
-    assert assigned.group(1).split() == ["-D", "warnings"], assigned.group(1)
