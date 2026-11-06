@@ -48,31 +48,29 @@ pub use defaults::{
 };
 pub use locale::{Locale, LocaleParseError};
 pub use logging::{LogFormat, LogFormatParseError};
-use ortho_config::{OrthoConfig, OrthoResult, PostMergeContext, PostMergeHook};
+use ortho_config::{
+    OrthoConfig,
+    OrthoConfigLocalization,
+    OrthoResult,
+    PostMergeContext,
+    PostMergeHook,
+};
 pub use runtime::{RuntimePaths, RuntimePathsError};
 use serde::{Deserialize, Serialize};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
 
+/// Returns the locale used when no configuration source supplies one.
 fn default_locale() -> Locale { Locale::en_us() }
 
 const CONFIG_FIELD_HELP: &[(&str, &str)] = &[
+    ("daemon_socket", "Overrides the daemon transport endpoint"),
+    ("log_filter", "Sets the tracing filter"),
+    ("log_format", "Selects the structured log output format"),
     (
-        "weaver.fields.daemon_socket.help",
-        "Overrides the daemon transport endpoint",
-    ),
-    ("weaver.fields.log_filter.help", "Sets the tracing filter"),
-    (
-        "weaver.fields.log_format.help",
-        "Selects the structured log output format",
-    ),
-    (
-        "weaver.fields.capability_overrides.help",
+        "capability_overrides",
         "Appends a language capability override directive",
     ),
-    (
-        "weaver.fields.locale.help",
-        "Selects the operator-facing locale",
-    ),
+    ("locale", "Selects the operator-facing locale"),
 ];
 const DEFAULT_CONFIG_FIELD_HELP: &str = "Overrides a shared configuration value";
 
@@ -85,15 +83,19 @@ const DEFAULT_CONFIG_FIELD_HELP: &str = "Overrides a shared configuration value"
 ///
 /// ```rust
 /// assert_eq!(
-///     weaver_config::config_field_help("weaver.fields.locale.help"),
+///     weaver_config::config_field_help("weaver-args-locale-help"),
 ///     "Selects the operator-facing locale"
 /// );
 /// ```
 #[must_use]
 pub fn config_field_help(help_id: &str) -> &'static str {
+    let field_name = Config::ARG_IDS
+        .iter()
+        .find(|identifiers| identifiers.help_id == help_id)
+        .map(|identifiers| identifiers.name);
     CONFIG_FIELD_HELP
         .iter()
-        .find_map(|(candidate, help)| (*candidate == help_id).then_some(*help))
+        .find_map(|(candidate, help)| (Some(*candidate) == field_name).then_some(*help))
         .unwrap_or(DEFAULT_CONFIG_FIELD_HELP)
 }
 
@@ -202,12 +204,18 @@ impl Config {
     #[must_use]
     pub fn locale(&self) -> &Locale { &self.locale }
 
+    /// Collapses repeated capability directives into last-wins order, so the
+    /// capability matrix and CLI agree on which directive for a language and
+    /// capability takes effect.
     fn normalise_capability_overrides(&mut self) {
         deduplicate_directives(&mut self.capability_overrides);
     }
 }
 
 impl PostMergeHook for Config {
+    /// OrthoConfig calls this after merging all layers, so every load path,
+    /// including defaults and `merge_from_layers`, normalises capability
+    /// directives before the configuration is returned.
     fn post_merge(&mut self, _context: &PostMergeContext) -> OrthoResult<()> {
         self.normalise_capability_overrides();
         Ok(())
@@ -234,11 +242,28 @@ mod tests {
 
     use std::collections::BTreeMap;
 
-    use ortho_config::MergeComposer;
+    use ortho_config::{MergeComposer, OrthoConfigLocalization};
     use proptest::prelude::*;
     use serde_json::json;
 
     use super::{CapabilityDirective, CapabilityOverride, Config};
+
+    #[test]
+    fn config_help_uses_generated_localisation_identifiers() {
+        for (field_name, expected_help) in super::CONFIG_FIELD_HELP {
+            let help_id = Config::ARG_IDS
+                .iter()
+                .find(|identifiers| identifiers.name == *field_name)
+                .map(|identifiers| identifiers.help_id)
+                .expect("each described config field should have a generated help ID");
+
+            assert_eq!(super::config_field_help(help_id), *expected_help);
+        }
+        assert_eq!(
+            super::config_field_help("unknown-help-id"),
+            super::DEFAULT_CONFIG_FIELD_HELP
+        );
+    }
 
     fn directive_layer_strategy() -> impl Strategy<Value = (CapabilityDirective, usize)> {
         (

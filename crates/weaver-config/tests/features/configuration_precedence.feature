@@ -1,10 +1,16 @@
-Feature: Configuration precedence under OrthoConfig v0.9.0
+Feature: Configuration precedence under OrthoConfig v0.10.0
 
   Scenario: CLI locale overrides environment and configuration file values
     Given a configuration file setting the locale to "en-GB"
     And the environment overrides the locale to "fr-FR"
     When the CLI sets the locale to "de-DE"
     Then loading the configuration resolves the locale to "de-DE"
+
+  Scenario: Explicit CLI value equal to the default overrides lower layers
+    Given a configuration file setting the locale to "ja-JP"
+    And the environment overrides the locale to "fr-FR"
+    When the CLI sets the locale to "en-US"
+    Then loading the configuration resolves the locale to "en-US"
 
   Scenario: Environment locale overrides a configuration file value
     Given a configuration file setting the locale to "en-GB"

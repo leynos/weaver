@@ -13,10 +13,10 @@
 # CI applied before this file existed. This governs every test no override
 # matches; none of them starts a compiler.
 slow-timeout = { period = "60s", terminate-after = 3 }
-# The whole run. Each test is bounded by its own allowance, but a run whose
-# tests each stay inside theirs can still exceed the job. Measured: the
-# workspace's 1,558 tests took 234 s on CI and 1,048 s on a loaded local host.
-global-timeout = "45m"
+# The whole run, kept below the coverage job's 20-minute limit and its cargo
+# watchdog so nextest reports the overrun itself rather than the job being
+# cancelled. Measured: the workspace's 1,558 tests took 234 s on CI.
+global-timeout = "15m"
 
 [test-groups.nested-cargo-builds]
 # These tests start a child `cargo` or `rustc` of their own: the trybuild
@@ -34,10 +34,9 @@ max-threads = 1
 # `weaver` binary, but only when it is missing and at most once per process, so
 # they stay in the default pool.
 #
-# Measured on CI: 26 s, 39 s and 85 s for the three slowest of these tests. On
-# a loaded local host the 85 s test took about 1,000 s waiting on the shared
-# Cargo cache, so the allowance is twenty warning periods (1,200 s): the
-# largest in this file, and well above anything a quiet host needs.
+# Measured on CI: 26 s, 39 s and 85 s for the three slowest of these tests.
+# An instrumented from-scratch build is slower, so the allowance is five
+# 120-second periods (600 s), which the coverage job's limit still covers.
 filter = 'binary(=load_manifest) | binary(=compile_time)'
 test-group = "nested-cargo-builds"
-slow-timeout = { period = "60s", terminate-after = 20 }
+slow-timeout = { period = "120s", terminate-after = 5 }
