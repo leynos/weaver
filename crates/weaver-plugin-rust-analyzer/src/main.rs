@@ -1,12 +1,12 @@
 //! Binary entrypoint for the rust-analyzer actuator plugin.
 
-use std::io::{self, BufReader, Write};
+use std::io::{self, Write};
 
 use weaver_plugin_rust_analyzer::run;
 
 fn main() {
     let stdin = io::stdin();
-    let mut reader = BufReader::new(stdin.lock());
+    let mut reader = stdin.lock();
     let stdout = io::stdout();
     let mut writer = stdout.lock();
 
