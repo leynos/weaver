@@ -37,8 +37,8 @@ library retains a Rust 1.89 minimum: its runtime dependency graph passes a Rust
 1.89.0 check. Its test targets use the internal `weaver-test-macros` package,
 which follows the workspace's Rust 1.90 floor. The workspace floor follows
 `tree-sitter` 0.27.1, which requires Rust 1.90. Test-only `serial_test` 4.0.1
-requires Rust 1.93.1; `rust-toolchain.toml` pins Nightly 2026-10-27 for
-repository builds and full-suite tests.
+requires Rust 1.93.1; `rust-toolchain.toml` pins a dated nightly for repository
+builds and full-suite tests.
 
 ## 3 The build standard
 
@@ -96,7 +96,13 @@ not, so it records an exception, and `.cargo/config.toml` carries no
 `codegen-backend` key (`tests/workflow_contracts/build_footprint_test.py`
 refuses one).
 
-Measured on `nightly-2026-10-27` (31 October 2026), with
+Re-measured on `nightly-2026-11-06` (7 November 2026) with the same command
+under the Cranelift development default: 1,588 of 1,602 tests ran before
+nextest's 900 s global timeout, 49 failed and one timed out, so the exception
+stands. The 34 Python graph-slice snapshot cases in that count fail under LLVM
+too on a host with `pyrefly` installed (as this one is), so they are not
+evidence about the backend. The fuller account below was measured on
+`nightly-2026-10-27` (31 October 2026), with
 `cargo nextest run --workspace --all-targets --all-features --no-fail-fast`
 under the Cranelift development default: 1,564 tests ran and 48 failed, all
 with the same abort, `llvm.x86.sse2.pmulhu.w is not yet supported` (SIGABRT,
