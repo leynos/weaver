@@ -37,8 +37,8 @@ library retains a Rust 1.89 minimum: its runtime dependency graph passes a Rust
 1.89.0 check. Its test targets use the internal `weaver-test-macros` package,
 which follows the workspace's Rust 1.90 floor. The workspace floor follows
 `tree-sitter` 0.27.1, which requires Rust 1.90. Test-only `serial_test` 4.0.1
-requires Rust 1.93.1; `rust-toolchain.toml` pins Nightly 2026-10-27 for
-repository builds and full-suite tests.
+requires Rust 1.93.1; `rust-toolchain.toml` pins a dated nightly for repository
+builds and full-suite tests.
 
 ## 3 The build standard
 
