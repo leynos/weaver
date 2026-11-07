@@ -96,7 +96,13 @@ not, so it records an exception, and `.cargo/config.toml` carries no
 `codegen-backend` key (`tests/workflow_contracts/build_footprint_test.py`
 refuses one).
 
-Measured on `nightly-2026-10-27` (31 October 2026), with
+Re-measured on `nightly-2026-11-06` (7 November 2026) with the same command
+under the Cranelift development default: 1,588 of 1,602 tests ran before
+nextest's 900 s global timeout, 49 failed and one timed out, so the exception
+stands. The 34 Python graph-slice snapshot cases in that count fail under LLVM
+too on a host with `pyrefly` installed (as this one is), so they are not
+evidence about the backend. The fuller account below was measured on
+`nightly-2026-10-27` (31 October 2026), with
 `cargo nextest run --workspace --all-targets --all-features --no-fail-fast`
 under the Cranelift development default: 1,564 tests ran and 48 failed, all
 with the same abort, `llvm.x86.sse2.pmulhu.w is not yet supported` (SIGABRT,

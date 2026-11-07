@@ -84,7 +84,7 @@ configuration layering, and the complete command reference.
 
 ## Building from source
 
-Weaver requires the pinned **Nightly Rust toolchain `nightly-2026-10-27`** for
+Weaver requires the pinned **Nightly Rust toolchain `nightly-2026-11-06`** for
 local builds. The workspace `.cargo/config.toml` uses options that require the
 Nightly toolchain, so stable Rust is not sufficient for local Cargo builds in
 this checkout. To build:
@@ -98,13 +98,13 @@ make release
 
 `make release` adds neither the configuration's frontend flag nor `mold`, and
 forwards any `RUSTFLAGS` you export. The bare equivalent,
-`cargo +nightly-2026-10-27 build --release`, takes the frontend flag (and
+`cargo +nightly-2026-11-06 build --release`, takes the frontend flag (and
 `mold` on Linux) because Cargo applies the configuration to every build.
 
 To run the test suite:
 
 ```sh
-cargo +nightly-2026-10-27 test --workspace
+cargo +nightly-2026-11-06 test --workspace
 ```
 
 ### Toolchain prerequisites
@@ -114,14 +114,14 @@ parallel frontend and the native metadata key). Install the pinned toolchain
 with:
 
 ```sh
-rustup toolchain install nightly-2026-10-27
+rustup toolchain install nightly-2026-11-06
 ```
 
 Set a local override so Cargo uses that pinned Nightly automatically in this
 checkout:
 
 ```sh
-rustup override set nightly-2026-10-27
+rustup override set nightly-2026-11-06
 ```
 
 If this prerequisite is missing, the failure mode is often opaque: Cargo may
