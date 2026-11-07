@@ -15,13 +15,16 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn temp_dir() -> TempDir { TempDir::new().expect("create temporary directory") }
+fn temp_dir() -> std::io::Result<TempDir> { TempDir::new() }
 
 #[rstest]
-fn malformed_explicit_config_returns_file_error(temp_dir: TempDir) {
-    let cli_path = temp_dir.path().join("cli_weaver.toml");
-    let dir = Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
-        .expect("open temp dir");
+fn malformed_explicit_config_returns_file_error(
+    temp_dir: std::io::Result<TempDir>,
+) -> Result<(), std::io::Error> {
+    let root = temp_dir?;
+    let cli_path = root.path().join("cli_weaver.toml");
+    let dir =
+        Dir::open_ambient_dir(root.path(), cap_std::ambient_authority()).expect("open temp dir");
 
     dir.write(
         "cli_weaver.toml",
@@ -44,16 +47,25 @@ fn malformed_explicit_config_returns_file_error(temp_dir: TempDir) {
 
     match error.as_ref() {
         OrthoError::File { path, .. } => assert_eq!(path, &cli_path),
-        other => panic!("expected file error, got {other:?}"),
+        other => {
+            return Err(std::io::Error::other(format!(
+                "expected file error, got {other:?}"
+            )));
+        }
     }
+
+    Ok(())
 }
 
 #[rstest]
-fn missing_extends_reports_referencing_and_resolved_paths(temp_dir: TempDir) {
-    let config_path = temp_dir.path().join("weaver.toml");
-    let missing_parent_path = temp_dir.path().join("missing.toml");
-    let dir = Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
-        .expect("open temp dir");
+fn missing_extends_reports_referencing_and_resolved_paths(
+    temp_dir: std::io::Result<TempDir>,
+) -> Result<(), std::io::Error> {
+    let root = temp_dir?;
+    let config_path = root.path().join("weaver.toml");
+    let missing_parent_path = root.path().join("missing.toml");
+    let dir =
+        Dir::open_ambient_dir(root.path(), cap_std::ambient_authority()).expect("open temp dir");
 
     dir.write("weaver.toml", "extends = \"missing.toml\"\n")
         .expect("write extending config");
@@ -68,7 +80,7 @@ fn missing_extends_reports_referencing_and_resolved_paths(temp_dir: TempDir) {
     let message = error.to_string();
     let referencing_path = config_path.display().to_string();
     let missing_parent = missing_parent_path.display().to_string();
-    let normalized_message = message.replace(&temp_dir.path().display().to_string(), "<TEMP>");
+    let normalized_message = message.replace(&root.path().display().to_string(), "<TEMP>");
 
     assert_that!(
         message.as_str(),
@@ -79,4 +91,6 @@ fn missing_extends_reports_referencing_and_resolved_paths(temp_dir: TempDir) {
         contains_substring(missing_parent.as_str())
     );
     insta::assert_snapshot!(normalized_message);
+
+    Ok(())
 }

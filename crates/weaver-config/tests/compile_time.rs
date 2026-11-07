@@ -1,6 +1,6 @@
 //! Compile-time checks for the public `weaver-config` API.
 //!
-//! The OrthoConfig v0.10.0 migration changes the derive and the generated
+//! The `OrthoConfig` v0.10.0 migration changes the derive and the generated
 //! metadata behind `Config`. This suite keeps the caller-facing surface stable
 //! by compiling a small downstream crate with `trybuild`.
 
