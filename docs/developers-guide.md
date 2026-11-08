@@ -2320,3 +2320,11 @@ For launch failures, guidance can tell the operator where to inspect runtime
 artefacts even when the daemon process never starts. For startup failures,
 guidance derives `runtime_dir.join("weaverd.health")` and points directly at
 the health snapshot that should explain why readiness was not reached.
+
+## 26 Plugin protocol round-trip test helper
+
+The JSON round-trip assertion in `crates/weaver-plugins/src/protocol/tests.rs`
+is private to those protocol tests. It handles serialization, deserialization,
+and equality; each caller retains its protocol-specific assertions. Reuse it
+within that module only, rather than exporting a test-support API for an
+unrelated protocol.
