@@ -25,6 +25,7 @@ fn run_rename_refactor_snapshot(
     snapshot_name: &str,
     provider: Option<&str>,
 ) -> std::io::Result<()> {
+    let weaver_bin = resolve_or_build_weaver_binary_path()?;
     let daemon = FakeDaemon::start(1, "renamed_name")?;
     let endpoint = daemon.endpoint();
 
@@ -57,11 +58,10 @@ fn run_rename_refactor_snapshot(
         "new_name=renamed_name".into(),
     ]);
 
-    let mut command = Command::new(resolve_or_build_weaver_binary_path()?);
+    let mut command = Command::new(weaver_bin);
     let output = command.args(&args).output()?;
 
-    let transcript = output_to_transcript(command_string, &output, daemon.requests());
-    daemon.join();
+    let transcript = output_to_transcript(command_string, &output, daemon.join()?);
 
     assert_debug_snapshot!(snapshot_name, transcript);
 
@@ -77,7 +77,7 @@ fn refactor_rust_routing_cli_snapshot(#[case] case_name: &str, #[case] provider:
 }
 
 #[test]
-fn refactor_rust_analyzer_pipeline_with_observe_and_jq_snapshot() {
+fn refactor_rust_analyzer_pipeline_with_observe_and_jq_snapshot() -> std::io::Result<()> {
     let jq_available = Command::new("jq").arg("--version").output().is_ok();
     if !jq_available {
         writeln!(
@@ -85,13 +85,12 @@ fn refactor_rust_analyzer_pipeline_with_observe_and_jq_snapshot() {
             "Skipping test: jq not available on PATH"
         )
         .ok();
-        return;
+        return Ok(());
     }
 
-    let daemon = FakeDaemon::start(2, "renamed_name").expect("fake daemon should start");
+    let weaver_bin = resolve_or_build_weaver_binary_path()?;
+    let daemon = FakeDaemon::start(2, "renamed_name")?;
     let endpoint = daemon.endpoint();
-    let weaver_bin =
-        resolve_or_build_weaver_binary_path().expect("weaver binary should be locatable");
 
     let shell_script = concat!(
         "\"$WEAVER_BIN\" --daemon-socket \"$WEAVER_ENDPOINT\" --output json ",
@@ -106,13 +105,12 @@ fn refactor_rust_analyzer_pipeline_with_observe_and_jq_snapshot() {
         .args(["-c", shell_script])
         .env("WEAVER_BIN", weaver_bin)
         .env("WEAVER_ENDPOINT", endpoint.as_str())
-        .output()
-        .expect("pipeline command should execute");
+        .output()?;
 
     let command_string =
         String::from("weaver observe get-definition | jq -r '.[0].symbol' | weaver act refactor");
-    let transcript = output_to_transcript(command_string, &output, daemon.requests());
-    daemon.join();
+    let transcript = output_to_transcript(command_string, &output, daemon.join()?);
 
     assert_debug_snapshot!("refactor_rust_analyzer_pipeline_observe_jq", transcript);
+    Ok(())
 }
