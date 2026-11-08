@@ -272,6 +272,10 @@ fn run_render_boundary_matrix(args: &[&str]) -> TestResult<Output> {
     Command::new(env!("CARGO"))
         .args([
             "run",
+            // The enclosing test build has already fetched the locked
+            // dependencies, so this nested cargo must not resolve or
+            // download anything.
+            "--frozen",
             "-p",
             "weaver-docs-gate",
             "--example",
