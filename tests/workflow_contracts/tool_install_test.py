@@ -18,6 +18,9 @@ an action that quietly builds from source anyway:
   that runs is the code that was reviewed;
 - the Whitaker-specific contract verifies its pinned prebuilt action and
   Cranelift input;
+- `install-whitaker` is asked for an installer release new enough to pass
+  `--no-source-fallback`, and the inputs that would force or permit a source
+  build stay at the values that refuse one;
 - each install runs before the step that needs its tool.
 
 Run via ``make test-workflow-contracts``.
@@ -47,6 +50,12 @@ WHITAKER_CLONE: typ.Final = re.compile(
 
 #: A full commit SHA, the only pin that names one immutable revision.
 COMMIT_SHA: typ.Final = re.compile(r"^[0-9a-f]{40}$")
+
+#: The first `whitaker-installer` release with `--no-source-fallback`, which the
+#: action always passes. An older installer cannot refuse a source build, so
+#: the step would silently compile the lint suite when a prebuilt asset is
+#: missing.
+MINIMUM_INSTALLER: typ.Final = (0, 2, 9)
 
 LANE: typ.Final = ("ci.yml", "build-test")
 NIXIE_ACTION: typ.Final = "leynos/shared-actions/.github/actions/install-nixie"
@@ -323,4 +332,34 @@ def test_each_install_runs_before_the_step_that_needs_it(
     install, _ = _action_step(action)
     assert install < _run_index(command), (
         f"{action} must run before `{command}` in {LANE[0]}:{LANE[1]}"
+    )
+
+
+def test_whitaker_cannot_fall_back_to_a_source_build() -> None:
+    """The installer is new enough to refuse a source build, and does.
+
+    `install-whitaker` always passes `--no-source-fallback`, which only exists
+    from installer 0.2.9. The caller must therefore ask for at least that
+    release. `suite-version` is refused by the action when set (a pin would
+    force a source build), and `ci-mode` turns off the check that catches a
+    missing prebuilt asset, so a caller that unsets it would let the step
+    proceed without one.
+    """
+    _, step = _action_step(WHITAKER_ACTION)
+    inputs = step.get("with", {})
+    assert isinstance(inputs, dict), "install-whitaker must declare its inputs"
+
+    # An absent input takes the action's default, 0.2.11, which is new enough.
+    version = str(inputs.get("installer-version", "0.2.11"))
+    assert _version(version) >= MINIMUM_INSTALLER, (
+        f"installer-version {version} predates --no-source-fallback "
+        f"({'.'.join(map(str, MINIMUM_INSTALLER))}), so the step could "
+        "compile the lint suite when a prebuilt asset is missing"
+    )
+    assert not inputs.get("suite-version"), (
+        "suite-version pins the rolling lint suite, which forces a source build"
+    )
+    assert str(inputs.get("ci-mode", "true")).lower() == "true", (
+        "ci-mode must stay on, so an unpublished prebuilt asset fails the step "
+        "instead of being built from source"
     )
