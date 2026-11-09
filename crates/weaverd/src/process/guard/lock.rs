@@ -146,11 +146,10 @@ fn handle_existing_lock(
         warn!(
             target: PROCESS_TARGET,
             pid,
-            "reclaimed stale daemon lock; removing recorded pid and health files",
+            "reclaimed stale daemon lock; recorded pid and health files are removed once the \
+             endpoint binds",
         );
     }
-    super::remove_file(dir, paths.pid_path())?;
-    super::remove_file(dir, paths.health_path())?;
     Ok(lock)
 }
 

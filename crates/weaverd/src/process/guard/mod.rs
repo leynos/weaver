@@ -129,14 +129,39 @@ impl ProcessGuard {
         Ok(())
     }
 
+    /// Removes runtime artefacts left behind by an earlier daemon.
+    ///
+    /// The caller must invoke this only once the endpoint has been bound. A
+    /// launch that fails to bind has proven that some other process still
+    /// serves the endpoint, and that process may be an older release whose
+    /// only record of its own PID is these files. Deleting them before the
+    /// bind would strip `weaver daemon stop` of the last way to reach it.
+    ///
+    /// # Errors
+    /// Returns [`LaunchError::Cleanup`] when an artefact exists but cannot be
+    /// removed.
+    pub(super) fn reclaim_stale_artefacts(&self) -> Result<(), LaunchError> {
+        for path in [self.paths.pid_path(), self.paths.health_path()] {
+            remove_file(&self.runtime_dir, path)?;
+        }
+        Ok(())
+    }
+
     /// Borrows the runtime paths resolved for this daemon instance.
     pub(super) const fn paths(&self) -> &RuntimePaths { &self.paths }
 
     #[cfg(test)]
     fn terminate_before_pid_write(self) { drop(self); }
 
-    /// Removes the lock, PID, and health artefacts, ignoring absent files.
+    /// Removes only the artefacts this guard wrote.
+    ///
+    /// A launch that fails before `write_pid` must leave a previous daemon's
+    /// PID and health files untouched; removing them unconditionally would
+    /// orphan a process that is still serving the endpoint.
     fn cleanup(&self) {
+        if self.pid.is_none() {
+            return;
+        }
         for path in [self.paths.pid_path(), self.paths.health_path()] {
             remove_runtime_file(&self.runtime_dir, path);
         }
@@ -303,6 +328,8 @@ pub(super) mod test_support;
 
 #[cfg(test)]
 mod tests;
+// check' to verify your resolution
+// weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
 // check' to verify your resolution
 // weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
 // check' to verify your resolution
