@@ -114,33 +114,42 @@ def _run_index(command: str) -> int:
     return matches[0]
 
 
-#: The version grammar the pinned actions accept: one to three numeric
-#: components, none with a leading zero. `install-whitaker` pads a short
-#: version to three components before comparing it with its floor, and
-#: rejects `0.2.09` precisely because of the leading zero.
-_ACCEPTED_VERSION: typ.Final = re.compile(
-    r"(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,2}"
+#: The numeric component shared by both version grammars: no leading zero, so
+#: `0.2.09` is rejected by the action itself rather than normalised.
+_COMPONENT: typ.Final = r"(0|[1-9][0-9]*)"
+
+#: `install-whitaker` accepts one to three components and pads the omitted
+#: ones with zero before comparing against its floor.
+_INSTALLER_VERSION: typ.Final = re.compile(
+    rf"{_COMPONENT}(\.{_COMPONENT}){{0,2}}"
+)
+
+#: `install-nixie` is stricter at the short end: it accepts two or three
+#: components, so a bare `"4"` fails the action even though the padded value
+#: would clear a major floor.
+_NIXIE_PYTHON_VERSION: typ.Final = re.compile(
+    rf"{_COMPONENT}\.{_COMPONENT}(\.{_COMPONENT})?"
 )
 
 
-def _version(text: str) -> tuple[int, ...]:
+def _version(text: str, pattern: typ.Pattern[str]) -> tuple[int, ...]:
     """Parse an action version, normalised to `(MAJOR, MINOR, PATCH)`.
 
-    A caller may write one to three numeric components without a leading zero,
-    which is what `install-whitaker` validates before padding the omitted
-    components with zero. Comparing a short version as written would order
-    `1.0` below `0.2.9` instead of above it, so the result always has three
-    components.
+    Both pinned actions pad a short version with zeros before comparing it
+    with a floor, so a version must be normalised before that comparison:
+    read as written, `"1.0"` would order below `"0.2.9"`. The component-count
+    rule is the caller's, because the two actions disagree about it, so
+    `pattern` is the grammar the action under test actually enforces.
 
     Examples
     --------
-    >>> _version("0.2.9")
+    >>> _version("0.2.9", _INSTALLER_VERSION)
     (0, 2, 9)
-    >>> _version("1.0")
+    >>> _version("1.0", _INSTALLER_VERSION)
     (1, 0, 0)
     """
-    assert _ACCEPTED_VERSION.fullmatch(text), (
-        f"{text!r} is not one to three numeric components without a leading zero"
+    assert pattern.fullmatch(text), (
+        f"{text!r} does not match {pattern.pattern!r}"
     )
     parts = [int(part) for part in text.split(".")]
     return (*parts, *([0] * (3 - len(parts))))
@@ -341,7 +350,7 @@ def test_merman_comes_from_the_verified_release() -> None:
         f"version checked below; got {inputs.get('nixie-version')!r}"
     )
     python = str(inputs.get("python-version", "3.14"))
-    assert _version(python) >= (3, 14), (
+    assert _version(python, _NIXIE_PYTHON_VERSION) >= (3, 14), (
         f"install-nixie's python-version {python} is below 3.14, which "
         "nixie-cli 1.1.0 requires; the install fails to resolve"
     )
@@ -377,7 +386,7 @@ def test_whitaker_cannot_fall_back_to_a_source_build() -> None:
 
     # An absent input takes the action's default, 0.2.11, which is new enough.
     version = str(inputs.get("installer-version", "0.2.11"))
-    assert _version(version) >= MINIMUM_INSTALLER, (
+    assert _version(version, _INSTALLER_VERSION) >= MINIMUM_INSTALLER, (
         f"installer-version {version} predates --no-source-fallback "
         f"({'.'.join(map(str, MINIMUM_INSTALLER))}), so the step could "
         "compile the lint suite when a prebuilt asset is missing"
