@@ -838,6 +838,10 @@ instead of compiling them on every run:
   rolling lint suite, and fails in `ci-mode` rather than falling back to a
   source build. The suite follows Whitaker's default branch tip; the action
   revision and installer version are pinned, but the suite itself is not.
+  `tests/workflow_contracts/tool_install_test.py` holds the caller to an
+  installer release that can refuse that fallback (`--no-source-fallback`
+  arrived in 0.2.9) and to the inputs that keep `ci-mode` on without pinning
+  the suite.
 - **Merman**, the Mermaid renderer used by `make nixie`, comes from
   `install-nixie`. The action verifies Merman 0.7.0's release archive against
   its pinned checksum and installs Nixie 1.1.0 on Python 3.14, which that

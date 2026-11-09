@@ -18,6 +18,9 @@ an action that quietly builds from source anyway:
   that runs is the code that was reviewed;
 - the Whitaker-specific contract verifies its pinned prebuilt action and
   Cranelift input;
+- `install-whitaker` is asked for an installer release new enough to pass
+  `--no-source-fallback`, and the inputs that would force or permit a source
+  build stay at the values that refuse one;
 - each install runs before the step that needs its tool.
 
 Run via ``make test-workflow-contracts``.
@@ -47,6 +50,12 @@ WHITAKER_CLONE: typ.Final = re.compile(
 
 #: A full commit SHA, the only pin that names one immutable revision.
 COMMIT_SHA: typ.Final = re.compile(r"^[0-9a-f]{40}$")
+
+#: The first `whitaker-installer` release with `--no-source-fallback`, which the
+#: action always passes. An older installer cannot refuse a source build, so
+#: the step would silently compile the lint suite when a prebuilt asset is
+#: missing.
+MINIMUM_INSTALLER: typ.Final = (0, 2, 9)
 
 LANE: typ.Final = ("ci.yml", "build-test")
 NIXIE_ACTION: typ.Final = "leynos/shared-actions/.github/actions/install-nixie"
@@ -105,10 +114,45 @@ def _run_index(command: str) -> int:
     return matches[0]
 
 
-def _version(text: str) -> tuple[int, ...]:
-    """Parse a dotted numeric version, refusing anything else."""
-    assert re.fullmatch(r"\d+\.\d+\.\d+", text), f"{text!r} is not MAJOR.MINOR.PATCH"
-    return tuple(int(part) for part in text.split("."))
+#: The numeric component shared by both version grammars: no leading zero, so
+#: `0.2.09` is rejected by the action itself rather than normalised.
+_COMPONENT: typ.Final = r"(0|[1-9][0-9]*)"
+
+#: `install-whitaker` accepts one to three components and pads the omitted
+#: ones with zero before comparing against its floor.
+_INSTALLER_VERSION: typ.Final = re.compile(
+    rf"{_COMPONENT}(\.{_COMPONENT}){{0,2}}"
+)
+
+#: `install-nixie` is stricter at the short end: it accepts two or three
+#: components, so a bare `"4"` fails the action even though the padded value
+#: would clear a major floor.
+_NIXIE_PYTHON_VERSION: typ.Final = re.compile(
+    rf"{_COMPONENT}\.{_COMPONENT}(\.{_COMPONENT})?"
+)
+
+
+def _version(text: str, pattern: typ.Pattern[str]) -> tuple[int, ...]:
+    """Parse an action version, normalised to `(MAJOR, MINOR, PATCH)`.
+
+    Both pinned actions pad a short version with zeros before comparing it
+    with a floor, so a version must be normalised before that comparison:
+    read as written, `"1.0"` would order below `"0.2.9"`. The component-count
+    rule is the caller's, because the two actions disagree about it, so
+    `pattern` is the grammar the action under test actually enforces.
+
+    Examples
+    --------
+    >>> _version("0.2.9", _INSTALLER_VERSION)
+    (0, 2, 9)
+    >>> _version("1.0", _INSTALLER_VERSION)
+    (1, 0, 0)
+    """
+    assert pattern.fullmatch(text), (
+        f"{text!r} does not match {pattern.pattern!r}"
+    )
+    parts = [int(part) for part in text.split(".")]
+    return (*parts, *([0] * (3 - len(parts))))
 
 
 def _normalise_shell_continuations(script: str) -> str:
@@ -306,7 +350,7 @@ def test_merman_comes_from_the_verified_release() -> None:
         f"version checked below; got {inputs.get('nixie-version')!r}"
     )
     python = str(inputs.get("python-version", "3.14"))
-    assert _version(f"{python}.0" if python.count(".") == 1 else python) >= (3, 14), (
+    assert _version(python, _NIXIE_PYTHON_VERSION) >= (3, 14), (
         f"install-nixie's python-version {python} is below 3.14, which "
         "nixie-cli 1.1.0 requires; the install fails to resolve"
     )
@@ -323,4 +367,38 @@ def test_each_install_runs_before_the_step_that_needs_it(
     install, _ = _action_step(action)
     assert install < _run_index(command), (
         f"{action} must run before `{command}` in {LANE[0]}:{LANE[1]}"
+    )
+
+
+def test_whitaker_cannot_fall_back_to_a_source_build() -> None:
+    """The installer is new enough to refuse a source build, and does.
+
+    `install-whitaker` always passes `--no-source-fallback`, which only exists
+    from installer 0.2.9. The caller must therefore ask for at least that
+    release. `suite-version` is refused by the action when set (a pin would
+    force a source build), and `ci-mode` turns off the check that catches a
+    missing prebuilt asset, so a caller that unsets it would let the step
+    proceed without one.
+    """
+    _, step = _action_step(WHITAKER_ACTION)
+    inputs = step.get("with", {})
+    assert isinstance(inputs, dict), "install-whitaker must declare its inputs"
+
+    # An absent input takes the action's default, 0.2.11, which is new enough.
+    version = str(inputs.get("installer-version", "0.2.11"))
+    assert _version(version, _INSTALLER_VERSION) >= MINIMUM_INSTALLER, (
+        f"installer-version {version} predates --no-source-fallback "
+        f"({'.'.join(map(str, MINIMUM_INSTALLER))}), so the step could "
+        "compile the lint suite when a prebuilt asset is missing"
+    )
+    assert not inputs.get("suite-version"), (
+        "suite-version pins the rolling lint suite, which forces a source build"
+    )
+    # An unquoted `true` arrives as a boolean and the runner lowercases it, so
+    # `True` is what the action's `true|false` case sees. A quoted `"TRUE"`
+    # reaches the action verbatim and fails that case, so it must not pass here.
+    ci_mode = inputs.get("ci-mode", "true")
+    assert ci_mode is True or ci_mode == "true", (
+        "ci-mode must stay on, so an unpublished prebuilt asset fails the step "
+        "instead of being built from source"
     )
