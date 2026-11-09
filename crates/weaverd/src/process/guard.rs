@@ -105,12 +105,38 @@ impl ProcessGuard {
         Ok(())
     }
 
+    /// Removes runtime artefacts left behind by an earlier daemon.
+    ///
+    /// The caller must invoke this only once the endpoint has been bound. A
+    /// launch that fails to bind has proven that some other process still
+    /// serves the endpoint, and that process may be an older release whose
+    /// only record of its own PID is these files. Deleting them before the
+    /// bind would strip `weaver daemon stop` of the last way to reach it.
+    ///
+    /// # Errors
+    /// Returns [`LaunchError::Cleanup`] when an artefact exists but cannot be
+    /// removed.
+    pub(super) fn reclaim_stale_artefacts(&self) -> Result<(), LaunchError> {
+        for path in [self.paths.pid_path(), self.paths.health_path()] {
+            remove_file(&self.runtime_dir, path)?;
+        }
+        Ok(())
+    }
+
     pub(super) fn paths(&self) -> &RuntimePaths { &self.paths }
 
     #[cfg(test)]
     fn terminate_before_pid_write(self) { drop(self); }
 
+    /// Removes only the artefacts this guard wrote.
+    ///
+    /// A launch that fails before `write_pid` must leave a previous daemon's
+    /// PID and health files untouched; removing them unconditionally would
+    /// orphan a process that is still serving the endpoint.
     fn cleanup(&self) {
+        if self.pid.is_none() {
+            return;
+        }
         for path in [self.paths.pid_path(), self.paths.health_path()] {
             remove_runtime_file(&self.runtime_dir, path);
         }

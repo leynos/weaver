@@ -178,7 +178,7 @@ fn terminated_launch_before_pid_write_reclaims_lock() -> Result<(), String> {
 #[rstest]
 #[case("0\n", true)]
 #[case("999999\n", false)]
-fn stale_pid_is_reclaimed(
+fn stale_pid_is_reclaimed_only_after_binding(
     #[case] pid: &str,
     #[case] write_health: bool,
     #[with(pid)] seeded_runtime_paths: Result<(TempDir, RuntimePaths), String>,
@@ -198,10 +198,22 @@ fn stale_pid_is_reclaimed(
     let runtime_dir = open_runtime_dir(&paths)?;
     let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
         .map_err(|error| format!("stale runtime should be reclaimed: {error}"))?;
+    assert!(
+        runtime_file_exists(&paths, paths.pid_file_name())?,
+        "acquiring the lock must not remove artefacts a serving daemon may still own",
+    );
+
+    guard
+        .reclaim_stale_artefacts()
+        .map_err(|error| format!("stale artefacts should be reclaimed after binding: {error}"))?;
+    assert!(
+        !runtime_file_exists(&paths, paths.pid_file_name())?,
+        "stale pid file should be removed once the endpoint has bound",
+    );
     if write_health {
         assert!(
             !runtime_file_exists(&paths, paths.health_file_name())?,
-            "stale health file should be removed before reacquiring",
+            "stale health file should be removed once the endpoint has bound",
         );
     }
     guard
@@ -222,7 +234,32 @@ fn held_lock_with_live_pid_rejects_launch() -> Result<(), String> {
         .map_err(|error| format!("pid write should succeed: {error}"))?;
 
     let runtime_dir = open_runtime_dir(&paths)?;
-    match ProcessGuard::acquire(runtime_dir, paths) {
+    assert_launch_rejected(ProcessGuard::acquire(runtime_dir, paths), pid)
+}
+
+/// Asserts the platform's expected refusal for a duplicate launch.
+///
+/// Solaris locks are process-associated, so the same process's in-flight
+/// launch is refused by the process-local reservation before the OS lock is
+/// examined; elsewhere the held OS lock itself carries the refusal.
+#[cfg(target_os = "solaris")]
+fn assert_launch_rejected(
+    outcome: Result<ProcessGuard, LaunchError>,
+    _pid: u32,
+) -> Result<(), String> {
+    match outcome {
+        Err(LaunchError::StartupInProgress { .. }) => Ok(()),
+        other => Err(format!("expected startup-in-progress error, got {other:?}")),
+    }
+}
+
+/// Asserts the platform's expected refusal for a duplicate launch.
+#[cfg(not(target_os = "solaris"))]
+fn assert_launch_rejected(
+    outcome: Result<ProcessGuard, LaunchError>,
+    pid: u32,
+) -> Result<(), String> {
+    match outcome {
         Err(LaunchError::AlreadyRunning { pid: recorded }) => {
             assert_eq!(recorded, pid, "pid should match recorded process");
             Ok(())
@@ -242,12 +279,44 @@ fn unlocked_lock_with_live_pid_is_reclaimed() -> Result<(), String> {
     let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
         .map_err(|error| format!("unlocked lock should be reclaimed: {error}"))?;
     assert!(
+        runtime_file_exists(&paths, paths.pid_file_name())?,
+        "the recorded pid must survive until the endpoint is bound",
+    );
+    guard
+        .reclaim_stale_artefacts()
+        .map_err(|error| format!("stale artefacts should be reclaimed: {error}"))?;
+    assert!(
         !runtime_file_exists(&paths, paths.pid_file_name())?,
-        "stale pid file should be removed after reclaiming the lock",
+        "stale pid file should be removed after the endpoint is bound",
     );
     guard
         .write_pid(pid)
         .map_err(|error| format!("pid write should succeed: {error}"))?;
+    Ok(())
+}
+
+#[test]
+fn failed_launch_preserves_previous_runtime_artefacts() -> Result<(), String> {
+    let (_dir, paths) = seeded_runtime_paths("4242\n")?;
+    write_runtime_file(&paths, paths.health_file_name(), b"{\"status\":\"ready\"}")?;
+
+    let runtime_dir = open_runtime_dir(&paths)?;
+    let guard = ProcessGuard::acquire(runtime_dir, paths.clone())
+        .map_err(|error| format!("stale lock should be reclaimed: {error}"))?;
+    guard.terminate_before_pid_write();
+
+    assert!(
+        runtime_file_exists(&paths, paths.pid_file_name())?,
+        "a launch that never bound the endpoint must keep the previous pid file",
+    );
+    assert!(
+        runtime_file_exists(&paths, paths.health_file_name())?,
+        "a launch that never bound the endpoint must keep the previous health file",
+    );
+    assert!(
+        runtime_file_exists(&paths, paths.lock_file_name())?,
+        "the persistent lock path should remain for the next launch",
+    );
     Ok(())
 }
 

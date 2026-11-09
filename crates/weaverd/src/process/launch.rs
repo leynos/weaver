@@ -124,10 +124,16 @@ where
         #[cfg(target_os = "solaris")]
         guard.after_daemonize()?;
     }
+    // The endpoint is bound while the lock is held, and before any runtime
+    // artefact is written or replaced. Binding can fail because another daemon
+    // — possibly an older release that knows nothing of the lock — still serves
+    // the endpoint; in that case its PID and health files are the only way to
+    // reach it, so they must survive this failed launch untouched.
+    let listener = SocketListener::bind(config.daemon_socket())?;
+    guard.reclaim_stale_artefacts()?;
     let pid = std::process::id();
     guard.write_pid(pid)?;
     guard.write_health(HealthState::Starting)?;
-    let listener = SocketListener::bind(config.daemon_socket())?;
 
     // Create a single provider and backends instance shared by daemon and dispatch
     let provider =

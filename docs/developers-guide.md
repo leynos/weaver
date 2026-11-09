@@ -2239,15 +2239,20 @@ process-associated lock after daemonization; the parent's lock holds until the
 parent exits.
 
 When startup finds an existing lock file, it tries to take the OS lock before
-consulting the recorded PID. A free lock is reclaimed and any stale PID and
-health files are removed, even when the recorded PID still names a live
-process, because that number may have been reused after the original daemon
-exited. A held lock is reported as already running when the recorded PID is
-live, and as already in progress when no live PID is recorded. On normal guard
-cleanup, the PID and health files are removed while the persistent lock file is
-retained. The `sha2` dependency derives endpoint identifiers, `rustix` provides
-Unix file-lock operations, and `windows-sys` exposes the Windows `LockFileEx`
-and `UnlockFileEx` APIs.
+consulting the recorded PID. A free lock is reclaimed even when the recorded
+PID still names a live process, because that number may have been reused after
+the original daemon exited. A held lock is reported as already running when the
+recorded PID is live, and as already in progress when no live PID is recorded.
+The launch binds its endpoint while still holding the lock, and only a
+successful bind lets it remove the predecessor's stale PID and health files.
+Binding can fail because another daemon, possibly an older release that holds
+no lock, still serves the endpoint; that daemon's PID file is then the only way
+to stop it, so a failed launch must leave it in place. On normal guard cleanup,
+the guard removes the PID and health files it wrote and retains the persistent
+lock file; a guard that never wrote a PID removes neither. The `sha2`
+dependency derives endpoint identifiers, `rustix` provides Unix file-lock
+operations, and `windows-sys` exposes the Windows `LockFileEx` and
+`UnlockFileEx` APIs.
 
 ### 25.1 Test infrastructure for runtime paths
 

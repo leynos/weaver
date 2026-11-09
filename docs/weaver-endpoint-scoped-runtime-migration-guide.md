@@ -80,24 +80,27 @@ weaver daemon stop
 If `daemon stop` is unavailable, or the previous process cannot be reached that
 way, read the PID recorded by the previous release and stop it directly. The
 previous release wrote a shared `weaverd.pid` in the runtime directory for the
-configured endpoint, which section 1 defines as the parent of the socket. It
-did not always use the default directory, so reading the default path for a
-non-default endpoint can return a missing file or the PID of a different daemon:
+configured endpoint, as described in section 1. It did not always use the
+default directory, so reading the default path for a non-default endpoint can
+return a missing file or the PID of a different daemon:
 
 ```sh
 # Read the PID written by the previous release. Use the runtime directory
-# identified in section 1, which is the parent of the configured socket.
+# identified in section 1.
 cat "<runtime-dir>/weaverd.pid"
 
-# Confirm the recorded process owns the configured socket before signalling it.
-ss -xp | grep "<socket-path>"
+# For a Unix endpoint, confirm the recorded process owns the listening socket.
+ss -lxnp | grep "<socket-path>"
 
-# Replace <pid> with the value printed above, once it matches the socket owner.
+# For a TCP endpoint, confirm the recorded process owns the configured listener.
+ss -ltnp | grep "<host>:<port>"
+
+# Replace <pid> with the value printed above, once it matches the endpoint owner.
 kill <pid>
 ```
 
 Replace `<pid>` with the numeric PID. Confirm that the process listed against
-the configured socket has that PID, and that it has exited after the signal,
+the configured endpoint has that PID, and that it has exited after the signal,
 before continuing.
 
 ## 3. Upgrade and start the new version

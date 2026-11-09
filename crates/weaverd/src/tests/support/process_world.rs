@@ -17,6 +17,7 @@ use serde_json::Value;
 use weaver_config::RuntimePaths;
 
 use crate::{
+    bootstrap::ConfigLoader,
     process::{
         LaunchError,
         LaunchMode,
@@ -26,6 +27,7 @@ use crate::{
         test_support,
     },
     tests::support::{FailingConfigLoader, RecordingHealthReporter, TestConfigLoader, fs},
+    transport::SocketListener,
 };
 
 pub const WAIT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -43,6 +45,9 @@ pub struct ProcessTestWorld {
     result: Option<Result<(), LaunchError>>,
     wait_error: Option<String>,
     health_history: RefCell<Vec<String>>,
+    /// A listener occupying the configured endpoint, held so a launch cannot
+    /// bind it. Dropping the world releases the endpoint.
+    _occupied_endpoint: Option<SocketListener>,
 }
 
 impl ProcessTestWorld {
@@ -65,6 +70,7 @@ impl ProcessTestWorld {
             result: None,
             wait_error: None,
             health_history: RefCell::new(Vec::new()),
+            _occupied_endpoint: None,
         };
         test_support::clear_health_events(world.health_path().as_path()).ok();
         Ok(world)
@@ -119,6 +125,25 @@ impl ProcessTestWorld {
         };
         let result = run_daemon_with(plan);
         self.result = Some(result);
+        Ok(())
+    }
+
+    /// Occupies the configured endpoint so a subsequent launch cannot bind it.
+    ///
+    /// The listener is held for the world's lifetime, standing in for another
+    /// daemon that still serves the endpoint.
+    ///
+    /// # Errors
+    /// Returns an error when the configuration cannot be loaded or the
+    /// endpoint cannot be bound.
+    pub fn occupy_endpoint(&mut self) -> StepResult {
+        let config = self
+            .loader
+            .load()
+            .map_err(|error| format!("load test configuration: {error}"))?;
+        let listener = SocketListener::bind(config.daemon_socket())
+            .map_err(|error| format!("occupy test endpoint: {error}"))?;
+        self._occupied_endpoint = Some(listener);
         Ok(())
     }
 
@@ -187,6 +212,8 @@ impl ProcessTestWorld {
     pub fn write_stale_runtime(&self) -> StepResult {
         fs::write(self.lock_path(), b"").map_err(|error| error.to_string())?;
         fs::write(self.pid_path(), b"0\n").map_err(|error| error.to_string())?;
+        fs::write(self.health_path(), b"{\"status\":\"ready\"}\n")
+            .map_err(|error| error.to_string())?;
         Ok(())
     }
 
@@ -349,38 +376,5 @@ pub fn snapshot_status(snapshot: &Value) -> &str {
 }
 
 #[cfg(test)]
-mod tests {
-    //! Focused tests for process-supervision test-world helpers.
-
-    use std::cell::Cell;
-
-    use super::*;
-
-    #[test]
-    fn wait_for_condition_returns_exists_failure_without_timeout() {
-        let world = ProcessTestWorld::new().expect("create process test world");
-        fs::write(world.lock_path(), "lock").expect("create lock-file fixture");
-        let attempts = Cell::new(0);
-
-        let error = world
-            .wait_for_condition(
-                |state| {
-                    attempts.set(attempts.get() + 1);
-                    fs::exists(state.lock_path().join("child"))
-                        .map_err(|error| format!("check lock file existence: {error}"))
-                },
-                "child of lock file",
-            )
-            .expect_err("exists error should stop polling");
-
-        assert_eq!(attempts.get(), 1, "predicate should be called once");
-        assert!(
-            error.starts_with("check lock file existence:"),
-            "expected exists error, got: {error}"
-        );
-        assert!(
-            !error.contains("timeout waiting"),
-            "predicate failure should not become a timeout: {error}"
-        );
-    }
-}
+#[path = "process_world_tests.rs"]
+mod tests;

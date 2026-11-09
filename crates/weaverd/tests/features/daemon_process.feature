@@ -43,6 +43,14 @@ Feature: Daemon process management
     And the stale runtime pid is replaced with the current process id
     And the runtime state is cleaned up
 
+  Scenario: Launch refuses a busy endpoint without discarding runtime artefacts
+    Given a fresh daemon process world
+    And stale runtime artefacts exist
+    And the configured endpoint is already bound
+    When the daemon starts in foreground mode
+    Then the daemon run fails because the endpoint is in use
+    And the previous runtime artefacts are preserved
+
   Scenario: Terminated launch before PID write recovers
     Given a fresh daemon process world
     And a prior launch terminated after acquiring the lock

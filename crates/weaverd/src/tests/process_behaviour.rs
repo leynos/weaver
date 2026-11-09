@@ -9,6 +9,7 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 use crate::{
     process::{LaunchError, LaunchMode},
     tests::support::{ProcessTestWorld, fs as test_fs, snapshot_status},
+    transport::ListenerError,
 };
 
 type ProcessWorld = Result<RefCell<ProcessTestWorld>, String>;
@@ -76,6 +77,46 @@ fn daemon_run_completes(world: &ProcessWorld) -> Result<(), String> {
 fn given_stale_runtime(world: &ProcessWorld) -> Result<(), String> {
     let world = process_world(world)?;
     world.borrow().write_stale_runtime()?;
+    Ok(())
+}
+
+#[given("the configured endpoint is already bound")]
+fn given_endpoint_bound(world: &ProcessWorld) -> Result<(), String> {
+    process_world(world)?.borrow_mut().occupy_endpoint()
+}
+
+#[then("the daemon run fails because the endpoint is in use")]
+fn then_daemon_fails_endpoint_in_use(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
+    let binding = world.borrow();
+    match binding.last_error() {
+        Some(LaunchError::Listener {
+            source: ListenerError::UnixInUse { .. },
+        }) => Ok(()),
+        other => Err(format!(
+            "expected endpoint-in-use listener error, got {other:?}"
+        )),
+    }
+}
+
+#[then("the previous runtime artefacts are preserved")]
+fn then_previous_artefacts_preserved(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
+    let world = world.borrow();
+    assert_eq!(
+        world.read_pid()?,
+        Some(0),
+        "the previous daemon's pid file should survive a failed launch",
+    );
+    assert!(
+        test_fs::exists(world.health_path())
+            .map_err(|error| format!("check health file: {error}"))?,
+        "the previous daemon's health file should survive a failed launch",
+    );
+    assert!(
+        world.lock_exists()?,
+        "the persistent lock path should remain available",
+    );
     Ok(())
 }
 
