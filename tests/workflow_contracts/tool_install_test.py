@@ -114,10 +114,36 @@ def _run_index(command: str) -> int:
     return matches[0]
 
 
+#: The version grammar the pinned actions accept: one to three numeric
+#: components, none with a leading zero. `install-whitaker` pads a short
+#: version to three components before comparing it with its floor, and
+#: rejects `0.2.09` precisely because of the leading zero.
+_ACCEPTED_VERSION: typ.Final = re.compile(
+    r"(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,2}"
+)
+
+
 def _version(text: str) -> tuple[int, ...]:
-    """Parse a dotted numeric version, refusing anything else."""
-    assert re.fullmatch(r"\d+\.\d+\.\d+", text), f"{text!r} is not MAJOR.MINOR.PATCH"
-    return tuple(int(part) for part in text.split("."))
+    """Parse an action version, normalised to `(MAJOR, MINOR, PATCH)`.
+
+    A caller may write one to three numeric components without a leading zero,
+    which is what `install-whitaker` validates before padding the omitted
+    components with zero. Comparing a short version as written would order
+    `1.0` below `0.2.9` instead of above it, so the result always has three
+    components.
+
+    Examples
+    --------
+    >>> _version("0.2.9")
+    (0, 2, 9)
+    >>> _version("1.0")
+    (1, 0, 0)
+    """
+    assert _ACCEPTED_VERSION.fullmatch(text), (
+        f"{text!r} is not one to three numeric components without a leading zero"
+    )
+    parts = [int(part) for part in text.split(".")]
+    return (*parts, *([0] * (3 - len(parts))))
 
 
 def _normalise_shell_continuations(script: str) -> str:
@@ -315,7 +341,7 @@ def test_merman_comes_from_the_verified_release() -> None:
         f"version checked below; got {inputs.get('nixie-version')!r}"
     )
     python = str(inputs.get("python-version", "3.14"))
-    assert _version(f"{python}.0" if python.count(".") == 1 else python) >= (3, 14), (
+    assert _version(python) >= (3, 14), (
         f"install-nixie's python-version {python} is below 3.14, which "
         "nixie-cli 1.1.0 requires; the install fails to resolve"
     )
@@ -359,7 +385,11 @@ def test_whitaker_cannot_fall_back_to_a_source_build() -> None:
     assert not inputs.get("suite-version"), (
         "suite-version pins the rolling lint suite, which forces a source build"
     )
-    assert str(inputs.get("ci-mode", "true")).lower() == "true", (
+    # An unquoted `true` arrives as a boolean and the runner lowercases it, so
+    # `True` is what the action's `true|false` case sees. A quoted `"TRUE"`
+    # reaches the action verbatim and fails that case, so it must not pass here.
+    ci_mode = inputs.get("ci-mode", "true")
+    assert ci_mode is True or ci_mode == "true", (
         "ci-mode must stay on, so an unpublished prebuilt asset fails the step "
         "instead of being built from source"
     )
