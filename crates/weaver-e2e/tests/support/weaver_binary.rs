@@ -344,27 +344,3 @@ where
         )
     })
 }
-
-/// Builds the workspace `weaver` binary with `cargo`.
-///
-/// # Errors
-/// Returns a description if `cargo` could not be spawned; a non-zero exit is
-/// reported as [`BuildOutcome::Failed`] rather than as an error.
-fn run_workspace_build() -> Result<BuildOutcome, String> {
-    let status = Command::new("cargo")
-        .current_dir(workspace_root()?)
-        // `--frozen`: the workspace lock is committed and the gate fetches first,
-        // so this nested build must not resolve or reach the index while it holds
-        // the shared package-cache lock.
-        .args(["build", "--frozen", "-p", "weaver-cli", "--bin", "weaver"])
-        .status()
-        .map_err(|error| format!("failed to build workspace weaver binary: {error}"))?;
-
-    if status.success() {
-        Ok(BuildOutcome::Succeeded)
-    } else {
-        Ok(BuildOutcome::Failed {
-            status: status.to_string(),
-        })
-    }
-}

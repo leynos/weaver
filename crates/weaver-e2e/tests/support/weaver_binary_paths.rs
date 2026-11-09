@@ -66,6 +66,10 @@ pub(super) fn run_workspace_build(binary: &WorkspaceBinary) -> Result<BuildOutco
     let status = Command::new("cargo")
         .current_dir(workspace_root()?)
         .args(binary.build_arguments())
+        // `--frozen`: the workspace lock is committed and the gate fetches first,
+        // so this nested build must not resolve or reach the index while it holds
+        // the shared package-cache lock.
+        .arg("--frozen")
         .status()
         .map_err(|error| format!("failed to build workspace {} binary: {error}", binary.name))?;
 
