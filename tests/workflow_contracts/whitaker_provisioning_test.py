@@ -1,11 +1,11 @@
 """Contract tests for how CI provisions Whitaker (concordat QG-002).
 
 The estate provisions Whitaker one way: the shared-actions ``install-whitaker``
-action, pinned to a listed revision, with the lint suite left to the rolling
-release. These tests hold ``ci.yml`` to that and reject the source-revision pin
-Weaver used while whitaker#311 was open. Changing the action pin therefore also
-means changing ``PINNED_REVISION`` here, to another revision that concordat's
-QG-002 rule lists.
+action, pinned to a full commit SHA, with the lint suite left to the rolling
+release. These tests hold ``ci.yml`` to that shape and reject the
+source-revision pin Weaver used while whitaker#311 was open. Which revisions
+are acceptable is concordat's QG-002 rule; the tests check the shape of the
+pin, so a pin bump needs no edit here.
 
 Run via ``make test-workflow-contracts``.
 """
@@ -19,8 +19,10 @@ import pytest
 from workflow_loader import WORKFLOW_DIR, Document, load_workflow
 
 INSTALL_ACTION: typ.Final = "leynos/shared-actions/.github/actions/install-whitaker@"
-PINNED_REVISION: typ.Final = "5a99aed78ce68dcebd3052b75c31e6f173162b1e"
-_ACTION: typ.Final = f"{INSTALL_ACTION}{PINNED_REVISION}"
+#: The action reference: a full 40-hex commit SHA, never a branch, tag or short ref.
+_PINNED_ACTION_RE: typ.Final = re.compile(re.escape(INSTALL_ACTION) + r"[0-9a-f]{40}")
+#: A well-formed reference for the synthetic workflows below.
+_ACTION: typ.Final = f"{INSTALL_ACTION}{'a' * 40}"
 #: Text that marks a hand-rolled Whitaker install or a suite pin.
 HAND_ROLLED_RE: typ.Final = re.compile(r"whitaker-installer|WHITAKER_REV")
 
@@ -36,7 +38,7 @@ def _is_pinned_install(step: dict) -> bool:
     """Report whether a step is the unconditional pinned action with Cranelift."""
     inputs = step.get("with") or {}
     return (
-        step.get("uses") == _ACTION
+        _PINNED_ACTION_RE.fullmatch(str(step.get("uses", ""))) is not None
         and "if" not in step
         and inputs.get("cranelift") is True
     )
@@ -95,8 +97,8 @@ def _ci() -> Document:
 def test_ci_provisions_whitaker_through_the_pinned_action_before_linting() -> None:
     """``build-test`` runs the pinned action with Cranelift before ``make lint``."""
     assert _provisions_before_lint(_ci()), (
-        f"build-test must run {_ACTION} unconditionally with cranelift: true "
-        "before make lint"
+        f"build-test must run {INSTALL_ACTION}<full sha> unconditionally with "
+        "cranelift: true before make lint"
     )
 
 
@@ -117,8 +119,13 @@ def test_ci_has_no_hand_rolled_install_or_suite_pin() -> None:
             f"      - uses: {_ACTION}\n        with:\n          cranelift: true\n",
         ),
         (
-            "a different pin",
-            f"jobs:\n  build-test:\n    steps:\n      - uses: {INSTALL_ACTION}{'0' * 40}\n"
+            "a branch ref",
+            f"jobs:\n  build-test:\n    steps:\n      - uses: {INSTALL_ACTION}main\n"
+            "        with:\n          cranelift: true\n      - run: make lint\n",
+        ),
+        (
+            "a short sha",
+            f"jobs:\n  build-test:\n    steps:\n      - uses: {INSTALL_ACTION}0eabb6bc\n"
             "        with:\n          cranelift: true\n      - run: make lint\n",
         ),
         (
@@ -134,7 +141,7 @@ def test_ci_has_no_hand_rolled_install_or_suite_pin() -> None:
     ],
 )
 def test_each_way_of_missing_the_install_fails_the_contract(case: str, source: str) -> None:
-    """A missing, late, skipped, differently pinned or Cranelift-less install fails."""
+    """A missing, late, skipped, unpinned or Cranelift-less install fails."""
     assert not _provisions_before_lint(load_workflow(source)), case
 
 
