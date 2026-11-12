@@ -70,6 +70,7 @@ EXPECTED_GUARD: typ.Final = "runner.environment == 'self-hosted'"
 COMPILING_JOBS: typ.Final = (
     ("ci.yml", "build-test"),
     ("coverage-main.yml", "coverage-upload"),
+    ("coverage-main.yml", "coverage-warmup"),
     ("build-and-package.yml", "build"),
 )
 

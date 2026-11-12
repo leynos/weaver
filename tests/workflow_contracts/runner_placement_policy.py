@@ -58,8 +58,9 @@ EXPECTED_FORK_FALLBACK: typ.Final = {
 #: Lanes that cannot meet a fork and so declare a bare label. A constant
 #: guard would read as a decision nobody made.
 #:
-#: ``coverage-upload`` serves push and dispatch, neither of which carries a
-#: pull request. ``release.yml``'s ``release`` is gated on ``should_publish``,
+#: ``coverage-upload`` (hosted) and its two Ubicloud companions
+#: ``coverage-baseline`` and ``coverage-warmup`` serve push and dispatch, neither
+#: of which carries a pull request. ``release.yml``'s ``release`` is gated on ``should_publish``,
 #: true only on a tag push, so it is skipped on every dry run.
 #: ``build-macos`` needs a macOS runner and Ubicloud offer none, so there is
 #: no fallback to write.
@@ -71,7 +72,9 @@ EXPECTED_FORK_FALLBACK: typ.Final = {
 #: reads as a decision, and it moves when somebody re-enables it and can watch
 #: it run.
 EXPECTED_LITERAL_LABEL: typ.Final = {
-    ("coverage-main.yml", "coverage-upload"): UBICLOUD_SMALL,
+    ("coverage-main.yml", "coverage-upload"): GITHUB_HOSTED_LABEL,
+    ("coverage-main.yml", "coverage-baseline"): UBICLOUD_SMALL,
+    ("coverage-main.yml", "coverage-warmup"): UBICLOUD_SMALL,
     ("release.yml", "release"): UBICLOUD_SMALL,
     ("release.yml", "build-macos"): MACOS_LABEL,
     ("release.yml", "build-freebsd"): GITHUB_HOSTED_LABEL,
@@ -121,7 +124,9 @@ DELEGATED_JOBS: typ.Final = {
 #: ``build-and-package.yml`` entry here is the one that bounds all three.
 EXPECTED_CEILING_MINUTES: typ.Final = {
     ("ci.yml", "build-test"): 60,
-    ("coverage-main.yml", "coverage-upload"): 20,
+    ("coverage-main.yml", "coverage-upload"): 60,
+    ("coverage-main.yml", "coverage-baseline"): 15,
+    ("coverage-main.yml", "coverage-warmup"): 30,
     ("release.yml", "metadata"): 10,
     ("release.yml", "release"): 15,
     ("build-and-package.yml", "build"): 30,
