@@ -132,7 +132,7 @@ jobs:
           RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Zthreads=8 -Clink-arg=-fuse-ld=mold"
           cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
       - name: Install Whitaker
-        uses: leynos/shared-actions/.github/actions/install-whitaker@5a99aed78ce68dcebd3052b75c31e6f173162b1e # shared-actions 5a99aed7 (whitaker-installer 0.2.11)
+        uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2 # shared-actions 0eabb6bc (whitaker-installer 0.2.12)
         with:
           cranelift: true
       - name: Lint
