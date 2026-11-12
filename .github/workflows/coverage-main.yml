@@ -29,25 +29,22 @@ concurrency:
 
 jobs:
   coverage-upload:
-    # A push lane, so Ubicloud rather than GitHub-hosted. It waited 691 s for
-    # a runner on 2026-09-16 to do 174 s of work, the worst queue-to-work
-    # ratio in the repository. There is no fork arm: neither `push` nor
-    # `workflow_dispatch` carries a pull request, so the guard would be
-    # constant here and a constant guard reads as a decision nobody made.
+    # The measuring job is GitHub-hosted: this job's whole cost is compiling
+    # and running the suite, and Ubicloud minutes are the scarce ones. It uses
+    # no compiler cache, because on a hosted runner sccache reaches only
+    # GitHub's store, which no Ubicloud lane reads. What Ubicloud lanes read
+    # from main is kept by the two Ubicloud jobs below. There is no fork arm:
+    # neither `push` nor `workflow_dispatch` carries a pull request.
     #
-    # Two vCPU, unlike `ci.yml`. This lane runs the coverage suite and
-    # nothing else, nobody waits on it, and the arithmetic on the one hazard
-    # that cares about core count works out: the two trybuild cases take
-    # 20.5 s and 25.4 s here on four vCPU, and nextest kills a test at 180 s
-    # by default. Even at three times slower they stay under half the kill.
-    # Should that stop being true the remedy is `ubicloud-standard-4`, as on
-    # `ci.yml`, not a longer deadline for the test.
-    runs-on: ubicloud-standard-2
+    # Hosted runners have four vCPU, so the two trybuild cases (20.5 s and
+    # 25.4 s on four vCPU) stay far below nextest's 180 s kill.
+    runs-on: ubuntu-latest
     # The CodeScene token lives in this environment, whose deployment policy
     # admits `main` alone; the codescene environment contract holds it to
     # this job.
     environment: codescene
-    timeout-minutes: 20
+    # A cold hosted build compiles everything with no cache.
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
@@ -72,8 +69,10 @@ jobs:
         uses: leynos/shared-actions/.github/actions/setup-rust@cfcc379e29be516160f499864ae82720842359af
         with:
           install-mold: 'true'
+          use-sccache: 'false'
+          save-cache: 'false'
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
         with:
           output-path: lcov.info
           format: lcov
@@ -82,6 +81,11 @@ jobs:
           # to 77.08% (tests unchanged). The cached baseline is keyed by this
           # path, so a new path resets it to the committed figure.
           baseline-rust-file: .coverage-baseline-v2.rust
+          # `coverage-baseline` saves the baseline on Ubicloud, where the
+          # pull-request lane reads it; a baseline saved from this hosted
+          # job would land in GitHub's store, which that lane cannot see.
+          publish-baseline: never
+          baseline-artefact-name: coverage-baseline-handover
       # Reports whether the token is configured without binding it anywhere:
       # the expression is evaluated before the shell runs, so this step
       # writes `available=true` or `available=false` and the token is in no
@@ -98,7 +102,7 @@ jobs:
         # as the trunk's and move the ratchet baseline with it. Nothing would
         # report it.
         if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@cfcc379e29be516160f499864ae82720842359af
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
         with:
           format: lcov
           # Stated rather than left to the action's default, because this
@@ -106,3 +110,52 @@ jobs:
           # point of the split.
           mode: upload
           access-token: ${{ secrets.CS_ACCESS_TOKEN }}
+
+  coverage-baseline:
+    # Saves the ratchet baseline the measuring job hands over, into the store
+    # the Ubicloud pull-request lane reads. It does no compiling. The action
+    # publishes only on a push to `main`, so a dispatch leaves the baseline
+    # where it was.
+    needs: coverage-upload
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Publish the ratchet baseline
+        uses: leynos/shared-actions/.github/actions/publish-coverage-baseline@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        with:
+          artefact-name: coverage-baseline-handover
+          # The same path the generator and the pull-request lane use: it is
+          # part of the cache entry's version.
+          baseline-rust-file: .coverage-baseline-v2.rust
+
+  coverage-warmup:
+    # Build-only: compiles the same instrumented test binaries as the
+    # pull-request lane so their compiler-cache entries sit in main's
+    # Ubicloud scope, which a pull request reads only if a main job on
+    # Ubicloud writes it. It runs no test and uploads nothing.
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+      BUILD_PROFILE: debug
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Export Ubicloud cache credentials
+        if: runner.environment == 'self-hosted'
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@cfcc379e29be516160f499864ae82720842359af
+      - name: Setup Rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@cfcc379e29be516160f499864ae82720842359af
+        with:
+          install-mold: 'true'
+      - name: Compile the instrumented tests
+        uses: leynos/shared-actions/.github/actions/generate-coverage@f84a7def5646a6fc7ba77c1f486906f66a0fed96
+        with:
+          output-path: lcov.info
+          format: lcov
+          build-only: 'true'

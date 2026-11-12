@@ -309,16 +309,18 @@ macOS build, which needs hardware Ubicloud do not offer, and the FreeBSD leg,
 which is switched off and so has nothing to measure; there, public-repository
 minutes are free.
 
-| Workflow                | Job               | Trigger                | Runner                | Ceiling  |
-| ----------------------- | ----------------- | ---------------------- | --------------------- | -------- |
-| `ci.yml`                | `build-test`      | pull request, dispatch | `ubicloud-standard-4` | 60 min   |
-| `coverage-main.yml`     | `coverage-upload` | push, dispatch         | `ubicloud-standard-2` | 20 min   |
-| `release.yml`           | `metadata`        | tag push, dry run      | `ubicloud-standard-2` | 10 min   |
-| `release.yml`           | `release`         | tag push               | `ubicloud-standard-2` | 15 min   |
-| `release.yml`           | `build-linux`     | tag push, dry run      | `ubicloud-standard-4` | callee's |
-| `release.yml`           | `build-freebsd`   | tag push, dry run      | `ubuntu-latest`       | callee's |
-| `release.yml`           | `build-macos`     | tag push, dry run      | `macos-15`            | callee's |
-| `build-and-package.yml` | `build`           | called                 | caller's choice       | 30 min   |
+| Workflow                | Job                 | Trigger                | Runner                | Ceiling  |
+| ----------------------- | ------------------- | ---------------------- | --------------------- | -------- |
+| `ci.yml`                | `build-test`        | pull request, dispatch | `ubicloud-standard-4` | 60 min   |
+| `coverage-main.yml`     | `coverage-upload`   | push, dispatch         | `ubuntu-latest`       | 60 min   |
+| `coverage-main.yml`     | `coverage-baseline` | push, dispatch         | `ubicloud-standard-2` | 15 min   |
+| `coverage-main.yml`     | `coverage-warmup`   | push, dispatch         | `ubicloud-standard-2` | 30 min   |
+| `release.yml`           | `metadata`          | tag push, dry run      | `ubicloud-standard-2` | 10 min   |
+| `release.yml`           | `release`           | tag push               | `ubicloud-standard-2` | 15 min   |
+| `release.yml`           | `build-linux`       | tag push, dry run      | `ubicloud-standard-4` | callee's |
+| `release.yml`           | `build-freebsd`     | tag push, dry run      | `ubuntu-latest`       | callee's |
+| `release.yml`           | `build-macos`       | tag push, dry run      | `macos-15`            | callee's |
+| `build-and-package.yml` | `build`             | called                 | caller's choice       | 30 min   |
 
 *Table 1: Where each lane runs, and what bounds it.*
 
@@ -364,10 +366,21 @@ slower than a GitHub public runner's four for Rust compilation, measured on
 wireframe, so two vCPU would roughly triple a lane that already takes a quarter
 of an hour.
 
-`coverage-upload` is the one compile-heavy lane on the smaller shape, and that
-is a computed margin rather than an oversight. The workspace has three trybuild
-cases which spawn their own cargo builds: `public_api_contracts_compile` in
-`weaver-config` and in `weaver-docs-gate`, and
+`coverage-main.yml` is split three ways. `coverage-upload`, which measures and
+uploads, is GitHub-hosted (four vCPU, no compiler cache), because its whole
+cost is compiling and running the suite and Ubicloud minutes are the scarce
+ones. `coverage-baseline` saves the ratchet baseline on Ubicloud, where
+`ci.yml`'s ratchet reads it: the hosted job sets `publish-baseline: never` and
+hands the figure over as an artefact. `coverage-warmup` compiles the
+instrumented tests build-only on `ubicloud-standard-2`, so main's Ubicloud
+compiler cache stays warm for pull requests. The paragraphs below describe the
+trybuild margin, which held on the smaller shape and holds a fortiori on the
+hosted four vCPU.
+
+The measuring lane was the one compile-heavy lane on the smaller shape, and
+that was a computed margin rather than an oversight. The workspace has three
+trybuild cases which spawn their own cargo builds:
+`public_api_contracts_compile` in `weaver-config` and in `weaver-docs-gate`, and
 `test_support_exports_compile_downstream` in `weaver-plugins`. The two older
 cases took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
 terminates a test after three 60-second periods by default, and those cases
@@ -381,7 +394,7 @@ took almost two minutes, and the fixture then ran past the remaining budget.
 build and still terminates a hung test inside the job timeout. It is not a
 general deadline increase: the remedy for a slow lane stays
 `ubicloud-standard-4`, not a longer deadline for every test. Nobody waits on
-`coverage-upload`, so the smaller shape is worth the slower run there.
+the main coverage lane, which is why a slower runner was acceptable there.
 
 ### 7.3 The fork fallback
 
@@ -793,11 +806,11 @@ so the symptom is a slower build and metered egress that nothing reports.
 Every job here that compiles on a runner which can be Ubicloud declares the
 step:
 
-| Workflow                | Job               | Why the guard is needed                                                  |
-| ----------------------- | ----------------- | ------------------------------------------------------------------------ |
-| `ci.yml`                | `build-test`      | the fork arm is GitHub-hosted                                            |
-| `coverage-main.yml`     | `coverage-upload` | always Ubicloud today; the guard keeps it correct if a fork arm is added |
-| `build-and-package.yml` | `build`           | the runner is the caller's choice, and two of five legs are macOS        |
+| Workflow                | Job               | Why the guard is needed                                           |
+| ----------------------- | ----------------- | ----------------------------------------------------------------- |
+| `ci.yml`                | `build-test`      | the fork arm is GitHub-hosted                                     |
+| `coverage-main.yml`     | `coverage-upload` | push and dispatch only; hosted, so no guard is needed             |
+| `build-and-package.yml` | `build`           | the runner is the caller's choice, and two of five legs are macOS |
 
 *Table 3: Where the credentials step belongs.*
 
