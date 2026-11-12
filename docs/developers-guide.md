@@ -365,23 +365,25 @@ wireframe, so two vCPU would roughly triple a lane that already takes a quarter
 of an hour.
 
 `coverage-upload` is the one compile-heavy lane on the smaller shape, and that
-is a computed margin rather than an oversight. The workspace has three trybuild
+is a computed margin rather than an oversight. The workspace has four trybuild
 cases which spawn their own cargo builds: `public_api_contracts_compile` in
 `weaver-config` and in `weaver-docs-gate`, and
-`test_support_exports_compile_downstream` in `weaver-plugins`. The two older
-cases took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
-terminates a test after three 60-second periods by default, and those cases
-then sat under half that kill. An instrumented trybuild build grows with the
-downstream crate's dependency tree rather than with the fixture. On 2026-10-31
-the `weaver-config` case exceeded the default kill on the developer lane once
-the fixture grew to cover the generated metadata: its instrumented build alone
-took almost two minutes, and the fixture then ran past the remaining budget.
-`.config/nextest.toml` therefore allows five 120-second periods for the
-`compile_time` binaries alone. That budget fits a from-scratch instrumented
-build and still terminates a hung test inside the job timeout. It is not a
-general deadline increase: the remedy for a slow lane stays
-`ubicloud-standard-4`, not a longer deadline for every test. Nobody waits on
-`coverage-upload`, so the smaller shape is worth the slower run there.
+`test_support_exports_compile_downstream` in `weaver-plugins` and in `weaverd`.
+The two older cases took 20.5 and 25.4 seconds of a 50.3-second suite on four
+vCPU. nextest terminates a test after three 60-second periods by default, and
+those cases then sat under half that kill. An instrumented trybuild build grows
+with the downstream crate's dependency tree rather than with the fixture. On
+2026-10-31 the `weaver-config` case exceeded the default kill on the developer
+lane once the fixture grew to cover the generated metadata: its instrumented
+build alone took almost two minutes, and the fixture then ran past the
+remaining budget. `.config/nextest.toml` therefore allows five 120-second
+periods for the `compile_time` binaries alone. That budget fits a from-scratch
+instrumented build and still terminates a hung test inside the job timeout. The
+`weaverd` case instruments the largest dependency tree of the four, so it is
+the one to watch if that budget is ever tightened. It is not a general deadline
+increase: the remedy for a slow lane stays `ubicloud-standard-4`, not a longer
+deadline for every test. Nobody waits on `coverage-upload`, so the smaller
+shape is worth the slower run there.
 
 ### 7.3 The fork fallback
 
@@ -1541,22 +1543,44 @@ that both `run_graph_slice` and `run_get_card` build on. It resolves the
 callers render it themselves, with the ephemeral daemon endpoint and any
 temporary fixture path already replaced by stable placeholders.
 
-### 19.2 Resolving the `weaver` binary
+### 19.2 Resolving the `weaver` and `weaverd` binaries
 
 `run_cli` locates the CLI binary via `resolve_or_build_weaver_binary_path()` in
-`crates/weaver-e2e/tests/support/weaver_binary.rs`. This resolver exists because
-`assert_cmd`'s usual `CARGO_BIN_EXE_weaver` environment lookup only works from
-the crate that owns the binary (`weaver-cli`); it is never set when tests run
-from `weaver-e2e`. The resolver first checks the target directory and the
-`CARGO_BIN_EXE_weaver` environment variable, then, on a cold cache, shells out
-to `cargo build -p weaver-cli --bin weaver` and writes the resulting artefacts
-into the workspace target directory.
+`crates/weaver-e2e/tests/support/weaver_binary.rs`. The daemon harness locates
+its binary through the sibling module
+`crates/weaver-e2e/tests/support/weaverd_binary.rs`. Both resolvers exist
+because `assert_cmd`'s usual `CARGO_BIN_EXE_*` environment lookup only works
+from the crate that owns the binary (`weaver-cli` or `weaverd`); Cargo never
+sets either variable when the tests run from `weaver-e2e`.
 
-The outcome — success or failure — is memoized in a process-wide `OnceLock`, so
-the build runs at most once per test process and concurrent test threads cannot
-race to spawn competing builds. This cache is per process, not per test run: a
-failed build poisons every remaining test in that binary, and the next
-`cargo test` invocation starts afresh.
+The resolution rules are shared. A private `WorkspaceBinary` value names each
+target's executable stem, owning Cargo package, and Cargo-provided environment
+variable; `weaver` maps to package `weaver-cli` with `CARGO_BIN_EXE_weaver`, and
+`weaverd` maps to package `weaverd` with `CARGO_BIN_EXE_weaverd`. Probes run
+in this order:
+
+1. the `CARGO_BIN_EXE_*` variable, if it names an existing regular file;
+2. the directory holding the running test executable, with a trailing `deps`
+   segment stripped, which is the active Cargo target directory;
+3. the conventional `<workspace root>/target/debug/<binary>` location.
+
+When no candidate exists, the resolver shells out to
+`cargo build -p <package> --bin <binary>`, writing artefacts into the workspace
+target directory, then probes the same two filesystem candidates again. An
+existence probe distinguishes "absent" from "unreadable": only
+`ErrorKind::NotFound` reports the candidate as missing, while any other
+metadata failure is returned as an error, so an inaccessible binary never
+triggers a build that cannot fix it.
+
+Each binary's outcome — success or failure — is memoized in its own process-wide
+`OnceLock`, so the build runs at most once per test process and concurrent
+test threads cannot race to spawn competing builds. This cache is per process,
+not per test run: a failed build poisons every remaining test in that binary,
+and the next `cargo test` invocation starts afresh. Failures name the binary,
+the build's exit status when the build ran and exited non-zero, and the two
+candidate paths that were checked when a successful build still left no
+executable behind.
+
 `crates/weaver-e2e/tests/test_support/daemon_harness.rs` re-exports a thin
 wrapper of the same name, `resolve_or_build_weaver_binary_path`, adapting the
 `Result<&'static Path, &'static str>` return type to `io::Result<PathBuf>` for
@@ -2188,14 +2212,120 @@ fixed order:
 4. Return an invalid-arguments error when neither `--position` nor `offset=`
    is available.
 
-## 25 Dispatch lifecycle observability internals
+## 25 Runtime paths and process supervision
+
+`RuntimePaths` in `weaver-config` gives the CLI and daemon one canonical set of
+runtime artefact paths for a configured endpoint. Unix socket endpoints use the
+socket's parent directory. TCP endpoints use the per-user runtime directory:
+the platform runtime directory on Unix, with a per-user temporary directory
+fallback, and the temporary directory on non-Unix platforms.
+
+The default endpoint retains the legacy names `weaverd.lock`, `weaverd.pid`, and
+`weaverd.health`. Other endpoints use those prefixes with a SHA-256 identifier
+derived from the complete endpoint, including its transport and, for TCP, host
+and port. This keeps artefacts for distinct endpoints separate without putting
+endpoint text in filenames. `RuntimePaths::from_config` derives the paths and
+creates the runtime directory; use `RuntimePaths::from_config_readonly` when
+paths are needed without filesystem changes. The public accessors expose the
+runtime directory, each full artefact path, and each artefact filename.
+
+`ProcessGuard` owns the daemon's runtime lock for the guard's lifetime. It
+opens the persistent lock file relative to the capability-opened runtime
+directory, then locks that same open file: supported Unix targets use `flock`,
+Solaris uses `fcntl` plus a process-local guard, and Windows uses `LockFileEx`.
+The lock file remains in place during normal cleanup so another process cannot
+race by locking a different inode. On Solaris, the child reacquires the
+process-associated lock after daemonization; the parent's lock holds until the
+parent exits.
+
+When startup finds an existing lock file, it tries to take the OS lock before
+consulting the recorded PID. A free lock is reclaimed even when the recorded
+PID still names a live process, because that number may have been reused after
+the original daemon exited. A held lock is reported as already running when the
+recorded PID is live, and as already in progress when no live PID is recorded.
+The launch binds its endpoint while still holding the lock, and only a
+successful bind lets it remove the predecessor's stale PID and health files.
+Binding can fail because another daemon, possibly an older release that holds
+no lock, still serves the endpoint; that daemon's PID file is then the only way
+to stop it, so a failed launch must leave it in place. On normal guard cleanup,
+the guard removes the PID and health files it wrote and retains the persistent
+lock file; a guard that never wrote a PID removes neither. The `sha2`
+dependency derives endpoint identifiers, `rustix` provides Unix file-lock
+operations, and `windows-sys` exposes the Windows `LockFileEx` and
+`UnlockFileEx` APIs.
+
+### 25.1 Test infrastructure for runtime paths
+
+`crates/weaverd/src/tests/support/` holds the helpers that daemon tests use to
+exercise endpoint-scoped runtime artefacts without touching a real daemon's
+files.
+
+`TestConfigLoader` (`config_loader.rs`) provisions a Unix socket path under a
+temporary directory. Its `runtime_paths` method loads that configuration and
+derives `RuntimePaths` with `from_config_readonly`, so a test sees the same
+endpoint-scoped lock, PID, and health names that production derives while no
+runtime directory is created as a side effect.
+
+`ProcessTestWorld` (`process_world.rs`) stores those derived paths and exposes
+`lock_path`, `pid_path`, and `health_path`. Scenarios assert against those
+accessors rather than fixed `weaverd.*` names, which keeps the behavioural
+features independent of the endpoint identifier.
+
+`terminate_before_pid_write`
+(`crates/weaverd/src/process/guard/test_support.rs`) acquires a real
+`ProcessGuard` on the runtime directory and simulates a launch that dies after
+taking the lock but before it writes a PID. The world's method of the same name
+delegates to it, and the resulting stale lock exercises startup reclamation.
+
+`ProcessTestWorld::lock_exists` returns `Result<bool, String>` rather than a
+plain `bool`: `Ok(true)` and `Ok(false)` report a successful existence check,
+while `Err` reports that the check itself failed. A permission or I/O error is
+therefore surfaced instead of being flattened into "absent", which would let a
+test pass for the wrong reason.
+
+`ProcessTestWorld::wait_for_condition` takes a predicate returning
+`Result<bool, String>` and polls it until it reports `true` or the wait
+deadline expires. A predicate error is returned immediately rather than being
+retried until the timeout, so a broken probe fails the step with its own
+diagnosis instead of a misleading "timed out waiting for …" message.
+
+The end-to-end counterpart lives in
+`crates/weaver-e2e/tests/runtime_artefacts/`. Its `main.rs` carries
+`#![cfg(unix)]` because the scenario drives real `weaver` and `weaverd`
+processes over Unix sockets; the module is therefore compiled and run only on
+Unix hosts. Unlike the daemon unit tests, it derives the expected artefact
+names through the public `RuntimePaths` API rather than the `test-support`
+helpers, so the assertions exercise the same surface a user's configuration
+reaches.
+
+The scenario starts two daemons on two non-default Unix endpoints that share
+one runtime directory, then checks endpoint isolation end to end. It first
+asserts that the two endpoints derive distinct lock, PID, and health names.
+After both daemons are running it writes legacy `weaverd.pid` and
+`weaverd.health` decoys into the shared directory and confirms that
+`weaver status` reports the endpoint-scoped PID rather than the decoy. Stopping
+endpoint A must remove A's PID and health files while retaining A's persistent
+lock, and must leave endpoint B's daemon running with its artefacts intact. The
+scenario then removes B's PID file and confirms that `weaver stop` refuses to
+signal a reachable socket it cannot verify, before stopping B normally and
+checking the same cleanup contract. A `DaemonGuard` sends `SIGTERM` to any
+daemon still recorded as running when the test unwinds, so a failed assertion
+does not leak processes.
+
+The scenario's process probes use the `nix` crate, declared as a Unix-only
+development dependency in `crates/weaver-e2e/Cargo.toml` under
+`[target.'cfg(unix)'.dev-dependencies]` with the `signal` feature enabled. That
+feature supplies both the signal-0 existence probe and the `SIGTERM` cleanup
+path; the dependency is scoped to Unix targets because the whole module is.
+
+## 26 Dispatch lifecycle observability internals
 
 This section documents the dispatch and startup-observability helpers added for
 daemon request handling and CLI lifecycle guidance. The pieces are
 intentionally small: dispatch owns request telemetry at the daemon boundary,
 while lifecycle monitoring owns the runtime files that explain daemon readiness.
 
-### 25.1 `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
+### 26.1 `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
 
 `crates/weaverd/src/dispatch/handler/` is split into three modules:
 
@@ -2219,9 +2349,9 @@ while lifecycle monitoring owns the runtime files that explain daemon readiness.
 - `endpoint: impl Into<String>` records the socket or TCP endpoint handling
   the request. Structured dispatch events include this value for operator
   correlation.
-- `runtime_dir: PathBuf` records the daemon runtime directory. Structured
-  dispatch events derive the `weaverd.health` health-snapshot path from it, so
-  logs and CLI guidance point at the same runtime artefacts.
+- `runtime_paths: RuntimePaths` supplies the selected runtime directory and
+  endpoint-scoped health-snapshot path, so logs and CLI guidance point at the
+  same runtime artefacts.
 
 The connection flow is:
 
@@ -2240,7 +2370,7 @@ large context object through parse and validation helpers, or lose the
 distinction between client disconnects, read failures, malformed JSON, invalid
 commands, and oversized requests.
 
-### 25.2 Structured dispatch events
+### 26.2 Structured dispatch events
 
 `StructuredEventMetadata` carries optional domain, operation, size, and
 maximum-size fields for structured dispatch logs. Its constructors and builder
@@ -2266,12 +2396,12 @@ metadata, and five optional sensitive request fields:
 - `full_payload`
 
 `serialize_structured_event` always includes `event`, `endpoint`,
-`runtime_dir`, and the derived `weaverd.health` path, then extends the payload
-with metadata. If any sensitive field is present, the serializer writes the
-field with the `"<redacted>"` marker rather than the original content. That
-keeps structured logs useful for diagnosing dispatch failures without exposing
-patch contents, request bodies, source text, environment values, or complete
-payloads.
+`runtime_dir`, and the endpoint-scoped health path supplied by `RuntimePaths`,
+then extends the payload with metadata. If any sensitive field is present, the
+serializer writes the field with the `"<redacted>"` marker rather than the
+original content. That keeps structured logs useful for diagnosing dispatch
+failures without exposing patch contents, request bodies, source text,
+environment values, or complete payloads.
 
 `emit_structured_event` formats the event as JSON and logs it to
 `DISPATCH_TARGET`. It uses `tracing::error!` when `is_error` is true and
@@ -2279,7 +2409,7 @@ payloads.
 and serialized payload under the same target so downstream tracing filters can
 collect dispatch telemetry consistently.
 
-### 25.3 `monitoring_readers` (`weaver-cli/src/lifecycle/monitoring_readers.rs`)
+### 26.3 `monitoring_readers` (`weaver-cli/src/lifecycle/monitoring_readers.rs`)
 
 `monitoring_readers` centralizes runtime-file reads for daemon lifecycle
 monitoring. It exists so health and PID files share the same missing-file,
@@ -2302,28 +2432,33 @@ non-empty content to the caller-provided parse closure.
 
 The concrete readers have these return semantics:
 
-- `read_health` returns `Ok(Some(HealthSnapshot))` when `weaverd.health` is
-  present and valid JSON, `Ok(None)` when the file is missing or empty,
-  `Err(LifecycleError::ReadHealth { .. })` when reading fails, and
+- `read_health` returns `Ok(Some(HealthSnapshot))` when the configured health
+  snapshot is present and valid JSON, `Ok(None)` when the file is missing or
+  empty, `Err(LifecycleError::ReadHealth { .. })` when reading fails, and
   `Err(LifecycleError::ParseHealth { .. })` when JSON parsing fails.
 - `read_pid` returns `Ok(Some(u32))` when the PID file is present and contains
   a valid integer, `Ok(None)` when it is missing or empty,
   `Err(LifecycleError::ReadPid { .. })` when reading fails, and
   `Err(LifecycleError::ParsePid { .. })` when integer parsing fails.
 
-### 25.4 `runtime_dir` in lifecycle errors
+### 26.4 `runtime_dir` in lifecycle errors
 
 `LifecycleError::LaunchDaemon` and `LifecycleError::StartupFailed` both carry
-`runtime_dir: PathBuf`. The CLI keeps this path with the error because startup
-guidance is produced after the lower-level lifecycle operation has already
-failed. Carrying the runtime directory in the error lets actionable guidance
-derive the same `weaverd.health` path that monitoring uses and surface runtime
-artefact inspection as a next diagnostic step.
+`runtime_dir: PathBuf`. `StartupFailed` also carries the endpoint-scoped
+`health_path: PathBuf` supplied by `RuntimePaths`. The CLI keeps these paths
+with the errors because startup guidance is produced after the lower-level
+lifecycle operation has already failed.
 
 For launch failures, guidance can tell the operator where to inspect runtime
 artefacts even when the daemon process never starts. For startup failures,
-guidance derives `runtime_dir.join("weaverd.health")` and points directly at
-the health snapshot that should explain why readiness was not reached.
+guidance uses the endpoint-scoped health path and points directly at the health
+snapshot that should explain why readiness was not reached.
+
+`startup_readiness_guidance` keeps the shared alternatives layout for
+`StartupFailed`, `StartupTimeout`, and `StartupAborted`. It is private to
+`actionable_guidance.rs` and should remain limited to those lifecycle variants.
+Other modules use `write_startup_guidance`, so the constructor's details and
+operator-facing wording stay owned by the CLI renderer.
 
 ## 26 Plugin protocol round-trip test helper
 

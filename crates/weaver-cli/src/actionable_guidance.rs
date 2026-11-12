@@ -183,44 +183,48 @@ fn launch_daemon_guidance(binary: &OsStr, runtime_dir: &Path) -> ActionableGuida
     ActionableGuidance::new(problem, alternatives, next_command)
 }
 
-fn startup_failed_guidance(exit_status: Option<i32>, runtime_dir: &Path) -> ActionableGuidance {
-    let problem = format!("daemon exited before reporting ready (status: {exit_status:?})");
-    let health_path = runtime_dir.join("weaverd.health");
+fn startup_readiness_guidance(
+    problem: String,
+    explanation: &str,
+    advice: &str,
+    health_path: &Path,
+) -> ActionableGuidance {
     let alternatives = vec![
-        "The daemon started but failed to become ready.".to_string(),
+        explanation.to_string(),
         String::new(),
         "Valid alternatives:".to_string(),
-        "  - Check the daemon logs for errors".to_string(),
-        startup_socket_hint(Some(health_path.as_path())),
-        startup_output_hint().to_string(),
-    ];
-    ActionableGuidance::new(problem, alternatives, startup_retry_command())
-}
-
-fn startup_timeout_guidance(health_path: &Path) -> ActionableGuidance {
-    let problem = "timed out waiting for daemon to become ready".to_string();
-    let alternatives = vec![
-        "The daemon did not report ready within the timeout period.".to_string(),
-        String::new(),
-        "Valid alternatives:".to_string(),
-        "  - Check if the daemon is stuck or slow to start".to_string(),
+        format!("  - {advice}"),
         startup_socket_hint(Some(health_path)),
         startup_output_hint().to_string(),
     ];
     ActionableGuidance::new(problem, alternatives, startup_retry_command())
 }
 
+fn startup_failed_guidance(exit_status: Option<i32>, health_path: &Path) -> ActionableGuidance {
+    startup_readiness_guidance(
+        format!("daemon exited before reporting ready (status: {exit_status:?})"),
+        "The daemon started but failed to become ready.",
+        "Check the daemon logs for errors",
+        health_path,
+    )
+}
+
+fn startup_timeout_guidance(health_path: &Path) -> ActionableGuidance {
+    startup_readiness_guidance(
+        "timed out waiting for daemon to become ready".to_string(),
+        "The daemon did not report ready within the timeout period.",
+        "Check if the daemon is stuck or slow to start",
+        health_path,
+    )
+}
+
 fn startup_aborted_guidance(path: &Path) -> ActionableGuidance {
-    let problem = "daemon reported 'stopping' before reaching ready".to_string();
-    let alternatives = vec![
-        "The daemon started but shut down before becoming ready.".to_string(),
-        String::new(),
-        "Valid alternatives:".to_string(),
-        "  - Check the health snapshot for shutdown reason".to_string(),
-        startup_socket_hint(Some(path)),
-        startup_output_hint().to_string(),
-    ];
-    ActionableGuidance::new(problem, alternatives, startup_retry_command())
+    startup_readiness_guidance(
+        "daemon reported 'stopping' before reaching ready".to_string(),
+        "The daemon started but shut down before becoming ready.",
+        "Check the health snapshot for shutdown reason",
+        path,
+    )
 }
 
 /// Writes actionable guidance to the given writer using the three-part template.
@@ -294,9 +298,9 @@ pub(crate) fn write_startup_guidance<W: Write>(
         } => launch_daemon_guidance(binary, runtime_dir),
         LifecycleError::StartupFailed {
             exit_status,
-            runtime_dir,
+            health_path,
             ..
-        } => startup_failed_guidance(*exit_status, runtime_dir),
+        } => startup_failed_guidance(*exit_status, health_path),
         LifecycleError::StartupTimeout { health_path, .. } => startup_timeout_guidance(health_path),
         LifecycleError::StartupAborted { path } => startup_aborted_guidance(path),
         other => {

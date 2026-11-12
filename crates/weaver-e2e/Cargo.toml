@@ -28,5 +28,8 @@ weaver-config = { path = "../weaver-config" }
 weaverd = { path = "../weaverd", features = ["test-support"] }
 weaver-test-macros = { path = "../weaver-test-macros" }
 
+[target.'cfg(unix)'.dev-dependencies]
+nix = { version = "0.31", features = ["signal"] }
+
 [lints]
 workspace = true

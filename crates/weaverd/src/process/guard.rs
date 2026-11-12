@@ -11,15 +11,18 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-#[cfg(unix)]
-use cap_std::fs::OpenOptionsExt;
-use cap_std::fs::{Dir, File, OpenOptions};
+use cap_std::fs::Dir;
 use nix::{errno::Errno, sys::signal::kill, unistd::Pid};
 use serde::Serialize;
 use tracing::{info, warn};
 use weaver_config::RuntimePaths;
 
 use super::{PROCESS_TARGET, errors::LaunchError, files::atomic_write};
+
+mod lock;
+use self::lock::{LockFile, acquire_lock};
+#[cfg(test)]
+use self::lock::{acquire_process_lock, lock_file};
 
 #[cfg(test)]
 static HEALTH_EVENTS: OnceLock<Mutex<HashMap<PathBuf, Vec<&'static str>>>> = OnceLock::new();
@@ -28,7 +31,7 @@ static HEALTH_EVENTS: OnceLock<Mutex<HashMap<PathBuf, Vec<&'static str>>>> = Onc
 pub(super) struct ProcessGuard {
     paths: RuntimePaths,
     runtime_dir: Dir,
-    _lock: File,
+    _lock: LockFile,
     pid: Option<u32>,
 }
 
@@ -41,6 +44,11 @@ impl ProcessGuard {
             _lock: lock,
             pid: None,
         })
+    }
+
+    #[cfg(target_os = "solaris")]
+    pub(super) fn after_daemonize(&self) -> Result<(), LaunchError> {
+        self._lock.after_daemonize(&self.paths)
     }
 
     pub(super) fn write_pid(&mut self, pid: u32) -> Result<(), LaunchError> {
@@ -97,14 +105,39 @@ impl ProcessGuard {
         Ok(())
     }
 
+    /// Removes runtime artefacts left behind by an earlier daemon.
+    ///
+    /// The caller must invoke this only once the endpoint has been bound. A
+    /// launch that fails to bind has proven that some other process still
+    /// serves the endpoint, and that process may be an older release whose
+    /// only record of its own PID is these files. Deleting them before the
+    /// bind would strip `weaver daemon stop` of the last way to reach it.
+    ///
+    /// # Errors
+    /// Returns [`LaunchError::Cleanup`] when an artefact exists but cannot be
+    /// removed.
+    pub(super) fn reclaim_stale_artefacts(&self) -> Result<(), LaunchError> {
+        for path in [self.paths.pid_path(), self.paths.health_path()] {
+            remove_file(&self.runtime_dir, path)?;
+        }
+        Ok(())
+    }
+
     pub(super) fn paths(&self) -> &RuntimePaths { &self.paths }
 
+    #[cfg(test)]
+    fn terminate_before_pid_write(self) { drop(self); }
+
+    /// Removes only the artefacts this guard wrote.
+    ///
+    /// A launch that fails before `write_pid` must leave a previous daemon's
+    /// PID and health files untouched; removing them unconditionally would
+    /// orphan a process that is still serving the endpoint.
     fn cleanup(&self) {
-        for path in [
-            self.paths.lock_path(),
-            self.paths.pid_path(),
-            self.paths.health_path(),
-        ] {
+        if self.pid.is_none() {
+            return;
+        }
+        for path in [self.paths.pid_path(), self.paths.health_path()] {
             remove_runtime_file(&self.runtime_dir, path);
         }
     }
@@ -173,84 +206,6 @@ impl<'a> HealthSnapshot<'a> {
     }
 }
 
-fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        options.mode(0o600);
-    }
-    let filename = runtime_filename(paths.lock_path())?;
-    match dir.open_with(filename, &options) {
-        Ok(file) => {
-            info!(
-                target: PROCESS_TARGET,
-                file = %paths.lock_path().display(),
-                "acquired daemon lock"
-            );
-            Ok(file)
-        }
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-            handle_existing_lock(dir, paths)
-        }
-        Err(source) => Err(LaunchError::LockCreate {
-            path: paths.lock_path().to_path_buf(),
-            source,
-        }),
-    }
-}
-
-fn handle_existing_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
-    if !runtime_file_exists(dir, paths.pid_path())? {
-        info!(
-            target: PROCESS_TARGET,
-            lock = %paths.lock_path().display(),
-            "refusing to start: launch already in progress",
-        );
-        return Err(LaunchError::StartupInProgress {
-            lock: paths.lock_path().to_path_buf(),
-            pid: paths.pid_path().to_path_buf(),
-        });
-    }
-
-    match read_pid(dir, paths.pid_path()) {
-        Some(0) => {
-            warn!(
-                target: PROCESS_TARGET,
-                "existing daemon recorded zero pid; cleaning stale files",
-            );
-        }
-        Some(pid) => match check_process(pid)? {
-            true => {
-                info!(
-                    target: PROCESS_TARGET,
-                    pid,
-                    "refusing to start: existing daemon alive",
-                );
-                return Err(LaunchError::AlreadyRunning { pid });
-            }
-            false => {
-                warn!(
-                    target: PROCESS_TARGET,
-                    pid,
-                    "existing daemon not detected; cleaning stale files",
-                );
-            }
-        },
-        None => {
-            warn!(
-                target: PROCESS_TARGET,
-                "pid file unreadable; cleaning stale files",
-            );
-        }
-    }
-
-    remove_file(dir, paths.lock_path())?;
-    remove_file(dir, paths.pid_path())?;
-    remove_file(dir, paths.health_path())?;
-    acquire_lock(dir, paths)
-}
-
 fn read_pid(dir: &Dir, path: &Path) -> Option<u32> {
     let content = dir.read_to_string(runtime_filename(path).ok()?).ok()?;
     content.trim().parse::<u32>().ok()
@@ -277,10 +232,6 @@ where
 
 fn remove_file(dir: &Dir, path: &Path) -> Result<(), LaunchError> {
     with_runtime_file(dir, path, (), |d, name| d.remove_file(name))
-}
-
-fn runtime_file_exists(dir: &Dir, path: &Path) -> Result<bool, LaunchError> {
-    with_runtime_file(dir, path, false, |d, name| d.metadata(name).map(|_| true))
 }
 
 fn runtime_filename(path: &Path) -> Result<&Path, LaunchError> {

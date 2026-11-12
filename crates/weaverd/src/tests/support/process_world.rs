@@ -17,6 +17,7 @@ use serde_json::Value;
 use weaver_config::RuntimePaths;
 
 use crate::{
+    bootstrap::ConfigLoader,
     process::{
         LaunchError,
         LaunchMode,
@@ -26,6 +27,7 @@ use crate::{
         test_support,
     },
     tests::support::{FailingConfigLoader, RecordingHealthReporter, TestConfigLoader, fs},
+    transport::SocketListener,
 };
 
 pub const WAIT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -35,6 +37,7 @@ pub type StepResult = Result<(), String>;
 
 pub struct ProcessTestWorld {
     loader: TestConfigLoader,
+    runtime_paths: RuntimePaths,
     reporter: Arc<RecordingHealthReporter>,
     daemonizer: TestDaemonizer,
     shutdown: TestShutdownSignal,
@@ -42,6 +45,9 @@ pub struct ProcessTestWorld {
     result: Option<Result<(), LaunchError>>,
     wait_error: Option<String>,
     health_history: RefCell<Vec<String>>,
+    /// A listener occupying the configured endpoint, held so a launch cannot
+    /// bind it. Dropping the world releases the endpoint.
+    _occupied_endpoint: Option<SocketListener>,
 }
 
 impl ProcessTestWorld {
@@ -53,8 +59,10 @@ impl ProcessTestWorld {
     /// runtime directory.
     pub fn new() -> Result<Self, String> {
         let loader = TestConfigLoader::new()?;
+        let runtime_paths = loader.runtime_paths()?;
         let world = Self {
             loader,
+            runtime_paths,
             reporter: Arc::new(RecordingHealthReporter::default()),
             daemonizer: TestDaemonizer::default(),
             shutdown: TestShutdownSignal::new(),
@@ -62,6 +70,7 @@ impl ProcessTestWorld {
             result: None,
             wait_error: None,
             health_history: RefCell::new(Vec::new()),
+            _occupied_endpoint: None,
         };
         test_support::clear_health_events(world.health_path().as_path()).ok();
         Ok(world)
@@ -119,6 +128,25 @@ impl ProcessTestWorld {
         Ok(())
     }
 
+    /// Occupies the configured endpoint so a subsequent launch cannot bind it.
+    ///
+    /// The listener is held for the world's lifetime, standing in for another
+    /// daemon that still serves the endpoint.
+    ///
+    /// # Errors
+    /// Returns an error when the configuration cannot be loaded or the
+    /// endpoint cannot be bound.
+    pub fn occupy_endpoint(&mut self) -> StepResult {
+        let config = self
+            .loader
+            .load()
+            .map_err(|error| format!("load test configuration: {error}"))?;
+        let listener = SocketListener::bind(config.daemon_socket())
+            .map_err(|error| format!("occupy test endpoint: {error}"))?;
+        self._occupied_endpoint = Some(listener);
+        Ok(())
+    }
+
     pub fn start_foreground_with_invalid_config(&mut self) -> StepResult {
         if self.result.is_some() {
             return Err("result already recorded".to_string());
@@ -170,11 +198,11 @@ impl ProcessTestWorld {
 
     pub fn take_wait_error(&mut self) -> Option<String> { self.wait_error.take() }
 
-    pub fn lock_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.lock") }
+    pub fn lock_path(&self) -> PathBuf { self.runtime_paths.lock_path().to_path_buf() }
 
-    pub fn pid_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.pid") }
+    pub fn pid_path(&self) -> PathBuf { self.runtime_paths.pid_path().to_path_buf() }
 
-    pub fn health_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.health") }
+    pub fn health_path(&self) -> PathBuf { self.runtime_paths.health_path().to_path_buf() }
 
     pub fn read_health(&self) -> Result<Value, String> {
         let content = fs::read_to_string(self.health_path()).map_err(|error| error.to_string())?;
@@ -184,6 +212,8 @@ impl ProcessTestWorld {
     pub fn write_stale_runtime(&self) -> StepResult {
         fs::write(self.lock_path(), b"").map_err(|error| error.to_string())?;
         fs::write(self.pid_path(), b"0\n").map_err(|error| error.to_string())?;
+        fs::write(self.health_path(), b"{\"status\":\"ready\"}\n")
+            .map_err(|error| error.to_string())?;
         Ok(())
     }
 
@@ -193,8 +223,8 @@ impl ProcessTestWorld {
         Ok(())
     }
 
-    pub fn write_lock_without_pid(&self) -> StepResult {
-        fs::write(self.lock_path(), b"").map_err(|error| error.to_string())
+    pub fn terminate_before_pid_write(&self) -> StepResult {
+        test_support::terminate_before_pid_write(&self.runtime_paths)
     }
 
     pub fn read_pid(&self) -> Result<Option<u32>, String> {
@@ -223,6 +253,10 @@ impl ProcessTestWorld {
                 .any(|status| status == expected)
     }
 
+    /// Checks whether the runtime lock file exists.
+    ///
+    /// Returns whether the file exists, or an error when the filesystem
+    /// existence check fails.
     pub fn lock_exists(&self) -> Result<bool, String> {
         fs::exists(self.lock_path()).map_err(|error| format!("check lock file: {error}"))
     }
@@ -246,11 +280,11 @@ impl ProcessTestWorld {
 
     pub fn wait_for_condition<F>(&self, predicate: F, description: &str) -> StepResult
     where
-        F: Fn(&Self) -> bool,
+        F: Fn(&Self) -> Result<bool, String>,
     {
         let deadline = Instant::now() + WAIT_TIMEOUT;
         while Instant::now() < deadline {
-            if predicate(self) {
+            if predicate(self)? {
                 return Ok(());
             }
             thread::sleep(POLL_INTERVAL);
@@ -340,3 +374,7 @@ pub fn snapshot_status(snapshot: &Value) -> &str {
         .and_then(Value::as_str)
         .map_or("<missing status>", |status| status)
 }
+
+#[cfg(test)]
+#[path = "process_world_tests.rs"]
+mod tests;

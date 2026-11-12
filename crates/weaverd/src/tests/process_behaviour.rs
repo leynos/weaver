@@ -9,6 +9,7 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 use crate::{
     process::{LaunchError, LaunchMode},
     tests::support::{ProcessTestWorld, fs as test_fs, snapshot_status},
+    transport::ListenerError,
 };
 
 type ProcessWorld = Result<RefCell<ProcessTestWorld>, String>;
@@ -79,6 +80,46 @@ fn given_stale_runtime(world: &ProcessWorld) -> Result<(), String> {
     Ok(())
 }
 
+#[given("the configured endpoint is already bound")]
+fn given_endpoint_bound(world: &ProcessWorld) -> Result<(), String> {
+    process_world(world)?.borrow_mut().occupy_endpoint()
+}
+
+#[then("the daemon run fails because the endpoint is in use")]
+fn then_daemon_fails_endpoint_in_use(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
+    let binding = world.borrow();
+    match binding.last_error() {
+        Some(LaunchError::Listener {
+            source: ListenerError::UnixInUse { .. },
+        }) => Ok(()),
+        other => Err(format!(
+            "expected endpoint-in-use listener error, got {other:?}"
+        )),
+    }
+}
+
+#[then("the previous runtime artefacts are preserved")]
+fn then_previous_artefacts_preserved(world: &ProcessWorld) -> Result<(), String> {
+    let world = process_world(world)?;
+    let world = world.borrow();
+    assert_eq!(
+        world.read_pid()?,
+        Some(0),
+        "the previous daemon's pid file should survive a failed launch",
+    );
+    assert!(
+        test_fs::exists(world.health_path())
+            .map_err(|error| format!("check health file: {error}"))?,
+        "the previous daemon's health file should survive a failed launch",
+    );
+    assert!(
+        world.lock_exists()?,
+        "the persistent lock path should remain available",
+    );
+    Ok(())
+}
+
 #[given("stale runtime artefacts with invalid pid exist")]
 fn given_stale_runtime_invalid(world: &ProcessWorld) -> Result<(), String> {
     let world = process_world(world)?;
@@ -86,10 +127,10 @@ fn given_stale_runtime_invalid(world: &ProcessWorld) -> Result<(), String> {
     Ok(())
 }
 
-#[given("a lock without a pid file exists")]
-fn given_lock_without_pid(world: &ProcessWorld) -> Result<(), String> {
+#[given("a prior launch terminated after acquiring the lock")]
+fn given_terminated_launch_before_pid_write(world: &ProcessWorld) -> Result<(), String> {
     let world = process_world(world)?;
-    world.borrow().write_lock_without_pid()?;
+    world.borrow().terminate_before_pid_write()?;
     Ok(())
 }
 
@@ -99,7 +140,7 @@ fn then_daemonisation_requested(world: &ProcessWorld) -> Result<(), String> {
     world
         .borrow()
         .wait_for_condition(
-            |state| state.daemonizer_calls() > 0,
+            |state| Ok(state.daemonizer_calls() > 0),
             "daemonisation to be invoked",
         )
         .map_err(|error| format!("expected daemonisation to be invoked at least once: {error}"))
@@ -111,7 +152,10 @@ fn then_lock_file_exists(world: &ProcessWorld) -> Result<(), String> {
     world
         .borrow()
         .wait_for_condition(
-            |state| test_fs::exists(state.lock_path()).is_ok_and(|exists| exists),
+            |state| {
+                test_fs::exists(state.lock_path())
+                    .map_err(|error| format!("check lock file existence: {error}"))
+            },
             "lock file to be written",
         )
         .map_err(|error| format!("lock file should exist whilst daemon is running: {error}"))
@@ -124,7 +168,10 @@ fn then_pid_file_exists(world: &ProcessWorld) -> Result<(), String> {
         let world_ref = world.borrow();
         world_ref
             .wait_for_condition(
-                |state| test_fs::exists(state.pid_path()).is_ok_and(|exists| exists),
+                |state| {
+                    test_fs::exists(state.pid_path())
+                        .map_err(|error| format!("check pid file existence: {error}"))
+                },
                 "pid file to be written",
             )
             .map_err(|error| format!("pid file should be written: {error}"))?;
@@ -168,7 +215,7 @@ fn then_health_starting(world: &ProcessWorld) -> Result<(), String> {
     world
         .borrow()
         .wait_for_condition(
-            |state| state.saw_status("starting"),
+            |state| Ok(state.saw_status("starting")),
             "starting health snapshot",
         )
         .map_err(|error| format!("starting health snapshot should have been observed: {error}"))
@@ -180,19 +227,19 @@ fn then_health_stopping(world: &ProcessWorld) -> Result<(), String> {
     world
         .borrow()
         .wait_for_condition(
-            |state| state.saw_status("stopping"),
+            |state| Ok(state.saw_status("stopping")),
             "stopping health snapshot",
         )
         .map_err(|error| format!("daemon should publish stopping health snapshot: {error}"))
 }
 
-#[then("the runtime artefacts are removed")]
-fn then_runtime_removed(world: &ProcessWorld) -> Result<(), String> {
+#[then("the runtime state is cleaned up")]
+fn then_runtime_state_cleaned_up(world: &ProcessWorld) -> Result<(), String> {
     let world = process_world(world)?;
     let world = world.borrow();
     assert!(
-        !test_fs::exists(world.lock_path()).map_err(|error| format!("check lock file: {error}"))?,
-        "lock file should be removed after shutdown",
+        world.lock_exists()?,
+        "lock file should remain available for the next launch",
     );
     assert!(
         !test_fs::exists(world.pid_path()).map_err(|error| format!("check pid file: {error}"))?,
@@ -218,16 +265,6 @@ fn then_stale_pid_replaced(world: &ProcessWorld) -> Result<(), String> {
         pid,
         std::process::id(),
         "pid file should record the current process id",
-    );
-    Ok(())
-}
-
-#[then("the lock file remains in place")]
-fn then_lock_remains(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    assert!(
-        world.borrow().lock_exists()?,
-        "lock file should remain when launch is still in progress",
     );
     Ok(())
 }
@@ -261,11 +298,6 @@ fn then_daemon_succeeds(world: &ProcessWorld) -> Result<(), String> {
         .ok_or_else(|| String::from("expected a recorded daemon result"))?;
     assert!(result.is_ok(), "daemon run should succeed: {result:?}");
     Ok(())
-}
-
-#[then("the daemon run fails with launch already in progress")]
-fn then_daemon_fails_launch_in_progress(world: &ProcessWorld) -> Result<(), String> {
-    assert_daemon_error_contains(process_world(world)?, "launch already in progress")
 }
 
 #[then("the daemon run fails with invalid configuration")]
