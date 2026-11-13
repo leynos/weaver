@@ -214,7 +214,7 @@ fn trims_whitespace_in_language_parse() {
 
 #[rstest]
 fn rejects_invalid_language_with_message() {
-    let err = Language::from_str("go").unwrap_err();
+    let err = Language::from_str("go").expect_err("go is not a supported language");
     assert_eq!(err.input(), "go");
     assert_eq!(err.to_string(), "unsupported language 'go'");
 }

@@ -17,19 +17,31 @@ pub(crate) const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
 /// 3. If still running, kills it and waits
 fn wait_during_grace_period(child: &mut Child, language: Language) {
     thread::sleep(Duration::from_millis(200));
-    match child.try_wait() {
-        Ok(Some(status)) => {
-            debug!(
-                target: ADAPTER_TARGET,
-                language = %language,
-                ?status,
-                "language server exited during grace period"
-            );
-        }
-        Ok(None) | Err(_) => {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+    if let Ok(Some(status)) = child.try_wait() {
+        debug!(
+            target: ADAPTER_TARGET,
+            language = %language,
+            ?status,
+            "language server exited during grace period"
+        );
+        return;
+    }
+
+    if let Err(error) = child.kill() {
+        warn!(
+            target: ADAPTER_TARGET,
+            language = %language,
+            error = %error,
+            "failed to kill unresponsive language server"
+        );
+    }
+    if let Err(error) = child.wait() {
+        warn!(
+            target: ADAPTER_TARGET,
+            language = %language,
+            error = %error,
+            "failed to reap unresponsive language server"
+        );
     }
 }
 

@@ -236,16 +236,20 @@ impl TestWorld {
         let mut new_handles: HashMap<Language, RecordingServerHandle> = HashMap::new();
 
         for config in &self.configs {
-            let server = match &config.initialization_error {
-                Some(message) => RecordingLanguageServer::failing_initialize(
-                    config.capabilities.clone(),
-                    message.clone(),
-                ),
-                None => RecordingLanguageServer::new(
-                    config.capabilities.clone(),
-                    config.responses.clone(),
-                ),
-            };
+            let server = config.initialization_error.as_ref().map_or_else(
+                || {
+                    RecordingLanguageServer::new(
+                        config.capabilities.clone(),
+                        config.responses.clone(),
+                    )
+                },
+                |message| {
+                    RecordingLanguageServer::failing_initialize(
+                        config.capabilities.clone(),
+                        message.clone(),
+                    )
+                },
+            );
 
             let handle = server.handle();
             new_host.register_language(config.language, Box::new(server))?;

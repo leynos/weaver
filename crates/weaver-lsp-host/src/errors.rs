@@ -102,13 +102,15 @@ pub enum LspHostError {
 
 impl LspHostError {
     /// Builds an `UnknownLanguage` error for the supplied language.
-    pub(crate) fn unknown(language: Language) -> Self { Self::UnknownLanguage { language } }
+    pub(crate) const fn unknown(language: Language) -> Self { Self::UnknownLanguage { language } }
 
     /// Builds a `DuplicateLanguage` error.
-    pub(crate) fn duplicate(language: Language) -> Self { Self::DuplicateLanguage { language } }
+    pub(crate) const fn duplicate(language: Language) -> Self {
+        Self::DuplicateLanguage { language }
+    }
 
     /// Builds a `CapabilityUnavailable` error with the provided reason.
-    pub(crate) fn capability_unavailable(
+    pub(crate) const fn capability_unavailable(
         language: Language,
         capability: CapabilityKind,
         reason: CapabilitySource,
@@ -121,7 +123,7 @@ impl LspHostError {
     }
 
     /// Wraps an underlying language server failure.
-    pub(crate) fn server(
+    pub(crate) const fn server(
         language: Language,
         operation: HostOperation,
         source: LanguageServerError,
