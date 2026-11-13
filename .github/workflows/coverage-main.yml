@@ -60,19 +60,19 @@ jobs:
           persist-credentials: false
       - name: Export Ubicloud cache credentials
         if: runner.environment == 'self-hosted'
-        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@9ed445010fe26a7facb708d7a9ba4d5bd0fa57ca
       # `.cargo/config.toml` selects `mold` for every Linux build, including
       # the scratch crates the trybuild cases compile under `target/`, so the
       # runner needs the linker before coverage runs. The input installs it
       # and sets no flag; the Cargo configuration does that.
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/setup-rust@9ed445010fe26a7facb708d7a9ba4d5bd0fa57ca
         with:
           install-mold: 'true'
           use-sccache: 'false'
           save-cache: 'false'
       - name: Generate coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/generate-coverage@9ed445010fe26a7facb708d7a9ba4d5bd0fa57ca
         with:
           output-path: lcov.info
           format: lcov
@@ -102,7 +102,7 @@ jobs:
         # as the trunk's and move the ratchet baseline with it. Nothing would
         # report it.
         if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@9ed445010fe26a7facb708d7a9ba4d5bd0fa57ca
         with:
           format: lcov
           # Stated rather than left to the action's default, because this
@@ -123,7 +123,7 @@ jobs:
       contents: read
     steps:
       - name: Publish the ratchet baseline
-        uses: leynos/shared-actions/.github/actions/publish-coverage-baseline@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/publish-coverage-baseline@9ed445010fe26a7facb708d7a9ba4d5bd0fa57ca
         with:
           artefact-name: coverage-baseline-handover
           # The same path the generator and the pull-request lane use: it is
@@ -148,13 +148,13 @@ jobs:
           persist-credentials: false
       - name: Export Ubicloud cache credentials
         if: runner.environment == 'self-hosted'
-        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@9ed445010fe26a7facb708d7a9ba4d5bd0fa57ca
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/setup-rust@9ed445010fe26a7facb708d7a9ba4d5bd0fa57ca
         with:
           install-mold: 'true'
       - name: Compile the instrumented tests
-        uses: leynos/shared-actions/.github/actions/generate-coverage@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/generate-coverage@9ed445010fe26a7facb708d7a9ba4d5bd0fa57ca
         with:
           output-path: lcov.info
           format: lcov
