@@ -20,6 +20,17 @@ const ALL_KINDS: [CapabilityKind; 5] = [
     CapabilityKind::Hover,
 ];
 
+/// Returns the capability key at `index`, failing the test outside `ALL_KINDS`.
+///
+/// Every strategy that supplies an index is bounded by `ALL_KINDS`, so the
+/// panic marks a broken test assumption rather than a production condition.
+fn kind_key_at(index: usize) -> &'static str {
+    let Some(kind) = ALL_KINDS.get(index) else {
+        panic!("capability index {index} is outside ALL_KINDS");
+    };
+    kind.key()
+}
+
 /// Builds a capability set from a five-bit advertisement mask.
 fn set_from_bits(bits: u8) -> ServerCapabilitySet {
     ServerCapabilitySet::new(
@@ -116,17 +127,17 @@ proptest! {
         let mut overrides = CapabilityMatrix::default();
         overrides.set_override(
             Language::Rust.as_str(),
-            ALL_KINDS[denied].key(),
+            kind_key_at(denied),
             CapabilityOverride::Deny,
         );
         overrides.set_override(
             Language::Rust.as_str(),
-            ALL_KINDS[forced].key(),
+            kind_key_at(forced),
             CapabilityOverride::Force,
         );
         overrides.set_override(
             Language::Rust.as_str(),
-            ALL_KINDS[allowed].key(),
+            kind_key_at(allowed),
             CapabilityOverride::Allow,
         );
 

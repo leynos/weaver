@@ -257,8 +257,8 @@ fn assert_field_ids_resolve(fields: &[FieldMetadata], localizer: &dyn Localizer)
 }
 
 /// Asserts an optional projected identifier resolves when one is present.
-fn assert_optional_resolves(id: Option<&str>, localizer: &dyn Localizer) {
-    if let Some(id) = id {
+fn assert_optional_resolves(maybe_id: Option<&str>, localizer: &dyn Localizer) {
+    if let Some(id) = maybe_id {
         assert_resolves(id, localizer);
     }
 }
