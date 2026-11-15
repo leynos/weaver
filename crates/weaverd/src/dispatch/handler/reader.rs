@@ -25,18 +25,46 @@ pub(super) fn read_request_line(
     let mut chunk = [0_u8; 1024];
 
     loop {
-        let bytes_read = read_with_retry(stream, &mut chunk)?;
-        if bytes_read == 0 {
-            return Ok(finish_request_line(buffer));
-        }
-        // `read` never reports more bytes than the buffer can hold, so the
-        // checked slice always succeeds; defaulting to an empty chunk keeps the
-        // impossible case panic-free.
-        let filled_chunk = chunk.get(..bytes_read).unwrap_or_default();
-        if append_request_chunk(&mut buffer, filled_chunk)? {
-            return Ok(Some(buffer));
+        match read_next_chunk(stream, &mut buffer, &mut chunk)? {
+            ChunkOutcome::LineComplete => return Ok(Some(buffer)),
+            ChunkOutcome::Disconnected => return Ok(finish_request_line(buffer)),
+            ChunkOutcome::NeedsMore => {}
         }
     }
+}
+
+/// What one read from the stream means for the request line being assembled.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ChunkOutcome {
+    /// A newline arrived, so the buffered line is ready to hand back.
+    LineComplete,
+    /// The client disconnected; whatever was buffered is all there is.
+    Disconnected,
+    /// The chunk was absorbed and another read is needed.
+    NeedsMore,
+}
+
+/// Absorbs one chunk into `buffer` and reports whether the line is finished.
+///
+/// `read` never reports more bytes than the buffer can hold, so the checked
+/// slice always succeeds; defaulting to an empty chunk keeps the impossible
+/// case panic-free.
+fn read_next_chunk(
+    stream: &mut ConnectionStream,
+    buffer: &mut Vec<u8>,
+    chunk: &mut [u8],
+) -> Result<ChunkOutcome, DispatchError> {
+    let bytes_read = read_with_retry(stream, chunk)?;
+    if bytes_read == 0 {
+        return Ok(ChunkOutcome::Disconnected);
+    }
+
+    let filled_chunk = chunk.get(..bytes_read).unwrap_or_default();
+    if append_request_chunk(buffer, filled_chunk)? {
+        return Ok(ChunkOutcome::LineComplete);
+    }
+
+    Ok(ChunkOutcome::NeedsMore)
 }
 
 /// Selects the log message associated with a request-read failure.

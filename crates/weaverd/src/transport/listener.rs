@@ -56,6 +56,42 @@ enum ListenerKind {
     Unix(UnixListener),
 }
 
+/// Binds the transport-specific listener that `endpoint` names.
+fn bind_listener(endpoint: &SocketEndpoint) -> Result<ListenerKind, ListenerError> {
+    match endpoint {
+        SocketEndpoint::Tcp { host, port } => bind_tcp_kind(host, *port),
+        SocketEndpoint::Unix { path } => bind_unix_kind(endpoint, path),
+    }
+}
+
+/// Binds a TCP listener and wraps it as a [`ListenerKind`].
+fn bind_tcp_kind(host: &str, port: u16) -> Result<ListenerKind, ListenerError> {
+    Ok(ListenerKind::Tcp(bind_tcp(host, port)?))
+}
+
+/// Binds a Unix-domain listener, or rejects the endpoint where they do not exist.
+///
+/// Both parameters are underscore-prefixed because each target reads only one
+/// of them: the Unix arm uses the path, the non-Unix arm reports the endpoint.
+/// The path is taken as `impl AsRef<Path>` because the concrete UTF-8 path type
+/// lives in `weaver-config`'s dependency graph rather than this crate's.
+fn bind_unix_kind(
+    _endpoint: &SocketEndpoint,
+    _path: &impl AsRef<std::path::Path>,
+) -> Result<ListenerKind, ListenerError> {
+    #[cfg(unix)]
+    {
+        Ok(ListenerKind::Unix(bind_unix(_path.as_ref())?))
+    }
+
+    #[cfg(not(unix))]
+    {
+        Err(ListenerError::UnsupportedUnix {
+            endpoint: _endpoint.to_string(),
+        })
+    }
+}
+
 impl SocketListener {
     /// Binds to the provided socket endpoint.
     ///
@@ -63,32 +99,11 @@ impl SocketListener {
     /// address resolution errors, sockets already in use, or Unix socket
     /// filesystem conflicts.
     pub(crate) fn bind(endpoint: &SocketEndpoint) -> Result<Self, ListenerError> {
-        match endpoint {
-            SocketEndpoint::Tcp { host, port } => {
-                let listener = bind_tcp(host, *port)?;
-                Ok(Self {
-                    endpoint: endpoint.clone(),
-                    listener: ListenerKind::Tcp(listener),
-                })
-            }
-            SocketEndpoint::Unix { path } => {
-                #[cfg(unix)]
-                {
-                    let listener = bind_unix(path.as_std_path())?;
-                    Ok(Self {
-                        endpoint: endpoint.clone(),
-                        listener: ListenerKind::Unix(listener),
-                    })
-                }
-
-                #[cfg(not(unix))]
-                {
-                    Err(ListenerError::UnsupportedUnix {
-                        endpoint: endpoint.to_string(),
-                    })
-                }
-            }
-        }
+        let listener = bind_listener(endpoint)?;
+        Ok(Self {
+            endpoint: endpoint.clone(),
+            listener,
+        })
     }
 
     #[cfg(test)]

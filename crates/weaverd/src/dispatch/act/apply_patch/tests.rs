@@ -4,7 +4,7 @@ use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_test_macros::allow_fixture_expansion_lints;
 
-use super::{ApplyPatchExecutor, resolve_path};
+use super::{ApplyPatchExecutor, workspace::resolve_path};
 use crate::{
     dispatch::act::apply_patch::{ApplyPatchFailure, types::FilePath},
     safety_harness::{ConfigurableSemanticLock, ConfigurableSyntacticLock},

@@ -153,23 +153,31 @@ fn normalise_manpage(manpage: &str) -> String {
 
 /// Recursively checks each structured command path and long flag in both surfaces.
 fn assert_rendered_surface(node: &CommandNode, rendered_surfaces: &RenderedSurfaces<'_>) {
-    if let CommandSemantics::Structured = node.semantics {
-        let path = command_path(node);
-        rendered_surfaces.assert_token(&SurfaceToken {
-            value: &path,
-            kind: "command path",
-        });
-        for argument in node.arguments {
-            let flag = format!("--{}", argument.long);
-            rendered_surfaces.assert_token(&SurfaceToken {
-                value: &flag,
-                kind: "long flag",
-            });
-        }
-    }
-
+    assert_node_surface(node, rendered_surfaces);
     for child in node.children {
         assert_rendered_surface(child, rendered_surfaces);
+    }
+}
+
+/// Asserts a structured node's own command path and long flags are rendered.
+fn assert_node_surface(node: &CommandNode, rendered_surfaces: &RenderedSurfaces<'_>) {
+    if let CommandSemantics::Structured = node.semantics {
+        rendered_surfaces.assert_token(&SurfaceToken {
+            value: &command_path(node),
+            kind: "command path",
+        });
+        assert_long_flags(node, rendered_surfaces);
+    }
+}
+
+/// Asserts every long flag the node declares appears in both surfaces.
+fn assert_long_flags(node: &CommandNode, rendered_surfaces: &RenderedSurfaces<'_>) {
+    for argument in node.arguments {
+        let flag = format!("--{}", argument.long);
+        rendered_surfaces.assert_token(&SurfaceToken {
+            value: &flag,
+            kind: "long flag",
+        });
     }
 }
 

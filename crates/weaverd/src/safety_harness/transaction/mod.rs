@@ -9,6 +9,7 @@
 mod commit;
 #[cfg(test)]
 mod content_transaction_tests;
+mod temp_file;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]

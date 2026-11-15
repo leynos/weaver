@@ -3,6 +3,7 @@
 //! Parses Git-style patch streams, applies SEARCH/REPLACE modifications, and
 //! executes the Double-Lock safety harness before committing changes.
 
+mod changes;
 mod errors;
 mod matcher;
 mod parser;
@@ -21,12 +22,10 @@ use tracing::debug;
 
 pub(crate) use self::errors::ApplyPatchError;
 use self::{
-    matcher::apply_search_replace,
     parser::parse_patch,
     payloads::{ApplyPatchSummary, GenericErrorEnvelope, VerificationErrorEnvelope},
     semantic_lock::LspSemanticLockAdapter,
-    types::{FileContent, FilePath, PatchOperation, PatchText, SearchReplaceBlock},
-    workspace::{ValidatedPath, path_exists, read_patch_target, resolve_path},
+    types::PatchText,
 };
 use crate::{
     backends::{BackendKind, FusionBackends},
@@ -107,14 +106,6 @@ pub(crate) struct ApplyPatchExecutor<'a> {
     semantic_lock: &'a dyn SemanticLock,
 }
 
-/// Represents the kind of file system change to validate and construct.
-enum ChangeKind {
-    /// Creates or overwrites a file with the supplied content.
-    Create(FileContent),
-    /// Deletes the target file.
-    Delete,
-}
-
 impl<'a> ApplyPatchExecutor<'a> {
     /// Creates an executor bound to a workspace root and both safety locks.
     pub(crate) fn new(
@@ -184,121 +175,6 @@ impl<'a> ApplyPatchExecutor<'a> {
                 Err(ApplyPatchFailure::Patch(ApplyPatchError::EmptyTransaction))
             }
             Err(error) => Err(map_harness_error(error)),
-        }
-    }
-
-    /// Builds the content changes described by `operations`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ApplyPatchError`] when any operation fails path validation or
-    /// target-content checks.
-    fn build_changes(
-        &self,
-        workspace_dir: &Dir,
-        operations: &[PatchOperation],
-    ) -> Result<Vec<ContentChange>, ApplyPatchError> {
-        let mut changes = Vec::new();
-        for operation in operations {
-            let change = match operation {
-                PatchOperation::Modify { path, blocks } => {
-                    self.build_modify_change(workspace_dir, path, blocks)?
-                }
-                PatchOperation::Create { path, content } => {
-                    self.build_create_change(workspace_dir, path, content)?
-                }
-                PatchOperation::Delete { path } => self.build_delete_change(workspace_dir, path)?,
-            };
-            changes.push(change);
-        }
-        Ok(changes)
-    }
-
-    /// Builds the write change for one modify operation.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ApplyPatchError`] when the target is missing or a search block
-    /// does not match the file content.
-    fn build_modify_change(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-        blocks: &[SearchReplaceBlock],
-    ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(workspace_dir, path)?;
-        let original_text = read_patch_target(workspace_dir, &resolved.relative, path)?;
-        let original = FileContent::new(original_text);
-        let modified = apply_search_replace(path, &original, blocks)?;
-        Ok(ContentChange::write(
-            resolved.absolute,
-            modified.into_string(),
-        ))
-    }
-
-    /// Builds the write change for one create operation.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ApplyPatchError`] when the target already exists or the path
-    /// is invalid.
-    fn build_create_change(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-        content: &FileContent,
-    ) -> Result<ContentChange, ApplyPatchError> {
-        self.build_validated_change(workspace_dir, path, ChangeKind::Create(content.clone()))
-    }
-
-    /// Builds the delete change for one delete operation.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ApplyPatchError`] when the target does not exist or the path
-    /// is invalid.
-    fn build_delete_change(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-    ) -> Result<ContentChange, ApplyPatchError> {
-        self.build_validated_change(workspace_dir, path, ChangeKind::Delete)
-    }
-
-    /// Resolves and validates a patch path within the workspace.
-    fn resolve_and_validate(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-    ) -> Result<ValidatedPath, ApplyPatchError> {
-        resolve_path(workspace_dir, &self.workspace_root, path)
-    }
-
-    /// Builds a validated content change after checking existence constraints.
-    fn build_validated_change(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-        kind: ChangeKind,
-    ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(workspace_dir, path)?;
-
-        match kind {
-            ChangeKind::Create(content) => {
-                if path_exists(workspace_dir, &resolved.relative, path)? {
-                    return Err(ApplyPatchError::FileAlreadyExists { path: path.clone() });
-                }
-                Ok(ContentChange::write(
-                    resolved.absolute,
-                    content.into_string(),
-                ))
-            }
-            ChangeKind::Delete => {
-                if !path_exists(workspace_dir, &resolved.relative, path)? {
-                    return Err(ApplyPatchError::DeleteMissing { path: path.clone() });
-                }
-                Ok(ContentChange::delete(resolved.absolute))
-            }
         }
     }
 }

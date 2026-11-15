@@ -103,27 +103,11 @@ impl SystemLifecycle {
         ensure_no_extra_arguments(invocation)?;
         let paths = prepare_runtime(context)?;
         let dir = open_runtime_dir(&paths)?;
-        let Some(pid) = read_pid(&dir, PID_FILENAME, paths.pid_path())? else {
-            if socket_is_reachable(context.config.daemon_socket())? {
-                return Err(LifecycleError::MissingPidWithSocket {
-                    path: paths.pid_path().to_path_buf(),
-                    endpoint: context.config.daemon_socket().to_string(),
-                });
-            }
-            output.stdout_line(format_args!(
-                "daemon is not running (pid file missing at {})",
-                paths.pid_path().display()
-            ))?;
-            return Ok(ExitCode::SUCCESS);
-        };
-        signal_daemon(pid)?;
-        wait_for_shutdown(&paths, context.config.daemon_socket())?;
-        output.stdout_line(format_args!("daemon pid {pid} stopped cleanly"))?;
-        output.stderr_line(format_args!(
-            "removed runtime artefacts from {}",
-            paths.runtime_dir().display()
-        ))?;
-        Ok(ExitCode::SUCCESS)
+
+        match read_pid(&dir, PID_FILENAME, paths.pid_path())? {
+            Some(pid) => stop_daemon(pid, &paths, context, output),
+            None => report_missing_pid(&paths, context, output),
+        }
     }
 
     /// Returns the daemon runtime paths from the current configuration.
@@ -234,4 +218,44 @@ impl SystemLifecycle {
         Self::report_degraded_status(RuntimeProbe { reachable, pid }, runtime, output)?;
         Ok(ExitCode::SUCCESS)
     }
+}
+
+/// Signals the daemon recorded by `pid` and reports the shutdown.
+fn stop_daemon<W: Write, E: Write>(
+    pid: u32,
+    paths: &RuntimePaths,
+    context: LifecycleContext<'_>,
+    output: &mut LifecycleOutput<W, E>,
+) -> Result<ExitCode, LifecycleError> {
+    signal_daemon(pid)?;
+    wait_for_shutdown(paths, context.config.daemon_socket())?;
+    output.stdout_line(format_args!("daemon pid {pid} stopped cleanly"))?;
+    output.stderr_line(format_args!(
+        "removed runtime artefacts from {}",
+        paths.runtime_dir().display()
+    ))?;
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Reports the stop outcome when no PID file records a daemon.
+///
+/// A reachable socket without a PID file is an inconsistent runtime state the
+/// operator has to resolve, so it stays an error rather than a plain message.
+fn report_missing_pid<W: Write, E: Write>(
+    paths: &RuntimePaths,
+    context: LifecycleContext<'_>,
+    output: &mut LifecycleOutput<W, E>,
+) -> Result<ExitCode, LifecycleError> {
+    if socket_is_reachable(context.config.daemon_socket())? {
+        return Err(LifecycleError::MissingPidWithSocket {
+            path: paths.pid_path().to_path_buf(),
+            endpoint: context.config.daemon_socket().to_string(),
+        });
+    }
+
+    output.stdout_line(format_args!(
+        "daemon is not running (pid file missing at {})",
+        paths.pid_path().display()
+    ))?;
+    Ok(ExitCode::SUCCESS)
 }

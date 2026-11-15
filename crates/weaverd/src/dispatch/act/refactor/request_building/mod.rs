@@ -223,20 +223,54 @@ fn apply_rename_symbol_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
     context: &CapabilityMappingContext<'_>,
 ) -> Result<(), DispatchError> {
-    let file = context.file_path;
+    insert_rename_uri(plugin_args, context.file_path)?;
+    reject_reserved_position(plugin_args, context.file_path)?;
+
+    if let Some(position) = context.position {
+        return insert_position_from_line_col(plugin_args, context, position);
+    }
+
+    match plugin_args.remove("offset") {
+        Some(offset_value) => {
+            insert_position_from_offset(plugin_args, context.file_path, offset_value)
+        }
+        None => Err(invalid_rename_arguments(
+            context.file_path,
+            "refactor rename requires --position LINE:COL",
+        )),
+    }
+}
+
+/// Inserts the `uri` argument naming the file whose symbols are renamed.
+fn insert_rename_uri(
+    plugin_args: &mut HashMap<String, serde_json::Value>,
+    file: &Path,
+) -> Result<(), DispatchError> {
     plugin_args.insert(
         String::from("uri"),
-        serde_json::Value::String(
-            Url::from_file_path(file)
-                .map_err(|()| {
-                    DispatchError::invalid_arguments(format!(
-                        "cannot construct file URI for '{}'",
-                        file.display()
-                    ))
-                })?
-                .to_string(),
-        ),
+        serde_json::Value::String(rename_file_uri(file)?),
     );
+
+    Ok(())
+}
+
+/// Builds the `file://` URI for the rename target.
+fn rename_file_uri(file: &Path) -> Result<String, DispatchError> {
+    Url::from_file_path(file)
+        .map(|url| url.to_string())
+        .map_err(|()| {
+            DispatchError::invalid_arguments(format!(
+                "cannot construct file URI for '{}'",
+                file.display()
+            ))
+        })
+}
+
+/// Rejects a caller-supplied `position=`, which the plugin contract reserves.
+fn reject_reserved_position(
+    plugin_args: &HashMap<String, serde_json::Value>,
+    file: &Path,
+) -> Result<(), DispatchError> {
     if plugin_args.contains_key("position") {
         return Err(invalid_rename_arguments(
             file,
@@ -244,54 +278,75 @@ fn apply_rename_symbol_mapping(
              the internal plugin contract",
         ));
     }
-    if let Some(position) = context.position {
-        let offset = line_col_to_byte_offset(
-            context.file_content,
-            position.line,
-            position.column,
-            Some(file),
-        )
-        .inspect_err(|error| {
-            context.metrics.increment_conversion_error();
-            warn_position_conversion_error(file, position, error);
-        })?;
-        plugin_args.insert(
-            String::from("position"),
-            serde_json::Value::String(offset.to_string()),
-        );
-        return Ok(());
-    }
-    if let Some(offset_val) = plugin_args.remove("offset") {
-        tracing::warn!(
-            file_path = %file.display(),
-            "using deprecated offset= for rename position"
-        );
-        let offset = match offset_val {
-            serde_json::Value::String(value) => value.trim().to_owned(),
-            serde_json::Value::Number(value) => value.to_string(),
-            _ => {
-                return Err(invalid_rename_arguments(
-                    file,
-                    "refactor rename deprecated offset= must be a numeric or string byte offset",
-                ));
-            }
-        };
-        let byte_offset = offset.parse::<usize>().map_err(|_error| {
-            invalid_rename_arguments(
-                file,
-                "refactor rename deprecated offset= must be a numeric or string byte offset",
-            )
-        })?;
-        plugin_args.insert(
-            String::from("position"),
-            serde_json::Value::String(byte_offset.to_string()),
-        );
-        return Ok(());
-    }
-    Err(invalid_rename_arguments(
+
+    Ok(())
+}
+
+/// Inserts the plugin `position` argument from an explicit line/column pair.
+fn insert_position_from_line_col(
+    plugin_args: &mut HashMap<String, serde_json::Value>,
+    context: &CapabilityMappingContext<'_>,
+    position: LineCol,
+) -> Result<(), DispatchError> {
+    let file = context.file_path;
+    let offset = line_col_to_byte_offset(
+        context.file_content,
+        position.line,
+        position.column,
+        Some(file),
+    )
+    .inspect_err(|error| {
+        context.metrics.increment_conversion_error();
+        warn_position_conversion_error(file, position, error);
+    })?;
+    plugin_args.insert(
+        String::from("position"),
+        serde_json::Value::String(offset.to_string()),
+    );
+
+    Ok(())
+}
+
+/// Inserts the plugin `position` argument from the deprecated `offset=` value.
+fn insert_position_from_offset(
+    plugin_args: &mut HashMap<String, serde_json::Value>,
+    file: &Path,
+    offset_value: serde_json::Value,
+) -> Result<(), DispatchError> {
+    tracing::warn!(
+        file_path = %file.display(),
+        "using deprecated offset= for rename position"
+    );
+    let byte_offset = parse_deprecated_offset(file, offset_value)?;
+    plugin_args.insert(
+        String::from("position"),
+        serde_json::Value::String(byte_offset.to_string()),
+    );
+
+    Ok(())
+}
+
+/// Parses the deprecated `offset=` value, accepting numbers and numeric strings.
+fn parse_deprecated_offset(
+    file: &Path,
+    offset_value: serde_json::Value,
+) -> Result<usize, DispatchError> {
+    let text = match offset_value {
+        serde_json::Value::String(value) => value.trim().to_owned(),
+        serde_json::Value::Number(value) => value.to_string(),
+        _ => return Err(deprecated_offset_error(file)),
+    };
+
+    text.parse::<usize>()
+        .map_err(|_error| deprecated_offset_error(file))
+}
+
+/// Builds the error for a deprecated `offset=` value that is not a byte offset.
+fn deprecated_offset_error(file: &Path) -> DispatchError {
+    invalid_rename_arguments(
         file,
-        "refactor rename requires --position LINE:COL",
-    ))
+        "refactor rename deprecated offset= must be a numeric or string byte offset",
+    )
 }
 
 /// Classifies how the rename position was supplied for tracing.

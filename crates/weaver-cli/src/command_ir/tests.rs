@@ -14,6 +14,7 @@ use ortho_config::{
         EnvMetadata,
         FieldMetadata,
         FileMetadata,
+        HeadingIds,
         ORTHO_DOCS_IR_VERSION,
         OrthoConfigDocs,
         ValueType,
@@ -220,10 +221,16 @@ fn unresolved_identifiers_are_not_silently_accepted_by_the_test_helper() {
 /// hierarchy, so a new nested node cannot escape validation.
 fn assert_identifiers_resolve(metadata: &DocMetadata, localizer: &dyn Localizer) {
     assert_resolves(&metadata.about_id, localizer);
-    if let Some(synopsis_id) = &metadata.synopsis_id {
-        assert_resolves(synopsis_id, localizer);
+    assert_optional_resolves(metadata.synopsis_id.as_deref(), localizer);
+    assert_heading_ids_resolve(&metadata.sections.headings_ids, localizer);
+    assert_field_ids_resolve(&metadata.fields, localizer);
+    for child in &metadata.subcommands {
+        assert_identifiers_resolve(child, localizer);
     }
-    let headings = &metadata.sections.headings_ids;
+}
+
+/// Asserts every section-heading identifier resolves, including `commands`.
+fn assert_heading_ids_resolve(headings: &HeadingIds, localizer: &dyn Localizer) {
     for id in [
         &headings.name,
         &headings.synopsis,
@@ -238,17 +245,21 @@ fn assert_identifiers_resolve(metadata: &DocMetadata, localizer: &dyn Localizer)
     ] {
         assert_resolves(id, localizer);
     }
-    if let Some(commands) = &headings.commands {
-        assert_resolves(commands, localizer);
-    }
-    for field in &metadata.fields {
+    assert_optional_resolves(headings.commands.as_deref(), localizer);
+}
+
+/// Asserts each field's help identifiers resolve, long help included.
+fn assert_field_ids_resolve(fields: &[FieldMetadata], localizer: &dyn Localizer) {
+    for field in fields {
         assert_resolves(&field.help_id, localizer);
-        if let Some(long_help_id) = &field.long_help_id {
-            assert_resolves(long_help_id, localizer);
-        }
+        assert_optional_resolves(field.long_help_id.as_deref(), localizer);
     }
-    for child in &metadata.subcommands {
-        assert_identifiers_resolve(child, localizer);
+}
+
+/// Asserts an optional projected identifier resolves when one is present.
+fn assert_optional_resolves(id: Option<&str>, localizer: &dyn Localizer) {
+    if let Some(id) = id {
+        assert_resolves(id, localizer);
     }
 }
 

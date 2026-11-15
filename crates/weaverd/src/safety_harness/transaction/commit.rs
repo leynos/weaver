@@ -1,17 +1,17 @@
 //! Commit helpers for applying verified changes.
 
 use std::{
-    io::{self, Write as IoWrite},
+    io,
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
-use cap_std::fs::{Dir, OpenOptions};
+use cap_std::fs::Dir;
 use tracing::warn;
 
 use super::{
     super::{error::SafetyHarnessError, verification::VerificationContext},
     relative_workspace_path,
+    temp_file::{cleanup_temp_file, create_parent_dirs, write_unique_temp_file},
 };
 
 /// Planned file deletion with rollback context.
@@ -149,19 +149,6 @@ fn cleanup_prepared_temp_files(dir: &Dir, prepared: &[PreparedFile]) {
     }
 }
 
-/// Removes a temporary file, treating an already-absent file as success.
-fn cleanup_temp_file(dir: &Dir, temp_path: &Path) {
-    if let Err(err) = dir.remove_file(temp_path)
-        && err.kind() != io::ErrorKind::NotFound
-    {
-        warn!(
-            path = %temp_path.display(),
-            error = %err,
-            "failed to remove transaction temporary file",
-        );
-    }
-}
-
 /// Removes files slated for deletion, rolling back changes on failure.
 fn apply_deletions(
     dir: &Dir,
@@ -197,34 +184,9 @@ fn prepare_file(
 ) -> Result<PathBuf, SafetyHarnessError> {
     let relative = relative_workspace_path(path, workspace_root)
         .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
-    let parent = relative.parent().unwrap_or_else(|| Path::new("."));
 
-    // Create parent directories if they don't exist (for nested new files)
-    if parent != Path::new("") && parent != Path::new(".") {
-        dir.create_dir_all(parent)
-            .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
-    }
-
-    for attempt in 0..16 {
-        let temp_path = unique_temp_path(relative, attempt)
-            .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
-        match write_temp_file(dir, temp_path.as_path(), content) {
-            Ok(()) => return Ok(temp_path),
-            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
-            Err(err) => {
-                drop(dir.remove_file(temp_path.as_path()));
-                return Err(SafetyHarnessError::file_write(path.to_path_buf(), err));
-            }
-        }
-    }
-
-    Err(SafetyHarnessError::file_write(
-        path.to_path_buf(),
-        io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            "could not create a unique transaction temporary file",
-        ),
-    ))
+    create_parent_dirs(dir, path, relative)?;
+    write_unique_temp_file(dir, path, relative, content)
 }
 
 /// Rolls back committed files to their original content.
@@ -289,37 +251,6 @@ fn file_exists(dir: &Dir, workspace_root: &Path, path: &Path) -> Result<bool, Sa
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
         Err(err) => Err(SafetyHarnessError::file_write(path.to_path_buf(), err)),
     }
-}
-
-/// Writes `content` to a new temporary file and flushes it to disk.
-fn write_temp_file(dir: &Dir, temp_path: &Path, content: &str) -> io::Result<()> {
-    let mut file = dir.open_with(temp_path, OpenOptions::new().write(true).create_new(true))?;
-    file.write_all(content.as_bytes())?;
-    file.sync_all()?;
-    Ok(())
-}
-
-/// Builds a collision-resistant temporary path for `attempt` beside the target.
-fn unique_temp_path(relative: &Path, attempt: u8) -> io::Result<PathBuf> {
-    let parent = relative.parent().unwrap_or_else(|| Path::new("."));
-    let name = relative.file_name().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "target path has no file name")
-    })?;
-    let thread_id = std::thread::current().id();
-    let unique = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(io::Error::other)?
-        .as_nanos();
-    let mut temp_path = parent.to_path_buf();
-    temp_path.push(format!(
-        ".{}.{}.{:?}.{}.{}.tmp",
-        name.to_string_lossy(),
-        std::process::id(),
-        thread_id,
-        unique,
-        attempt
-    ));
-    Ok(temp_path)
 }
 
 #[cfg(test)]
