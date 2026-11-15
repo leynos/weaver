@@ -157,33 +157,9 @@ impl<C: CallHierarchyClient> CallGraphProvider for LspCallGraphProvider<C> {
         position: &SourcePosition,
         depth: u32,
     ) -> Result<CallGraph, GraphError> {
-        let mut graph = CallGraph::new();
-
-        // Prepare call hierarchy at the position
-        let items = self.prepare_at_position(position)?;
-
-        if items.is_empty() {
-            return Err(GraphError::symbol_not_found(
-                &position.path,
-                position.line(),
-                position.column(),
-            ));
-        }
-
-        // Add the root nodes and explore both directions
-        for item in &items {
-            let node = call_hierarchy_item_to_node(item);
-            graph.add_node(node);
-        }
-
-        if depth > 0 {
-            // Explore callers and callees
-            for item in &items {
-                self.explore_callers(&mut graph, item, depth)?;
-                self.explore_callees(&mut graph, item, depth)?;
-            }
-        }
-
+        let items = require_items(self.prepare_at_position(position)?, position)?;
+        let mut graph = seed_graph(&items);
+        self.explore_roots(&mut graph, &items, depth)?;
         Ok(graph)
     }
 
@@ -219,21 +195,10 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
     where
         F: Fn(&mut Self, &mut CallGraph, &CallHierarchyItem, u32) -> Result<(), GraphError>,
     {
-        let mut graph = CallGraph::new();
-
-        let items = self.prepare_at_position(position)?;
-
-        if items.is_empty() {
-            return Err(GraphError::symbol_not_found(
-                &position.path,
-                position.line(),
-                position.column(),
-            ));
-        }
+        let items = require_items(self.prepare_at_position(position)?, position)?;
+        let mut graph = seed_graph(&items);
 
         for item in &items {
-            let node = call_hierarchy_item_to_node(item);
-            graph.add_node(node);
             explore_fn(self, &mut graph, item, depth)?;
         }
 
@@ -362,6 +327,50 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
 
         Ok(())
     }
+
+    /// Explores callers and callees of every root, stopping at `depth` levels.
+    fn explore_roots(
+        &mut self,
+        graph: &mut CallGraph,
+        items: &[CallHierarchyItem],
+        depth: u32,
+    ) -> Result<(), GraphError> {
+        if depth == 0 {
+            return Ok(());
+        }
+
+        for item in items {
+            self.explore_callers(graph, item, depth)?;
+            self.explore_callees(graph, item, depth)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Fails when the server reported no hierarchy items at `position`.
+fn require_items(
+    items: Vec<CallHierarchyItem>,
+    position: &SourcePosition,
+) -> Result<Vec<CallHierarchyItem>, GraphError> {
+    if items.is_empty() {
+        return Err(GraphError::symbol_not_found(
+            &position.path,
+            position.line(),
+            position.column(),
+        ));
+    }
+
+    Ok(items)
+}
+
+/// Seeds a graph with one node per hierarchy item, ready for exploration.
+fn seed_graph(items: &[CallHierarchyItem]) -> CallGraph {
+    let mut graph = CallGraph::new();
+    for item in items {
+        graph.add_node(call_hierarchy_item_to_node(item));
+    }
+    graph
 }
 
 /// Converts an LSP `CallHierarchyItem` to our domain `CallNode`.

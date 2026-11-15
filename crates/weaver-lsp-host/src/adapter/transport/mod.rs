@@ -8,7 +8,7 @@
 //! ```
 
 use std::{
-    io::{self, BufRead, BufReader, BufWriter, Write},
+    io::{self, BufRead, BufReader, BufWriter},
     process::{ChildStdin, ChildStdout},
     sync::{
         Arc,
@@ -23,41 +23,9 @@ use super::{
     error::TransportError,
 };
 
-/// Writes an LSP-framed message to any writer.
-fn write_framed<W: Write>(mut writer: W, message: &[u8]) -> Result<(), TransportError> {
-    let header = format!("Content-Length: {}\r\n\r\n", message.len());
-    writer.write_all(header.as_bytes())?;
-    writer.write_all(message)?;
-    writer.flush()?;
-    Ok(())
-}
+mod framing;
 
-/// Reads headers and extracts the Content-Length value from any reader.
-fn read_content_length<R: BufRead>(reader: &mut R) -> Result<usize, TransportError> {
-    let mut content_length: Option<usize> = None;
-
-    loop {
-        let mut line = String::new();
-        let bytes_read = reader.read_line(&mut line)?;
-        if bytes_read == 0 {
-            return Err(TransportError::Io(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "connection closed while reading headers",
-            )));
-        }
-
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            break;
-        }
-
-        if let Some(value) = trimmed.strip_prefix("Content-Length: ") {
-            content_length = Some(value.parse().map_err(|_| TransportError::InvalidHeader)?);
-        }
-    }
-
-    content_length.ok_or(TransportError::MissingContentLength)
-}
+use framing::{read_content_length, write_framed};
 
 /// How long to wait for a language server to answer before giving up on it.
 ///

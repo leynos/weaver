@@ -2,12 +2,14 @@
 
 use std::{fs, fs::DirBuilder};
 
-use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
+use camino::{Utf8Path, Utf8PathBuf};
 #[cfg(unix)]
 use libc::geteuid;
 use thiserror::Error;
 
 use super::SocketEndpoint;
+#[cfg(unix)]
+use super::path_normalize::normalize_parent_path;
 
 /// Errors raised when preparing socket directories.
 #[derive(Debug, Error)]
@@ -330,52 +332,6 @@ fn validate_no_path_traversal(parent: &Utf8Path) -> Result<(), SocketPreparation
     }
 
     Ok(())
-}
-
-#[cfg(unix)]
-/// Resolves `.` and `..` components lexically without touching the filesystem.
-fn normalize_parent_path(parent: &Utf8Path) -> Utf8PathBuf {
-    let mut components = Vec::new();
-    let mut is_absolute = false;
-
-    for component in parent.components() {
-        match component {
-            Utf8Component::RootDir => {
-                is_absolute = true;
-                components.clear();
-            }
-            Utf8Component::CurDir | Utf8Component::Prefix(_) => {}
-            Utf8Component::ParentDir => {
-                if parent_dir_should_pop(components.last().copied()) {
-                    components.pop();
-                } else if !is_absolute {
-                    components.push("..");
-                }
-            }
-            Utf8Component::Normal(normal_component) => components.push(normal_component),
-        }
-    }
-
-    let mut normalized = if is_absolute {
-        Utf8PathBuf::from("/")
-    } else {
-        Utf8PathBuf::new()
-    };
-    for component in components {
-        normalized.push(component);
-    }
-
-    if normalized.as_str().is_empty() {
-        Utf8PathBuf::from(".")
-    } else {
-        normalized
-    }
-}
-
-#[cfg(unix)]
-/// Reports whether a `..` component may pop the preceding component.
-fn parent_dir_should_pop(last: Option<&str>) -> bool {
-    matches!(last, Some(component) if component != "..")
 }
 
 #[cfg(unix)]
