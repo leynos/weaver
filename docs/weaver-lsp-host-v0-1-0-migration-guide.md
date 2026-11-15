@@ -154,3 +154,22 @@ Because the build-time flags are now additive, an adaptor that previously had
 no way to advertise call hierarchy or hover must opt in explicitly; the host
 treats an absent capability as unavailable and reports
 `CapabilitySource::MissingOnServer`.
+
+### Const accessors
+
+`ServerCapabilitySet::supports_definition`, `supports_references`,
+`supports_diagnostics`, `supports_call_hierarchy`, and `supports_hover` are
+no longer `const fn`; they were `const fn` in earlier releases. Code that
+called one of them in a const context — a `const` item initializer, a
+`const fn` body, or a static initializer — no longer compiles.
+
+Call the accessor at runtime, or copy its result into an ordinary binding,
+rather than relying on const evaluation of the accessor. A caller that
+genuinely needs a compile-time value must derive it from the constructor
+arguments it supplied, not from the accessor. The accessors themselves
+remain available as ordinary methods, and `supports(capability)` remains the
+general query.
+
+Const evaluation is unavailable because the set is now stored in a
+`BTreeSet<CapabilityKind>`, whose membership test is not a const operation;
+supporting it again would mean changing the representation once more.

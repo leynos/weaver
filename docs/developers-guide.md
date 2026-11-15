@@ -2120,22 +2120,27 @@ This guarantee is specific to `TestWorld::rebuild_host`; other crates
 direction:
 
 - `server` owns the `LanguageServer` trait and `ServerCapabilitySet`.
-- `capability` owns `CapabilityKind`, `CapabilitySource`, the per-language
-  `CapabilityMatrix` overrides, and `CapabilitySummary`.
+- `capability` owns `CapabilityKind`, `CapabilitySource`, and
+  `CapabilitySummary`, and consumes `weaver-config`'s `CapabilityMatrix`
+  alongside them.
 - `host` owns `LspHost`, `Session`, `CallContext`, and the dispatch helpers.
 - `adapter` provides the process-backed `LanguageServer` implementation.
 
-`server` and `capability` do not depend on `host`; adaptors implement the trait
-without knowing how negotiation or dispatch works, and `host` is the only
-module that combines the two.
+`capability` depends on `server`, `weaver-config`, and `language`; `server`
+depends only on `capability::CapabilityKind`; and `host` depends on `server`,
+`capability`, and `weaver-config`. Adaptors implement the trait without
+knowing how negotiation or dispatch works, and `host` remains the only module
+that combines `server` and `capability`.
 
 `ServerCapabilitySet` stores a `BTreeSet<CapabilityKind>` rather than one
 boolean per capability. New capabilities are added by extending
 `CapabilityKind` and adding a builder (`with_*`) plus accessor (`supports_*`)
 pair, so existing adaptors keep compiling and an unadvertised capability is
-unavailable by default. `supports(capability)` is the general query;
-`supports_definition()` and its siblings are thin conveniences used by the
-negotiation code.
+unavailable by default. `supports(capability)` is the general query.
+Negotiation is `resolve_state` in
+`crates/weaver-lsp-host/src/capability.rs`, which calls
+`ServerCapabilitySet::supports(capability)` directly; the `supports_*()`
+accessors are convenience wrappers for callers outside the negotiation path.
 
 Every request routes through the same three stages:
 
