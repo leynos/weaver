@@ -13,7 +13,14 @@ use super::{
     clock::{Clock, RestartCooldown, SystemClock},
     config::LspServerConfig,
     error::AdapterError,
-    lifecycle::{ADAPTER_TARGET, terminate_child},
+    lifecycle::{
+        ADAPTER_TARGET,
+        DROP_DESCRIPTION,
+        UNRESPONSIVE_DESCRIPTION,
+        kill_and_reap,
+        kill_then_reap,
+        terminate_child,
+    },
     messaging,
     state::ProcessState,
     transport::StdioTransport,
@@ -195,22 +202,7 @@ impl ProcessLanguageServer {
         if let ProcessState::Running { mut child, .. } =
             std::mem::replace(&mut *state, ProcessState::Stopped)
         {
-            if let Err(error) = child.kill() {
-                warn!(
-                    target: ADAPTER_TARGET,
-                    language = %self.language,
-                    error = %error,
-                    "failed to kill unresponsive language server"
-                );
-            }
-            if let Err(error) = child.wait() {
-                warn!(
-                    target: ADAPTER_TARGET,
-                    language = %self.language,
-                    error = %error,
-                    "failed to reap unresponsive language server"
-                );
-            }
+            kill_and_reap(&mut child, self.language, UNRESPONSIVE_DESCRIPTION);
         }
     }
 
@@ -353,34 +345,29 @@ impl ProcessLanguageServer {
 
         *state = ProcessState::Running { child, transport };
     }
+
+    /// Removes the running child from the adapter state, marking it stopped.
+    ///
+    /// Returns the child so teardown can happen outside the state lock, and
+    /// `None` when no process was running. A poisoned lock is still recovered
+    /// so cleanup is attempted even after a panic.
+    fn take_running_child(&self) -> Option<Child> {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        match std::mem::replace(&mut *state, ProcessState::Stopped) {
+            ProcessState::Running { child, .. } => Some(child),
+            ProcessState::NotStarted | ProcessState::Stopped => None,
+        }
+    }
 }
 
 impl Drop for ProcessLanguageServer {
     fn drop(&mut self) {
-        let mut state = match self.state.lock() {
-            Ok(guard) => guard,
-            Err(poison) => poison.into_inner(),
-        };
-
-        // Recover from poisoning to attempt graceful shutdown even after a panic
-        if let ProcessState::Running { mut child, .. } =
-            std::mem::replace(&mut *state, ProcessState::Stopped)
-        {
-            if let Err(e) = child.kill() {
-                warn!(
-                    target: ADAPTER_TARGET,
-                    language = %self.language,
-                    error = %e,
-                    "failed to kill language server process on drop"
-                );
-            } else if let Err(error) = child.wait() {
-                warn!(
-                    target: ADAPTER_TARGET,
-                    language = %self.language,
-                    error = %error,
-                    "failed to reap language server process on drop"
-                );
-            }
+        if let Some(mut child) = self.take_running_child() {
+            kill_then_reap(&mut child, self.language, DROP_DESCRIPTION);
         }
     }
 }

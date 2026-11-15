@@ -30,6 +30,20 @@ fn running_server(child: Child, stdout: ChildStdout, stdin: ChildStdin) -> Proce
     server
 }
 
+/// Reports whether a process with `pid` is still present.
+///
+/// `ps -p` exits non-zero when the pid matches nothing, which asks the question
+/// without sending the process a signal.
+fn is_running(pid: u32) -> bool {
+    Command::new("ps")
+        .args(["-p", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("ps must be available")
+        .success()
+}
+
 /// Fields every `Debug` rendering must report.
 ///
 /// The state is the field the implementation summarises; the rest are passed
@@ -113,13 +127,12 @@ fn debug_reports_poisoned_state() {
 
 #[test]
 fn stop_unresponsive_stops_an_already_exited_child() {
-    // Reaping first makes this deterministic: the adapter's `kill` sees a
-    // child whose status is already known. `Child::kill` returns `Ok(())` in
-    // that case rather than signalling a pid the OS may have recycled, so the
-    // test covers a server that dies just as its deadline expires, not the
-    // `failed to kill` diagnostic. That diagnostic is defensive: reaching it
-    // needs a `kill` failure, which `std::process::Child` cannot be made to
-    // produce on demand.
+    // This is a success-path test only. Reaping first makes it deterministic:
+    // `Child::kill` on a child whose status is already known returns `Ok(())`
+    // rather than signalling a pid the OS may have recycled, and `Child::wait`
+    // returns the cached status. Neither warn branch is reachable, because
+    // `std::process::Child` cannot be made to fail on demand. The failure
+    // diagnostics are covered by the `ReapableChild` fake in `lifecycle_tests`.
     let (mut child, stdout, stdin) = spawn_child("exit 0");
     child.wait().expect("the shell exits at once");
     let server = running_server(child, stdout, stdin);
@@ -133,5 +146,42 @@ fn stop_unresponsive_stops_an_already_exited_child() {
             Err(AdapterError::ProcessExited)
         ),
         "a stopped adapter must refuse further traffic"
+    );
+}
+
+#[test]
+fn stop_unresponsive_records_when_the_server_stopped_answering() {
+    let (mut child, stdout, stdin) = spawn_child("exit 0");
+    child.wait().expect("the shell exits at once");
+    let server = running_server(child, stdout, stdin);
+
+    assert!(
+        format!("{server:?}").contains("unresponsive_since: Mutex { data: None"),
+        "the adapter must start without a recorded stop"
+    );
+
+    server.stop_unresponsive();
+
+    assert!(
+        format!("{server:?}").contains("unresponsive_since: Mutex { data: Some("),
+        "stopping the server must record when it happened"
+    );
+}
+
+#[test]
+fn dropping_an_adapter_with_a_reaped_child_leaves_the_process_stopped() {
+    let (mut child, stdout, stdin) = spawn_child("exit 0");
+    let pid = child.id();
+    child.wait().expect("the shell exits at once");
+    let server = running_server(child, stdout, stdin);
+    assert_state(&server, &format!("running (pid: {pid})"));
+
+    // Dropping must tolerate a stale handle whose status was already collected
+    // instead of panicking on it, and must leave no process behind.
+    drop(server);
+
+    assert!(
+        !is_running(pid),
+        "the adapter must leave the server stopped, but {pid} is still running"
     );
 }
