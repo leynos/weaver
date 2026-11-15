@@ -13,6 +13,9 @@ use url::Url;
 
 mod preparation;
 
+#[cfg(unix)]
+mod path_normalize;
+
 pub use preparation::SocketPreparationError;
 
 /// Declarative configuration for daemon sockets.
@@ -74,6 +77,15 @@ fn decode_unix_path(path: &str) -> Result<String, std::str::Utf8Error> {
         .map(std::borrow::Cow::into_owned)
 }
 
+/// Writes a TCP URL, bracketing a literal IPv6 host as the URL syntax requires.
+fn write_tcp_url(formatter: &mut fmt::Formatter<'_>, host: &str, port: u16) -> fmt::Result {
+    if host.contains(':') {
+        write!(formatter, "tcp://[{host}]:{port}")
+    } else {
+        write!(formatter, "tcp://{host}:{port}")
+    }
+}
+
 impl fmt::Display for SocketEndpoint {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -82,13 +94,7 @@ impl fmt::Display for SocketEndpoint {
                 url.set_path(path.as_str());
                 write!(formatter, "{url}")
             }
-            Self::Tcp { host, port } => {
-                if host.contains(':') {
-                    write!(formatter, "tcp://[{host}]:{port}")
-                } else {
-                    write!(formatter, "tcp://{host}:{port}")
-                }
-            }
+            Self::Tcp { host, port } => write_tcp_url(formatter, host, *port),
         }
     }
 }
