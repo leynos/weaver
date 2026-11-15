@@ -230,15 +230,15 @@ fn apply_rename_symbol_mapping(
         return insert_position_from_line_col(plugin_args, context, position);
     }
 
-    match plugin_args.remove("offset") {
-        Some(offset_value) => {
-            insert_position_from_offset(plugin_args, context.file_path, offset_value)
-        }
-        None => Err(invalid_rename_arguments(
-            context.file_path,
-            "refactor rename requires --position LINE:COL",
-        )),
-    }
+    plugin_args.remove("offset").map_or_else(
+        || {
+            Err(invalid_rename_arguments(
+                context.file_path,
+                "refactor rename requires --position LINE:COL",
+            ))
+        },
+        |offset_value| insert_position_from_offset(plugin_args, context.file_path, offset_value),
+    )
 }
 
 /// Inserts the `uri` argument naming the file whose symbols are renamed.

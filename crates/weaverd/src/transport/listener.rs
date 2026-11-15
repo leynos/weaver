@@ -69,27 +69,32 @@ fn bind_tcp_kind(host: &str, port: u16) -> Result<ListenerKind, ListenerError> {
     Ok(ListenerKind::Tcp(bind_tcp(host, port)?))
 }
 
-/// Binds a Unix-domain listener, or rejects the endpoint where they do not exist.
+/// Binds a Unix-domain listener on targets that support Unix sockets.
 ///
-/// Both parameters are underscore-prefixed because each target reads only one
-/// of them: the Unix arm uses the path, the non-Unix arm reports the endpoint.
-/// The path is taken as `impl AsRef<Path>` because the concrete UTF-8 path type
-/// lives in `weaver-config`'s dependency graph rather than this crate's.
+/// The endpoint is unused here because the path it carries is already the
+/// binding target; the underscore keeps the shared call site identical to the
+/// non-Unix definition below. The path is taken as `impl AsRef<Path>` because
+/// the concrete UTF-8 path type lives in `weaver-config`, not in this crate.
+#[cfg(unix)]
 fn bind_unix_kind(
     _endpoint: &SocketEndpoint,
+    path: &impl AsRef<std::path::Path>,
+) -> Result<ListenerKind, ListenerError> {
+    Ok(ListenerKind::Unix(bind_unix(path.as_ref())?))
+}
+
+/// Rejects a Unix endpoint on targets without Unix-domain sockets.
+///
+/// The path is unused here because there is no socket to bind; naming it with
+/// an underscore keeps the shared call site identical to the Unix definition.
+#[cfg(not(unix))]
+fn bind_unix_kind(
+    endpoint: &SocketEndpoint,
     _path: &impl AsRef<std::path::Path>,
 ) -> Result<ListenerKind, ListenerError> {
-    #[cfg(unix)]
-    {
-        Ok(ListenerKind::Unix(bind_unix(_path.as_ref())?))
-    }
-
-    #[cfg(not(unix))]
-    {
-        Err(ListenerError::UnsupportedUnix {
-            endpoint: _endpoint.to_string(),
-        })
-    }
+    Err(ListenerError::UnsupportedUnix {
+        endpoint: endpoint.to_string(),
+    })
 }
 
 impl SocketListener {
