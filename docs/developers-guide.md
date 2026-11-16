@@ -2128,19 +2128,19 @@ direction:
 
 `capability` depends on `server`, `weaver-config`, and `language`; `server`
 depends only on `capability::CapabilityKind`; and `host` depends on `server`,
-`capability`, and `weaver-config`. Adaptors implement the trait without
-knowing how negotiation or dispatch works, and `host` remains the only module
-that combines `server` and `capability`.
+`capability`, and `weaver-config`. Adaptors implement the trait without knowing
+how negotiation or dispatch works, and `host` remains the only module that
+combines `server` and `capability`.
 
 `ServerCapabilitySet` stores a `BTreeSet<CapabilityKind>` rather than one
 boolean per capability. New capabilities are added by extending
 `CapabilityKind` and adding a builder (`with_*`) plus accessor (`supports_*`)
 pair, so existing adaptors keep compiling and an unadvertised capability is
 unavailable by default. `supports(capability)` is the general query.
-Negotiation is `resolve_state` in
-`crates/weaver-lsp-host/src/capability.rs`, which calls
-`ServerCapabilitySet::supports(capability)` directly; the `supports_*()`
-accessors are convenience wrappers for callers outside the negotiation path.
+Negotiation is `resolve_state` in `crates/weaver-lsp-host/src/capability.rs`,
+which calls `ServerCapabilitySet::supports(capability)` directly; the
+`supports_*()` accessors are convenience wrappers for callers outside the
+negotiation path.
 
 Every request routes through the same three stages:
 
