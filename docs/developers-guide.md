@@ -256,8 +256,11 @@ discards a non-Unicode value and falls back to a default; choosing `raw` where
 and `returning` to fix one outcome per test, rather than reading the ambient
 environment and accepting either branch. `MockEnv` lives behind the crate's
 `mock` feature, so it belongs in `dev-dependencies`. Direct
-`std::env::{set_var, remove_var}` in tests is forbidden: it mutates shared
-process state and races other tests in the same binary.
+`std::env::{set_var, remove_var, set_current_dir}` in tests is forbidden: it
+mutates shared process state and races other tests in the same binary. The
+three methods are listed under `disallowed-methods` in `clippy.toml`, so
+`make lint` rejects a call; pass a directory in, or use `Command::env` and
+`Command::current_dir` to confine a change to a child process.
 
 **Build scripts follow the same rule.** `weaver-cli/build.rs`,
 `weaverd/build.rs` and `weaver-build-util` take their reader as a parameter for
@@ -269,7 +272,9 @@ snapshots and restores the parent environment around `birdcage`'s own
 environment stripping. It calls `unsafe { env::set_var / env::remove_var }`
 because `birdcage` 0.8.1 mutates the parent process environment before forking
 and offers no per-child environment API. Any replacement for that guard has to
-change the sandbox API, not the call-site.
+change the sandbox API, not the call-site. Its two calls carry an item-scoped
+`#[expect(clippy::disallowed_methods, reason = ...)]`, so any other call still
+fails the lint.
 
 ## 5 Workflow pins and Dependabot
 
