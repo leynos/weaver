@@ -17,42 +17,75 @@ use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider
 #[path = "graph_slice_test_support.rs"]
 mod support;
 
+/// Returns the value at a nested object path, or `None` when any level is absent.
+fn json_at<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
+    path.iter().try_fold(value, |node, key| node.get(*key))
+}
+
+/// Returns the first element of the array-valued member at `path`, if present.
+fn first_at<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
+    json_at(value, path)
+        .and_then(serde_json::Value::as_array)
+        .and_then(|items| items.first())
+}
+
+/// Returns `Err` carrying `message` unless `condition` holds.
+fn ensure(condition: bool, message: impl Into<String>) -> Result<(), String> {
+    if condition {
+        Ok(())
+    } else {
+        Err(message.into())
+    }
+}
+
 fn assert_success_response(status: i32, payload: &serde_json::Value) {
     assert_eq!(status, 0, "expected success exit status");
     assert_eq!(
-        payload["status"], "success",
+        json_at(payload, &["status"]),
+        Some(&serde_json::json!("success")),
         "expected success payload status"
     );
-    assert_eq!(payload["schema_version"], "graph_slice.v1");
+    assert_eq!(
+        json_at(payload, &["schema_version"]),
+        Some(&serde_json::json!("graph_slice.v1"))
+    );
 }
 
 fn assert_default_graph_slice_shape(payload: &serde_json::Value) {
-    assert_eq!(payload["constraints"]["direction"], "both");
     assert_eq!(
-        payload["constraints"]["budget"]["max_cards"],
-        serde_json::json!(30)
+        json_at(payload, &["constraints", "direction"]),
+        Some(&serde_json::json!("both"))
     );
-    assert_eq!(payload["edges"], serde_json::json!([]));
+    assert_eq!(
+        json_at(payload, &["constraints", "budget", "max_cards"]),
+        Some(&serde_json::json!(30))
+    );
+    assert_eq!(json_at(payload, &["edges"]), Some(&serde_json::json!([])));
 }
 
 fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
     assert_eq!(
-        payload["spillover"]["truncated"], true,
+        json_at(payload, &["spillover", "truncated"]),
+        Some(&serde_json::json!(true)),
         "expected truncated"
     );
-    let frontier = match payload["spillover"]["frontier"].as_array() {
-        Some(frontier) => frontier,
-        None => panic!("frontier array"),
+    let Some(frontier) =
+        json_at(payload, &["spillover", "frontier"]).and_then(serde_json::Value::as_array)
+    else {
+        panic!("frontier array");
     };
     assert!(!frontier.is_empty(), "expected non-empty frontier");
     for (index, entry) in frontier.iter().enumerate() {
         assert!(
-            entry["symbol_id"].as_str().is_some_and(|s| !s.is_empty()),
+            entry
+                .get("symbol_id")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|s| !s.is_empty()),
             "frontier entry {index} should have a non-empty symbol_id"
         );
         assert_eq!(
-            entry["depth"],
-            serde_json::json!(1),
+            entry.get("depth"),
+            Some(&serde_json::json!(1)),
             "frontier entry {index} depth should be 1"
         );
     }
@@ -79,22 +112,24 @@ fn collect_ids_from_array<'a>(
 }
 
 /// Collects `symbol.symbol_id` from every card in a `cards` array.
-fn symbol_ids(cards: &serde_json::Value) -> Result<Vec<&str>, String> {
+fn symbol_ids(cards: Option<&serde_json::Value>) -> Result<Vec<&str>, String> {
+    let cards_value = cards.ok_or_else(|| "cards should be an array".to_owned())?;
     collect_ids_from_array(
-        cards,
+        cards_value,
         "cards should be an array",
         "symbol_id should be a string",
-        |card| card["symbol"]["symbol_id"].as_str(),
+        |card| json_at(card, &["symbol", "symbol_id"]).and_then(serde_json::Value::as_str),
     )
 }
 
 /// Collects `symbol_id` from every entry in a spillover frontier array.
-fn frontier_ids(frontier: &serde_json::Value) -> Result<Vec<&str>, String> {
+fn frontier_ids(frontier: Option<&serde_json::Value>) -> Result<Vec<&str>, String> {
+    let frontier_value = frontier.ok_or_else(|| "frontier should be an array".to_owned())?;
     collect_ids_from_array(
-        frontier,
+        frontier_value,
         "frontier should be an array",
         "frontier symbol_id should be a string",
-        |entry| entry["symbol_id"].as_str(),
+        |entry| entry.get("symbol_id").and_then(serde_json::Value::as_str),
     )
 }
 
@@ -110,17 +145,33 @@ fn refusal_status(reason: &str) -> Option<i32> {
     }
 }
 
-/// Asserts the refusal envelope shape, keeping failures on the calling line.
+/// Checks the refusal envelope shape, returning an error on the calling line.
 macro_rules! assert_refusal {
     ($status:expr, $payload:expr, $reason:expr) => {{
-        let reason: &str = $reason;
-        let payload = &$payload;
-        let expected_status =
-            refusal_status(reason).unwrap_or_else(|| panic!("unknown refusal reason {reason}"));
-        assert_eq!($status, expected_status);
-        assert_eq!(payload["status"], "refusal");
-        assert_eq!(payload["schema_version"], "graph_slice.v1");
-        assert_eq!(payload["refusal"]["reason"], reason);
+        let refusal_reason: &str = $reason;
+        let refusal_payload = &$payload;
+        let expected_status = refusal_status(refusal_reason)
+            .ok_or_else(|| format!("unknown refusal reason {refusal_reason}"))?;
+        let actual_status = $status;
+        ensure(
+            actual_status == expected_status,
+            format!("expected status {expected_status}, got {actual_status}"),
+        )?;
+        ensure(
+            json_at(refusal_payload, &["status"]).and_then(serde_json::Value::as_str)
+                == Some("refusal"),
+            "expected a refusal payload status",
+        )?;
+        ensure(
+            json_at(refusal_payload, &["schema_version"]).and_then(serde_json::Value::as_str)
+                == Some("graph_slice.v1"),
+            "expected schema_version graph_slice.v1",
+        )?;
+        ensure(
+            json_at(refusal_payload, &["refusal", "reason"]).and_then(serde_json::Value::as_str)
+                == Some(refusal_reason),
+            format!("expected refusal reason {refusal_reason}"),
+        )?;
     }};
 }
 
@@ -157,14 +208,40 @@ fn valid_request_returns_success_and_echoed_constraints(
     assert_success_response(status, &payload);
     assert_success_response(second_status, &second_payload);
     assert_default_graph_slice_shape(&payload);
-    assert_eq!(payload["constraints"]["entry_detail"], "structure");
-    assert_eq!(payload["constraints"]["node_detail"], "semantic");
-    assert_eq!(payload["spillover"]["truncated"], false);
-    assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "increment");
-    let first_symbol_ids = symbol_ids(&payload["cards"])?;
-    let second_symbol_ids = symbol_ids(&second_payload["cards"])?;
-    assert!(first_symbol_ids.len() >= 2);
-    assert_eq!(first_symbol_ids, second_symbol_ids);
+    ensure(
+        json_at(&payload, &["constraints", "entry_detail"]).and_then(serde_json::Value::as_str)
+            == Some("structure"),
+        "expected structure entry detail",
+    )?;
+    ensure(
+        json_at(&payload, &["constraints", "node_detail"]).and_then(serde_json::Value::as_str)
+            == Some("semantic"),
+        "expected semantic node detail",
+    )?;
+    ensure(
+        json_at(&payload, &["spillover", "truncated"]) == Some(&serde_json::json!(false)),
+        "expected spillover not truncated",
+    )?;
+    ensure(
+        first_at(&payload, &["cards"])
+            .and_then(|card| json_at(card, &["symbol", "ref", "name"]))
+            .and_then(serde_json::Value::as_str)
+            == Some("increment"),
+        "expected the increment card name",
+    )?;
+    let first_symbol_ids = symbol_ids(json_at(&payload, &["cards"]))?;
+    let second_symbol_ids = symbol_ids(json_at(&second_payload, &["cards"]))?;
+    ensure(
+        first_symbol_ids.len() >= 2,
+        format!(
+            "expected at least two symbols, got {}",
+            first_symbol_ids.len()
+        ),
+    )?;
+    ensure(
+        first_symbol_ids == second_symbol_ids,
+        "expected stable symbol ids across identical requests",
+    )?;
     Ok(())
 }
 
@@ -202,20 +279,38 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
     let (second_status, second_payload) = dispatch_payload(&request, &mut backends)?;
 
     assert_success_response(status, &payload);
-    assert_eq!(payload["cards"].as_array().expect("cards array").len(), 1);
-    assert_eq!(
-        payload["constraints"]["budget"]["max_cards"],
-        serde_json::json!(1)
-    );
+    ensure(
+        json_at(&payload, &["cards"])
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|cards| cards.len() == 1),
+        "expected exactly one card",
+    )?;
+    ensure(
+        json_at(&payload, &["constraints", "budget", "max_cards"]) == Some(&serde_json::json!(1)),
+        "expected a max_cards budget of 1",
+    )?;
     assert_success_response(second_status, &second_payload);
-    assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "build");
-    let kept_symbol_id = payload["cards"][0]["symbol"]["symbol_id"]
-        .as_str()
-        .expect("kept symbol_id should be a string");
-    let first_frontier = frontier_ids(&payload["spillover"]["frontier"])?;
-    let second_frontier = frontier_ids(&second_payload["spillover"]["frontier"])?;
-    assert!(!first_frontier.contains(&kept_symbol_id));
-    assert_eq!(first_frontier, second_frontier);
+    ensure(
+        first_at(&payload, &["cards"])
+            .and_then(|card| json_at(card, &["symbol", "ref", "name"]))
+            .and_then(serde_json::Value::as_str)
+            == Some("build"),
+        "expected the build card name",
+    )?;
+    let kept_symbol_id = first_at(&payload, &["cards"])
+        .and_then(|card| json_at(card, &["symbol", "symbol_id"]))
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "kept symbol_id should be a string".to_owned())?;
+    let first_frontier = frontier_ids(json_at(&payload, &["spillover", "frontier"]))?;
+    let second_frontier = frontier_ids(json_at(&second_payload, &["spillover", "frontier"]))?;
+    ensure(
+        !first_frontier.contains(&kept_symbol_id),
+        "expected the kept symbol to be absent from the frontier",
+    )?;
+    ensure(
+        first_frontier == second_frontier,
+        "expected stable frontier ids across identical requests",
+    )?;
     assert_spillover_truncated_with_frontier(&payload);
     Ok(())
 }
@@ -264,7 +359,11 @@ fn structured_refusal_cases(
 
     assert_refusal!(status, payload, expected_reason);
     if let Some(message) = expected_message {
-        assert_eq!(payload["refusal"]["message"], message);
+        ensure(
+            json_at(&payload, &["refusal", "message"]).and_then(serde_json::Value::as_str)
+                == Some(message),
+            format!("expected refusal message {message}"),
+        )?;
     }
     Ok(())
 }

@@ -2,12 +2,14 @@
 
 use std::{fs, fs::DirBuilder};
 
-use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
+use camino::{Utf8Path, Utf8PathBuf};
 #[cfg(unix)]
 use libc::geteuid;
 use thiserror::Error;
 
 use super::SocketEndpoint;
+#[cfg(unix)]
+use super::path_normalize::normalize_parent_path;
 
 /// Errors raised when preparing socket directories.
 #[derive(Debug, Error)]
@@ -127,6 +129,7 @@ pub fn prepare_endpoint_filesystem(
     Ok(())
 }
 
+/// Splits the parent path into the existing prefix and the missing suffix.
 fn split_existing_prefix(
     parent: &Utf8Path,
 ) -> Result<(Utf8PathBuf, Vec<String>), SocketPreparationError> {
@@ -154,6 +157,7 @@ fn split_existing_prefix(
     }
 }
 
+/// Records one missing path segment and returns the next ancestor to inspect.
 fn handle_not_found(
     current: &Utf8Path,
     parent: &Utf8Path,
@@ -181,6 +185,7 @@ fn handle_not_found(
     }
 }
 
+/// Creates each missing socket directory segment in order.
 fn create_missing_socket_directories(
     mut existing_prefix: Utf8PathBuf,
     missing_suffix: &[String],
@@ -248,6 +253,7 @@ pub fn ensure_secure_directory(parent: &Utf8Path) -> Result<(), SocketPreparatio
 }
 
 #[cfg(unix)]
+/// Verifies the directory exists, is a directory, and is owned by the caller.
 fn check_directory_ownership(
     parent: &Utf8Path,
     expected_uid: u32,
@@ -279,6 +285,7 @@ fn check_directory_ownership(
 }
 
 #[cfg(unix)]
+/// Tightens directory permissions to owner-only access.
 fn check_directory_permissions(parent: &Utf8Path) -> Result<(), SocketPreparationError> {
     use std::os::unix::fs::PermissionsExt;
 
@@ -305,6 +312,7 @@ fn check_directory_permissions(parent: &Utf8Path) -> Result<(), SocketPreparatio
 }
 
 #[cfg(unix)]
+/// Rejects directories whose canonical form escapes the configured path.
 fn validate_no_path_traversal(parent: &Utf8Path) -> Result<(), SocketPreparationError> {
     let canonical = fs::canonicalize(parent.as_std_path()).map_err(|source| {
         SocketPreparationError::Canonicalize {
@@ -312,63 +320,18 @@ fn validate_no_path_traversal(parent: &Utf8Path) -> Result<(), SocketPreparation
             source,
         }
     })?;
-    let canonical = Utf8PathBuf::from_path_buf(canonical)
+    let canonical_utf8 = Utf8PathBuf::from_path_buf(canonical)
         .map_err(|path| SocketPreparationError::NonUtf8CanonicalPath { path })?;
     let normalized_parent = normalize_parent_path(parent);
 
-    if !canonical.ends_with(&normalized_parent) {
+    if !canonical_utf8.ends_with(&normalized_parent) {
         return Err(SocketPreparationError::PathTraversal {
             path: normalized_parent,
-            canonical,
+            canonical: canonical_utf8,
         });
     }
 
     Ok(())
-}
-
-#[cfg(unix)]
-fn normalize_parent_path(parent: &Utf8Path) -> Utf8PathBuf {
-    let mut components = Vec::new();
-    let mut is_absolute = false;
-
-    for component in parent.components() {
-        match component {
-            Utf8Component::RootDir => {
-                is_absolute = true;
-                components.clear();
-            }
-            Utf8Component::CurDir => {}
-            Utf8Component::ParentDir => {
-                if parent_dir_should_pop(components.last().copied()) {
-                    components.pop();
-                } else if !is_absolute {
-                    components.push("..");
-                }
-            }
-            Utf8Component::Normal(component) => components.push(component),
-            Utf8Component::Prefix(_) => {}
-        }
-    }
-
-    let mut normalized = if is_absolute {
-        Utf8PathBuf::from("/")
-    } else {
-        Utf8PathBuf::new()
-    };
-    for component in components {
-        normalized.push(component);
-    }
-
-    if normalized.as_str().is_empty() {
-        Utf8PathBuf::from(".")
-    } else {
-        normalized
-    }
-}
-
-#[cfg(unix)]
-fn parent_dir_should_pop(last: Option<&str>) -> bool {
-    matches!(last, Some(component) if component != "..")
 }
 
 #[cfg(unix)]

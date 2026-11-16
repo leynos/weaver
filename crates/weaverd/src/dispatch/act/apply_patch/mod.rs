@@ -3,6 +3,7 @@
 //! Parses Git-style patch streams, applies SEARCH/REPLACE modifications, and
 //! executes the Double-Lock safety harness before committing changes.
 
+mod changes;
 mod errors;
 mod matcher;
 mod parser;
@@ -21,12 +22,10 @@ use tracing::debug;
 
 pub(crate) use self::errors::ApplyPatchError;
 use self::{
-    matcher::apply_search_replace,
     parser::parse_patch,
     payloads::{ApplyPatchSummary, GenericErrorEnvelope, VerificationErrorEnvelope},
     semantic_lock::LspSemanticLockAdapter,
-    types::{FileContent, FilePath, PatchOperation, PatchText, SearchReplaceBlock},
-    workspace::{ValidatedPath, path_exists, read_patch_target, resolve_path},
+    types::PatchText,
 };
 use crate::{
     backends::{BackendKind, FusionBackends},
@@ -84,7 +83,7 @@ pub fn handle<W: Write>(
             writer.write_stdout(payload)?;
             Ok(DispatchResult::success())
         }
-        Err(ApplyPatchFailure::Patch(error)) => write_patch_error(writer, error),
+        Err(ApplyPatchFailure::Patch(error)) => write_patch_error(writer, &error),
         Err(ApplyPatchFailure::Verification { phase, failures }) => {
             write_verification_error(writer, phase, failures)
         }
@@ -97,19 +96,18 @@ pub fn handle<W: Write>(
     }
 }
 
+/// Executes parsed patch operations against one workspace.
 pub(crate) struct ApplyPatchExecutor<'a> {
+    /// Absolute root of the workspace the patch is applied to.
     workspace_root: PathBuf,
+    /// Syntactic lock consulted before committing changes.
     syntactic_lock: &'a dyn SyntacticLock,
+    /// Semantic lock consulted before committing changes.
     semantic_lock: &'a dyn SemanticLock,
 }
 
-/// Represents the kind of file system change to validate and construct.
-enum ChangeKind {
-    Create(FileContent),
-    Delete,
-}
-
 impl<'a> ApplyPatchExecutor<'a> {
+    /// Creates an executor bound to a workspace root and both safety locks.
     pub(crate) fn new(
         workspace_root: PathBuf,
         syntactic_lock: &'a dyn SyntacticLock,
@@ -122,13 +120,20 @@ impl<'a> ApplyPatchExecutor<'a> {
         }
     }
 
+    /// Executes a patch against the workspace and reports what changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApplyPatchFailure`] when the workspace cannot be opened, the
+    /// patch fails to parse or apply, or a safety-harness phase rejects the
+    /// change.
     pub(crate) fn execute(&self, patch: &str) -> Result<ApplyPatchSummary, ApplyPatchFailure> {
         let workspace_dir =
             Dir::open_ambient_dir(&self.workspace_root, cap_std::ambient_authority()).map_err(
                 |error| ApplyPatchFailure::Io(format!("failed to open workspace: {error}")),
             )?;
-        let patch = PatchText::new(patch);
-        let operations = parse_patch(&patch).map_err(map_patch_error)?;
+        let patch_text = PatchText::new(patch);
+        let operations = parse_patch(&patch_text).map_err(map_patch_error)?;
         let changes = self
             .build_changes(&workspace_dir, &operations)
             .map_err(map_patch_error)?;
@@ -172,125 +177,41 @@ impl<'a> ApplyPatchExecutor<'a> {
             Err(error) => Err(map_harness_error(error)),
         }
     }
-
-    fn build_changes(
-        &self,
-        workspace_dir: &Dir,
-        operations: &[PatchOperation],
-    ) -> Result<Vec<ContentChange>, ApplyPatchError> {
-        let mut changes = Vec::new();
-        for operation in operations {
-            let change = match operation {
-                PatchOperation::Modify { path, blocks } => {
-                    self.build_modify_change(workspace_dir, path, blocks)?
-                }
-                PatchOperation::Create { path, content } => {
-                    self.build_create_change(workspace_dir, path, content)?
-                }
-                PatchOperation::Delete { path } => self.build_delete_change(workspace_dir, path)?,
-            };
-            changes.push(change);
-        }
-        Ok(changes)
-    }
-
-    fn build_modify_change(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-        blocks: &[SearchReplaceBlock],
-    ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(workspace_dir, path)?;
-        let original = read_patch_target(workspace_dir, &resolved.relative, path)?;
-        let original = FileContent::new(original);
-        let modified = apply_search_replace(path, &original, blocks)?;
-        Ok(ContentChange::write(
-            resolved.absolute,
-            modified.into_string(),
-        ))
-    }
-
-    fn build_create_change(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-        content: &FileContent,
-    ) -> Result<ContentChange, ApplyPatchError> {
-        self.build_validated_change(workspace_dir, path, ChangeKind::Create(content.clone()))
-    }
-
-    fn build_delete_change(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-    ) -> Result<ContentChange, ApplyPatchError> {
-        self.build_validated_change(workspace_dir, path, ChangeKind::Delete)
-    }
-
-    /// Resolves and validates a patch path within the workspace.
-    fn resolve_and_validate(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-    ) -> Result<ValidatedPath, ApplyPatchError> {
-        resolve_path(workspace_dir, &self.workspace_root, path)
-    }
-
-    /// Builds a validated content change after checking existence constraints.
-    fn build_validated_change(
-        &self,
-        workspace_dir: &Dir,
-        path: &FilePath,
-        kind: ChangeKind,
-    ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(workspace_dir, path)?;
-
-        match kind {
-            ChangeKind::Create(content) => {
-                if path_exists(workspace_dir, &resolved.relative, path)? {
-                    return Err(ApplyPatchError::FileAlreadyExists { path: path.clone() });
-                }
-                Ok(ContentChange::write(
-                    resolved.absolute,
-                    content.into_string(),
-                ))
-            }
-            ChangeKind::Delete => {
-                if !path_exists(workspace_dir, &resolved.relative, path)? {
-                    return Err(ApplyPatchError::DeleteMissing { path: path.clone() });
-                }
-                Ok(ContentChange::delete(resolved.absolute))
-            }
-        }
-    }
 }
 
+/// Failure raised while executing an apply-patch request.
 #[derive(Debug)]
 pub(crate) enum ApplyPatchFailure {
+    /// The patch could not be parsed, validated, or applied.
     Patch(ApplyPatchError),
+    /// A safety-harness phase rejected the change.
     Verification {
+        /// Name of the failing verification phase.
         phase: &'static str,
+        /// Failures reported by that phase.
         failures: Vec<VerificationFailure>,
     },
+    /// A semantic backend could not be started or queried.
     BackendUnavailable(String),
+    /// An I/O or harness error rendered for the operator.
     Io(String),
 }
 
+/// Converts a safety-harness failure into an apply-patch failure.
 fn map_harness_error(error: SafetyHarnessError) -> ApplyPatchFailure {
     match error {
-        SafetyHarnessError::SemanticBackendUnavailable { message } => {
-            ApplyPatchFailure::BackendUnavailable(message)
-        }
-        SafetyHarnessError::SyntacticBackendUnavailable { message } => {
+        SafetyHarnessError::SemanticBackendUnavailable { message }
+        | SafetyHarnessError::SyntacticBackendUnavailable { message } => {
             ApplyPatchFailure::BackendUnavailable(message)
         }
         other => ApplyPatchFailure::Io(other.to_string()),
     }
 }
 
+/// Converts a parse or apply error into an apply-patch failure.
 fn map_patch_error(error: ApplyPatchError) -> ApplyPatchFailure {
     match error {
-        error @ ApplyPatchError::Io { .. } => ApplyPatchFailure::Io(error.to_string()),
+        io_error @ ApplyPatchError::Io { .. } => ApplyPatchFailure::Io(io_error.to_string()),
         other => ApplyPatchFailure::Patch(other),
     }
 }
@@ -306,15 +227,25 @@ fn write_error_payload<W: Write, T: serde::Serialize>(
     Ok(DispatchResult::with_status(status))
 }
 
+/// Writes a patch error as JSON and returns its fixed exit status.
+///
+/// # Errors
+///
+/// Returns [`DispatchError`] when serialisation or stderr writing fails.
 fn write_patch_error<W: Write>(
     writer: &mut ResponseWriter<W>,
-    error: ApplyPatchError,
+    error: &ApplyPatchError,
 ) -> Result<DispatchResult, DispatchError> {
     let json = error.to_json()?;
     writer.write_stderr(json)?;
-    Ok(DispatchResult::with_status(error.exit_status()))
+    Ok(DispatchResult::with_status(ApplyPatchError::exit_status()))
 }
 
+/// Writes a verification-failure envelope to stderr.
+///
+/// # Errors
+///
+/// Returns [`DispatchError`] when serialisation or stderr writing fails.
 fn write_verification_error<W: Write>(
     writer: &mut ResponseWriter<W>,
     phase: &str,
@@ -324,6 +255,11 @@ fn write_verification_error<W: Write>(
     write_error_payload(writer, &payload, 1)
 }
 
+/// Writes a generic backend-error envelope to stderr.
+///
+/// # Errors
+///
+/// Returns [`DispatchError`] when serialisation or stderr writing fails.
 fn write_backend_error<W: Write>(
     writer: &mut ResponseWriter<W>,
     kind: &'static str,

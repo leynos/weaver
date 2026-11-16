@@ -7,6 +7,7 @@
 mod jsonrpc;
 mod process;
 mod text_edits;
+mod workspace_edits;
 
 use std::{
     io::BufWriter,
@@ -23,14 +24,12 @@ use weaver_plugins::protocol::FilePayload;
 use self::{
     jsonrpc::{JsonRpcRequestSpec, send_notification, send_request, spawn_message_reader},
     process::{close_session, terminate_session},
-    text_edits::{
-        PositionEncoding,
+    text_edits::{PositionEncoding, path_to_file_uri, write_stub_cargo_toml},
+    workspace_edits::{
         apply_workspace_edit,
         byte_offset_to_lsp_position,
         ensure_response_is_object,
         parse_workspace_edit,
-        path_to_file_uri,
-        write_stub_cargo_toml,
     },
 };
 use crate::{ByteOffset, RustAnalyzerAdapter, RustAnalyzerAdapterError, write_workspace_file};

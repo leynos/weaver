@@ -14,6 +14,7 @@ use ortho_config::{
         EnvMetadata,
         FieldMetadata,
         FileMetadata,
+        HeadingIds,
         ORTHO_DOCS_IR_VERSION,
         OrthoConfigDocs,
         ValueType,
@@ -43,8 +44,12 @@ fn projection_preserves_the_structured_command_hierarchy_without_passthrough() {
             .collect::<Vec<_>>(),
         ["definitions", "daemon"],
     );
+    let definitions = metadata
+        .subcommands
+        .first()
+        .expect("projection must expose the definitions command");
     assert_eq!(
-        metadata.subcommands[0]
+        definitions
             .subcommands
             .iter()
             .map(|node| node.app_name.as_str())
@@ -57,7 +62,14 @@ fn projection_preserves_the_structured_command_hierarchy_without_passthrough() {
 fn projection_preserves_required_definition_arguments() {
     let metadata =
         project(command_tree::root()).expect("the built-in command tree should be bounded");
-    let definitions_get = &metadata.subcommands[0].subcommands[0];
+    let definitions = metadata
+        .subcommands
+        .first()
+        .expect("projection must expose the definitions command");
+    let definitions_get = definitions
+        .subcommands
+        .first()
+        .expect("projection must expose the definitions get command");
 
     assert_eq!(
         definitions_get
@@ -104,7 +116,7 @@ fn hand_assembled_argument_metadata_matches_the_upstream_derive() {
     assert_eq!(hand_assembled, derived.fields);
 }
 
-/// Rebuilds the field metadata the OrthoConfig derive would emit for a
+/// Rebuilds the field metadata the `OrthoConfig` derive would emit for a
 /// fixture argument, so the hand-assembled projection can be compared against
 /// the real derive. Returns `None` when the argument has no CLI metadata.
 fn derived_field(long: &'static str, value_name: Option<&'static str>) -> Option<FieldMetadata> {
@@ -209,10 +221,16 @@ fn unresolved_identifiers_are_not_silently_accepted_by_the_test_helper() {
 /// hierarchy, so a new nested node cannot escape validation.
 fn assert_identifiers_resolve(metadata: &DocMetadata, localizer: &dyn Localizer) {
     assert_resolves(&metadata.about_id, localizer);
-    if let Some(synopsis_id) = &metadata.synopsis_id {
-        assert_resolves(synopsis_id, localizer);
+    assert_optional_resolves(metadata.synopsis_id.as_deref(), localizer);
+    assert_heading_ids_resolve(&metadata.sections.headings_ids, localizer);
+    assert_field_ids_resolve(&metadata.fields, localizer);
+    for child in &metadata.subcommands {
+        assert_identifiers_resolve(child, localizer);
     }
-    let headings = &metadata.sections.headings_ids;
+}
+
+/// Asserts every section-heading identifier resolves, including `commands`.
+fn assert_heading_ids_resolve(headings: &HeadingIds, localizer: &dyn Localizer) {
     for id in [
         &headings.name,
         &headings.synopsis,
@@ -227,17 +245,21 @@ fn assert_identifiers_resolve(metadata: &DocMetadata, localizer: &dyn Localizer)
     ] {
         assert_resolves(id, localizer);
     }
-    if let Some(commands) = &headings.commands {
-        assert_resolves(commands, localizer);
-    }
-    for field in &metadata.fields {
+    assert_optional_resolves(headings.commands.as_deref(), localizer);
+}
+
+/// Asserts each field's help identifiers resolve, long help included.
+fn assert_field_ids_resolve(fields: &[FieldMetadata], localizer: &dyn Localizer) {
+    for field in fields {
         assert_resolves(&field.help_id, localizer);
-        if let Some(long_help_id) = &field.long_help_id {
-            assert_resolves(long_help_id, localizer);
-        }
+        assert_optional_resolves(field.long_help_id.as_deref(), localizer);
     }
-    for child in &metadata.subcommands {
-        assert_identifiers_resolve(child, localizer);
+}
+
+/// Asserts an optional projected identifier resolves when one is present.
+fn assert_optional_resolves(maybe_id: Option<&str>, localizer: &dyn Localizer) {
+    if let Some(id) = maybe_id {
+        assert_resolves(id, localizer);
     }
 }
 
@@ -269,9 +291,15 @@ fn generated_tree(depth: usize, branching: usize, label: &'static str) -> &'stat
     }
 
     let children = (0..branching)
-        .map(|index| *generated_tree(depth - 1, branching, LABELS[index]))
+        .map(|index| {
+            let child_label = LABELS
+                .get(index)
+                .copied()
+                .expect("branching must stay within the LABELS fixtures");
+            *generated_tree(depth - 1, branching, child_label)
+        })
         .collect::<Vec<_>>();
-    let children = Box::leak(children.into_boxed_slice());
+    let child_nodes = Box::leak(children.into_boxed_slice());
 
     Box::leak(Box::new(CommandNode {
         resource_path: &[],
@@ -280,7 +308,7 @@ fn generated_tree(depth: usize, branching: usize, label: &'static str) -> &'stat
         summary: "generated command",
         arguments: &[],
         semantics: CommandSemantics::Structured,
-        children,
+        children: child_nodes,
     }))
 }
 

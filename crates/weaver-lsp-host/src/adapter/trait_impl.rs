@@ -24,11 +24,13 @@ use lsp_types::{
     InitializeParams,
     InitializeResult,
     InitializedParams,
+    PartialResultParams,
     PositionEncodingKind,
     ReferenceParams,
     TextDocumentClientCapabilities,
     TextDocumentIdentifier,
     Uri,
+    WorkDoneProgressParams,
 };
 use tracing::debug;
 
@@ -36,6 +38,7 @@ use super::{lifecycle::ADAPTER_TARGET, process::ProcessLanguageServer};
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
 impl ProcessLanguageServer {
+    /// Sends the `initialize` request and its `initialized` notification.
     fn send_initialize_handshake(&mut self) -> Result<InitializeResult, LanguageServerError> {
         let params = InitializeParams {
             process_id: Some(std::process::id()),
@@ -65,6 +68,7 @@ impl ProcessLanguageServer {
         Ok(result)
     }
 
+    /// Returns the position encoding the server agreed to, logging a downgrade.
     fn negotiate_position_encoding<'a>(
         &self,
         caps: &'a lsp_types::ServerCapabilities,
@@ -82,6 +86,7 @@ impl ProcessLanguageServer {
         negotiated
     }
 
+    /// Converts raw server capabilities into the host's capability set.
     fn build_capability_set(
         &self,
         caps: &lsp_types::ServerCapabilities,
@@ -91,7 +96,7 @@ impl ProcessLanguageServer {
         let references_supported = caps.references_provider.is_some();
         let diagnostics_supported = caps.diagnostic_provider.is_some();
         let call_hierarchy_supported = caps.call_hierarchy_provider.is_some();
-        let hover_supported = supports_hover(&caps.hover_provider);
+        let hover_supported = supports_hover(caps.hover_provider.as_ref());
 
         debug!(
             target: ADAPTER_TARGET,
@@ -153,7 +158,7 @@ impl LanguageServer for ProcessLanguageServer {
         params: ReferenceParams,
     ) -> Result<Vec<lsp_types::Location>, LanguageServerError> {
         self.send_request_optional("textDocument/references", params)
-            .map(|opt| opt.unwrap_or_default())
+            .map(Option::unwrap_or_default)
             .map_err(|e| LanguageServerError::with_source("references request failed", e))
     }
 
@@ -163,8 +168,8 @@ impl LanguageServer for ProcessLanguageServer {
             text_document: TextDocumentIdentifier { uri: uri.clone() },
             identifier: None,
             previous_result_id: None,
-            work_done_progress_params: Default::default(),
-            partial_result_params: Default::default(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
         };
 
         let result: DocumentDiagnosticReport = self
@@ -237,10 +242,11 @@ impl LanguageServer for ProcessLanguageServer {
     }
 }
 
-fn supports_hover(capability: &Option<HoverProviderCapability>) -> bool {
+/// Returns whether the server advertises hover support.
+const fn supports_hover(capability: Option<&HoverProviderCapability>) -> bool {
     matches!(
         capability,
-        Some(HoverProviderCapability::Simple(true)) | Some(HoverProviderCapability::Options(_))
+        Some(HoverProviderCapability::Simple(true) | HoverProviderCapability::Options(_))
     )
 }
 
@@ -254,19 +260,19 @@ mod tests {
 
     #[test]
     fn explicit_false_hover_capability_is_not_treated_as_supported() {
-        assert!(!supports_hover(&Some(HoverProviderCapability::Simple(
+        assert!(!supports_hover(Some(&HoverProviderCapability::Simple(
             false
         ))));
     }
 
     #[test]
     fn explicit_true_hover_capability_is_treated_as_supported() {
-        assert!(supports_hover(&Some(HoverProviderCapability::Simple(true))));
+        assert!(supports_hover(Some(&HoverProviderCapability::Simple(true))));
     }
 
     #[test]
     fn hover_options_are_treated_as_supported() {
-        assert!(supports_hover(&Some(HoverProviderCapability::Options(
+        assert!(supports_hover(Some(&HoverProviderCapability::Options(
             HoverOptions {
                 work_done_progress_options: WorkDoneProgressOptions {
                     work_done_progress: Some(true),

@@ -11,20 +11,27 @@ use tracing::{error, info};
 
 use crate::dispatch::{errors::DispatchError, router::DISPATCH_TARGET};
 
+/// Placeholder written in place of every sensitive field value.
 const REDACTION_MARKER: &str = "<redacted>";
+/// File name of the health snapshot recorded next to the runtime directory.
 const HEALTH_SNAPSHOT_NAME: &str = "weaverd.health";
 
 /// Metadata fields attached to a structured dispatch event.
 #[derive(Debug)]
 pub(super) struct StructuredEventMetadata {
+    /// Dispatch domain name, omitted when the request could not be parsed.
     domain: Option<String>,
+    /// Operation name within the domain, omitted when it is unknown.
     operation: Option<String>,
+    /// Observed request size in bytes, when known.
     size: Option<usize>,
+    /// Configured request size limit in bytes, set only for size rejections.
     max_size: Option<usize>,
 }
 
 impl StructuredEventMetadata {
-    pub(super) fn none() -> Self {
+    /// Creates metadata with every optional field absent.
+    pub(super) const fn none() -> Self {
         Self {
             domain: None,
             operation: None,
@@ -33,6 +40,7 @@ impl StructuredEventMetadata {
         }
     }
 
+    /// Creates metadata carrying the domain and operation it is given.
     pub(super) fn new(domain: impl Into<String>, operation: impl Into<String>) -> Self {
         Self {
             domain: Some(domain.into()),
@@ -42,16 +50,19 @@ impl StructuredEventMetadata {
         }
     }
 
-    pub(super) fn with_size(mut self, size: usize) -> Self {
+    /// Records the observed request size in bytes.
+    pub(super) const fn with_size(mut self, size: usize) -> Self {
         self.size = Some(size);
         self
     }
 
-    pub(super) fn with_max_size(mut self, max_size: usize) -> Self {
+    /// Records the configured request size limit in bytes.
+    pub(super) const fn with_max_size(mut self, max_size: usize) -> Self {
         self.max_size = Some(max_size);
         self
     }
 
+    /// Copies the present metadata fields into a JSON payload object.
     pub(super) fn extend_payload(&self, payload: &mut serde_json::Map<String, serde_json::Value>) {
         if let Some(domain) = &self.domain {
             payload.insert("domain".into(), json!(domain));
@@ -71,18 +82,28 @@ impl StructuredEventMetadata {
 /// Structured event payload assembled by the dispatch handler.
 #[derive(Debug)]
 pub(super) struct StructuredDispatchEvent {
+    /// Stable event name emitted in the structured log line.
     event: &'static str,
+    /// Endpoint that received the request.
     endpoint: String,
+    /// Runtime directory whose health snapshot accompanies the event.
     runtime_dir: std::path::PathBuf,
+    /// Optional request metadata attached to the event.
     metadata: StructuredEventMetadata,
+    /// Request patch text, retained only to mark it redacted.
     pub(super) patch: Option<String>,
+    /// Request body text, retained only to mark it redacted.
     pub(super) body: Option<String>,
+    /// Source text referenced by the request, retained only to mark it redacted.
     pub(super) source: Option<String>,
+    /// Environment snapshot, retained only to mark it redacted.
     pub(super) env: Option<String>,
+    /// Full request payload, retained only to mark it redacted.
     pub(super) full_payload: Option<String>,
 }
 
 impl StructuredDispatchEvent {
+    /// Creates an event with no sensitive payload fields attached.
     pub(super) fn new(
         event: &'static str,
         endpoint: impl Into<String>,
@@ -127,10 +148,12 @@ pub(super) fn read_error_event(
     }
 }
 
-fn redacted(value: &Option<String>) -> Option<Value> {
-    value
-        .as_ref()
-        .map(|_| Value::String(REDACTION_MARKER.to_owned()))
+/// Replaces a present sensitive value with the redaction marker.
+///
+/// The original value is never serialized; only its presence is preserved so
+/// consumers can tell that a field was supplied.
+fn redacted(value: Option<&String>) -> Option<Value> {
+    value.map(|_| Value::String(REDACTION_MARKER.to_owned()))
 }
 
 /// Serializes a structured event into JSON with sensitive fields redacted.
@@ -166,7 +189,7 @@ pub(super) fn serialize_structured_event(event: &StructuredDispatchEvent) -> Val
         ("fullPayload", &event.full_payload),
     ];
     for (key, value) in redacted_fields {
-        if let Some(redacted) = redacted(value) {
+        if let Some(redacted) = redacted(value.as_ref()) {
             payload.insert((*key).into(), redacted);
         }
     }
@@ -174,6 +197,7 @@ pub(super) fn serialize_structured_event(event: &StructuredDispatchEvent) -> Val
     Value::Object(payload)
 }
 
+/// Renders a structured event as compact JSON text for tracing.
 pub(super) fn format_structured_event(event: &StructuredDispatchEvent) -> String {
     serialize_structured_event(event).to_string()
 }

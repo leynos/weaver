@@ -12,8 +12,13 @@ use rstest::rstest;
 const HELPER_SRC: &str = include_str!("../src/dispatch/act/refactor/refactor_helpers.rs");
 
 /// Returns `refactor_helpers.rs` without its in-file lint compliance tests.
+///
+/// `split_once` keeps the split on a character boundary, so no byte slicing is
+/// involved even though the marker is ASCII.
 fn refactor_helpers_source() -> &'static str {
-    &HELPER_SRC[..HELPER_SRC.rfind("#[cfg(test)]").unwrap_or(HELPER_SRC.len())]
+    HELPER_SRC
+        .split_once("#[cfg(test)]")
+        .map_or(HELPER_SRC, |(source, _tests)| source)
 }
 
 /// Returns whether `source` contains `pattern` after stripping whitespace.

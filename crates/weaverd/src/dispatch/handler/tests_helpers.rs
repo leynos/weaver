@@ -153,12 +153,12 @@ struct FieldVisitor {
 impl Visit for FieldVisitor {
     fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
         self.fields
-            .insert(field.name().to_string(), format!("{value:?}"));
+            .insert(field.name().to_owned(), format!("{value:?}"));
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {
         self.fields
-            .insert(field.name().to_string(), value.to_string());
+            .insert(field.name().to_owned(), value.to_owned());
     }
 }
 
@@ -172,7 +172,7 @@ where
         if let Ok(mut events) = self.events.lock() {
             events.push(CapturedEvent {
                 level: *event.metadata().level(),
-                target: event.metadata().target().to_string(),
+                target: event.metadata().target().to_owned(),
                 fields: visitor.fields,
             });
         }
@@ -220,10 +220,23 @@ pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
         events: Arc::clone(&events),
     });
     dispatcher::with_default(&Dispatch::new(subscriber), action);
-    let mut events = events
+    let mut recorded_events = events
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    events.drain(..).collect()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    recorded_events.drain(..).collect()
+}
+
+/// Returns `Err` carrying `message` unless `condition` holds.
+///
+/// Fallible tests use this instead of assertions so a failed expectation
+/// reports the observed value without panicking from a `Result`-returning
+/// function.
+pub(crate) fn ensure(condition: bool, message: impl Into<String>) -> Result<(), String> {
+    if condition {
+        Ok(())
+    } else {
+        Err(message.into())
+    }
 }
 
 /// Creates a connected dispatch handler harness with a temporary workspace.
@@ -237,7 +250,7 @@ pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
 pub(crate) fn harness(
     backend_manager: Result<BackendManagerFixture, String>,
 ) -> Result<HandlerTestHarness, String> {
-    let backend_manager = backend_manager?.manager();
+    let manager = backend_manager?.manager();
     let temp_dir = TempDir::new().map_err(|error| format!("temporary directory: {error}"))?;
     let (listener, addr) = create_listener()?;
     let workspace_root = temp_dir.path().join("weaverd-test-workspace");
@@ -251,7 +264,7 @@ pub(crate) fn harness(
             .accept()
             .map_err(|error| format!("accept: {error}"))?;
         DispatchConnectionHandler::new(
-            backend_manager,
+            manager,
             workspace_root,
             endpoint.to_string_lossy().into_owned(),
             runtime_dir,

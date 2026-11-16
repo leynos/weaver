@@ -20,7 +20,10 @@ use super::{
     },
     *,
 };
-use crate::tests::support::fs as test_fs;
+use crate::{
+    test_helpers::{ensure_same, ensure_same_ref},
+    tests::support::fs as test_fs,
+};
 
 struct RefactorWorld {
     workspace: TempDir,
@@ -58,8 +61,11 @@ impl RefactorWorld {
         self.request
             .arguments
             .windows(2)
-            .find_map(|pair| (pair[0] == "--file").then(|| pair[1].clone()))
-            .ok_or_else(|| "target file argument missing".to_string())
+            .find_map(|pair| match pair {
+                [flag, value] if flag == "--file" => Some(value.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| "target file argument missing".to_owned())
     }
 
     fn write_file(&self, relative: &str, content: &str) -> Result<(), String> {
@@ -121,7 +127,7 @@ fn refactor_world(world: &mut RefactorWorldFixture) -> Result<&mut RefactorWorld
 }
 
 /// Configures the request and routing mode, then lays down the routed fixture.
-fn arrange_rename_request(
+fn arrange_rename(
     world: &mut RefactorWorldFixture,
     file: &str,
     provider: &str,
@@ -143,12 +149,12 @@ fn given_workspace_file(world: &mut RefactorWorldFixture) -> Result<(), String> 
 
 #[given("a valid act refactor request for rope")]
 fn given_valid_rope_request(world: &mut RefactorWorldFixture) -> Result<(), String> {
-    arrange_rename_request(world, "notes.py", "rope", RoutingMode::AutomaticPython)
+    arrange_rename(world, "notes.py", "rope", RoutingMode::AutomaticPython)
 }
 
 #[given("a valid act refactor request for rust-analyzer")]
 fn given_valid_rust_request(world: &mut RefactorWorldFixture) -> Result<(), String> {
-    arrange_rename_request(
+    arrange_rename(
         world,
         "notes.rs",
         "rust-analyzer",
@@ -171,7 +177,7 @@ fn given_unsupported_language_request(world: &mut RefactorWorldFixture) -> Resul
 fn given_explicit_provider_mismatch_request(
     world: &mut RefactorWorldFixture,
 ) -> Result<(), String> {
-    arrange_rename_request(
+    arrange_rename(
         world,
         "notes.py",
         "rust-analyzer",
@@ -218,53 +224,54 @@ fn extract_status(world: &RefactorWorld) -> Result<i32, String> {
 
 #[then("the refactor command succeeds")]
 fn then_refactor_succeeds(world: &mut RefactorWorldFixture) -> Result<(), String> {
-    assert_eq!(extract_status(refactor_world(world)?)?, 0);
-    Ok(())
+    ensure_same(extract_status(refactor_world(world)?)?, 0, "status")
 }
 
 #[then("the refactor command fails with status 1")]
 fn then_refactor_fails_status_one(world: &mut RefactorWorldFixture) -> Result<(), String> {
     let state = refactor_world(world)?;
     let result = state.dispatch_result.as_ref().ok_or("result missing")?;
-    match result {
-        Ok(status) => assert_eq!(*status, 1),
-        Err(error) => assert_eq!(error.exit_status(), 1),
-    }
-    Ok(())
+    let status = match result {
+        Ok(status) => *status,
+        Err(error) => error.exit_status(),
+    };
+    ensure_same(status, 1, "status")
+}
+
+/// Asserts the routed target file holds the content `expected` derives for it.
+fn ensure_target_content(
+    world: &mut RefactorWorldFixture,
+    expected: fn(&Path) -> &'static str,
+    what: &str,
+) -> Result<(), String> {
+    let state = refactor_world(world)?;
+    let target_file = state.target_file()?;
+    let actual = read_routed_target(state)?;
+    ensure_same_ref(actual.as_str(), expected(Path::new(&target_file)), what)
 }
 
 #[then("the target file is updated")]
 fn then_target_file_updated(world: &mut RefactorWorldFixture) -> Result<(), String> {
-    let state = refactor_world(world)?;
-    let target_file = state.target_file()?;
-    assert_eq!(
-        read_routed_target(state)?,
-        updated_content_for(Path::new(&target_file))
-    );
-    Ok(())
+    ensure_target_content(world, updated_content_for, "updated target file")
 }
 
 #[then("the target file is unchanged")]
 fn then_target_file_unchanged(world: &mut RefactorWorldFixture) -> Result<(), String> {
-    let state = refactor_world(world)?;
-    let target_file = state.target_file()?;
-    assert_eq!(
-        read_routed_target(state)?,
-        original_content_for(Path::new(&target_file))
-    );
-    Ok(())
+    ensure_target_content(world, original_content_for, "unchanged target file")
 }
 
 #[then("the stderr stream contains {text}")]
 fn then_stderr_contains(world: &mut RefactorWorldFixture, text: String) -> Result<(), String> {
     let state = refactor_world(world)?;
     let needle = text.trim_matches('"');
-    assert!(
-        state.response_stream.contains(needle),
-        "expected response stream to contain '{needle}', got: {}",
-        state.response_stream
-    );
-    Ok(())
+    if state.response_stream.contains(needle) {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected response stream to contain '{needle}', got: {}",
+            state.response_stream
+        ))
+    }
 }
 
 #[then("the dispatch error contains {text}")]

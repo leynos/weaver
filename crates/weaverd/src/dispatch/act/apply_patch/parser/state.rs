@@ -5,14 +5,19 @@ use crate::dispatch::act::apply_patch::{
     types::{FileContent, FilePath, ReplacementText, SearchPattern, SearchReplaceBlock},
 };
 
+/// Accumulates `SEARCH`/`REPLACE` pairs while scanning one modify operation.
 pub(super) struct SearchReplaceParser {
+    /// Blocks captured so far, in source order.
     blocks: Vec<SearchReplaceBlock>,
+    /// Byte offset where the open `SEARCH` block begins, if one is open.
     search_start: Option<usize>,
+    /// Byte offset where the open `REPLACE` block begins, if one is open.
     replace_start: Option<usize>,
 }
 
 impl SearchReplaceParser {
-    pub(super) fn new() -> Self {
+    /// Creates a parser with no captured blocks and no open markers.
+    pub(super) const fn new() -> Self {
         Self {
             blocks: Vec::new(),
             search_start: None,
@@ -20,14 +25,16 @@ impl SearchReplaceParser {
         }
     }
 
-    pub(super) fn handle_search_marker(&mut self, offset: usize) {
+    /// Records the start offset of a new `SEARCH` block.
+    pub(super) const fn handle_search_marker(&mut self, offset: usize) {
         self.search_start = Some(offset);
         self.replace_start = None;
     }
 
+    /// Closes the open `SEARCH` block at a separator line.
     pub(super) fn handle_separator(&mut self, chunk: &str, line_start: usize) {
         if let Some(start) = self.search_start {
-            let search = &chunk[start..line_start];
+            let search = chunk.get(start..line_start).unwrap_or_default();
             self.replace_start = Some(line_end_from_chunk(chunk, line_start));
             self.blocks.push(SearchReplaceBlock {
                 search: SearchPattern::new(search),
@@ -36,6 +43,12 @@ impl SearchReplaceParser {
         }
     }
 
+    /// Completes the open block with the text before the `REPLACE` marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApplyPatchError::UnclosedSearchBlock`] when no separator line
+    /// preceded the replace marker.
     pub(super) fn handle_replace_marker(
         &mut self,
         chunk: &str,
@@ -45,7 +58,7 @@ impl SearchReplaceParser {
         let Some(start) = self.replace_start else {
             return Err(ApplyPatchError::UnclosedSearchBlock { path: path.clone() });
         };
-        let replace = &chunk[start..line_start];
+        let replace = chunk.get(start..line_start).unwrap_or_default();
         if let Some(last) = self.blocks.last_mut() {
             last.replace = ReplacementText::new(replace);
         }
@@ -54,6 +67,14 @@ impl SearchReplaceParser {
         Ok(())
     }
 
+    /// Checks that no marker block is still open at the end of the operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApplyPatchError::UnclosedSearchBlock`] when a `SEARCH` block
+    /// never reached its separator, and
+    /// [`ApplyPatchError::UnclosedReplaceBlock`] when a `REPLACE` block never
+    /// reached its closing marker.
     pub(super) fn validate_complete(&self, path: &FilePath) -> Result<(), ApplyPatchError> {
         if self.search_start.is_some() && self.replace_start.is_none() {
             return Err(ApplyPatchError::UnclosedSearchBlock { path: path.clone() });
@@ -64,21 +85,28 @@ impl SearchReplaceParser {
         Ok(())
     }
 
+    /// Reports whether a `SEARCH` or `REPLACE` block is still open.
     pub(super) const fn is_open(&self) -> bool {
         self.search_start.is_some() || self.replace_start.is_some()
     }
 
+    /// Consumes the parser and returns the captured blocks.
     pub(super) fn into_blocks(self) -> Vec<SearchReplaceBlock> { self.blocks }
 }
 
+/// Captures added lines from a create hunk until the operation completes.
 pub(super) struct CreateContentCapture {
+    /// Accumulated file content, with the leading `+` already stripped.
     content: String,
+    /// Whether added lines are currently being collected.
     capture_hunk: bool,
+    /// Whether any hunk header has been seen at all.
     saw_hunk: bool,
 }
 
 impl CreateContentCapture {
-    pub(super) fn new() -> Self {
+    /// Creates a capture that is not yet collecting added lines.
+    pub(super) const fn new() -> Self {
         Self {
             content: String::new(),
             capture_hunk: false,
@@ -86,11 +114,13 @@ impl CreateContentCapture {
         }
     }
 
-    pub(super) fn handle_hunk_header(&mut self) {
+    /// Starts collecting added lines at a hunk header.
+    pub(super) const fn handle_hunk_header(&mut self) {
         self.saw_hunk = true;
         self.capture_hunk = true;
     }
 
+    /// Appends one added line to the captured content.
     pub(super) fn capture_line(&mut self, line: &str) {
         if !self.capture_hunk {
             return;
@@ -100,6 +130,11 @@ impl CreateContentCapture {
         self.content.push_str(ending);
     }
 
+    /// Validates that a hunk was seen and returns the captured content.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApplyPatchError::MissingHunk`] when no hunk header was seen.
     pub(super) fn validate_and_finish(
         self,
         path: &FilePath,
@@ -111,21 +146,26 @@ impl CreateContentCapture {
     }
 }
 
+/// Returns the offset just past the newline that ends the line at `line_start`.
 fn line_end_from_chunk(chunk: &str, line_start: usize) -> usize {
-    chunk[line_start..]
-        .find('\n')
-        .map(|offset| line_start + offset + 1)
-        .unwrap_or(chunk.len())
+    chunk
+        .get(line_start..)
+        .and_then(|tail| tail.find('\n'))
+        .map_or(chunk.len(), |offset| line_start + offset + 1)
 }
 
+/// Splits a diff line into its content and original line ending.
 fn split_line_content(line: &str) -> (&str, &str) {
-    if let Some(stripped) = line.strip_suffix("\r\n") {
-        (strip_leading_plus(stripped), "\r\n")
-    } else if let Some(stripped) = line.strip_suffix('\n') {
-        (strip_leading_plus(stripped), "\n")
-    } else {
-        (strip_leading_plus(line), "")
-    }
+    line.strip_suffix("\r\n").map_or_else(
+        || {
+            line.strip_suffix('\n').map_or_else(
+                || (strip_leading_plus(line), ""),
+                |stripped| (strip_leading_plus(stripped), "\n"),
+            )
+        },
+        |stripped| (strip_leading_plus(stripped), "\r\n"),
+    )
 }
 
+/// Removes a leading `+` marker from an added diff line.
 fn strip_leading_plus(line: &str) -> &str { line.strip_prefix('+').unwrap_or(line) }

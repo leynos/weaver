@@ -53,7 +53,7 @@ impl Domain {
     }
 
     /// Returns the canonical string representation.
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Observe => "observe",
             Self::Act => "act",
@@ -78,7 +78,9 @@ impl DispatchResult {
 
 /// Context for routing operations within a domain.
 pub struct DomainRoutingContext {
+    /// Canonical name of the domain this context routes.
     pub(crate) domain: &'static str,
+    /// Every operation the domain recognizes, in catalogue order.
     pub(crate) known_operations: &'static [&'static str],
 }
 
@@ -118,7 +120,7 @@ impl DomainRoutingContext {
 
 /// Returns the daemon's domain-to-operation routing catalogue.
 #[cfg(feature = "test-support")]
-pub(crate) fn routing_catalogue() -> [(&'static str, &'static [&'static str]); 3] {
+pub(crate) const fn routing_catalogue() -> [(&'static str, &'static [&'static str]); 3] {
     [
         (
             DomainRoutingContext::OBSERVE.domain,
@@ -141,7 +143,9 @@ pub(crate) fn routing_catalogue() -> [(&'static str, &'static [&'static str]); 3
 /// delegates to the appropriate handler. MVP handlers return "not implemented"
 /// responses for all known operations.
 pub struct DomainRouter {
+    /// Absolute directory against which workspace-relative paths are resolved.
     workspace_root: PathBuf,
+    /// Runtime used to execute refactor plugin operations.
     refactor_runtime: Arc<dyn act::refactor::RefactorPluginRuntime + Send + Sync>,
 }
 
@@ -213,14 +217,18 @@ impl DomainRouter {
         );
 
         match domain {
-            Domain::Observe => self.route_observe(request, writer, backends),
+            Domain::Observe => Self::route_observe(request, writer, backends),
             Domain::Act => self.route_act(request, writer, backends),
-            Domain::Verify => self.route_verify(request, writer),
+            Domain::Verify => Self::route_verify(request, writer),
         }
     }
 
+    /// Routes an `observe` request to its handler.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation is unknown or its handler fails.
     fn route_observe<W: Write>(
-        &self,
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
         backends: &mut FusionBackends<SemanticBackendProvider>,
@@ -234,6 +242,11 @@ impl DomainRouter {
         }
     }
 
+    /// Routes an `act` request to its handler.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation is unknown or its handler fails.
     fn route_act<W: Write>(
         &self,
         request: &CommandRequest,
@@ -258,8 +271,12 @@ impl DomainRouter {
         }
     }
 
+    /// Routes a `verify` request, which currently delegates to the fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation is unknown.
     fn route_verify<W: Write>(
-        &self,
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
@@ -278,12 +295,17 @@ impl DomainRouter {
         } else {
             Err(DispatchError::unknown_operation(
                 routing.domain,
-                operation.to_string(),
+                operation.to_owned(),
                 routing.known_operations,
             ))
         }
     }
 
+    /// Emits the "operation not yet implemented" notice for a known operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing the notice fails.
     fn write_not_implemented<W: Write>(
         writer: &mut ResponseWriter<W>,
         domain: &str,
@@ -296,6 +318,11 @@ impl DomainRouter {
     }
 }
 
+/// Rejects workspace roots that are not absolute paths.
+///
+/// # Errors
+///
+/// Returns [`DispatchError::InvalidArguments`] if `workspace_root` is relative.
 fn validate_absolute_workspace_root(workspace_root: &Path) -> Result<(), DispatchError> {
     if workspace_root.is_absolute() {
         Ok(())

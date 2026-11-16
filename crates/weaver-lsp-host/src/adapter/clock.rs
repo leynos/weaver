@@ -58,6 +58,7 @@ impl Deadline {
 /// multiplying the stall by the batch size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RestartCooldown {
+    /// How long a stopped server is left alone after its last failure.
     period: Duration,
 }
 
@@ -102,7 +103,7 @@ impl ManualClock {
         *self
             .elapsed
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner()) += by;
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += by;
     }
 }
 
@@ -112,7 +113,7 @@ impl Clock for ManualClock {
         let elapsed = *self
             .elapsed
             .lock()
-            .unwrap_or_else(|poison| poison.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         self.origin + elapsed
     }
 }

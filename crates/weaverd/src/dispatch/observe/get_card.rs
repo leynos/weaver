@@ -59,12 +59,12 @@ pub fn handle<W: Write>(
         detail: card_request.detail,
     }) {
         Ok(card) => {
-            let mut card = card.as_ref().clone();
+            let mut owned_card = card.as_ref().clone();
             if card_request.detail >= DetailLevel::Semantic {
-                apply_lsp_enrichment(&mut card, &source, backends);
+                apply_lsp_enrichment(&mut owned_card, &source, backends);
             }
             GetCardResponse::Success {
-                card: Box::new(card),
+                card: Box::new(owned_card),
             }
         }
         Err(error) => map_extraction_error(error, card_request.detail)?,
@@ -72,7 +72,6 @@ pub fn handle<W: Write>(
 
     let status = match &response {
         GetCardResponse::Success { .. } => 0,
-        GetCardResponse::Refusal { .. } => 1,
         _ => 1,
     };
     let json = serde_json::to_string(&response)?;
@@ -97,6 +96,7 @@ fn apply_lsp_enrichment(
     }
 }
 
+/// Validates that `uri` uses the `file` scheme and converts it to a path.
 fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
     if uri.scheme() != "file" {
         return Err(DispatchError::invalid_arguments(format!(
@@ -105,11 +105,12 @@ fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
         )));
     }
 
-    uri.to_file_path().map_err(|_| {
+    uri.to_file_path().map_err(|()| {
         DispatchError::invalid_arguments(format!("URI is not a valid file path: {uri}"))
     })
 }
 
+/// Converts a card extraction error into a refusal or a dispatch error.
 fn map_extraction_error(
     error: CardExtractionError,
     detail: weaver_cards::DetailLevel,

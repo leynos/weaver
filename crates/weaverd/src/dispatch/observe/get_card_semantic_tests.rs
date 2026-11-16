@@ -1,6 +1,14 @@
 //! Semantic-enrichment tests for `observe::get_card`.
 
 use super::*;
+use crate::test_helpers::ensure_same;
+
+/// Returns the `key` member of a JSON object, reporting a missing field.
+fn field<'a>(value: &'a serde_json::Value, key: &str) -> Result<&'a serde_json::Value, String> {
+    value
+        .get(key)
+        .ok_or_else(|| format!("missing field `{key}`"))
+}
 
 /// Dispatches the standard Rust fixture against `server` at semantic detail.
 fn dispatch_semantic_card(
@@ -43,19 +51,38 @@ fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(
 
     let (status, payload) = dispatch_semantic_card(&dir, server)?;
 
-    assert_eq!(status, 0);
-    assert_eq!(payload["status"], "success");
-    assert_eq!(payload["card"]["lsp"]["source"], "lsp_hover");
-    assert_eq!(
-        payload["card"]["lsp"]["type"],
-        "fn greet(name: &str) -> usize"
-    );
-    assert_eq!(payload["card"]["lsp"]["deprecated"], true);
-    assert_eq!(
-        payload["card"]["provenance"]["sources"],
-        serde_json::json!(["tree_sitter", "lsp_hover"])
-    );
-    Ok(())
+    ensure_same(status, 0, "handler status")?;
+    ensure_same(
+        payload.get("status").and_then(serde_json::Value::as_str),
+        Some("success"),
+        "envelope status",
+    )?;
+
+    let card = field(&payload, "card")?;
+    let lsp = field(card, "lsp")?;
+    ensure_same(
+        lsp.get("source").and_then(serde_json::Value::as_str),
+        Some("lsp_hover"),
+        "lsp.source",
+    )?;
+    ensure_same(
+        lsp.get("type").and_then(serde_json::Value::as_str),
+        Some("fn greet(name: &str) -> usize"),
+        "lsp.type",
+    )?;
+    ensure_same(
+        lsp.get("deprecated").and_then(serde_json::Value::as_bool),
+        Some(true),
+        "lsp.deprecated",
+    )?;
+
+    let provenance = field(card, "provenance")?;
+    let expected_sources = serde_json::json!(["tree_sitter", "lsp_hover"]);
+    ensure_same(
+        provenance.get("sources"),
+        Some(&expected_sources),
+        "provenance.sources",
+    )
 }
 
 #[rstest]
@@ -68,12 +95,27 @@ fn handle_returns_semantic_success_with_degraded_provenance_when_hover_is_unavai
 
     let (status, payload) = dispatch_semantic_card(&dir, server)?;
 
-    assert_eq!(status, 0);
-    assert_eq!(payload["status"], "success");
-    assert!(payload["card"]["lsp"].is_null());
-    assert_eq!(
-        payload["card"]["provenance"]["sources"],
-        serde_json::json!(["tree_sitter", "tree_sitter_degraded_semantic"])
-    );
-    Ok(())
+    ensure_same(status, 0, "handler status")?;
+    ensure_same(
+        payload.get("status").and_then(serde_json::Value::as_str),
+        Some("success"),
+        "envelope status",
+    )?;
+
+    let card = field(&payload, "card")?;
+    // A card without LSP enrichment omits `lsp` entirely, because the field is
+    // skipped when it is `None`, so an absent key means "no LSP data".
+    ensure_same(
+        card.get("lsp").is_none_or(serde_json::Value::is_null),
+        true,
+        "lsp to be null or absent",
+    )?;
+
+    let provenance = field(card, "provenance")?;
+    let expected_sources = serde_json::json!(["tree_sitter", "tree_sitter_degraded_semantic"]);
+    ensure_same(
+        provenance.get("sources"),
+        Some(&expected_sources),
+        "provenance.sources",
+    )
 }

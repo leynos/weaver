@@ -9,6 +9,7 @@
 mod commit;
 #[cfg(test)]
 mod content_transaction_tests;
+mod temp_file;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]
@@ -83,11 +84,11 @@ pub enum ContentChange {
 impl ContentChange {
     /// Creates a write change.
     #[must_use]
-    pub fn write(path: PathBuf, content: String) -> Self { Self::Write { path, content } }
+    pub const fn write(path: PathBuf, content: String) -> Self { Self::Write { path, content } }
 
     /// Creates a delete change.
     #[must_use]
-    pub fn delete(path: PathBuf) -> Self { Self::Delete { path } }
+    pub const fn delete(path: PathBuf) -> Self { Self::Delete { path } }
 
     /// Path targeted by this change.
     #[must_use]
@@ -100,8 +101,11 @@ impl ContentChange {
 
 /// Builder for applying full-content changes through the Double-Lock harness.
 pub struct ContentTransaction<'a> {
+    /// Changes queued for validation and commit.
     changes: Vec<ContentChange>,
+    /// Syntactic lock applied to the assembled verification context.
     syntactic_lock: &'a dyn SyntacticLock,
+    /// Semantic lock applied after the syntactic lock passes.
     semantic_lock: &'a dyn SemanticLock,
 }
 
@@ -165,7 +169,7 @@ impl<'a> ContentTransaction<'a> {
             }
         }
 
-        execute_with_locks(TransactionExecution {
+        execute_with_locks(&TransactionExecution {
             context: &context,
             paths_to_write: &paths_to_write,
             deletions: &deletions,
@@ -179,8 +183,11 @@ impl<'a> ContentTransaction<'a> {
 
 /// Builder for coordinating the Double-Lock verification process.
 pub struct EditTransaction<'a> {
+    /// File edits queued for validation and commit.
     file_edits: Vec<FileEdit>,
+    /// Syntactic lock applied to the assembled verification context.
     syntactic_lock: &'a dyn SyntacticLock,
+    /// Semantic lock applied after the syntactic lock passes.
     semantic_lock: &'a dyn SemanticLock,
 }
 
@@ -250,7 +257,7 @@ impl<'a> EditTransaction<'a> {
             paths_to_write.push(path.to_path_buf());
         }
 
-        execute_with_locks(TransactionExecution {
+        execute_with_locks(&TransactionExecution {
             context: &context,
             paths_to_write: &paths_to_write,
             deletions: &[],
@@ -290,7 +297,7 @@ fn read_existing_file(
 
 /// Executes the Double-Lock validation pipeline and commits changes on success.
 fn execute_with_locks(
-    execution: TransactionExecution<'_>,
+    execution: &TransactionExecution<'_>,
 ) -> Result<TransactionOutcome, SafetyHarnessError> {
     let syntactic_result = execution.syntactic_lock.validate(execution.context);
     if let SyntacticLockResult::Failed { failures } = syntactic_result {
@@ -302,7 +309,7 @@ fn execute_with_locks(
         return Ok(TransactionOutcome::SemanticLockFailed { failures });
     }
 
-    commit_changes_with_deletes(CommitPlan {
+    commit_changes_with_deletes(&CommitPlan {
         dir: execution.workspace_dir,
         workspace_root: execution.workspace_root,
         context: execution.context,
@@ -320,15 +327,27 @@ fn execute_with_locks(
 /// Bundles the verification context, files to write, planned deletions, and
 /// the syntactic/semantic lock interfaces used by the pipeline.
 struct TransactionExecution<'a> {
+    /// Verification context holding original and modified content.
     context: &'a VerificationContext,
+    /// Paths whose modified content should be written.
     paths_to_write: &'a [PathBuf],
+    /// Files planned for deletion after writes are committed.
     deletions: &'a [DeletePlan],
+    /// Workspace capability used for every file operation.
     workspace_dir: &'a Dir,
+    /// Absolute workspace root used to derive capability-relative paths.
     workspace_root: &'a Path,
+    /// Syntactic lock used for the first validation phase.
     syntactic_lock: &'a dyn SyntacticLock,
+    /// Semantic lock used for the second validation phase.
     semantic_lock: &'a dyn SemanticLock,
 }
 
+/// Strips the workspace root prefix, yielding a capability-relative path.
+///
+/// # Errors
+///
+/// Returns a permission-denied error when `path` lies outside `workspace_root`.
 pub(super) fn relative_workspace_path<'a>(
     path: &'a Path,
     workspace_root: &Path,

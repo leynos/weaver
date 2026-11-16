@@ -16,12 +16,16 @@ use crate::{
 /// A validated, known CLI domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum KnownDomain {
+    /// Read-only inspection of code structure and relationships.
     Observe,
+    /// Code-modifying operations.
     Act,
+    /// Validation of code correctness.
     Verify,
 }
 
 impl KnownDomain {
+    /// Returns the canonical lower-case name used on the command line.
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Observe => "observe",
@@ -45,6 +49,7 @@ impl KnownDomain {
             })
     }
 
+    /// Returns the operations the command tree registers for this domain.
     fn operations(self) -> Option<&'static [&'static str]> {
         command_tree::domain_operations()
             .iter()
@@ -52,6 +57,7 @@ impl KnownDomain {
             .map(|entry| entry.operations)
     }
 
+    /// Iterates over every domain in command-tree catalogue order.
     fn catalogue_order() -> impl Iterator<Item = Self> {
         command_tree::domain_operations()
             .iter()
@@ -64,8 +70,16 @@ pub(crate) fn operations_for_domain(domain: KnownDomain) -> Option<&'static [&'s
     domain.operations()
 }
 
-fn strip_bidi_isolates(text: String) -> String { text.replace(['\u{2068}', '\u{2069}'], "") }
+/// Strips Unicode bidirectional isolate controls from localized text.
+///
+/// Terminals render those controls as visible artefacts around embedded
+/// values, so guidance text removes them before writing.
+fn strip_bidi_isolates(text: &str) -> String { text.replace(['\u{2068}', '\u{2069}'], "") }
 
+/// Maps a catalogue domain name to its [`KnownDomain`] variant.
+///
+/// Panics when the catalogue contains a domain this mapping does not cover,
+/// which would mean the command tree and this module have diverged.
 fn known_domain_from_catalogue_entry(domain: &str) -> KnownDomain {
     match domain {
         "observe" => KnownDomain::Observe,
@@ -75,6 +89,8 @@ fn known_domain_from_catalogue_entry(domain: &str) -> KnownDomain {
     }
 }
 
+/// Formats the catalogue's domain names as a comma-separated list for help
+/// text.
 fn valid_domains_list() -> String {
     KnownDomain::catalogue_order()
         .map(KnownDomain::as_str)
@@ -82,6 +98,10 @@ fn valid_domains_list() -> String {
         .join(", ")
 }
 
+/// Suggests the unique nearest known domain within an edit distance of two.
+///
+/// Returns `None` when no domain is close enough or when two domains tie, so
+/// the caller never presents an arbitrary choice as a suggestion.
 pub(crate) fn suggestion_for_unknown_domain(domain: &str) -> Option<KnownDomain> {
     let normalized_domain: Vec<char> = domain.trim().to_ascii_lowercase().chars().collect();
     let mut best_match = None;
@@ -105,6 +125,10 @@ pub(crate) fn suggestion_for_unknown_domain(domain: &str) -> Option<KnownDomain>
     if tied { None } else { best_match }
 }
 
+/// Computes the Levenshtein distance between two character sequences.
+///
+/// Returns `None` when the distance exceeds `max_distance`, or as soon as a
+/// partial row proves the bound cannot be met.
 pub(crate) fn bounded_levenshtein(
     left: &[char],
     right: &[char],
@@ -115,19 +139,24 @@ pub(crate) fn bounded_levenshtein(
     }
 
     let mut previous: Vec<usize> = (0..=right.len()).collect();
-    let mut current = vec![0; right.len() + 1];
+    let mut current = Vec::with_capacity(right.len() + 1);
 
     for (left_index, left_char) in left.iter().enumerate() {
-        current[0] = left_index + 1;
-        let mut row_min = current[0];
+        current.clear();
+        current.push(left_index + 1);
+        let mut row_min = left_index + 1;
 
         for (right_index, right_char) in right.iter().enumerate() {
             let substitution_cost = usize::from(left_char != right_char);
-            current[right_index + 1] = usize::min(
-                usize::min(previous[right_index + 1] + 1, current[right_index] + 1),
-                previous[right_index] + substitution_cost,
+            let above = previous.get(right_index + 1).copied()?;
+            let above_left = previous.get(right_index).copied()?;
+            let left_neighbour = current.get(right_index).copied()?;
+            let cell = usize::min(
+                usize::min(above + 1, left_neighbour + 1),
+                above_left + substitution_cost,
             );
-            row_min = row_min.min(current[right_index + 1]);
+            current.push(cell);
+            row_min = row_min.min(cell);
         }
 
         if row_min > max_distance {
@@ -137,7 +166,7 @@ pub(crate) fn bounded_levenshtein(
         previous.clone_from_slice(&current);
     }
 
-    let distance = previous[right.len()];
+    let distance = *previous.last()?;
     (distance <= max_distance).then_some(distance)
 }
 
@@ -162,13 +191,13 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
     args.insert("domain", domain_name.into());
     args.insert("hint_operation", (*hint_operation).into());
 
-    let problem = strip_bidi_isolates(localizer.message(
+    let problem = strip_bidi_isolates(&localizer.message(
         "weaver-domain-guidance-missing-operation-error",
         Some(&args),
         &format!("operation required for domain '{domain_name}'"),
     ));
 
-    let available_operations = strip_bidi_isolates(localizer.message(
+    let available_operations = strip_bidi_isolates(&localizer.message(
         "weaver-domain-guidance-available-operations",
         None,
         "Available operations:",
@@ -201,13 +230,13 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     let valid_domains = valid_domains_list();
     args.insert("domains", valid_domains.as_str().into());
 
-    let problem = strip_bidi_isolates(localizer.message(
+    let problem = strip_bidi_isolates(&localizer.message(
         "weaver-domain-guidance-unknown-domain-error",
         Some(&args),
         &format!("unknown domain '{domain}'"),
     ));
 
-    let valid_domains_message = strip_bidi_isolates(localizer.message(
+    let valid_domains_message = strip_bidi_isolates(&localizer.message(
         "weaver-domain-guidance-valid-domains",
         Some(&args),
         &format!("Valid domains: {valid_domains}"),
@@ -219,7 +248,7 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     let next_command = if let Some(suggested_domain) = suggestion_for_unknown_domain(domain) {
         let suggested_domain_str = suggested_domain.as_str();
         args.insert("suggested_domain", suggested_domain_str.into());
-        let suggestion = strip_bidi_isolates(localizer.message(
+        let suggestion = strip_bidi_isolates(&localizer.message(
             "weaver-domain-guidance-did-you-mean-domain",
             Some(&args),
             &format!("Did you mean '{suggested_domain_str}'?"),
@@ -233,7 +262,7 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
         };
         format!("weaver {suggested_domain_str} {hint_op} --help")
     } else {
-        "weaver --help".to_string()
+        "weaver --help".to_owned()
     };
 
     let guidance = ActionableGuidance::new(problem, alternatives, next_command);

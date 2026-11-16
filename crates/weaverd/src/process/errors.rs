@@ -166,9 +166,13 @@ impl From<RuntimePathsError> for LaunchError {
     fn from(source: RuntimePathsError) -> Self {
         match source {
             RuntimePathsError::MissingSocketParent { path } => Self::MissingSocketParent { path },
-            RuntimePathsError::RuntimeDirectory { path, source } => {
-                Self::RuntimeDirectory { path, source }
-            }
+            RuntimePathsError::RuntimeDirectory {
+                path,
+                source: io_error,
+            } => Self::RuntimeDirectory {
+                path,
+                source: io_error,
+            },
         }
     }
 }

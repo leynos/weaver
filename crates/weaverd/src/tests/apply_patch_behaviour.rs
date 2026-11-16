@@ -101,7 +101,7 @@ impl ApplyPatchWorld {
 
     fn path(&self, relative: &str) -> PathBuf { self.temp_dir.path().join(relative) }
 
-    fn set_patch(&mut self, patch: &str) { self.patch = Some(patch.to_string()); }
+    fn set_patch(&mut self, patch: &str) { self.patch = Some(patch.to_owned()); }
 
     fn apply_patch(&mut self) -> Result<()> {
         let patch = self.patch.clone().context("patch should be set")?;
@@ -213,8 +213,8 @@ fn given_syntactic_fails(
     path: String,
     message: String,
 ) -> Result<()> {
-    let path = PathBuf::from(strip_quotes(&path));
-    let failure = VerificationFailure::new(path, message.as_str());
+    let failed_path = PathBuf::from(strip_quotes(&path));
+    let failure = VerificationFailure::new(failed_path, message.as_str());
     apply_patch_world(world)?.borrow_mut().syntactic_lock =
         ConfigurableSyntacticLock::failing(vec![failure]);
     Ok(())
@@ -232,8 +232,8 @@ fn given_semantic_fails(
     path: String,
     message: String,
 ) -> Result<()> {
-    let path = PathBuf::from(strip_quotes(&path));
-    let failure = VerificationFailure::new(path, message.as_str());
+    let failed_path = PathBuf::from(strip_quotes(&path));
+    let failure = VerificationFailure::new(failed_path, message.as_str());
     apply_patch_world(world)?.borrow_mut().semantic_lock =
         ConfigurableSemanticLock::failing(vec![failure]);
     Ok(())
@@ -246,22 +246,26 @@ fn when_patch_applied(world: &ApplyPatchWorldFixture) -> Result<()> {
 
 #[then("the apply-patch file {path} contains {snippet}")]
 fn then_file_contains(world: &ApplyPatchWorldFixture, path: String, snippet: String) -> Result<()> {
-    let path = strip_quotes(&path);
-    let snippet = strip_quotes(&snippet);
-    let content = apply_patch_world(world)?.borrow().read_file(path)?;
+    let relative_path = strip_quotes(&path);
+    let expected_snippet = strip_quotes(&snippet);
+    let content = apply_patch_world(world)?
+        .borrow()
+        .read_file(relative_path)?;
     ensure!(
-        content.contains(snippet),
-        "expected {path} to contain {snippet:?}, got: {content:?}"
+        content.contains(expected_snippet),
+        "expected {relative_path} to contain {expected_snippet:?}, got: {content:?}"
     );
     Ok(())
 }
 
 #[then("the file {path} is missing")]
 fn then_file_missing(world: &ApplyPatchWorldFixture, path: String) -> Result<()> {
-    let path = strip_quotes(&path);
+    let relative_path = strip_quotes(&path);
     ensure!(
-        !apply_patch_world(world)?.borrow().file_exists(path)?,
-        "expected {path} to be missing"
+        !apply_patch_world(world)?
+            .borrow()
+            .file_exists(relative_path)?,
+        "expected {relative_path} to be missing"
     );
     Ok(())
 }
@@ -276,14 +280,13 @@ fn then_patch_succeeds(world: &ApplyPatchWorldFixture) -> Result<()> {
 
 #[then("the apply-patch fails with {kind}")]
 fn then_patch_fails(world: &ApplyPatchWorldFixture, kind: String) -> Result<()> {
-    let kind = strip_quotes(&kind);
+    let expected_kind = strip_quotes(&kind);
     let state = apply_patch_world(world)?.borrow();
     let result = state.result.as_ref().context("result set")?;
-    let error = match result {
-        Err(error) => error,
-        Ok(()) => anyhow::bail!("expected failure, got success"),
+    let Err(error) = result else {
+        anyhow::bail!("expected failure, got success");
     };
-    match kind {
+    match expected_kind {
         "InvalidPath" => ensure!(matches!(
             error,
             ApplyPatchFailure::Patch(ApplyPatchError::InvalidPath { .. })

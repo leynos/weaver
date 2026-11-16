@@ -14,17 +14,22 @@ use crate::safety_harness::{
 /// Allows test scenarios to specify exact pass/fail behaviour.
 #[derive(Debug, Default, Clone)]
 pub struct ConfigurableSyntacticLock {
+    /// Failures reported whenever the lock is validated.
     failures: Vec<VerificationFailure>,
 }
 
 impl ConfigurableSyntacticLock {
     /// Creates a lock that always passes.
     #[must_use]
-    pub fn passing() -> Self { Self { failures: vec![] } }
+    pub const fn passing() -> Self {
+        Self {
+            failures: Vec::new(),
+        }
+    }
 
     /// Creates a lock that fails with the specified failures.
     #[must_use]
-    pub fn failing(failures: Vec<VerificationFailure>) -> Self { Self { failures } }
+    pub const fn failing(failures: Vec<VerificationFailure>) -> Self { Self { failures } }
 }
 
 impl SyntacticLock for ConfigurableSyntacticLock {
@@ -44,23 +49,25 @@ impl SyntacticLock for ConfigurableSyntacticLock {
 /// Allows test scenarios to specify exact pass/fail behaviour.
 #[derive(Debug, Default, Clone)]
 pub struct ConfigurableSemanticLock {
+    /// Failures reported when no backend error is configured.
     failures: Vec<VerificationFailure>,
+    /// Optional backend error message to return instead of a result.
     error: Option<String>,
 }
 
 impl ConfigurableSemanticLock {
     /// Creates a lock that always passes.
     #[must_use]
-    pub fn passing() -> Self {
+    pub const fn passing() -> Self {
         Self {
-            failures: vec![],
+            failures: Vec::new(),
             error: None,
         }
     }
 
     /// Creates a lock that fails with the specified failures.
     #[must_use]
-    pub fn failing(failures: Vec<VerificationFailure>) -> Self {
+    pub const fn failing(failures: Vec<VerificationFailure>) -> Self {
         Self {
             failures,
             error: None,

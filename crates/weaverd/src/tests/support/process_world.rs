@@ -69,7 +69,7 @@ impl ProcessTestWorld {
 
     pub fn start_background(&mut self) -> StepResult {
         if self.handle.is_some() {
-            return Err("daemon already running".to_string());
+            return Err("daemon already running".to_owned());
         }
         self.reset_observations();
         let loader = self.loader.clone();
@@ -92,7 +92,7 @@ impl ProcessTestWorld {
 
     pub fn start_foreground(&mut self, mode: LaunchMode, pretrigger: bool) -> StepResult {
         if self.result.is_some() {
-            return Err("result already recorded".to_string());
+            return Err("result already recorded".to_owned());
         }
         self.reset_observations();
         let reporter = self.reporter.clone() as Arc<dyn crate::health::HealthReporter>;
@@ -121,7 +121,7 @@ impl ProcessTestWorld {
 
     pub fn start_foreground_with_invalid_config(&mut self) -> StepResult {
         if self.result.is_some() {
-            return Err("result already recorded".to_string());
+            return Err("result already recorded".to_owned());
         }
         self.reset_observations();
         let reporter = self.reporter.clone() as Arc<dyn crate::health::HealthReporter>;
@@ -145,13 +145,13 @@ impl ProcessTestWorld {
         let handle = self
             .handle
             .take()
-            .ok_or_else(|| "daemon not running".to_string())?;
+            .ok_or_else(|| "daemon not running".to_owned())?;
         match handle.join() {
             Ok(result) => {
                 self.result = Some(result);
                 Ok(())
             }
-            Err(_) => Err("daemon thread panicked".to_string()),
+            Err(_) => Err("daemon thread panicked".to_owned()),
         }
     }
 

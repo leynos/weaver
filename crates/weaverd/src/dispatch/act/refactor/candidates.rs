@@ -19,12 +19,12 @@ pub(super) fn manifest_supports_language(
 /// Returns a ranking tuple for provider prioritization.
 pub(super) fn provider_rank(provider_name: &str, language: SupportedLanguage) -> (usize, &str) {
     let preferred = preferred_provider(language);
-    let rank = if provider_name == preferred { 0 } else { 1 };
+    let rank = usize::from(provider_name != preferred);
     (rank, provider_name)
 }
 
 /// Returns the preferred provider for a given language.
-pub(super) fn preferred_provider(language: SupportedLanguage) -> &'static str {
+pub(super) const fn preferred_provider(language: SupportedLanguage) -> &'static str {
     match language {
         SupportedLanguage::Python => "rope",
         SupportedLanguage::Rust => "rust-analyzer",

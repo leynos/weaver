@@ -167,25 +167,33 @@ fn render_boundary_matrix_example_writes_output() -> TestResult {
     let temp = temp_dir()?;
     let manifest_path = temp.path().join("manifest.toml");
     let output_path = temp.path().join("matrix.md");
-    write_file(temp.path(), "manifest.toml", VALID_MANIFEST)?
-        .map_err(|error| format!("write valid manifest: {error}"))?;
 
+    stage_valid_manifest(&temp)?;
     let output = run_render_boundary_matrix(&[manifest_path.as_str(), output_path.as_str()])?;
 
-    if !output.status.success() {
-        return Err(format!(
-            "example failed\nstdout: {}\nstderr: {}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
+    ensure_example_succeeded(&output)?;
+    let rendered = read_rendered_matrix(&temp)?;
 
-    let rendered = read_file(temp.path(), "matrix.md")?
-        .map_err(|error| format!("read rendered matrix: {error}"))?;
     ensure(
         rendered.contains("[12.1.1]"),
         "rendered output should name task",
     )
+}
+
+/// Write the valid manifest fixture that the example under test reads.
+fn stage_valid_manifest(temp: &Utf8TempDir) -> TestResult {
+    let written = write_file(temp.path(), "manifest.toml", VALID_MANIFEST)
+        .map_err(|error| format!("write valid manifest: {error}"))?;
+
+    written.map_err(|error| format!("write valid manifest: {error}"))
+}
+
+/// Read back the matrix the example rendered into `temp`.
+fn read_rendered_matrix(temp: &Utf8TempDir) -> TestResult<String> {
+    let contents = read_file(temp.path(), "matrix.md")
+        .map_err(|error| format!("read rendered matrix: {error}"))?;
+
+    contents.map_err(|error| format!("read rendered matrix: {error}"))
 }
 
 /// Prove the example reports a missing manifest path.
@@ -286,6 +294,18 @@ fn run_render_boundary_matrix(args: &[&str]) -> TestResult<Output> {
         .current_dir(repo_root()?)
         .output()
         .map_err(|error| format!("run render_boundary_matrix example: {error}"))
+}
+
+/// Fail with the example's captured output when it exited unsuccessfully.
+fn ensure_example_succeeded(output: &Output) -> TestResult {
+    ensure(
+        output.status.success(),
+        format!(
+            "example failed\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        ),
+    )
 }
 
 /// Check that the example failed and wrote the expected diagnostic.

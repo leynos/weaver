@@ -5,9 +5,10 @@ use std::path::Path;
 fn format_diff(path: &Path, git_header: &str) -> String {
     let original = original_content_for(path);
     let updated = updated_content_for(path);
-    format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n",)
+    format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n")
 }
 
+#[derive(Clone, Copy)]
 pub(crate) enum FileKind {
     Python,
     Rust,

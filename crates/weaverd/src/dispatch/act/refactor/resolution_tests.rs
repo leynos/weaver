@@ -9,14 +9,17 @@ use weaver_plugins::{
     manifest::{PluginKind, PluginMetadata},
 };
 
-use crate::dispatch::act::refactor::resolution::{
-    CandidateReason,
-    CapabilityResolutionDetails,
-    RefusalReason,
-    ResolutionOutcome,
-    ResolutionRequest,
-    SelectionMode,
-    resolve_provider,
+use crate::{
+    dispatch::act::refactor::resolution::{
+        CandidateReason,
+        CapabilityResolutionDetails,
+        RefusalReason,
+        ResolutionOutcome,
+        ResolutionRequest,
+        SelectionMode,
+        resolve_provider,
+    },
+    test_helpers::ensure_same,
 };
 
 fn registry() -> Result<PluginRegistry, String> {
@@ -58,17 +61,38 @@ fn assert_provider_selected(
     provider: &str,
     mode: SelectionMode,
     language: &str,
-) {
-    assert_eq!(details.selected_provider(), Some(provider));
-    assert_eq!(details.selection_mode, mode);
-    assert_eq!(details.outcome, ResolutionOutcome::Selected);
-    assert_eq!(details.language.as_deref(), Some(language));
+) -> Result<(), String> {
+    ensure_same(
+        details.selected_provider(),
+        Some(provider),
+        "selected provider",
+    )?;
+    ensure_same(details.selection_mode, mode, "selection mode")?;
+    ensure_same(details.outcome, ResolutionOutcome::Selected, "outcome")?;
+    ensure_same(details.language.as_deref(), Some(language), "language")
 }
 
-fn assert_provider_refused(details: &CapabilityResolutionDetails, reason: RefusalReason) {
-    assert_eq!(details.selected_provider(), None);
-    assert_eq!(details.outcome, ResolutionOutcome::Refused);
-    assert_eq!(details.refusal_reason, Some(reason));
+fn assert_provider_refused(
+    details: &CapabilityResolutionDetails,
+    reason: RefusalReason,
+) -> Result<(), String> {
+    ensure_same(details.selected_provider(), None, "selected provider")?;
+    ensure_same(details.outcome, ResolutionOutcome::Refused, "outcome")?;
+    ensure_same(details.refusal_reason, Some(reason), "refusal reason")
+}
+
+/// Asserts an explicit-provider request for `src/main.py` was refused with
+/// `reason`.
+fn assert_explicit_provider_refused(provider: &str, reason: RefusalReason) -> Result<(), String> {
+    let envelope = resolution_for("src/main.py", Some(provider))?;
+    let details = envelope.details();
+
+    ensure_same(
+        details.selection_mode,
+        SelectionMode::ExplicitProvider,
+        "selection mode",
+    )?;
+    assert_provider_refused(details, reason)
 }
 
 #[test]
@@ -76,13 +100,14 @@ fn automatic_python_selection_prefers_rope() -> Result<(), String> {
     let envelope = resolution_for("src/main.py", None)?;
     let details = envelope.details();
 
-    assert_provider_selected(details, "rope", SelectionMode::Automatic, "python");
-    assert_eq!(details.candidates.len(), 2);
-    assert_eq!(
-        details.candidates[0].reason,
-        CandidateReason::MatchedLanguageAndCapability
-    );
-    Ok(())
+    assert_provider_selected(details, "rope", SelectionMode::Automatic, "python")?;
+    ensure_same(details.candidates.len(), 2, "candidate count")?;
+    let first_reason = details.candidates.first().map(|candidate| candidate.reason);
+    ensure_same(
+        first_reason,
+        Some(CandidateReason::MatchedLanguageAndCapability),
+        "first candidate reason",
+    )
 }
 
 #[test]
@@ -90,26 +115,22 @@ fn automatic_rust_selection_prefers_rust_analyzer() -> Result<(), String> {
     let envelope = resolution_for("src/main.rs", None)?;
     let details = envelope.details();
 
-    assert_provider_selected(details, "rust-analyzer", SelectionMode::Automatic, "rust");
-    assert_eq!(
-        details
-            .candidates
-            .iter()
-            .find(|candidate| candidate.provider == "rope")
-            .map(|candidate| candidate.reason),
-        Some(CandidateReason::UnsupportedLanguage)
-    );
-    Ok(())
+    assert_provider_selected(details, "rust-analyzer", SelectionMode::Automatic, "rust")?;
+    let rope_reason = details
+        .candidates
+        .iter()
+        .find(|candidate| candidate.provider == "rope")
+        .map(|candidate| candidate.reason);
+    ensure_same(
+        rope_reason,
+        Some(CandidateReason::UnsupportedLanguage),
+        "rope candidate reason",
+    )
 }
 
 #[test]
 fn explicit_provider_mismatch_is_refused() -> Result<(), String> {
-    let envelope = resolution_for("src/main.py", Some("rust-analyzer"))?;
-    let details = envelope.details();
-
-    assert_eq!(details.selection_mode, SelectionMode::ExplicitProvider);
-    assert_provider_refused(details, RefusalReason::ExplicitProviderMismatch);
-    Ok(())
+    assert_explicit_provider_refused("rust-analyzer", RefusalReason::ExplicitProviderMismatch)
 }
 
 #[test]
@@ -117,19 +138,17 @@ fn explicit_provider_selection_succeeds_when_language_matches() -> Result<(), St
     let envelope = resolution_for("src/main.py", Some("rope"))?;
     let details = envelope.details();
 
-    assert_provider_selected(details, "rope", SelectionMode::ExplicitProvider, "python");
-    assert_eq!(details.requested_provider.as_deref(), Some("rope"));
-    Ok(())
+    assert_provider_selected(details, "rope", SelectionMode::ExplicitProvider, "python")?;
+    ensure_same(
+        details.requested_provider.as_deref(),
+        Some("rope"),
+        "requested provider",
+    )
 }
 
 #[test]
 fn unknown_explicit_provider_is_refused() -> Result<(), String> {
-    let envelope = resolution_for("src/main.py", Some("missing-provider"))?;
-    let details = envelope.details();
-
-    assert_eq!(details.selection_mode, SelectionMode::ExplicitProvider);
-    assert_provider_refused(details, RefusalReason::ProviderNotFound);
-    Ok(())
+    assert_explicit_provider_refused("missing-provider", RefusalReason::ProviderNotFound)
 }
 
 #[test]
@@ -137,8 +156,7 @@ fn unsupported_language_is_refused() -> Result<(), String> {
     let envelope = resolution_for("README.md", None)?;
     let details = envelope.details();
 
-    assert_provider_refused(details, RefusalReason::UnsupportedLanguage);
-    Ok(())
+    assert_provider_refused(details, RefusalReason::UnsupportedLanguage)
 }
 
 #[test]
@@ -146,15 +164,18 @@ fn supported_language_without_provider_is_refused_deterministically() -> Result<
     let envelope = resolution_for("src/main.ts", None)?;
     let details = envelope.details();
 
-    assert_eq!(details.language.as_deref(), Some("typescript"));
-    assert_provider_refused(details, RefusalReason::NoMatchingProvider);
-    assert!(
-        details
-            .candidates
-            .iter()
-            .all(|candidate| candidate.reason == CandidateReason::UnsupportedLanguage),
-        "expected deterministic unsupported-language rejections, got: {:?}",
-        details.candidates
-    );
-    Ok(())
+    ensure_same(details.language.as_deref(), Some("typescript"), "language")?;
+    assert_provider_refused(details, RefusalReason::NoMatchingProvider)?;
+    if details
+        .candidates
+        .iter()
+        .all(|candidate| candidate.reason == CandidateReason::UnsupportedLanguage)
+    {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected deterministic unsupported-language rejections, got: {:?}",
+            details.candidates
+        ))
+    }
 }

@@ -60,7 +60,7 @@ where
     let result = response
         .result
         .ok_or_else(|| AdapterError::InitializationFailed {
-            message: "empty result in response".to_string(),
+            message: "empty result in response".to_owned(),
         })?;
     serde_json::from_value(result).map_err(AdapterError::from)
 }

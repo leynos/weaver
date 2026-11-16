@@ -129,7 +129,7 @@ pub struct FileEdit {
 impl FileEdit {
     /// Creates a new file edit with no changes.
     #[must_use]
-    pub fn new(path: PathBuf) -> Self {
+    pub const fn new(path: PathBuf) -> Self {
         Self {
             path,
             edits: Vec::new(),
@@ -141,7 +141,7 @@ impl FileEdit {
 
     /// Builds a file edit from an existing collection of edits.
     #[must_use]
-    pub fn with_edits(path: PathBuf, edits: Vec<TextEdit>) -> Self { Self { path, edits } }
+    pub const fn with_edits(path: PathBuf, edits: Vec<TextEdit>) -> Self { Self { path, edits } }
 
     /// Path to the file being edited.
     #[must_use]
@@ -153,7 +153,7 @@ impl FileEdit {
 
     /// Returns true when no edits are present.
     #[must_use]
-    pub fn is_empty(&self) -> bool { self.edits.is_empty() }
+    pub const fn is_empty(&self) -> bool { self.edits.is_empty() }
 }
 
 #[cfg(test)]
@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(edit.start_column(), 0);
         assert_eq!(edit.end_line(), 3);
         assert_eq!(edit.end_column(), 5);
-        assert!(edit.new_text().is_empty());
+        assert_eq!(edit.new_text(), "");
     }
 
     #[test]

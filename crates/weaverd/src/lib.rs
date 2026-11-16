@@ -51,7 +51,8 @@ pub mod test_support {
     /// let catalogue = weaverd::test_support::routing_catalogue();
     /// assert!(catalogue.iter().any(|(domain, _)| *domain == "observe"));
     /// ```
-    pub fn routing_catalogue() -> [(&'static str, &'static [&'static str]); 3] {
+    #[must_use]
+    pub const fn routing_catalogue() -> [(&'static str, &'static [&'static str]); 3] {
         crate::dispatch::routing_catalogue()
     }
 }
@@ -86,5 +87,7 @@ pub use telemetry::{TelemetryError, TelemetryHandle};
 #[doc(hidden)]
 pub use transport::{ConnectionHandler, ConnectionStream};
 
+#[cfg(test)]
+mod test_helpers;
 #[cfg(test)]
 mod tests;

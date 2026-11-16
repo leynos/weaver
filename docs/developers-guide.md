@@ -192,6 +192,29 @@ manifests. The `weaver-cli` compile-time test checks all four declarations and
 uses `trybuild` fixtures to pin the accepted and rejected `missing_docs`
 diagnostics.
 
+### 4.1 Pinning `const` on public accessors
+
+Cargo cannot express "this accessor must stay a `const fn`", so the crates that
+promise it pin the property with a compile-time witness: a `const fn` wrapper
+whose body calls the accessor. Rust rejects a non-`const` call from inside a
+`const fn` body, so the wrapper stops compiling the moment the accessor loses
+`const`. The wrappers are exercised from an ordinary test, because the
+workspace's warnings-as-errors gate rejects dead code.
+
+- `crates/weaver-config/tests/const_api.rs` covers `Config`'s accessors.
+- `crates/weaver-sandbox/tests/const_api.rs` covers `SandboxProfile` and
+  `NetworkPolicy`.
+- `crates/weaver-lsp-host/tests/const_api.rs` covers the public
+  `weaver-lsp-host` accessors.
+- `crates/weaver-lsp-host/src/tests/const_api.rs` covers the items only the
+  crate can name: the `pub(crate)` `LspHostError` constructors and the private
+  `CapabilitySummary` fields. An integration test cannot call either.
+
+Prefer this witness over a `trybuild` fixture when the property is const-ness
+alone. A fixture costs a nested `cargo` build that must be serialized against
+the other compiler-starting tests, and it asserts on rendered diagnostics that
+move with the compiler; the witness costs one line and fails on the same edit.
+
 ## 5 Workflow pins and Dependabot
 
 Dependabot checks both ecosystems (`github-actions` and `cargo`) daily. The
@@ -1177,6 +1200,33 @@ preserve their declared type without implicit coercion. Boolean values must be
 `true` or `false` (the string `"yes"` is rejected as an invalid boolean, as
 shown in the user-facing error example).
 
+### 15.5 Socket parent normalisation
+
+`weaver-config`'s `socket::path_normalize::normalize_parent_path` folds the `.`
+and `..` components of a socket directory lexically, without touching the
+filesystem. A `..` pops the preceding name; at the root of an absolute path it
+is dropped, and in a relative path with nothing to pop it is kept. An empty
+result becomes `.`.
+
+`socket::preparation::validate_no_path_traversal` is its only caller. It
+canonicalises the parent directory, which resolves symlinks and removes `.` and
+`..` components, then requires the canonical path to end with the lexically
+folded parent. The check fails with `SocketPreparationError::PathTraversal`,
+carrying the folded parent and the canonical path, exactly when the canonical
+path does not end with the folded parent: for example, when a symlink in the
+configured path leads elsewhere. The fold stays textual so that the expected
+suffix does not depend on what the filesystem reports.
+
+### 15.6 Sandbox environment restoration
+
+`birdcage` strips the environment of the process that enters a sandbox, so
+`weaver-sandbox`'s `EnvGuard` captures the variables beforehand and restores
+them afterwards. `EnvGuard::restore` runs in two steps: `clear_environment`
+removes every variable currently present, then `apply_snapshot` reinstates each
+captured pair. Clearing first guarantees that a variable the sandbox added does
+not survive the restore. The source doc comments in `env_guard.rs` describe
+each step; this section records the order.
+
 ## 16 Card extraction cache internals
 
 The `observe get-card` path is optimized around two shared resources in
@@ -2113,6 +2163,101 @@ unchanged.
 This guarantee is specific to `TestWorld::rebuild_host`; other crates
 (`weaverd`, `weaver-sandbox`, `weaver-cli`) have their own internal
 `TestWorld`-style harnesses that are not covered by this section.
+
+### 23.1 Capability sets and request dispatch
+
+`weaver-lsp-host` is split into four modules with a deliberate dependency
+direction:
+
+- `server` owns the `LanguageServer` trait and `ServerCapabilitySet`.
+- `capability` owns `CapabilityKind`, `CapabilitySource`, and
+  `CapabilitySummary`, and consumes `weaver-config`'s `CapabilityMatrix`
+  alongside them.
+- `host` owns `LspHost`, `Session`, `CallContext`, and the dispatch helpers.
+- `adapter` provides the process-backed `LanguageServer` implementation.
+
+`capability` depends on `server`, `weaver-config`, and `language`; `server`
+depends only on `capability::CapabilityKind`; and `host` depends on `server`,
+`capability`, and `weaver-config`. Adaptors implement the trait without knowing
+how negotiation or dispatch works. `host` combines the two at runtime, while
+`capability` itself imports `ServerCapabilitySet` to resolve each language's
+advertised capabilities.
+
+`ServerCapabilitySet` stores a `BTreeSet<CapabilityKind>` rather than one
+boolean per capability. New capabilities are added by extending
+`CapabilityKind` and adding a builder (`with_*`) plus accessor (`supports_*`)
+pair, so existing adaptors keep compiling and an unadvertised capability is
+unavailable by default. `supports(capability)` is the general query.
+Negotiation is `resolve_state` in `crates/weaver-lsp-host/src/capability.rs`,
+which calls `ServerCapabilitySet::supports(capability)` directly; the
+`supports_*()` accessors are convenience wrappers for callers outside the
+negotiation path.
+
+Every request routes through the same three stages:
+
+1. The public request method constructs a `CallContext` describing the
+   language, operation, and optional required capability. Capability-gated
+   requests reach it through `call_with_capability`, which pairs a `CallSpec`
+   (capability plus operation) with the context; notifications construct the
+   ungated context directly with `CallContext::for_operation`.
+2. `call_with_session` borrows the session and override matrix from
+   `session_mut`, initialises the server on first use, and then enforces the
+   capability: an unavailable capability returns
+   `LspHostError::CapabilityUnavailable` with the negotiation `source`.
+3. The closure runs against the server and any `LanguageServerError` is mapped
+   to `LspHostError::Server` carrying the operation that failed.
+
+Keeping the three stages separate means capability negotiation decisions live
+in exactly one function, and each public request method is a one-line
+composition rather than a copy of the checks. `session_mut` is private
+precisely so that no caller can hold a session borrow outside these stages;
+adding a public accessor would allow code to issue requests that bypass
+capability negotiation.
+
+### 23.2 Process adapter layout, cleanup and framing
+
+The adapter code lives in these files:
+
+- `host/mod.rs` holds `LspHost` and its dispatch helpers; `host/call_context.rs`
+  holds `CallContext` and `CallSpec`.
+- `adapter/process/mod.rs` holds `ProcessLanguageServer`; `process/debug.rs`
+  holds its `Debug` rendering, which survives a poisoned state mutex;
+  `process/tests.rs` holds its unit tests.
+- `adapter/lifecycle.rs` holds the child cleanup helpers, and
+  `adapter/lifecycle_tests.rs` their tests.
+- `adapter/transport/mod.rs` holds `StdioTransport`; `transport/framing.rs`
+  holds the header helpers.
+
+`ReapableChild` is the seam the cleanup helpers are generic over. It exposes
+the two operations cleanup needs, `kill` and `wait`; `std::process::Child`
+implements it by forwarding to its inherent methods, and the tests supply a
+`FakeChild` that can be told to refuse either call, because a real `Child`
+cannot be made to fail on demand. Two policies sit on top of it:
+
+- `kill_and_reap` attempts both steps whatever the first returns, because a
+  failed kill does not prove the process has gone. An unresponsive server uses
+  it, since the server must not outlive its deadline.
+- `kill_then_reap` waits only after a successful kill, because waiting on a
+  process that refused the signal can block teardown for as long as the process
+  lives. The drop path uses it.
+
+Each failed step logs one warning on the `weaver_lsp_host::adapter` target
+carrying the language and the error. The `FakeChild` tests pin the message,
+target, fields and call counts of each case. `stop_unresponsive` sets the
+adapter state to `Stopped` before cleanup runs, so the transition does not
+depend on either call succeeding.
+
+`transport/framing.rs` reads and writes only the LSP envelope:
+`Content-Length: <n>\r\n\r\n` followed by exactly `n` bytes. `write_framed`
+writes the header, the body and a flush. `read_content_length` reads header
+lines until the blank line that ends the block. After trimming, a line counts
+as the length header only if it begins with the exact prefix `Content-Length:`
+followed by one ASCII space, so `Content-Length: 7` is recognised and
+`Content-Length:7` is ignored; every other line is ignored too. A later
+duplicate wins. Its failures are `TransportError::Io` with `UnexpectedEof` when
+the stream closes inside the header block, `TransportError::InvalidHeader` when
+the value does not parse as a `usize` (non-numeric, negative or out of range),
+and `TransportError::MissingContentLength` when the block ends without one.
 
 ## 24 Act-refactor position parsing and byte-offset conversion
 

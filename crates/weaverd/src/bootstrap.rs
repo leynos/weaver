@@ -12,6 +12,9 @@ use crate::{
     telemetry::{self, TelemetryError, TelemetryHandle},
 };
 
+/// Runs one fallible bootstrap step, reporting the failure before returning it.
+///
+/// The step's error is wrapped in the named [`BootstrapError`] variant.
 macro_rules! try_bootstrap {
     ($reporter:expr, $expr:expr => $variant:ident) => {{
         match $expr {
@@ -28,6 +31,10 @@ macro_rules! try_bootstrap {
 /// Trait abstracting configuration loading for testability.
 pub trait ConfigLoader: Send + Sync {
     /// Loads the daemon configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns the shared loader error when the configuration cannot be read.
     fn load(&self) -> Result<Config, Arc<OrthoError>>;
 }
 
@@ -42,12 +49,14 @@ impl ConfigLoader for SystemConfigLoader {
 /// Loader that always returns the supplied configuration clone.
 #[derive(Debug, Clone)]
 pub struct StaticConfigLoader {
+    /// Configuration clone returned by every load call.
     config: Config,
 }
 
 impl StaticConfigLoader {
     /// Builds a loader that always returns the provided configuration.
-    pub fn new(config: Config) -> Self { Self { config } }
+    #[must_use]
+    pub const fn new(config: Config) -> Self { Self { config } }
 }
 
 impl ConfigLoader for StaticConfigLoader {
@@ -82,9 +91,13 @@ pub enum BootstrapError {
 
 /// Result of a successful bootstrap invocation.
 pub struct Daemon<P> {
+    /// Resolved configuration shared with the backend registry.
     config: Config,
+    /// Registry of lazily started Semantic Fusion backends.
     backends: FusionBackends<P>,
+    /// Handle tying the daemon to the installed telemetry pipeline.
     telemetry: TelemetryHandle,
+    /// Observer receiving daemon lifecycle events.
     reporter: Arc<dyn HealthReporter>,
 }
 
@@ -109,11 +122,11 @@ impl<P> Daemon<P> {
 
     /// Accessor for the resolved configuration.
     #[must_use]
-    pub fn config(&self) -> &Config { &self.config }
+    pub const fn config(&self) -> &Config { &self.config }
 
     /// Accessor for the telemetry handle, primarily useful for testing.
     #[must_use]
-    pub fn telemetry(&self) -> TelemetryHandle { self.telemetry }
+    pub const fn telemetry(&self) -> TelemetryHandle { self.telemetry }
 }
 
 impl<P> Daemon<P>
@@ -121,6 +134,10 @@ where
     P: BackendProvider,
 {
     /// Ensures the specified backend is running, starting it on demand.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BackendStartupError`] when the backend fails to start.
     pub fn ensure_backend(&mut self, kind: BackendKind) -> Result<(), BackendStartupError> {
         let starting = !self.backends.is_started(kind);
         if starting {
@@ -148,6 +165,11 @@ where
 /// preparation complete, while `bootstrap_failed` publishes any early
 /// termination. Successful bootstraps install the global telemetry pipeline
 /// before returning the daemon handle.
+///
+/// # Errors
+///
+/// Returns [`BootstrapError`] when configuration loading, telemetry
+/// initialisation, or socket preparation fails.
 pub fn bootstrap_with<P>(
     loader: &dyn ConfigLoader,
     reporter: Arc<dyn HealthReporter>,
