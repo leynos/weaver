@@ -1200,6 +1200,32 @@ preserve their declared type without implicit coercion. Boolean values must be
 `true` or `false` (the string `"yes"` is rejected as an invalid boolean, as
 shown in the user-facing error example).
 
+### 15.5 Socket parent normalisation
+
+`weaver-config`'s `socket::path_normalize::normalize_parent_path` folds the `.`
+and `..` components of a socket directory lexically, without touching the
+filesystem. A `..` pops the preceding name; at the root of an absolute path it
+is dropped, and in a relative path with nothing to pop it is kept. An empty
+result becomes `.`.
+
+`socket::preparation::validate_no_path_traversal` is its only caller. It
+canonicalises the parent directory, which resolves symlinks but reports the
+path with its traversal components intact, then requires the canonical path to
+end with the lexically folded parent. A directory that escapes the configured
+path returns `SocketPreparationError::PathTraversal` carrying both forms. The
+fold stays textual so that the comparison does not depend on whatever the
+canonicalisation found.
+
+### 15.6 Sandbox environment restoration
+
+`birdcage` strips the environment of the process that enters a sandbox, so
+`weaver-sandbox`'s `EnvGuard` captures the variables beforehand and restores
+them afterwards. `EnvGuard::restore` runs in two steps: `clear_environment`
+removes every variable currently present, then `apply_snapshot` reinstates each
+captured pair. Clearing first guarantees that a variable the sandbox added does
+not survive the restore. The source doc comments in `env_guard.rs` describe
+each step; this section records the order.
+
 ## 16 Card extraction cache internals
 
 The `observe get-card` path is optimized around two shared resources in
@@ -2186,6 +2212,49 @@ composition rather than a copy of the checks. `session_mut` is private
 precisely so that no caller can hold a session borrow outside these stages;
 adding a public accessor would allow code to issue requests that bypass
 capability negotiation.
+
+### 23.2 Process adapter layout, cleanup and framing
+
+The adapter code lives in these files:
+
+- `host/mod.rs` holds `LspHost` and its dispatch helpers; `host/call_context.rs`
+  holds `CallContext` and `CallSpec`.
+- `adapter/process/mod.rs` holds `ProcessLanguageServer`; `process/debug.rs`
+  holds its `Debug` rendering, which survives a poisoned state mutex;
+  `process/tests.rs` holds its unit tests.
+- `adapter/lifecycle.rs` holds the child cleanup helpers, and
+  `adapter/lifecycle_tests.rs` their tests.
+- `adapter/transport/mod.rs` holds `StdioTransport`; `transport/framing.rs`
+  holds the header helpers.
+
+`ReapableChild` is the seam the cleanup helpers are generic over. It exposes
+the two operations cleanup needs, `kill` and `wait`; `std::process::Child`
+implements it by forwarding to its inherent methods, and the tests supply a
+`FakeChild` that can be told to refuse either call, because a real `Child`
+cannot be made to fail on demand. Two policies sit on top of it:
+
+- `kill_and_reap` attempts both steps whatever the first returns, because a
+  failed kill does not prove the process has gone. An unresponsive server uses
+  it, since the server must not outlive its deadline.
+- `kill_then_reap` waits only after a successful kill, because waiting on a
+  process that refused the signal can block teardown for as long as the process
+  lives. The drop path uses it.
+
+Each failed step logs one warning on the `weaver_lsp_host::adapter` target
+carrying the language and the error. The `FakeChild` tests pin the message,
+target, fields and call counts of each case. `stop_unresponsive` sets the
+adapter state to `Stopped` before cleanup runs, so the transition does not
+depend on either call succeeding.
+
+`transport/framing.rs` reads and writes only the LSP envelope:
+`Content-Length: <n>\r\n\r\n` followed by exactly `n` bytes. `write_framed`
+writes the header, the body and a flush. `read_content_length` reads header
+lines until the blank line that ends the block; a later duplicate
+`Content-Length` wins, and other headers are ignored. Its failures are
+`TransportError::Io` with `UnexpectedEof` when the stream closes inside the
+header block, `TransportError::InvalidHeader` when the `Content-Length` value
+is not a non-negative integer, and `TransportError::MissingContentLength` when
+the block ends without one.
 
 ## 24 Act-refactor position parsing and byte-offset conversion
 

@@ -90,8 +90,8 @@ The relevant implementation points are:
 - the [dispatch handler](../../crates/weaverd/src/dispatch/handler/mod.rs) and
   [backend manager](../../crates/weaverd/src/dispatch/backend_manager.rs);
 - the [listener](../../crates/weaverd/src/transport/listener.rs); and
-- the [LSP host](../../crates/weaver-lsp-host/src/host.rs) and
-  [process adapter](../../crates/weaver-lsp-host/src/adapter/process.rs).
+- the [LSP host](../../crates/weaver-lsp-host/src/host/mod.rs) and
+  [process adapter](../../crates/weaver-lsp-host/src/adapter/process/mod.rs).
 
 The design document already describes `weaverd` as managing a project registry,
 but the live implementation has no request-selected registry. This RFC makes
