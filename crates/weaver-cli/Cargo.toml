@@ -50,5 +50,5 @@ clap_mangen = "0.3"
 toml = { workspace = true }
 trybuild = { workspace = true }
 
-[lints.rust]
-missing_docs = "deny"
+[lints]
+workspace = true

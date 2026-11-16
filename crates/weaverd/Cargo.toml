@@ -52,5 +52,5 @@ weaver-test-macros = { path = "../weaver-test-macros" }
 camino = { workspace = true }
 weaver-build-util = { path = "../weaver-build-util" }
 
-[lints.rust]
-missing_docs = "deny"
+[lints]
+workspace = true
