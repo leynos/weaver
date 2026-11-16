@@ -17,6 +17,7 @@ cap-std = { workspace = true }
 daemonize-me = "2.0.2"
 dirs = "7.0"
 lsp-types.workspace = true
+mockable = { workspace = true }
 nix = { version = "0.31", features = ["signal", "user"] }
 once_cell.workspace = true
 ortho_config.workspace = true
@@ -40,6 +41,7 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 derive_more = { version = "2.1", features = ["as_ref", "deref"] }
 insta = { workspace = true, features = ["json", "redactions"] }
+mockable = { workspace = true, features = ["mock"] }
 mockall.workspace = true
 proptest = { workspace = true }
 rstest.workspace = true
@@ -50,6 +52,7 @@ weaver-test-macros = { path = "../weaver-test-macros" }
 
 [build-dependencies]
 camino = { workspace = true }
+mockable = { workspace = true }
 weaver-build-util = { path = "../weaver-build-util" }
 
 [lints]

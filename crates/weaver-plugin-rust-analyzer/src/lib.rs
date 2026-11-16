@@ -168,7 +168,8 @@ pub fn run_with_adapter<R: RustAnalyzerAdapter>(
 ///
 /// Returns an error if the response cannot be written.
 pub fn run(stdin: &mut impl BufRead, stdout: &mut impl Write) -> Result<(), PluginDispatchError> {
-    run_with_adapter(stdin, stdout, &RustAnalyzerLspAdapter)
+    let adapter = RustAnalyzerLspAdapter::from_env(&mockable::DefaultEnv);
+    run_with_adapter(stdin, stdout, &adapter)
 }
 
 /// Reads a single newline-delimited JSON request from the input stream.
