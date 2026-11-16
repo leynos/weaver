@@ -31,9 +31,12 @@ pub(super) trait ReapableChild {
 }
 
 impl ReapableChild for Child {
-    fn kill(&mut self) -> std::io::Result<()> { Child::kill(self) }
+    // `Self::kill` and `Self::wait` resolve to the inherent `Child` methods:
+    // an inherent method wins over a trait method of the same name in path
+    // resolution, so these forward rather than recurse.
+    fn kill(&mut self) -> std::io::Result<()> { Self::kill(self) }
 
-    fn wait(&mut self) -> std::io::Result<ExitStatus> { Child::wait(self) }
+    fn wait(&mut self) -> std::io::Result<ExitStatus> { Self::wait(self) }
 }
 
 /// Signals `child` to stop, warning when the signal cannot be sent.

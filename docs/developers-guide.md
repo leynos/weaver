@@ -180,17 +180,28 @@ from outside. A new test binary that starts a compiler joins the override's
 ## 4 Workspace lint policy
 
 The workspace lint tables include Rust and Clippy rules, but Cargo applies them
-to a package only when its manifest opts in with `[lints] workspace = true`.
-That setting brings in the full workspace Clippy policy, including
-`clippy::missing_docs_in_private_items`.
+to a package only when its manifest opts in with
 
-`weaver-cli`, `weaver-config`, `weaver-sandbox`, and `weaverd` opt into only
-the Rust public API documentation requirement. Each manifest declares
-`[lints.rust] missing_docs = "deny"` directly, without inheriting the broader
-workspace Clippy policy. Keep the package list here aligned with those
-manifests. The `weaver-cli` compile-time test checks all four declarations and
-uses `trybuild` fixtures to pin the accepted and rejected `missing_docs`
-diagnostics.
+```toml
+[lints]
+workspace = true
+```
+
+That setting brings in the full workspace Clippy policy, including
+`clippy::missing_docs_in_private_items`, and the Rust rules, including
+`missing_docs`. A member without the opt-in is silently exempt from all of it,
+so the opt-in is the whole enforcement mechanism.
+
+Every workspace member carries the opt-in.
+`crates/weaver-cli/tests/missing_docs_policy.rs` reads each member manifest,
+checks that the workspace table still denies `missing_docs`, and uses
+`trybuild` fixtures to pin the accepted and rejected `missing_docs`
+diagnostics. The list of manifests mirrors the workspace `members` array, so
+adding a member means adding it to that test as well.
+
+Do not reintroduce a crate-local `[lints.rust]` or `[lints.clippy]` table in a
+member manifest. Cargo refuses to combine one with the opt-in, and a member
+that drops the opt-in to keep a local table falls outside the policy entirely.
 
 ### 4.1 Pinning `const` on public accessors
 

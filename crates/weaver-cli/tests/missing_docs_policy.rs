@@ -1,37 +1,171 @@
-//! Compile-time regression checks for the workspace's package-level
-//! `missing_docs` policy.
+//! Compile-time regression checks for the workspace lint inheritance policy.
+//!
+//! Cargo applies `[workspace.lints]` to a package only when that package's
+//! manifest opts in with `[lints] workspace = true`. A member that forgets the
+//! opt-in silently loses the entire policy, so the opt-in is pinned here for
+//! every workspace member, alongside the workspace rule it inherits.
 
-const PACKAGE_MANIFESTS: [(&str, &str); 4] = [
+/// Every workspace member, with the manifest the opt-in must appear in.
+///
+/// The list mirrors the `members` array of the workspace manifest; adding a
+/// member without extending this list leaves that member unpinned.
+const MEMBER_MANIFESTS: [(&str, &str); 19] = [
+    (
+        "weaver-build-util",
+        include_str!("../../weaver-build-util/Cargo.toml"),
+    ),
     ("weaver-cli", include_str!("../Cargo.toml")),
+    (
+        "weaver-test-macros",
+        include_str!("../../weaver-test-macros/Cargo.toml"),
+    ),
     (
         "weaver-config",
         include_str!("../../weaver-config/Cargo.toml"),
     ),
     (
+        "weaver-daemon-types",
+        include_str!("../../weaver-daemon-types/Cargo.toml"),
+    ),
+    ("weaver-e2e", include_str!("../../weaver-e2e/Cargo.toml")),
+    (
+        "weaver-graph",
+        include_str!("../../weaver-graph/Cargo.toml"),
+    ),
+    ("weaverd", include_str!("../../weaverd/Cargo.toml")),
+    (
+        "weaver-lsp-host",
+        include_str!("../../weaver-lsp-host/Cargo.toml"),
+    ),
+    (
+        "weaver-plugin-rust-analyzer",
+        include_str!("../../weaver-plugin-rust-analyzer/Cargo.toml"),
+    ),
+    (
+        "weaver-plugin-rope",
+        include_str!("../../weaver-plugin-rope/Cargo.toml"),
+    ),
+    (
+        "weaver-plugins",
+        include_str!("../../weaver-plugins/Cargo.toml"),
+    ),
+    (
         "weaver-sandbox",
         include_str!("../../weaver-sandbox/Cargo.toml"),
     ),
-    ("weaverd", include_str!("../../weaverd/Cargo.toml")),
+    (
+        "weaver-syntax",
+        include_str!("../../weaver-syntax/Cargo.toml"),
+    ),
+    ("sempai-core", include_str!("../../sempai-core/Cargo.toml")),
+    ("sempai-yaml", include_str!("../../sempai-yaml/Cargo.toml")),
+    ("sempai", include_str!("../../sempai/Cargo.toml")),
+    (
+        "weaver-cards",
+        include_str!("../../weaver-cards/Cargo.toml"),
+    ),
+    (
+        "weaver-docs-gate",
+        include_str!("../../weaver-docs-gate/Cargo.toml"),
+    ),
 ];
 
-// Keep the four package manifests aligned with the public documentation rule.
+/// The workspace manifest that defines the inherited lint table.
+const WORKSPACE_MANIFEST: &str = include_str!("../../../Cargo.toml");
+
+/// Parses `source` as TOML, naming `package_name` in the failure message.
+///
+/// A malformed manifest means the policy this test pins cannot be read at all,
+/// so it is a hard failure rather than a skipped case.
+fn parse_manifest(package_name: &str, source: &str) -> toml::Value {
+    match toml::from_str(source) {
+        Ok(manifest) => manifest,
+        Err(error) => panic!("{package_name} manifest is invalid TOML: {error}"),
+    }
+}
+
+/// Looks up the string at `path` in `manifest`, if the path resolves to one.
+#[must_use]
+fn string_at<'a>(manifest: &'a toml::Value, path: &[&str]) -> Option<&'a str> {
+    path.iter()
+        .try_fold(manifest, |node, key| node.get(key))
+        .and_then(toml::Value::as_str)
+}
+
+/// Collects the workspace manifest's `members` entries, minus their directory.
+///
+/// Every member directory is named after its package, so the trailing path
+/// component is the name `MEMBER_MANIFESTS` lists.
+fn workspace_member_names() -> Vec<String> {
+    let manifest = parse_manifest("workspace", WORKSPACE_MANIFEST);
+    let Some(members) = manifest
+        .get("workspace")
+        .and_then(|workspace| workspace.get("members"))
+        .and_then(toml::Value::as_array)
+    else {
+        panic!("the workspace manifest must list its members");
+    };
+    let mut names: Vec<String> = members
+        .iter()
+        .map(|member| {
+            let Some(path) = member.as_str() else {
+                panic!("a workspace member must be a path, got {member}");
+            };
+            assert!(
+                !path.contains('*'),
+                "{path} is a glob; list members explicitly so the policy test can pin them"
+            );
+            path.rsplit('/').next().unwrap_or(path).to_owned()
+        })
+        .collect();
+    names.sort_unstable();
+    names
+}
+
+// A member missing from the pinned list would silently escape the opt-in check.
 #[test]
-fn affected_manifests_deny_missing_public_docs() {
-    for (package_name, source) in PACKAGE_MANIFESTS {
-        let manifest = toml::from_str::<toml::Value>(source)
-            .unwrap_or_else(|error| panic!("{package_name} manifest is invalid TOML: {error}"));
-        let level = manifest
+fn every_workspace_member_is_pinned() {
+    let mut pinned: Vec<String> = MEMBER_MANIFESTS
+        .iter()
+        .map(|(name, _)| (*name).to_owned())
+        .collect();
+    pinned.sort_unstable();
+
+    assert_eq!(
+        workspace_member_names(),
+        pinned,
+        "MEMBER_MANIFESTS must list exactly the workspace members"
+    );
+}
+
+// Pin the opt-in for every workspace member.
+#[test]
+fn every_member_inherits_the_workspace_lint_table() {
+    for (package_name, source) in MEMBER_MANIFESTS {
+        let manifest = parse_manifest(package_name, source);
+        let inherits = manifest
             .get("lints")
-            .and_then(|lints| lints.get("rust"))
-            .and_then(|rust| rust.get("missing_docs"))
-            .and_then(toml::Value::as_str);
+            .and_then(|lints| lints.get("workspace"))
+            .and_then(toml::Value::as_bool);
 
         assert_eq!(
-            level,
-            Some("deny"),
-            "{package_name} must deny undocumented public items"
+            inherits,
+            Some(true),
+            "{package_name} must opt in with `[lints] workspace = true`"
         );
     }
+}
+
+// The inherited table is only meaningful while it still denies missing docs.
+#[test]
+fn workspace_denies_undocumented_public_items() {
+    let manifest = parse_manifest("workspace", WORKSPACE_MANIFEST);
+
+    assert_eq!(
+        string_at(&manifest, &["workspace", "lints", "rust", "missing_docs"]),
+        Some("deny"),
+        "the workspace lint table must deny undocumented public items"
+    );
 }
 
 // Pin that documented public items pass and undocumented ones are rejected.

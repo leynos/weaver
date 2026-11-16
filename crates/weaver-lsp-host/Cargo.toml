@@ -21,3 +21,6 @@ rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }
 tracing-subscriber = "0.3"
 weaver-test-macros = { path = "../weaver-test-macros" }
+
+[lints]
+workspace = true
