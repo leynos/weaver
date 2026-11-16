@@ -20,6 +20,7 @@ weaver-plugins = { path = "../weaver-plugins" }
 anyhow = { workspace = true }
 mockable = { workspace = true, features = ["mock"] }
 mockall.workspace = true
+proptest = { workspace = true }
 rstest.workspace = true
 rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true

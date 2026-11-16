@@ -12,6 +12,12 @@ use cap_std::fs::Dir;
 use mockable::Env;
 use time::{OffsetDateTime, format_description::well_known::Iso8601};
 
+mod out_dir;
+pub use out_dir::out_dir_from_env;
+
+#[cfg(test)]
+mod env_tests;
+
 /// Date substituted when `SOURCE_DATE_EPOCH` is unset or unusable, so man
 /// pages remain reproducible even without an explicit build timestamp.
 const FALLBACK_DATE: &str = "1970-01-01";

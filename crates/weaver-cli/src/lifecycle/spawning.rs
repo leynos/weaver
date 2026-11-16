@@ -106,6 +106,23 @@ mod tests {
         assert_eq!(resolved, OsString::from("/env/weaverd"));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn resolve_daemon_binary_returns_a_non_unicode_environment_value_unchanged() {
+        use std::os::unix::ffi::OsStringExt;
+
+        // 0xFF is never valid UTF-8, so this value cannot survive a lossy
+        // conversion and must come back byte for byte.
+        let raw = OsString::from_vec(vec![b'/', b'o', b'p', b't', b'/', 0xff]);
+        let expected = raw.clone();
+        let mut env = MockEnv::new();
+        env.expect_os_string()
+            .withf(|key| key == "WEAVERD_BIN")
+            .returning(move |_| Some(raw.clone()));
+
+        assert_eq!(resolve_daemon_binary(None, &env), expected);
+    }
+
     #[test]
     fn resolve_daemon_binary_falls_back_to_default() {
         let mut env = MockEnv::new();

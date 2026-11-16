@@ -3499,6 +3499,7 @@ dependencies = [
  "lsp-types",
  "mockable",
  "mockall 0.15.0",
+ "proptest",
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",

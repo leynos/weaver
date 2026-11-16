@@ -11,6 +11,7 @@ mockable = { workspace = true }
 time = { version = "0.3", features = ["formatting"] }
 
 [dev-dependencies]
+mockable = { workspace = true, features = ["mock"] }
 tempfile = { workspace = true }
 
 [lints]
