@@ -193,6 +193,21 @@ fn stop_unresponsive_records_when_the_server_stopped_answering() {
 }
 
 #[test]
+fn dropping_an_adapter_with_a_live_child_stops_the_process() {
+    let (child, stdout, stdin) = spawn_child("sleep 30");
+    let pid = child.id();
+    let server = running_server(child, stdout, stdin);
+    assert!(is_running(pid), "the child must be alive before the drop");
+
+    drop(server);
+
+    assert!(
+        !is_running(pid),
+        "dropping the adapter must kill and reap the live server, but {pid} is still running"
+    );
+}
+
+#[test]
 fn dropping_an_adapter_with_a_reaped_child_leaves_the_process_stopped() {
     let (mut child, stdout, stdin) = spawn_child("exit 0");
     let pid = child.id();
