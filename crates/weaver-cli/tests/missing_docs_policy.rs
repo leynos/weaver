@@ -92,6 +92,52 @@ fn string_at<'a>(manifest: &'a toml::Value, path: &[&str]) -> Option<&'a str> {
         .and_then(toml::Value::as_str)
 }
 
+/// Collects the workspace manifest's `members` entries, minus their directory.
+///
+/// Every member directory is named after its package, so the trailing path
+/// component is the name `MEMBER_MANIFESTS` lists.
+fn workspace_member_names() -> Vec<String> {
+    let manifest = parse_manifest("workspace", WORKSPACE_MANIFEST);
+    let Some(members) = manifest
+        .get("workspace")
+        .and_then(|workspace| workspace.get("members"))
+        .and_then(toml::Value::as_array)
+    else {
+        panic!("the workspace manifest must list its members");
+    };
+    let mut names: Vec<String> = members
+        .iter()
+        .map(|member| {
+            let Some(path) = member.as_str() else {
+                panic!("a workspace member must be a path, got {member}");
+            };
+            assert!(
+                !path.contains('*'),
+                "{path} is a glob; list members explicitly so the policy test can pin them"
+            );
+            path.rsplit('/').next().unwrap_or(path).to_owned()
+        })
+        .collect();
+    names.sort_unstable();
+    names
+}
+
+// A member missing from the pinned list would silently escape the opt-in check.
+#[test]
+fn every_workspace_member_is_pinned() {
+    let mut pinned: Vec<String> = MEMBER_MANIFESTS
+        .iter()
+        .map(|(name, _)| (*name).to_owned())
+        .collect();
+    pinned.sort_unstable();
+
+    assert_eq!(
+        workspace_member_names(),
+        pinned,
+        "MEMBER_MANIFESTS must list exactly the workspace members"
+    );
+}
+
 // Pin the opt-in for every workspace member.
 #[test]
 fn every_member_inherits_the_workspace_lint_table() {
