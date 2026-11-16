@@ -9,6 +9,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use rstest::rstest;
 use tracing::{
     Event,
     Level,
@@ -104,6 +105,38 @@ fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
     std::mem::take(&mut *recorded)
 }
 
+/// The cleanup path a case exercises.
+///
+/// The two helpers differ in one respect that matters here: the unresponsive
+/// path reaps even when the kill failed, because the server must not outlive
+/// the deadline, while the drop path stops after a failed signal.
+#[derive(Clone, Copy, Debug)]
+enum Cleanup {
+    /// [`kill_and_reap`], used when a server misses its shutdown deadline.
+    Unresponsive,
+    /// [`kill_then_reap`], used when an adapter is dropped mid-conversation.
+    OnDrop,
+}
+
+impl Cleanup {
+    /// Description the cleanup helper logs for this path.
+    #[must_use]
+    const fn description(self) -> &'static str {
+        match self {
+            Self::Unresponsive => UNRESPONSIVE_DESCRIPTION,
+            Self::OnDrop => DROP_DESCRIPTION,
+        }
+    }
+
+    /// Runs this path against `child`.
+    fn run(self, child: &mut FakeChild) {
+        match self {
+            Self::Unresponsive => kill_and_reap(child, Language::Rust, self.description()),
+            Self::OnDrop => kill_then_reap(child, Language::Rust, self.description()),
+        }
+    }
+}
+
 /// The process operation a [`FakeChild`] is told to refuse.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Refused {
@@ -111,6 +144,26 @@ enum Refused {
     Kill,
     /// `wait` fails.
     Wait,
+}
+
+impl Refused {
+    /// Verb the cleanup diagnostic uses for this operation.
+    #[must_use]
+    const fn verb(self) -> &'static str {
+        match self {
+            Self::Kill => "kill",
+            Self::Wait => "reap",
+        }
+    }
+
+    /// Text the fake child reports when it refuses.
+    #[must_use]
+    const fn message(self) -> &'static str {
+        match self {
+            Self::Kill => "kill refused",
+            Self::Wait => "wait refused",
+        }
+    }
 }
 
 /// Stands in for a child whose cleanup calls can be made to fail.
@@ -134,9 +187,9 @@ impl FakeChild {
     }
 
     /// Returns `Err` when `operation` is the refused one.
-    fn refuse(&self, operation: Refused, message: &'static str) -> std::io::Result<()> {
+    fn refuse(&self, operation: Refused) -> std::io::Result<()> {
         if self.refused == Some(operation) {
-            return Err(std::io::Error::other(message));
+            return Err(std::io::Error::other(operation.message()));
         }
         Ok(())
     }
@@ -145,13 +198,12 @@ impl FakeChild {
 impl ReapableChild for FakeChild {
     fn kill(&mut self) -> std::io::Result<()> {
         self.kills += 1;
-        self.refuse(Refused::Kill, "kill refused")
+        self.refuse(Refused::Kill)
     }
 
     fn wait(&mut self) -> std::io::Result<ExitStatus> {
         self.waits += 1;
-        self.refuse(Refused::Wait, "wait refused")
-            .map(|()| ExitStatus::from_raw(0))
+        self.refuse(Refused::Wait).map(|()| ExitStatus::from_raw(0))
     }
 }
 
@@ -182,104 +234,42 @@ fn assert_warning(events: &[CapturedEvent], message: &str, error: &str) {
     );
 }
 
-/// A failed kill is reported once, and the unresponsive path still reaps.
-#[test]
-fn kill_and_reap_warns_when_the_kill_fails() {
-    let mut child = FakeChild::refusing(Refused::Kill);
+/// A refused cleanup call is reported once, and the path decides whether the
+/// reap still runs.
+#[rstest]
+#[case::unresponsive_kill_refused(Cleanup::Unresponsive, Refused::Kill, 1)]
+#[case::unresponsive_reap_refused(Cleanup::Unresponsive, Refused::Wait, 1)]
+#[case::drop_kill_refused(Cleanup::OnDrop, Refused::Kill, 0)]
+#[case::drop_reap_refused(Cleanup::OnDrop, Refused::Wait, 1)]
+fn a_refused_operation_warns(
+    #[case] cleanup: Cleanup,
+    #[case] refused: Refused,
+    #[case] expected_waits: usize,
+) {
+    let mut child = FakeChild::refusing(refused);
 
-    let events = capture_events(|| {
-        kill_and_reap(&mut child, Language::Rust, UNRESPONSIVE_DESCRIPTION);
-    });
+    let events = capture_events(|| cleanup.run(&mut child));
 
-    assert_warning(
-        &events,
-        "failed to kill unresponsive language server",
-        "kill refused",
-    );
+    let expected = format!("failed to {} {}", refused.verb(), cleanup.description());
+    assert_warning(&events, &expected, refused.message());
+    assert_eq!(child.kills, 1, "every path attempts the kill once");
     assert_eq!(
-        child.waits, 1,
-        "an unresponsive server is reaped even after a failed kill"
+        child.waits, expected_waits,
+        concat!(
+            "an unresponsive server is reaped even after a failed kill, and ",
+            "a dropped one is not waited on after one"
+        )
     );
-}
-
-/// A failed reap is reported once, after the kill was attempted.
-#[test]
-fn kill_and_reap_warns_when_the_reap_fails() {
-    let mut child = FakeChild::refusing(Refused::Wait);
-
-    let events = capture_events(|| {
-        kill_and_reap(&mut child, Language::Rust, UNRESPONSIVE_DESCRIPTION);
-    });
-
-    assert_warning(
-        &events,
-        "failed to reap unresponsive language server",
-        "wait refused",
-    );
-    assert_eq!(child.kills, 1, "the kill must happen before the reap");
-}
-
-/// A failed kill on the drop path is reported and the reap is skipped.
-#[test]
-fn kill_then_reap_warns_when_the_kill_fails_and_does_not_reap() {
-    let mut child = FakeChild::refusing(Refused::Kill);
-
-    let events = capture_events(|| {
-        kill_then_reap(&mut child, Language::Rust, DROP_DESCRIPTION);
-    });
-
-    assert_warning(
-        &events,
-        "failed to kill language server process on drop",
-        "kill refused",
-    );
-    assert_eq!(
-        child.waits, 0,
-        "the adapter must not wait on a process it failed to signal"
-    );
-}
-
-/// A failed reap on the drop path is reported once.
-#[test]
-fn kill_then_reap_warns_when_the_reap_fails() {
-    let mut child = FakeChild::refusing(Refused::Wait);
-
-    let events = capture_events(|| {
-        kill_then_reap(&mut child, Language::Rust, DROP_DESCRIPTION);
-    });
-
-    assert_warning(
-        &events,
-        "failed to reap language server process on drop",
-        "wait refused",
-    );
-    assert_eq!(child.kills, 1, "the kill must happen before the reap");
 }
 
 /// A cleanup where both calls succeed emits no warning.
-#[test]
-fn a_successful_kill_and_reap_is_silent() {
+#[rstest]
+#[case::unresponsive(Cleanup::Unresponsive)]
+#[case::on_drop(Cleanup::OnDrop)]
+fn a_successful_cleanup_is_silent(#[case] cleanup: Cleanup) {
     let mut child = FakeChild::default();
 
-    let events = capture_events(|| {
-        kill_and_reap(&mut child, Language::Rust, UNRESPONSIVE_DESCRIPTION);
-    });
-
-    assert!(
-        events.is_empty(),
-        "a successful cleanup must not warn, got {events:#?}"
-    );
-    assert_eq!((child.kills, child.waits), (1, 1));
-}
-
-/// A drop-path cleanup where both calls succeed emits no warning.
-#[test]
-fn a_successful_kill_then_reap_is_silent() {
-    let mut child = FakeChild::default();
-
-    let events = capture_events(|| {
-        kill_then_reap(&mut child, Language::Rust, DROP_DESCRIPTION);
-    });
+    let events = capture_events(|| cleanup.run(&mut child));
 
     assert!(
         events.is_empty(),
