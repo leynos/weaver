@@ -10,10 +10,20 @@ use std::{env, ffi::OsString};
 
 /// Removes one environment variable from the current process.
 #[inline]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "restoring the parent environment after sandbox activation needs process-wide \
+              mutation"
+)]
 fn unset_env_var<K: AsRef<std::ffi::OsStr>>(key: K) { unsafe { env::remove_var(key) } }
 
 /// Sets one environment variable on the current process.
 #[inline]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "restoring the parent environment after sandbox activation needs process-wide \
+              mutation"
+)]
 fn set_env_var<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, value: V) {
     unsafe { env::set_var(key, value) };
 }
