@@ -120,11 +120,15 @@ enum Cleanup {
 
 impl Cleanup {
     /// Description the cleanup helper logs for this path.
+    ///
+    /// These are literals rather than the production constants, so changing a
+    /// constant fails [`the_production_descriptions_are_stable`] instead of
+    /// silently moving the expected message with it.
     #[must_use]
     const fn description(self) -> &'static str {
         match self {
-            Self::Unresponsive => UNRESPONSIVE_DESCRIPTION,
-            Self::OnDrop => DROP_DESCRIPTION,
+            Self::Unresponsive => "unresponsive language server",
+            Self::OnDrop => "language server process on drop",
         }
     }
 
@@ -214,7 +218,7 @@ fn assert_warning(events: &[CapturedEvent], message: &str, error: &str) {
     let event = events.first().expect("the single event was just checked");
     assert_eq!(event.level, Level::WARN, "the diagnostic must be a warning");
     assert_eq!(
-        event.target, ADAPTER_TARGET,
+        event.target, "weaver_lsp_host::adapter",
         "the diagnostic must use the adapter target"
     );
     assert_eq!(
@@ -260,6 +264,15 @@ fn a_refused_operation_warns(
             "a dropped one is not waited on after one"
         )
     );
+}
+
+/// The production descriptions and target are pinned to the literals the tests
+/// expect, so a reworded diagnostic is a deliberate, visible change.
+#[test]
+fn the_production_descriptions_are_stable() {
+    assert_eq!(UNRESPONSIVE_DESCRIPTION, "unresponsive language server");
+    assert_eq!(DROP_DESCRIPTION, "language server process on drop");
+    assert_eq!(ADAPTER_TARGET, "weaver_lsp_host::adapter");
 }
 
 /// A cleanup where both calls succeed emits no warning.

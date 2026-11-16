@@ -2152,8 +2152,9 @@ direction:
 `capability` depends on `server`, `weaver-config`, and `language`; `server`
 depends only on `capability::CapabilityKind`; and `host` depends on `server`,
 `capability`, and `weaver-config`. Adaptors implement the trait without knowing
-how negotiation or dispatch works, and `host` remains the only module that
-combines `server` and `capability`.
+how negotiation or dispatch works. `host` combines the two at runtime, while
+`capability` itself imports `ServerCapabilitySet` to resolve each language's
+advertised capabilities.
 
 `ServerCapabilitySet` stores a `BTreeSet<CapabilityKind>` rather than one
 boolean per capability. New capabilities are added by extending

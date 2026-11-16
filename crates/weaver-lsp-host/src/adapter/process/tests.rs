@@ -1,11 +1,14 @@
 //! Unit tests for the process adapter's diagnostics and state transitions.
 
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::{
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+    time::Duration,
+};
 
 use super::ProcessLanguageServer;
 use crate::{
     Language,
-    adapter::{AdapterError, transport::StdioTransport},
+    adapter::{AdapterError, LspServerConfig, transport::StdioTransport},
 };
 
 /// Spawns `sh -c <script>` with piped standard streams.
@@ -87,6 +90,27 @@ fn debug_reports_not_started_state() {
         "the rendering {rendered} omits the default clock"
     );
     assert_state(&server, "not_started");
+}
+
+#[test]
+fn debug_reports_the_configured_server_not_just_the_label() {
+    let config = LspServerConfig::rust_default()
+        .with_working_dir("/workspace/example")
+        .with_response_timeout(Duration::from_millis(1234));
+    let server = ProcessLanguageServer::with_config(Language::Rust, config);
+
+    let rendered = format!("{server:?}");
+
+    for expected in [
+        "command: \"rust-analyzer\"",
+        "working_dir: Some(\"/workspace/example\")",
+        "response_timeout: 1.234s",
+    ] {
+        assert!(
+            rendered.contains(expected),
+            "the rendering {rendered} omits {expected}"
+        );
+    }
 }
 
 #[test]
