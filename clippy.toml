@@ -9,8 +9,9 @@ allow-expect-in-tests = true
 # Tests must not change the process-wide environment or working directory: it
 # forces the runner to serialize them. Inject an environment object or isolate
 # the change to a subprocess (`Command::env`, `Command::current_dir`). The
-# sandbox crate's environment guard and its tests exercise process-wide
-# mutation itself and carry an item-scoped `#[expect]` with a reason.
+# sandbox crate's environment guard restores the parent environment after
+# `birdcage` strips it, so its two functions carry an item-scoped `#[expect]`
+# with a reason.
 disallowed-methods = [
     { path = "std::env::set_var", reason = "process-wide env mutation; inject an environment or use a subprocess" },
     { path = "std::env::remove_var", reason = "process-wide env mutation; inject an environment or use a subprocess" },
