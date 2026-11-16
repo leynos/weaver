@@ -192,6 +192,29 @@ manifests. The `weaver-cli` compile-time test checks all four declarations and
 uses `trybuild` fixtures to pin the accepted and rejected `missing_docs`
 diagnostics.
 
+### 4.1 Pinning `const` on public accessors
+
+Cargo cannot express "this accessor must stay a `const fn`", so the crates that
+promise it pin the property with a compile-time witness: a `const fn` wrapper
+whose body calls the accessor. Rust rejects a non-`const` call from inside a
+`const fn` body, so the wrapper stops compiling the moment the accessor loses
+`const`. The wrappers are exercised from an ordinary test, because the
+workspace's warnings-as-errors gate rejects dead code.
+
+- `crates/weaver-config/tests/const_api.rs` covers `Config`'s accessors.
+- `crates/weaver-sandbox/tests/const_api.rs` covers `SandboxProfile` and
+  `NetworkPolicy`.
+- `crates/weaver-lsp-host/tests/const_api.rs` covers the public
+  `weaver-lsp-host` accessors.
+- `crates/weaver-lsp-host/src/tests/const_api.rs` covers the items only the
+  crate can name: the `pub(crate)` `LspHostError` constructors and the private
+  `CapabilitySummary` fields. An integration test cannot call either.
+
+Prefer this witness over a `trybuild` fixture when the property is const-ness
+alone. A fixture costs a nested `cargo` build that must be serialized against
+the other compiler-starting tests, and it asserts on rendered diagnostics that
+move with the compiler; the witness costs one line and fails on the same edit.
+
 ## 5 Workflow pins and Dependabot
 
 Dependabot checks both ecosystems (`github-actions` and `cargo`) daily. The
