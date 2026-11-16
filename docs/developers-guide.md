@@ -2251,12 +2251,13 @@ depend on either call succeeding.
 `Content-Length: <n>\r\n\r\n` followed by exactly `n` bytes. `write_framed`
 writes the header, the body and a flush. `read_content_length` reads header
 lines until the blank line that ends the block. After trimming, a line counts
-as the length header only if it begins with the exact prefix `Content-Length:`;
-every other line is ignored. A later duplicate wins. Its failures are
-`TransportError::Io` with `UnexpectedEof` when the stream closes inside the
-header block, `TransportError::InvalidHeader` when the value does not parse as a
-`usize` (non-numeric, negative or out of range), and
-`TransportError::MissingContentLength` when the block ends without one.
+as the length header only if it begins with the exact prefix `Content-Length:`
+followed by one ASCII space, so `Content-Length: 7` is recognised and
+`Content-Length:7` is ignored; every other line is ignored too. A later
+duplicate wins. Its failures are `TransportError::Io` with `UnexpectedEof` when
+the stream closes inside the header block, `TransportError::InvalidHeader` when
+the value does not parse as a `usize` (non-numeric, negative or out of range),
+and `TransportError::MissingContentLength` when the block ends without one.
 
 ## 24 Act-refactor position parsing and byte-offset conversion
 
