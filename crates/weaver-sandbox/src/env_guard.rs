@@ -12,8 +12,7 @@ use std::{env, ffi::OsString};
 #[inline]
 #[expect(
     clippy::disallowed_methods,
-    reason = "restoring the parent environment after sandbox activation needs process-wide \
-              mutation"
+    reason = "sandbox activation requires process-wide environment restoration"
 )]
 fn unset_env_var<K: AsRef<std::ffi::OsStr>>(key: K) { unsafe { env::remove_var(key) } }
 
@@ -21,8 +20,7 @@ fn unset_env_var<K: AsRef<std::ffi::OsStr>>(key: K) { unsafe { env::remove_var(k
 #[inline]
 #[expect(
     clippy::disallowed_methods,
-    reason = "restoring the parent environment after sandbox activation needs process-wide \
-              mutation"
+    reason = "sandbox activation requires process-wide environment restoration"
 )]
 fn set_env_var<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, value: V) {
     unsafe { env::set_var(key, value) };
