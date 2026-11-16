@@ -1209,12 +1209,13 @@ is dropped, and in a relative path with nothing to pop it is kept. An empty
 result becomes `.`.
 
 `socket::preparation::validate_no_path_traversal` is its only caller. It
-canonicalises the parent directory, which resolves symlinks but reports the
-path with its traversal components intact, then requires the canonical path to
-end with the lexically folded parent. A directory that escapes the configured
-path returns `SocketPreparationError::PathTraversal` carrying both forms. The
-fold stays textual so that the comparison does not depend on whatever the
-canonicalisation found.
+canonicalises the parent directory, which resolves symlinks and removes `.` and
+`..` components, then requires the canonical path to end with the lexically
+folded parent. The check fails with `SocketPreparationError::PathTraversal`,
+carrying the folded parent and the canonical path, exactly when the canonical
+path does not end with the folded parent: for example, when a symlink in the
+configured path leads elsewhere. The fold stays textual so that the expected
+suffix does not depend on what the filesystem reports.
 
 ### 15.6 Sandbox environment restoration
 
@@ -2249,12 +2250,13 @@ depend on either call succeeding.
 `transport/framing.rs` reads and writes only the LSP envelope:
 `Content-Length: <n>\r\n\r\n` followed by exactly `n` bytes. `write_framed`
 writes the header, the body and a flush. `read_content_length` reads header
-lines until the blank line that ends the block; a later duplicate
-`Content-Length` wins, and other headers are ignored. Its failures are
+lines until the blank line that ends the block. After trimming, a line counts
+as the length header only if it begins with the exact prefix `Content-Length:`;
+every other line is ignored. A later duplicate wins. Its failures are
 `TransportError::Io` with `UnexpectedEof` when the stream closes inside the
-header block, `TransportError::InvalidHeader` when the `Content-Length` value
-is not a non-negative integer, and `TransportError::MissingContentLength` when
-the block ends without one.
+header block, `TransportError::InvalidHeader` when the value does not parse as a
+`usize` (non-numeric, negative or out of range), and
+`TransportError::MissingContentLength` when the block ends without one.
 
 ## 24 Act-refactor position parsing and byte-offset conversion
 

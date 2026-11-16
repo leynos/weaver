@@ -1,10 +1,11 @@
 //! Lexical normalisation of socket directory paths.
 //!
-//! Canonicalisation resolves symlinks but reports the path with its `.` and
-//! `..` components intact, so the traversal check in [`super::preparation`]
-//! needs a folded form to compare against. Folding here is purely textual: it
-//! never touches the filesystem, so the comparison stays independent of
-//! whatever canonicalisation happens to find.
+//! Canonicalisation resolves symlinks and removes `.` and `..` components, so
+//! the traversal check in [`super::preparation`] needs a lexically folded form
+//! of the configured path to compare against: the canonical path must end with
+//! it. Folding here is purely textual: it never touches the filesystem, so the
+//! expected suffix stays independent of whatever canonicalisation happens to
+//! find.
 
 use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
 
