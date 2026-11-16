@@ -127,7 +127,7 @@ fn refactor_world(world: &mut RefactorWorldFixture) -> Result<&mut RefactorWorld
 }
 
 /// Configures the request and routing mode, then lays down the routed fixture.
-fn arrange_rename_request(
+fn arrange_rename(
     world: &mut RefactorWorldFixture,
     file: &str,
     provider: &str,
@@ -149,12 +149,12 @@ fn given_workspace_file(world: &mut RefactorWorldFixture) -> Result<(), String> 
 
 #[given("a valid act refactor request for rope")]
 fn given_valid_rope_request(world: &mut RefactorWorldFixture) -> Result<(), String> {
-    arrange_rename_request(world, "notes.py", "rope", RoutingMode::AutomaticPython)
+    arrange_rename(world, "notes.py", "rope", RoutingMode::AutomaticPython)
 }
 
 #[given("a valid act refactor request for rust-analyzer")]
 fn given_valid_rust_request(world: &mut RefactorWorldFixture) -> Result<(), String> {
-    arrange_rename_request(
+    arrange_rename(
         world,
         "notes.rs",
         "rust-analyzer",
@@ -177,7 +177,7 @@ fn given_unsupported_language_request(world: &mut RefactorWorldFixture) -> Resul
 fn given_explicit_provider_mismatch_request(
     world: &mut RefactorWorldFixture,
 ) -> Result<(), String> {
-    arrange_rename_request(
+    arrange_rename(
         world,
         "notes.py",
         "rust-analyzer",
@@ -238,28 +238,26 @@ fn then_refactor_fails_status_one(world: &mut RefactorWorldFixture) -> Result<()
     ensure_same(status, 1, "status")
 }
 
-#[then("the target file is updated")]
-fn then_target_file_updated(world: &mut RefactorWorldFixture) -> Result<(), String> {
+/// Asserts the routed target file holds the content `expected` derives for it.
+fn ensure_target_content(
+    world: &mut RefactorWorldFixture,
+    expected: fn(&Path) -> &'static str,
+    what: &str,
+) -> Result<(), String> {
     let state = refactor_world(world)?;
     let target_file = state.target_file()?;
     let actual = read_routed_target(state)?;
-    ensure_same_ref(
-        actual.as_str(),
-        updated_content_for(Path::new(&target_file)),
-        "updated target file",
-    )
+    ensure_same_ref(actual.as_str(), expected(Path::new(&target_file)), what)
+}
+
+#[then("the target file is updated")]
+fn then_target_file_updated(world: &mut RefactorWorldFixture) -> Result<(), String> {
+    ensure_target_content(world, updated_content_for, "updated target file")
 }
 
 #[then("the target file is unchanged")]
 fn then_target_file_unchanged(world: &mut RefactorWorldFixture) -> Result<(), String> {
-    let state = refactor_world(world)?;
-    let target_file = state.target_file()?;
-    let actual = read_routed_target(state)?;
-    ensure_same_ref(
-        actual.as_str(),
-        original_content_for(Path::new(&target_file)),
-        "unchanged target file",
-    )
+    ensure_target_content(world, original_content_for, "unchanged target file")
 }
 
 #[then("the stderr stream contains {text}")]

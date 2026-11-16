@@ -78,8 +78,7 @@ impl ApplyPatchExecutor<'_> {
         path: &FilePath,
         content: &FileContent,
     ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(workspace_dir, path)?;
-        reject_existing_path(workspace_dir, path, &resolved)?;
+        let resolved = self.check_presence(workspace_dir, path, RequiredPresence::Absent)?;
         Ok(ContentChange::write(
             resolved.absolute,
             content.clone().into_string(),
@@ -97,9 +96,25 @@ impl ApplyPatchExecutor<'_> {
         workspace_dir: &Dir,
         path: &FilePath,
     ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(workspace_dir, path)?;
-        reject_missing_path(workspace_dir, path, &resolved)?;
+        let resolved = self.check_presence(workspace_dir, path, RequiredPresence::Present)?;
         Ok(ContentChange::delete(resolved.absolute))
+    }
+
+    /// Resolves `path` and checks the workspace against `required`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApplyPatchError`] when the path is invalid, its presence cannot
+    /// be determined, or the workspace contradicts `required`.
+    fn check_presence(
+        &self,
+        workspace_dir: &Dir,
+        path: &FilePath,
+        required: RequiredPresence,
+    ) -> Result<ValidatedPath, ApplyPatchError> {
+        let resolved = self.resolve_and_validate(workspace_dir, path)?;
+        let exists = path_exists(workspace_dir, &resolved.relative, path)?;
+        required.mismatch(path, exists).map_or(Ok(resolved), Err)
     }
 
     /// Resolves and validates a patch path within the workspace.
@@ -112,30 +127,22 @@ impl ApplyPatchExecutor<'_> {
     }
 }
 
-/// Fails when a create target already exists in the workspace.
-fn reject_existing_path(
-    workspace_dir: &Dir,
-    path: &FilePath,
-    resolved: &ValidatedPath,
-) -> Result<(), ApplyPatchError> {
-    let exists = path_exists(workspace_dir, &resolved.relative, path)?;
-    if exists {
-        return Err(ApplyPatchError::FileAlreadyExists { path: path.clone() });
-    }
-
-    Ok(())
+/// The presence a patch operation requires of its target.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RequiredPresence {
+    /// A create target must not exist yet.
+    Absent,
+    /// A delete target must already exist.
+    Present,
 }
 
-/// Fails when a delete target is absent from the workspace.
-fn reject_missing_path(
-    workspace_dir: &Dir,
-    path: &FilePath,
-    resolved: &ValidatedPath,
-) -> Result<(), ApplyPatchError> {
-    let exists = path_exists(workspace_dir, &resolved.relative, path)?;
-    if !exists {
-        return Err(ApplyPatchError::DeleteMissing { path: path.clone() });
+impl RequiredPresence {
+    /// Names the error `path` raises when the workspace disagrees with `self`.
+    fn mismatch(self, path: &FilePath, exists: bool) -> Option<ApplyPatchError> {
+        match (self, exists) {
+            (Self::Absent, true) => Some(ApplyPatchError::FileAlreadyExists { path: path.clone() }),
+            (Self::Present, false) => Some(ApplyPatchError::DeleteMissing { path: path.clone() }),
+            _ => None,
+        }
     }
-
-    Ok(())
 }

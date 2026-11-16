@@ -123,19 +123,28 @@ fn normalize_legacy(
         LegacyFormula::PatternRegex(pattern) => Ok(regex_atom(pattern, fallback_span)),
         LegacyFormula::Patterns(clauses) => normalize_legacy_patterns(clauses, fallback_span),
         LegacyFormula::PatternEither(branches) => normalize_legacy_either(branches, fallback_span),
-        LegacyFormula::PatternNot(value) => {
-            normalize_legacy_unary(value, fallback_span, Formula::Not)
-        }
-        LegacyFormula::PatternInside(value) => {
-            normalize_legacy_unary(value, fallback_span, Formula::Inside)
-        }
+        LegacyFormula::PatternNot(value) => normalize_wrapped(
+            value.as_ref(),
+            fallback_span,
+            normalize_legacy_value,
+            Formula::Not,
+        ),
+        LegacyFormula::PatternInside(value) => normalize_wrapped(
+            value.as_ref(),
+            fallback_span,
+            normalize_legacy_value,
+            Formula::Inside,
+        ),
         LegacyFormula::PatternNotInside(value) => normalize_legacy_not_inside(value, fallback_span),
         LegacyFormula::PatternNotRegex(pattern) => {
             Ok(normalize_legacy_not_regex(pattern, fallback_span))
         }
-        LegacyFormula::Anywhere(value) => {
-            normalize_legacy_unary(value, fallback_span, Formula::Anywhere)
-        }
+        LegacyFormula::Anywhere(value) => normalize_wrapped(
+            value.as_ref(),
+            fallback_span,
+            normalize_legacy_value,
+            Formula::Anywhere,
+        ),
     }
 }
 
@@ -159,16 +168,23 @@ fn regex_atom(pattern: &str, fallback_span: Option<&SourceSpan>) -> Decorated<Fo
     )
 }
 
-/// Normalizes a legacy unary formula, wrapping its inner value with `wrap`.
-fn normalize_legacy_unary<F>(
-    value: &LegacyValue,
+/// Normalizes a unary formula's child with `normalize`, then wraps it in the
+/// constructor `wrap` names.
+///
+/// Both syntax generations wrap a single child the same way, so the shape lives
+/// here once: the generation differs only in which normalizer resolves the
+/// child.
+fn normalize_wrapped<T, N, F>(
+    value: &T,
     fallback_span: Option<&SourceSpan>,
+    normalize: N,
     wrap: F,
 ) -> Result<Decorated<Formula>, DiagnosticReport>
 where
+    N: FnOnce(&T, Option<&SourceSpan>) -> Result<Decorated<Formula>, DiagnosticReport>,
     F: FnOnce(Box<Decorated<Formula>>) -> Formula,
 {
-    let inner = normalize_legacy_value(value, fallback_span)?;
+    let inner = normalize(value, fallback_span)?;
     Ok(bare(wrap(Box::new(inner)), fallback_span))
 }
 
@@ -247,19 +263,6 @@ fn normalize_legacy_patterns(
     })
 }
 
-/// Normalizes a unary v2 match formula (Not, Inside, Anywhere).
-fn normalize_unary<F>(
-    inner: &MatchFormula,
-    fallback_span: Option<&SourceSpan>,
-    wrap: F,
-) -> Result<Decorated<Formula>, DiagnosticReport>
-where
-    F: FnOnce(Box<Decorated<Formula>>) -> Formula,
-{
-    let child = normalize_match(inner, fallback_span)?;
-    Ok(bare(wrap(Box::new(child)), fallback_span))
-}
-
 /// Normalizes a list of v2 match formula branches (All, Any).
 fn normalize_branches(
     branches: &[MatchFormula],
@@ -302,9 +305,21 @@ fn normalize_match(
         MatchFormula::Regex(pattern) => Ok(regex_atom(pattern, fallback_span)),
         MatchFormula::All(branches) => normalize_conjunction(branches, fallback_span),
         MatchFormula::Any(branches) => normalize_disjunction(branches, fallback_span),
-        MatchFormula::Not(inner) => normalize_unary(inner, fallback_span, Formula::Not),
-        MatchFormula::Inside(inner) => normalize_unary(inner, fallback_span, Formula::Inside),
-        MatchFormula::Anywhere(inner) => normalize_unary(inner, fallback_span, Formula::Anywhere),
+        MatchFormula::Not(inner) => {
+            normalize_wrapped(inner.as_ref(), fallback_span, normalize_match, Formula::Not)
+        }
+        MatchFormula::Inside(inner) => normalize_wrapped(
+            inner.as_ref(),
+            fallback_span,
+            normalize_match,
+            Formula::Inside,
+        ),
+        MatchFormula::Anywhere(inner) => normalize_wrapped(
+            inner.as_ref(),
+            fallback_span,
+            normalize_match,
+            Formula::Anywhere,
+        ),
         MatchFormula::Decorated {
             formula: inner_formula,
             where_clauses: raw_where,

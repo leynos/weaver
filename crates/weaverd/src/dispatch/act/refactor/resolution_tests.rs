@@ -81,6 +81,20 @@ fn assert_provider_refused(
     ensure_same(details.refusal_reason, Some(reason), "refusal reason")
 }
 
+/// Asserts an explicit-provider request for `src/main.py` was refused with
+/// `reason`.
+fn assert_explicit_provider_refused(provider: &str, reason: RefusalReason) -> Result<(), String> {
+    let envelope = resolution_for("src/main.py", Some(provider))?;
+    let details = envelope.details();
+
+    ensure_same(
+        details.selection_mode,
+        SelectionMode::ExplicitProvider,
+        "selection mode",
+    )?;
+    assert_provider_refused(details, reason)
+}
+
 #[test]
 fn automatic_python_selection_prefers_rope() -> Result<(), String> {
     let envelope = resolution_for("src/main.py", None)?;
@@ -116,15 +130,7 @@ fn automatic_rust_selection_prefers_rust_analyzer() -> Result<(), String> {
 
 #[test]
 fn explicit_provider_mismatch_is_refused() -> Result<(), String> {
-    let envelope = resolution_for("src/main.py", Some("rust-analyzer"))?;
-    let details = envelope.details();
-
-    ensure_same(
-        details.selection_mode,
-        SelectionMode::ExplicitProvider,
-        "selection mode",
-    )?;
-    assert_provider_refused(details, RefusalReason::ExplicitProviderMismatch)
+    assert_explicit_provider_refused("rust-analyzer", RefusalReason::ExplicitProviderMismatch)
 }
 
 #[test]
@@ -142,15 +148,7 @@ fn explicit_provider_selection_succeeds_when_language_matches() -> Result<(), St
 
 #[test]
 fn unknown_explicit_provider_is_refused() -> Result<(), String> {
-    let envelope = resolution_for("src/main.py", Some("missing-provider"))?;
-    let details = envelope.details();
-
-    ensure_same(
-        details.selection_mode,
-        SelectionMode::ExplicitProvider,
-        "selection mode",
-    )?;
-    assert_provider_refused(details, RefusalReason::ProviderNotFound)
+    assert_explicit_provider_refused("missing-provider", RefusalReason::ProviderNotFound)
 }
 
 #[test]
