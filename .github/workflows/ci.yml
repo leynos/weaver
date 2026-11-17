@@ -86,7 +86,7 @@ jobs:
       - name: Install uv
         # The same pin the estate's other consumers use. It runs on Node 24, and
         # with no Python dependency manifest to key a cache on, caching is off.
-        uses: astral-sh/setup-uv@5e83ccf689000bf635d77af2cdbad36ca1397375
+        uses: astral-sh/setup-uv@de938e707d6c238b34e29b5770a011e3155e2a3c
         with:
           enable-cache: false
       - name: Spelling (en-GB-oxendict)
