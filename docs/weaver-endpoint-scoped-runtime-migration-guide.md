@@ -10,6 +10,13 @@ endpoint need no action.
 The decision and its rationale are recorded in
 [ADR 0014](adrs/adr-0014-endpoint-scoped-runtime-artefacts.md).
 
+## Applies to
+
+This guide applies to the first Weaver release that ships endpoint-scoped
+runtime artefacts; at the time of writing the workspace is still version
+0.1.0. Any earlier build writes the shared `weaverd.lock`, `weaverd.pid`, and
+`weaverd.health` files described below, and must be stopped with that build.
+
 ## What changed
 
 Weaver now derives the daemon lock, PID, and health filenames from the complete
