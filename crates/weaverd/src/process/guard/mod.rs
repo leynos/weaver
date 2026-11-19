@@ -247,11 +247,35 @@ impl HealthSnapshot<'_> {
     }
 }
 
-/// Reads and parses the PID file, returning `None` when it is absent or
-/// unparseable.
-fn read_pid(dir: &Dir, path: &Path) -> Option<u32> {
-    let content = dir.read_to_string(runtime_filename(path).ok()?).ok()?;
-    content.trim().parse::<u32>().ok()
+/// Reads the recorded daemon PID.
+///
+/// A missing or empty file reports `Ok(None)`: the launch holds the lock but
+/// has not published its PID yet. Other I/O failures and unparseable content
+/// are returned as errors so the caller can distinguish an absent PID from a
+/// PID file it cannot trust.
+pub(super) fn read_pid(dir: &Dir, path: &Path) -> Result<Option<u32>, LaunchError> {
+    let filename = runtime_filename(path)?;
+    let content = match dir.read_to_string(filename) {
+        Ok(content) => content,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => {
+            return Err(LaunchError::PidRead {
+                path: path.to_path_buf(),
+                source,
+            });
+        }
+    };
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    trimmed
+        .parse::<u32>()
+        .map(Some)
+        .map_err(|_| LaunchError::PidParse {
+            path: path.to_path_buf(),
+            value: trimmed.to_owned(),
+        })
 }
 
 /// Runs `op` against the runtime file name, substituting `not_found_value`
@@ -313,7 +337,10 @@ fn runtime_filename(path: &Path) -> Result<&Path, LaunchError> {
 /// Returns [`LaunchError::CheckProcess`] if the signal probe fails for an
 /// unexpected reason.
 fn check_process(pid: u32) -> Result<bool, LaunchError> {
-    if pid == 0 {
+    // `kill` takes a signed PID. Zero and values above `i32::MAX` would be
+    // interpreted as a process group or as every process, so neither can name
+    // the process recorded in a PID file.
+    if pid == 0 || pid > i32::MAX as u32 {
         return Ok(false);
     }
     match kill(Pid::from_raw(pid.cast_signed()), None) {
@@ -328,6 +355,8 @@ pub(super) mod test_support;
 
 #[cfg(test)]
 mod tests;
+// check' to verify your resolution
+// weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
 // check' to verify your resolution
 // weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
 // check' to verify your resolution

@@ -1,4 +1,11 @@
-//! Unit tests for process guard health checking.
+//! Unit tests for [`ProcessGuard`]'s locking, runtime-file and health lifecycle.
+//!
+//! The cases cover acquiring and reclaiming the lock, distinguishing a live
+//! daemon from a launch that has not written its PID, reclaiming stale PID and
+//! health files only after the endpoint binds, PID-file read failures, probing
+//! process liveness (including zero, out-of-range and nonexistent PIDs), and
+//! the health snapshots written across the starting, ready and stopping
+//! transitions.
 
 use std::path::Path;
 
@@ -343,6 +350,9 @@ fn health_snapshot_records_event() -> Result<(), String> {
     }
     Ok(())
 }
+
+#[path = "pid_tests.rs"]
+mod pid_tests;
 // check' to verify your resolution
 // weave: run 'weave explain crates/weaverd/src/process/guard/tests.rs' for per-hunk detail, 'weave
 // check' to verify your resolution

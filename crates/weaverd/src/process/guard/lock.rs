@@ -142,7 +142,7 @@ fn handle_existing_lock(
         Err(other) => return Err(other),
     };
 
-    if let Some(pid) = super::read_pid(dir, paths.pid_path()) {
+    if let Some(pid) = super::read_pid(dir, paths.pid_path())? {
         warn!(
             target: PROCESS_TARGET,
             pid,
@@ -155,10 +155,12 @@ fn handle_existing_lock(
 
 /// Returns the recorded PID when it names a live process.
 ///
-/// A zero or unreadable PID cannot identify a process, so neither is reported
-/// as live.
+/// A zero or out-of-range PID cannot identify a process, so neither is
+/// reported as live. A missing PID is handled separately: it means the holder
+/// of the lock is a launch that has not published its PID yet, and the caller
+/// reports `StartupInProgress` rather than a dead daemon.
 fn live_recorded_pid(dir: &Dir, paths: &RuntimePaths) -> Result<Option<u32>, LaunchError> {
-    match super::read_pid(dir, paths.pid_path()) {
+    match super::read_pid(dir, paths.pid_path())? {
         Some(pid) if super::check_process(pid)? => Ok(Some(pid)),
         _ => Ok(None),
     }
