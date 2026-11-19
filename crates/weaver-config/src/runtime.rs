@@ -1,8 +1,10 @@
 //! Derives runtime artefact paths shared by the CLI and daemon.
 //!
 //! The runtime directory houses the daemon lock, pid, and health snapshots.
-//! Both binaries need to agree on the directory layout so lifecycle commands
-//! can interact with the files written by the daemon supervisor.
+//! [`RuntimePaths`] is the single resolver both `weaver` and `weaverd` use, so
+//! lifecycle commands operate on the exact files the daemon supervisor writes.
+//! The default endpoint keeps the legacy filenames; any other endpoint adds a
+//! SHA-256 identifier derived from the endpoint kind and its complete address.
 
 use std::{
     env,
@@ -34,6 +36,7 @@ pub struct RuntimePaths {
     /// Path to the health snapshot.
     health_path: PathBuf,
 }
+
 
 impl RuntimePaths {
     /// Derives runtime paths from the shared configuration.
@@ -125,6 +128,7 @@ impl RuntimePaths {
     pub fn health_file_name(&self) -> &Path { self.health_file_name.as_path() }
 }
 
+
 impl RuntimePaths {
     /// Derives the four runtime artefact paths from the configuration.
     fn derive_paths(config: &Config) -> Result<Self, RuntimePathsError> {
@@ -142,6 +146,7 @@ impl RuntimePaths {
         })
     }
 }
+
 
 fn runtime_file_names(endpoint: &SocketEndpoint) -> (PathBuf, PathBuf, PathBuf) {
     if endpoint == &crate::default_socket_endpoint() {
@@ -255,160 +260,5 @@ pub enum RuntimePathsError {
 }
 
 #[cfg(test)]
-mod tests {
-    //! Unit tests for runtime path derivation from configuration.
-
-    use proptest::prelude::*;
-
-    use super::*;
-    use crate::Config;
-
-    #[test]
-    fn default_endpoint_preserves_legacy_runtime_file_names() -> Result<(), RuntimePathsError> {
-        let paths = RuntimePaths::from_config_readonly(&Config::default())?;
-
-        assert_eq!(paths.lock_file_name(), Path::new("weaverd.lock"));
-        assert_eq!(paths.pid_file_name(), Path::new("weaverd.pid"));
-        assert_eq!(paths.health_file_name(), Path::new("weaverd.health"));
-        Ok(())
-    }
-
-    #[test]
-    fn unix_socket_paths_with_one_parent_have_distinct_runtime_files()
-    -> Result<(), RuntimePathsError> {
-        let first = runtime_paths(SocketEndpoint::unix("/tmp/weaver/first.sock"))?;
-        let second = runtime_paths(SocketEndpoint::unix("/tmp/weaver/second.sock"))?;
-
-        assert_eq!(first.runtime_dir(), second.runtime_dir());
-        assert_distinct_runtime_files(&first, &second);
-        Ok(())
-    }
-
-    #[test]
-    fn tcp_endpoints_with_different_hosts_have_distinct_runtime_files()
-    -> Result<(), RuntimePathsError> {
-        let first = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000))?;
-        let second = runtime_paths(SocketEndpoint::tcp("127.0.0.2", 9000))?;
-
-        assert_eq!(first.runtime_dir(), second.runtime_dir());
-        assert_distinct_runtime_files(&first, &second);
-        Ok(())
-    }
-
-    #[test]
-    fn tcp_endpoints_with_different_ports_have_distinct_runtime_files()
-    -> Result<(), RuntimePathsError> {
-        let first = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000))?;
-        let second = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9001))?;
-
-        assert_eq!(first.runtime_dir(), second.runtime_dir());
-        assert_distinct_runtime_files(&first, &second);
-        Ok(())
-    }
-
-    #[test]
-    fn identical_endpoints_have_identical_runtime_files() -> Result<(), RuntimePathsError> {
-        let first = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000))?;
-        let second = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000))?;
-
-        assert_eq!(first.lock_path(), second.lock_path());
-        assert_eq!(first.pid_path(), second.pid_path());
-        assert_eq!(first.health_path(), second.health_path());
-        Ok(())
-    }
-
-    proptest! {
-        #[test]
-        fn unix_endpoint_runtime_paths_are_deterministic_and_contained(segment in any::<u32>()) {
-            let endpoint = SocketEndpoint::unix(format!("/tmp/weaver/socket-{segment}.sock"));
-            let first = runtime_paths(endpoint.clone())
-                .map_err(|error| TestCaseError::fail(error.to_string()))?;
-            let second = runtime_paths(endpoint)
-                .map_err(|error| TestCaseError::fail(error.to_string()))?;
-
-            prop_assert_eq!(first.lock_path(), second.lock_path());
-            prop_assert_eq!(first.pid_path(), second.pid_path());
-            prop_assert_eq!(first.health_path(), second.health_path());
-            assert_runtime_paths_are_contained(&first);
-        }
-
-        #[test]
-        fn tcp_endpoint_runtime_paths_are_deterministic_and_contained(
-            host_suffix in "[a-z]{1,12}",
-            port in any::<u16>(),
-        ) {
-            let endpoint = SocketEndpoint::tcp(format!("host-{host_suffix}.example"), port);
-            let first = runtime_paths(endpoint.clone())
-                .map_err(|error| TestCaseError::fail(error.to_string()))?;
-            let second = runtime_paths(endpoint)
-                .map_err(|error| TestCaseError::fail(error.to_string()))?;
-
-            prop_assert_eq!(first.lock_path(), second.lock_path());
-            prop_assert_eq!(first.pid_path(), second.pid_path());
-            prop_assert_eq!(first.health_path(), second.health_path());
-            assert_runtime_paths_are_contained(&first);
-        }
-    }
-
-    #[test]
-    fn derives_paths_for_tcp_socket() {
-        let config = Config {
-            daemon_socket: SocketEndpoint::tcp("127.0.0.1", 9000),
-            ..Config::default()
-        };
-        let paths =
-            RuntimePaths::from_config_readonly(&config).expect("paths should derive for tcp");
-        let tail = paths
-            .runtime_dir()
-            .file_name()
-            .and_then(|name| name.to_str())
-            .expect("runtime dir should have trailing component");
-        assert!(
-            tail == "weaver" || tail.starts_with("uid-"),
-            "unexpected runtime tail: {tail}"
-        );
-        assert!(paths.lock_path().starts_with(paths.runtime_dir()));
-        assert!(paths.pid_path().starts_with(paths.runtime_dir()));
-        assert!(paths.health_path().starts_with(paths.runtime_dir()));
-    }
-
-    #[test]
-    fn rejects_unix_socket_without_parent() {
-        let config = Config {
-            daemon_socket: SocketEndpoint::unix("weaver.sock"),
-            ..Config::default()
-        };
-        let error = RuntimePaths::from_config(&config)
-            .expect_err("paths should fail for sockets without parents");
-        assert!(matches!(
-            error,
-            RuntimePathsError::MissingSocketParent { .. }
-        ));
-    }
-
-    fn runtime_paths(endpoint: SocketEndpoint) -> Result<RuntimePaths, RuntimePathsError> {
-        let config = Config {
-            daemon_socket: endpoint,
-            ..Config::default()
-        };
-        RuntimePaths::from_config_readonly(&config)
-    }
-
-    fn assert_distinct_runtime_files(first: &RuntimePaths, second: &RuntimePaths) {
-        assert_ne!(first.lock_path(), second.lock_path());
-        assert_ne!(first.pid_path(), second.pid_path());
-        assert_ne!(first.health_path(), second.health_path());
-    }
-
-    fn assert_runtime_paths_are_contained(paths: &RuntimePaths) {
-        for (name, path, suffix) in [
-            (paths.lock_file_name(), paths.lock_path(), ".lock"),
-            (paths.pid_file_name(), paths.pid_path(), ".pid"),
-            (paths.health_file_name(), paths.health_path(), ".health"),
-        ] {
-            assert_eq!(name.components().count(), 1);
-            assert!(name.to_string_lossy().ends_with(suffix));
-            assert!(path.starts_with(paths.runtime_dir()));
-        }
-    }
-}
+#[path = "runtime_tests.rs"]
+mod tests;
