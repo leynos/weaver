@@ -2551,3 +2551,287 @@ is private to those protocol tests. It handles serialization, deserialization,
 and equality; each caller retains its protocol-specific assertions. Reuse it
 within that module only, rather than exporting a test-support API for an
 unrelated protocol.
+
+## 27 Milestone 4.1.5: formula model and normalization pipeline
+
+Pull request #104 introduced the canonical formula model together with the
+normalization and validation stages that sit between YAML parsing and query
+plan construction. The pipeline lowers both grammar generations parsed by
+`sempai_yaml` (`LegacyFormula` and `MatchFormula`) into one canonical
+`Formula`, then rejects structurally invalid formulas before any plan is built.
+
+- `crates/sempai-core/src/formula.rs` — canonical `Formula`, `Atom`, and
+  `Decorated<T>` types.
+- `crates/sempai/src/normalize.rs` — legacy and v2 lowering.
+- `crates/sempai/src/normalize_constraints.rs` — `where` clause parsing.
+- `crates/sempai/src/semantic_check/` — structural validation and
+  diagnostics.
+- `crates/sempai/src/engine.rs` — pipeline wiring and `QueryPlan`.
+
+The sections below document the model and each pipeline stage in the order in
+which a rule traverses them. Section 14 remains a short summary of the same
+milestone.
+
+### 27.1 The `Formula` and `Atom` model
+
+`sempai_core::formula::Formula` is the single tree shape consumed by later
+stages. A node is a leaf atom, a boolean combination, or a context constraint:
+
+```rust
+pub enum Formula {
+    /// A leaf pattern or regex atom.
+    Atom(Atom),
+    /// Negation: the inner formula must not match.
+    Not(Box<Decorated<Self>>),
+    /// Context constraint: the anchor must be inside a match of the inner.
+    Inside(Box<Decorated<Self>>),
+    /// Context constraint: the inner must match somewhere in scope.
+    Anywhere(Box<Decorated<Self>>),
+    /// Conjunction: all branches must match.
+    And(Vec<Decorated<Self>>),
+    /// Disjunction: at least one branch must match.
+    Or(Vec<Decorated<Self>>),
+}
+```
+
+The variants divide into two groups:
+
+- Match candidates — `Atom`, `And`, and `Or` can produce a match.
+- Constraint forms — `Not`, `Inside`, and `Anywhere` restrict or remove
+  matches instead of producing one.
+
+The semantic validator relies on this distinction when deciding whether a
+conjunction contains a positive term (Section 27.4).
+
+Leaves are represented by `Atom`:
+
+```rust
+pub enum Atom {
+    /// A host-language pattern snippet.
+    Pattern(PatternAtom),
+    /// A regex pattern.
+    Regex(RegexAtom),
+    /// A raw Tree-sitter query (escape hatch).
+    TreeSitterQuery(TreeSitterQueryAtom),
+}
+```
+
+- `Atom::Pattern(PatternAtom)` — carries `text`, the raw host-language code
+  fragment written with Semgrep tokens.
+- `Atom::Regex(RegexAtom)` — carries `pattern`, the regular expression source.
+- `Atom::TreeSitterQuery(TreeSitterQueryAtom)` — carries `query`, a direct
+  Tree-sitter query string used as an escape hatch. Normalization also uses it
+  as a non-matchable placeholder for dependency principals (Section 27.3).
+
+### 27.2 The `Decorated<T>` wrapper
+
+Every formula node travels inside `Decorated<T>`, which keeps metadata beside
+the node it applies to:
+
+```rust
+pub struct Decorated<T> {
+    /// The core formula or atom.
+    pub node: T,
+    /// Optional `where` constraint clauses.
+    pub where_clauses: Vec<WhereClause>,
+    /// Optional alias binding name.
+    pub as_name: Option<String>,
+    /// Optional fix template text.
+    pub fix: Option<String>,
+    /// Source span for diagnostic anchoring.
+    pub span: Option<SourceSpan>,
+}
+```
+
+- `node` — the wrapped `Formula` (or the metadata point being decorated).
+- `where_clauses` — normalized `where` constraints attached to this node.
+- `as_name` — the optional alias binding written with `as`.
+- `fix` — the optional autofix template. Normalization carries the text
+  through; Sempai does not apply fixes at this stage.
+- `span` — the source location used to anchor diagnostics.
+
+`Formula::And` and `Formula::Or` store `Vec<Decorated<Formula>>`, while `Not`,
+`Inside`, and `Anywhere` store `Box<Decorated<Formula>>`. Metadata therefore
+travels with each subtree rather than with the tree as a whole. When a parsed
+node has no span of its own, normalization copies the enclosing rule span into
+`span` as a fallback when one is present; if no fallback span is available
+either, the node carries no diagnostic location.
+
+### 27.3 Normalization pipeline (`normalize.rs`)
+
+`normalize_search_principal` is the crate-internal entry point. It accepts a
+parsed `SearchQueryPrincipal` plus an optional fallback `SourceSpan` and returns
+`Result<Decorated<Formula>, DiagnosticReport>`. The generation-specific workers
+`normalize_legacy` and `normalize_match` are private and recursive.
+
+The algorithm proceeds in five steps:
+
+1. Dispatch on the principal variant: `Legacy` calls `normalize_legacy`,
+   `Match` calls `normalize_match`, and `ProjectDependsOn` calls
+   `normalize_dependency_principal`.
+2. Recursively map every syntax variant onto canonical constructors. Unary
+   forms share one helper that normalizes the child and then wraps it in `Not`,
+   `Inside`, or `Anywhere`.
+3. Parse `where` clauses with `parse_constraint`, attaching the resulting
+   `WhereClause` values to the `Decorated` node that owns them.
+4. Thread the optional fallback `SourceSpan` through the recursion so a
+   produced node carries a diagnostic location when one is available.
+5. Return the decorated tree, or propagate the `DiagnosticReport` produced by
+   a malformed recognized `where` clause.
+
+Table: Legacy keys lowered to canonical `Formula` constructors
+
+| Legacy clause                            | Canonical constructor               |
+| ---------------------------------------- | ----------------------------------- |
+| `pattern: "..."`                         | `Formula::Atom(Atom::Pattern(...))` |
+| `pattern-regex: "..."`                   | `Formula::Atom(Atom::Regex(...))`   |
+| `patterns: [...]`                        | `Formula::And([...])`               |
+| `pattern-either: [...]`                  | `Formula::Or([...])`                |
+| `pattern-not: ...`                       | `Formula::Not(Box<...>)`            |
+| `pattern-inside: ...`                    | `Formula::Inside(Box<...>)`         |
+| `pattern-not-inside: ...`                | `Formula::Not(Inside(...))`         |
+| `pattern-not-regex: "..."`               | `Formula::Not(Atom(Regex(...)))`    |
+| `semgrep-internal-pattern-anywhere: ...` | `Formula::Anywhere(Box<...>)`       |
+
+Table: v2 `match` keys lowered to canonical `Formula` constructors
+
+| v2 clause                  | Canonical constructor                |
+| -------------------------- | ------------------------------------ |
+| `"..."` (string shorthand) | `Formula::Atom(Atom::Pattern(...))`  |
+| `pattern: "..."`           | `Formula::Atom(Atom::Pattern(...))`  |
+| `regex: "..."`             | `Formula::Atom(Atom::Regex(...))`    |
+| `all: [...]`               | `Formula::And([...])`                |
+| `any: [...]`               | `Formula::Or([...])`                 |
+| `not: ...`                 | `Formula::Not(Box<...>)`             |
+| `inside: ...`              | `Formula::Inside(Box<...>)`          |
+| `anywhere: ...`            | `Formula::Anywhere(Box<...>)`        |
+| `where`, `as`, `fix`       | `Decorated<Formula>` metadata fields |
+
+Three details are specific to normalization:
+
+- A legacy `patterns` array is split by clause kind. Formula entries become
+  `And` branches; constraint entries become `where_clauses` on the enclosing
+  `And` decorator.
+- A v2 decorated object is normalized first, then its `where`, `as`, and `fix`
+  values are re-attached to the resulting decorator, because the canonical
+  model stores them on the wrapper rather than on the inner node.
+- A `r2c-internal-project-depends-on` principal has no formula body, so it
+  lowers to the non-matchable placeholder
+  `(__NONEXISTENT_NODE__) @_dependency_check`. The dependency payload is not
+  retained: `normalize_dependency_principal` ignores it, and `QueryPlan` stores
+  only the rule identifier, language, and formula. Dependency execution
+  semantics remain a later milestone.
+
+### 27.4 Semantic validation (`semantic_check/`)
+
+`semantic_check/mod.rs` exposes two validation stages. `validate_formula`
+checks formula-tree structure; `semantic_check/analysis.rs` performs one
+recursive walk that collects per-subtree facts and merges them upwards, so a
+parent operator can judge its branches without a second traversal.
+`validate_constraints` walks the decorated tree for constraint payload
+semantics; it is currently a placeholder pending execution-layer context; see
+issue #152.
+
+Structural validation enforces these rules:
+
+- `InvalidNotInOr` — an `Or` branch subtree must not contain a `Not`.
+  Negated terms have no defined meaning inside a disjunction, so the formula is
+  rejected with `E_SEMPAI_INVALID_NOT_IN_OR`. The first occurrence wins, and
+  this diagnostic is reported ahead of a missing-positive-term failure because
+  it is the more specific defect.
+- `MissingPositiveTermInAnd` — an `And` must contain at least one positive
+  match-producing term. An `Atom` is positive, while `Not`, `Inside`, and
+  `Anywhere` clear positivity for their entire subtree. An `And` or `Or` is
+  positive when at least one of its direct branches is positive. A conjunction
+  with no positive branch is rejected with
+  `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`, so `And(Not(Atom))` fails even
+  though the negated subtree contains an atom.
+- Depth limit — nesting above `MAX_FORMULA_DEPTH` (1000) is rejected with
+  `E_SEMPAI_SCHEMA_INVALID`, keeping the recursive analysis clear of the stack
+  limit.
+
+The operator-precedence reference exempts metavariable-pattern contexts from
+the conjunction rule. The current constraint model stores a
+`metavariable-pattern` body as text in `Constraint::MetavariablePattern` rather
+than as an `And` subtree, so no conjunction from that context reaches the
+check; the validator therefore needs no exemption branch.
+
+Diagnostics blame the tightest available location. Analysis prefers the
+offending node's own span, then the first child span, then the nearest
+inherited ancestor span.
+
+For example, this tree is rejected because the disjunction contains a negation:
+
+```rust
+use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
+
+fn decorate(node: Formula) -> Decorated<Formula> {
+    Decorated {
+        node,
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    }
+}
+
+let pattern = decorate(Formula::Atom(Atom::Pattern(PatternAtom {
+    text: String::from("foo"),
+})));
+let formula = decorate(Formula::Or(vec![decorate(Formula::Not(Box::new(
+    pattern,
+)))]));
+
+// validate_formula(&formula) returns a diagnostic with
+// `E_SEMPAI_INVALID_NOT_IN_OR` and the message
+// "negated terms are not allowed inside disjunction (Or/pattern-either)".
+```
+
+### 27.5 Engine wiring
+
+`Engine::compile_yaml` performs the stages in a fixed order, and any failure
+short-circuits with a `DiagnosticReport`:
+
+1. Parse the YAML rule file with `parse_rule_file`.
+2. Validate that every rule uses a mode the engine can execute; only `search`
+   mode proceeds today.
+3. Select search principals and normalize each one with
+   `normalize_search_principal`, using `rule.rule_span()` as the fallback span.
+4. Run `validate_formula` and then `validate_constraints` on the normalized
+   formula.
+5. Compile one plan per declared language and return
+   `Ok(Vec<QueryPlan>)`.
+
+A plan carries the rule identifier, the target language, and the validated
+formula:
+
+```rust
+pub struct QueryPlan {
+    rule_id: String,
+    language: Language,
+    formula: Arc<Decorated<Formula>>,
+}
+```
+
+`QueryPlan::formula()` exposes the shared formula for tests and integration. The
+`Arc` lets every language plan for one rule reference the same normalized tree
+instead of cloning it. The earlier `_plan` placeholder field no longer exists.
+
+### 27.6 Constraint parsing boundary (`normalize_constraints.rs`)
+
+`normalize_constraints.rs` is the serialization boundary for rule `where`
+clauses. It accepts raw YAML-backed JSON values and lowers them into
+`sempai_core::formula::Constraint` domain values, keeping the core formula
+types independent of transport formats.
+
+`parse_constraint` recognizes two clause kinds by key:
+
+- `metavariable-regex` — becomes `Constraint::MetavariableRegex` with the
+  `metavariable` and `regex` strings. The regex is not compiled here.
+- `metavariable-pattern` — becomes `Constraint::MetavariablePattern` with the
+  `metavariable` and `pattern` strings.
+
+Any other clause is preserved verbatim as `Constraint::Other` holding its JSON
+text, so unknown shapes survive normalization. A recognized key with a
+malformed body produces `E_SEMPAI_SCHEMA_INVALID`, blamed on the fallback span
+because the clause value carries no span of its own.
