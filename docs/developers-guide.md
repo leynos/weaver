@@ -2868,7 +2868,8 @@ pub struct Decorated<T> {
 `Inside`, and `Anywhere` store `Box<Decorated<Formula>>`. Metadata therefore
 travels with each subtree rather than with the tree as a whole. When a parsed
 node has no span of its own, normalization copies the enclosing rule span into
-`span` as a fallback.
+`span` as a fallback when one is present; if no fallback span is available
+either, the node carries no diagnostic location.
 
 ### 27.3 Normalization pipeline (`normalize.rs`)
 
@@ -2887,8 +2888,8 @@ The algorithm proceeds in five steps:
    `Inside`, or `Anywhere`.
 3. Parse `where` clauses with `parse_constraint`, attaching the resulting
    `WhereClause` values to the `Decorated` node that owns them.
-4. Thread the fallback `SourceSpan` through the recursion so every produced
-   node carries a diagnostic location.
+4. Thread the optional fallback `SourceSpan` through the recursion so a
+   produced node carries a diagnostic location when one is available.
 5. Return the decorated tree, or propagate the `DiagnosticReport` produced by
    a malformed recognized `where` clause.
 
