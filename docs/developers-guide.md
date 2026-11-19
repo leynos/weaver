@@ -2716,8 +2716,10 @@ Three details are specific to normalization:
   model stores them on the wrapper rather than on the inner node.
 - A `r2c-internal-project-depends-on` principal has no formula body, so it
   lowers to the non-matchable placeholder
-  `(__NONEXISTENT_NODE__) @_dependency_check`. The dependency payload stays
-  available for later execution work.
+  `(__NONEXISTENT_NODE__) @_dependency_check`. The dependency payload is not
+  retained: `normalize_dependency_principal` ignores it, and `QueryPlan` stores
+  only the rule identifier, language, and formula. Dependency execution
+  semantics remain a later milestone.
 
 ### 27.4 Semantic validation (`semantic_check/`)
 
@@ -2737,10 +2739,12 @@ Structural validation enforces these rules:
   this diagnostic is reported ahead of a missing-positive-term failure because
   it is the more specific defect.
 - `MissingPositiveTermInAnd` — an `And` must contain at least one positive
-  match-producing term. An `Atom` is positive; `Not`, `Inside`, and `Anywhere`
-  are not; an `And` or `Or` is positive when any descendant is positive. A
-  conjunction with no positive descendant is rejected with
-  `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`.
+  match-producing term. An `Atom` is positive, while `Not`, `Inside`, and
+  `Anywhere` clear positivity for their entire subtree. An `And` or `Or` is
+  positive when at least one of its direct branches is positive. A conjunction
+  with no positive branch is rejected with
+  `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`, so `And(Not(Atom))` fails even
+  though the negated subtree contains an atom.
 - Depth limit — nesting above `MAX_FORMULA_DEPTH` (1000) is rejected with
   `E_SEMPAI_SCHEMA_INVALID`, keeping the recursive analysis clear of the stack
   limit.
@@ -2775,7 +2779,7 @@ let pattern = decorate(Formula::Atom(Atom::Pattern(PatternAtom {
 })));
 let formula = decorate(Formula::Or(vec![decorate(Formula::Not(Box::new(
     pattern,
-)))]))
+)))]));
 
 // validate_formula(&formula) returns a diagnostic with
 // `E_SEMPAI_INVALID_NOT_IN_OR` and the message
