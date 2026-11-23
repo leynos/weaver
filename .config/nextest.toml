@@ -61,20 +61,25 @@ slow-timeout = { period = "120s", terminate-after = 5 }
 # executable that lacks the features the snapshots need (the Python graph-slice
 # snapshots fail), so keep the two in step. After `make test`'s own build it
 # finds everything fresh and does no work.
-# `nested-cargo-builds` runs the trybuild and example-rendering binaries once.
-# A failing test in the warm-up makes the script exit non-zero and nextest then
-# runs none of the selected tests, so the run fails with that test's own output.
-# `--no-fail-fast` lets the warm-up run every binary first, so the failure list
-# is complete. Both commands are `--frozen` (locked and offline): the gate has
-# already fetched, so neither may resolve or touch the registry. The second
-# passes `--all-features`, as `make test` does, because `weaver-plugins`'
+# The `warm-*` scripts run the trybuild and example-rendering binaries once,
+# one script per package. A failing test in a warm-up makes its script exit
+# non-zero and nextest then runs none of the tests it serves, so the run fails
+# with that test's own output. `--no-fail-fast` lets a script with two binaries
+# run both first, so the failure list is complete. Every command is `--frozen`
+# (locked and offline): the gate has already fetched, so none may resolve or
+# touch the registry. The `warm-*`
+# scripts pass `--all-features`, as `make test` does, because `weaver-plugins`'
 # `compile_time` test only exists with its `test-support` feature, and a
 # differently featured build would not be the one the timed run reuses.
 [scripts.setup.weaver-binary]
 command = ["cargo", "build", "--frozen", "--workspace", "--all-targets", "--all-features"]
 slow-timeout = { period = "300s", terminate-after = 3 }
 
-[scripts.setup.nested-cargo-builds]
+[scripts.setup.warm-config-compile]
+command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaver-config", "--test", "compile_time"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[scripts.setup.warm-docs-gate]
 command = [
   "cargo",
   "test",
@@ -82,30 +87,43 @@ command = [
   "--all-features",
   "--no-fail-fast",
   "-p",
-  "weaver-config",
-  "--test",
-  "compile_time",
-  "-p",
   "weaver-docs-gate",
   "--test",
   "compile_time",
   "--test",
   "load_manifest",
-  "-p",
-  "weaver-plugins",
-  "--test",
-  "compile_time",
-  "-p",
-  "weaver-cli",
-  "--test",
-  "missing_docs_policy",
 ]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[scripts.setup.warm-plugins-compile]
+command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaver-plugins", "--test", "compile_time"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[scripts.setup.warm-cli-docs-policy]
+command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaver-cli", "--test", "missing_docs_policy"]
 slow-timeout = { period = "300s", terminate-after = 3 }
 
 [[profile.default.scripts]]
 filter = 'package(weaver-e2e)'
 setup = "weaver-binary"
 
+# One script per package, each selected by the binaries it warms, so a run that
+# selects one of these tests warms only that test's build and an unrelated
+# failing binary cannot stop it. A new nested-build test binary needs both an
+# entry in the override's `filter` and a script rule here (docs/developers-guide.md
+# section 3.3).
 [[profile.default.scripts]]
-filter = 'binary(=load_manifest) | binary(=compile_time) | binary(=missing_docs_policy)'
-setup = "nested-cargo-builds"
+filter = 'binary_id(=weaver-config::compile_time)'
+setup = "warm-config-compile"
+
+[[profile.default.scripts]]
+filter = 'binary_id(=weaver-docs-gate::compile_time) | binary_id(=weaver-docs-gate::load_manifest)'
+setup = "warm-docs-gate"
+
+[[profile.default.scripts]]
+filter = 'binary_id(=weaver-plugins::compile_time)'
+setup = "warm-plugins-compile"
+
+[[profile.default.scripts]]
+filter = 'binary_id(=weaver-cli::missing_docs_policy)'
+setup = "warm-cli-docs-policy"
