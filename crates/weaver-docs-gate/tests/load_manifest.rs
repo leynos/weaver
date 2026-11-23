@@ -277,12 +277,12 @@ fn read_file(dir_path: &Utf8Path, file_name: &str) -> TestResult<Result<String, 
 
 /// Run the documented matrix-rendering example with caller-supplied args.
 fn run_render_boundary_matrix(args: &[&str]) -> TestResult<Output> {
+    // The enclosing test build has already fetched the locked dependencies, so
+    // this nested cargo must not resolve or download anything. Everything
+    // after `--` belongs to the example, not to cargo.
     Command::new(env!("CARGO"))
         .args([
             "run",
-            // The enclosing test build has already fetched the locked
-            // dependencies, so this nested cargo must not resolve or
-            // download anything.
             "--frozen",
             "-p",
             "weaver-docs-gate",

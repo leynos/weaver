@@ -174,8 +174,31 @@ builds it with the other targets before any test starts.
 `tests/workflow_contracts/nextest_config_test.py` reads the file with `tomllib`
 and checks the group, the override and the timeouts; it starts no `cargo`. The
 Concordat `nested-cargo-nextest` rule (NC-004, NC-005) holds the same property
-from outside. A new test binary that starts a compiler joins the override's
-`filter`.
+from outside. A new test binary that starts a compiler needs two entries in
+`.config/nextest.toml`, and leaving either out leaves it unprepared:
+
+- Add it to the override's `filter`, which puts it in the serial group.
+- Add a `[scripts.setup.warm-…]` script that runs it with
+  `cargo test --frozen --all-features -p <package> --test <binary>`, and a
+  `[[profile.default.scripts]]` rule whose `filter` selects that binary with
+  `binary_id(=<package>::<binary>)`, which the Concordat reader can follow
+  where it cannot follow an intersection. The script pays for the nested or
+  trybuild build once, before any selected test starts, so the timed body finds
+  it built.
+
+Each warm-up script has its own allowance of 300 seconds per period and
+terminates after three periods. A test in a warm-up that fails makes its script
+fail, and nextest then runs none of the tests that script serves and reports
+the failing test's own output. Each rule selects one binary, so a run that
+selects only some of these tests warms only those, and an unrelated failing
+binary cannot stop them. The isolation is between binaries, not between test
+cases: `cargo test --test <binary>` runs every non-ignored case in its binary,
+so a failing case in a binary blocks a run filtered to another case of the same
+binary. Every script uses `--frozen`, so it never resolves or touches the
+registry; run `cargo fetch --locked` first on a clean tree. The `weaver-binary`
+script builds `weaver` with the flags of `make test`, and must keep them in
+step with it, or it overwrites `target/debug/weaver` with a binary that lacks
+the features the snapshots need.
 
 ## 4 Workspace lint policy
 

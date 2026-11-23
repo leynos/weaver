@@ -1,5 +1,9 @@
 # cargo-nextest configuration for Weaver.
 #
+# Setup scripts are an experimental nextest feature; the `[scripts.setup.*]`
+# tables below need this opt-in.
+experimental = ["setup-scripts"]
+#
 # Scope: every `cargo nextest` invocation, including `make test` and the
 # coverage lane. nextest does not run doctests, which `make test` runs
 # separately with `cargo test --doc`.
@@ -41,3 +45,79 @@ max-threads = 1
 filter = 'binary(=load_manifest) | binary(=compile_time) | binary(=missing_docs_policy)'
 test-group = "nested-cargo-builds"
 slow-timeout = { period = "120s", terminate-after = 5 }
+
+# Every test binary selected below compiles something in a nested cargo or
+# trybuild build inside its own timed body. If nothing has filled those build
+# directories first, the first test to reach each pays a cold dependency build
+# and its timeout fails an assertion that is sound. These setup scripts pay for
+# the builds once, before any selected test starts, under their own allowance,
+# so every timed body then finds the directories warm. (The same move as
+# ortho-config #710 and whitaker #518.)
+#
+# `weaver-binary` builds the `weaver` executable that the end-to-end binaries
+# otherwise build on first use, inside whichever test reaches it first. It uses
+# the exact flags of `make test` (`CARGO_FLAGS` in the Makefile): a build with
+# a different feature set would overwrite `target/debug/weaver` with an
+# executable that lacks the features the snapshots need (the Python graph-slice
+# snapshots fail), so keep the two in step. After `make test`'s own build it
+# finds everything fresh and does no work.
+# The `warm-*` scripts run the trybuild and example-rendering binaries once,
+# one script per binary. A failing test in a warm-up makes its script exit
+# non-zero and nextest then runs none of the tests it serves, so the run fails
+# with that test's own output. Every command is `--frozen` (locked and
+# offline): the gate has already fetched, so none may resolve or touch the
+# registry. The `warm-*` scripts pass `--all-features`, as `make test` does, because `weaver-plugins`'
+# `compile_time` test only exists with its `test-support` feature, and a
+# differently featured build would not be the one the timed run reuses.
+[scripts.setup.weaver-binary]
+command = ["cargo", "build", "--frozen", "--workspace", "--all-targets", "--all-features"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[scripts.setup.warm-config-compile]
+command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaver-config", "--test", "compile_time"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[scripts.setup.warm-docs-gate-compile-time]
+command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaver-docs-gate", "--test", "compile_time"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[scripts.setup.warm-docs-gate-load-manifest]
+command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaver-docs-gate", "--test", "load_manifest"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[scripts.setup.warm-plugins-compile]
+command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaver-plugins", "--test", "compile_time"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[scripts.setup.warm-cli-docs-policy]
+command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaver-cli", "--test", "missing_docs_policy"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[[profile.default.scripts]]
+filter = 'package(weaver-e2e)'
+setup = "weaver-binary"
+
+# One script per binary, each selected by the binary it warms, so a run that
+# selects one of these tests warms only that binary's build and an unrelated
+# failing binary cannot stop it. A new nested-build test binary needs both an
+# entry in the override's `filter` and a script rule here (docs/developers-guide.md
+# section 3.3).
+[[profile.default.scripts]]
+filter = 'binary_id(=weaver-config::compile_time)'
+setup = "warm-config-compile"
+
+[[profile.default.scripts]]
+filter = 'binary_id(=weaver-docs-gate::compile_time)'
+setup = "warm-docs-gate-compile-time"
+
+[[profile.default.scripts]]
+filter = 'binary_id(=weaver-docs-gate::load_manifest)'
+setup = "warm-docs-gate-load-manifest"
+
+[[profile.default.scripts]]
+filter = 'binary_id(=weaver-plugins::compile_time)'
+setup = "warm-plugins-compile"
+
+[[profile.default.scripts]]
+filter = 'binary_id(=weaver-cli::missing_docs_policy)'
+setup = "warm-cli-docs-policy"
