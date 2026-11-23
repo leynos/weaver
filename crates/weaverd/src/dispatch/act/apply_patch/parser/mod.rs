@@ -141,35 +141,43 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
         let line_type = classify_line(trimmed);
         let line_info = LineInfo::new(line_type, line_start, line_end);
 
-        if matches!(
-            line_type,
-            LineType::SearchMarker | LineType::Separator | LineType::ReplaceMarker
-        ) {
-            let mut state = ParserState::new(&mut mode, &mut search_replace);
-            if handle_search_replace_marker(&line_info, &mut state, chunk, &path)? {
-                offset = line_info.end;
-                continue;
-            }
+        offset = line_end;
+        let mut state = ParserState::new(&mut mode, &mut search_replace);
+        if handle_search_replace_marker(&line_info, &mut state, chunk, &path)? {
+            continue;
         }
         if search_replace.is_open() {
-            offset = line_end;
             continue;
         }
 
         mode = detect_mode_transition(trimmed, mode);
-        if matches!(
-            line_type,
-            LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent
-        ) {
-            validate_line_type(line_type, trimmed)?;
-            handle_mode_specific_capture(mode, line_type, line, &mut create_capture);
-        }
-
-        offset = line_end;
+        capture_header_or_content(mode, &line_info, line, &mut create_capture)?;
     }
 
     search_replace.validate_complete(&path)?;
     construct_operation(mode, path, search_replace, create_capture)
+}
+
+/// Validates and captures a header or create-content line; other lines are ignored.
+///
+/// # Errors
+///
+/// Returns a parse error when the line type fails validation.
+fn capture_header_or_content(
+    mode: OperationMode,
+    line_info: &LineInfo,
+    line: &str,
+    create_capture: &mut CreateContentCapture,
+) -> Result<(), ApplyPatchError> {
+    let line_type = line_info.line_type;
+    if matches!(
+        line_type,
+        LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent
+    ) {
+        validate_line_type(line_type, trim_line(line))?;
+        handle_mode_specific_capture(mode, line_type, line, create_capture);
+    }
+    Ok(())
 }
 
 /// Handles SEARCH/REPLACE marker lines without mutating the cursor offset.
