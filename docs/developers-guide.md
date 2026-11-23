@@ -191,11 +191,14 @@ terminates after three periods. A test in a warm-up that fails makes its script
 fail, and nextest then runs none of the tests that script serves and reports
 the failing test's own output. Each rule selects one package's binaries, so a
 run that selects only some of these tests warms only those, and an unrelated
-failing binary cannot stop them. Every script uses `--frozen`, so it never
-resolves or touches the registry; run `cargo fetch --locked` first on a clean
-tree. The `weaver-binary` script builds `weaver` with the flags of `make test`,
-and must keep them in step with it, or it overwrites `target/debug/weaver` with
-a binary that lacks the features the snapshots need.
+failing binary cannot stop them. The isolation is between binaries, not between
+test cases: `cargo test --test <binary>` runs every non-ignored case in its
+binary, so a failing case in a binary blocks a run filtered to another case of
+the same binary. Every script uses `--frozen`, so it never resolves or touches
+the registry; run `cargo fetch --locked` first on a clean tree. The
+`weaver-binary` script builds `weaver` with the flags of `make test`, and must
+keep them in step with it, or it overwrites `target/debug/weaver` with a binary
+that lacks the features the snapshots need.
 
 ## 4 Workspace lint policy
 
