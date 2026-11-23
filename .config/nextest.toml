@@ -1,5 +1,9 @@
 # cargo-nextest configuration for Weaver.
 #
+# Setup scripts are an experimental nextest feature; the `[scripts.setup.*]`
+# tables below need this opt-in.
+experimental = ["setup-scripts"]
+#
 # Scope: every `cargo nextest` invocation, including `make test` and the
 # coverage lane. nextest does not run doctests, which `make test` runs
 # separately with `cargo test --doc`.
@@ -41,3 +45,63 @@ max-threads = 1
 filter = 'binary(=load_manifest) | binary(=compile_time) | binary(=missing_docs_policy)'
 test-group = "nested-cargo-builds"
 slow-timeout = { period = "120s", terminate-after = 5 }
+
+# Every test binary selected below compiles something in a nested cargo or
+# trybuild build inside its own timed body. If nothing has filled those build
+# directories first, the first test to reach each pays a cold dependency build
+# and its timeout fails an assertion that is sound. These setup scripts pay for
+# the builds once, before any selected test starts, under their own allowance,
+# so every timed body then finds the directories warm. (The same move as
+# ortho-config #710 and whitaker #518.)
+#
+# `weaver-binary` builds the `weaver` executable that the end-to-end binaries
+# otherwise build on first use, inside whichever test reaches it first. It uses
+# the exact flags of `make test` (`CARGO_FLAGS` in the Makefile): a build with
+# a different feature set would overwrite `target/debug/weaver` with an
+# executable that lacks the features the snapshots need (the Python graph-slice
+# snapshots fail), so keep the two in step. After `make test`'s own build it
+# finds everything fresh and does no work.
+# `nested-cargo-builds` runs the trybuild and example-rendering binaries once.
+# A failing test in the warm-up makes the script exit non-zero and nextest then
+# runs none of the selected tests, so the run fails with that test's own output.
+# `--no-fail-fast` lets the warm-up run every binary first, so the failure list
+# is complete. Both commands are `--locked`: the gate has already fetched, so
+# neither may resolve or touch the registry.
+[scripts.setup.weaver-binary]
+command = ["cargo", "build", "--locked", "--workspace", "--all-targets", "--all-features"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[scripts.setup.nested-cargo-builds]
+command = [
+  "cargo",
+  "test",
+  "--locked",
+  "--no-fail-fast",
+  "-p",
+  "weaver-config",
+  "--test",
+  "compile_time",
+  "-p",
+  "weaver-docs-gate",
+  "--test",
+  "compile_time",
+  "--test",
+  "load_manifest",
+  "-p",
+  "weaver-plugins",
+  "--test",
+  "compile_time",
+  "-p",
+  "weaver-cli",
+  "--test",
+  "missing_docs_policy",
+]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
+[[profile.default.scripts]]
+filter = 'package(weaver-e2e)'
+setup = "weaver-binary"
+
+[[profile.default.scripts]]
+filter = 'binary(=load_manifest) | binary(=compile_time) | binary(=missing_docs_policy)'
+setup = "nested-cargo-builds"
