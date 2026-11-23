@@ -6,10 +6,12 @@ use crate::dispatch::act::apply_patch::{
 };
 
 mod paths;
+mod scan;
 mod state;
 
 use self::{
     paths::parse_diff_paths,
+    scan::{ChunkContext, ChunkScan},
     state::{CreateContentCapture, SearchReplaceParser},
 };
 
@@ -129,47 +131,17 @@ fn slice_at_offsets<'a>(patch: &'a str, offsets: &[usize]) -> Vec<&'a str> {
 fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
     let (path_text, mut offset) = parse_header(chunk)?;
     let path = FilePath::new(path_text);
-    let mut mode = OperationMode::Unknown;
-    let mut search_replace = SearchReplaceParser::new();
-    let mut create_capture = CreateContentCapture::new();
+    let mut scan = ChunkScan::new();
+    let context = ChunkContext { chunk, path: &path };
 
     let remainder = chunk.get(offset..).unwrap_or_default();
     for line in remainder.split_inclusive('\n') {
-        let line_start = offset;
-        let line_end = offset + line.len();
-        let trimmed = trim_line(line);
-        let line_type = classify_line(trimmed);
-        let line_info = LineInfo::new(line_type, line_start, line_end);
-
-        if matches!(
-            line_type,
-            LineType::SearchMarker | LineType::Separator | LineType::ReplaceMarker
-        ) {
-            let mut state = ParserState::new(&mut mode, &mut search_replace);
-            if handle_search_replace_marker(&line_info, &mut state, chunk, &path)? {
-                offset = line_info.end;
-                continue;
-            }
-        }
-        if search_replace.is_open() {
-            offset = line_end;
-            continue;
-        }
-
-        mode = detect_mode_transition(trimmed, mode);
-        if matches!(
-            line_type,
-            LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent
-        ) {
-            validate_line_type(line_type, trimmed)?;
-            handle_mode_specific_capture(mode, line_type, line, &mut create_capture);
-        }
-
-        offset = line_end;
+        scan.consume_line(line, offset, &context)?;
+        offset += line.len();
     }
 
-    search_replace.validate_complete(&path)?;
-    construct_operation(mode, path, search_replace, create_capture)
+    scan.search_replace.validate_complete(&path)?;
+    construct_operation(scan.mode, path, scan.search_replace, scan.create_capture)
 }
 
 /// Handles SEARCH/REPLACE marker lines without mutating the cursor offset.
