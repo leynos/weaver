@@ -65,17 +65,21 @@ slow-timeout = { period = "120s", terminate-after = 5 }
 # A failing test in the warm-up makes the script exit non-zero and nextest then
 # runs none of the selected tests, so the run fails with that test's own output.
 # `--no-fail-fast` lets the warm-up run every binary first, so the failure list
-# is complete. Both commands are `--locked`: the gate has already fetched, so
-# neither may resolve or touch the registry.
+# is complete. Both commands are `--frozen` (locked and offline): the gate has
+# already fetched, so neither may resolve or touch the registry. The second
+# passes `--all-features`, as `make test` does, because `weaver-plugins`'
+# `compile_time` test only exists with its `test-support` feature, and a
+# differently featured build would not be the one the timed run reuses.
 [scripts.setup.weaver-binary]
-command = ["cargo", "build", "--locked", "--workspace", "--all-targets", "--all-features"]
+command = ["cargo", "build", "--frozen", "--workspace", "--all-targets", "--all-features"]
 slow-timeout = { period = "300s", terminate-after = 3 }
 
 [scripts.setup.nested-cargo-builds]
 command = [
   "cargo",
   "test",
-  "--locked",
+  "--frozen",
+  "--all-features",
   "--no-fail-fast",
   "-p",
   "weaver-config",
