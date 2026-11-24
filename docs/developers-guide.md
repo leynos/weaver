@@ -267,8 +267,11 @@ with ENOENT; on a host that forbids unprivileged user namespaces (hosted Ubuntu
 images) every sandboxed start fails with EPERM. `birdcage` reports those and
 unrelated failures with the same message, so the cases do not guess from it.
 Nextest hides the output of a passing test, so only `cargo test` shows the
-`SKIPPED:` lines. The cases that fail before exec, and the environment
-restoration case, always run.
+`SKIPPED:` lines. The cases that fail before exec always run. So does the
+environment restoration case: it passes only when the spawn succeeded and the
+environment came back unchanged, and it fails with "restoration was not
+verified" when `birdcage` cannot activate (a denied namespace, say), because
+the runner has no outcome between pass and fail.
 
 ### 4.2 Environment access and injection seams
 

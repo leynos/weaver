@@ -252,8 +252,8 @@ fn sorted_environment() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
 /// host need not exec in the sandbox). A typed preflight error fails it, since
 /// the sandbox was never reached. An activation error (a host that forbids the
 /// sandbox's namespaces refuses the spawn this way, but so can a failed
-/// exception) cannot show that the environment was ever stripped, so the case
-/// reports itself skipped, not passed.
+/// exception) cannot show that the environment was stripped and restored, so it
+/// fails the case as "not verified" instead of passing it.
 ///
 /// Not ported from the deleted `EnvGuard` tests: a variable created while the
 /// guard is live and removal on drop, which need the `pub(crate)` guard itself.
@@ -278,13 +278,14 @@ fn parent_environment_is_restored_after_spawn() -> Result<()> {
             child.wait_with_output().context("wait for the child")?;
             Ok(())
         }
-        // `birdcage` refused to activate (a denied namespace, say). Nothing
-        // shows it got as far as stripping the environment, so restoration was
-        // not exercised: report that instead of passing.
-        Err(SandboxError::Activation(err)) => Err(Skipped(format!(
-            "birdcage did not activate, so restoration was not exercised: {err}"
-        ))
-        .into()),
+        // `birdcage` refused to activate (a denied namespace, say). Activation
+        // can fail before or after it strips the environment, so a run that
+        // ends here has not verified restoration: fail rather than pass, since
+        // the runner cannot report a third outcome.
+        Err(SandboxError::Activation(err)) => bail!(
+            "restoration was not verified: birdcage did not activate ({err}), which can happen \
+             before or after it strips the environment"
+        ),
         Err(other) => bail!("the spawn failed before the sandbox was reached: {other}"),
     }
 }
