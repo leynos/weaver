@@ -247,11 +247,13 @@ fn sorted_environment() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
 /// snapshots the whole environment before the attempt and requires the same set
 /// after it, and the scenario variables must be among them.
 ///
-/// It asserts on the environment only. Whether the spawn succeeded and how the
-/// child fared belong to the other cases: a host that forbids the sandbox's
-/// namespaces refuses the spawn outright, and restoration must hold on that
-/// path too, so a refused spawn is reported after the comparison rather than
-/// instead of it, and does not need the host to exec in the sandbox.
+/// The environment comparison comes first, whatever the spawn did. A spawn
+/// that succeeds passes the case (the child's own outcome is irrelevant, so the
+/// host need not exec in the sandbox). A typed preflight error fails it, since
+/// the sandbox was never reached. An activation error (a host that forbids the
+/// sandbox's namespaces refuses the spawn this way, but so can a failed
+/// exception) cannot show that the environment was ever stripped, so the case
+/// reports itself skipped, not passed.
 ///
 /// Not ported from the deleted `EnvGuard` tests: a variable created while the
 /// guard is live and removal on drop, which need the `pub(crate)` guard itself.
@@ -265,21 +267,26 @@ fn parent_environment_is_restored_after_spawn() -> Result<()> {
     }
     let program = resolve_binary(&["/bin/true", "/usr/bin/true"])?;
     let profile = SandboxProfile::new().allow_executable(&program);
-    // A refused spawn (for example a denied namespace) and a child that exits
-    // badly both leave the environment as it was; only the comparison below is
-    // this case's verdict.
-    let spawned = spawn(profile, SandboxCommand::new(&program));
-    let waited = spawned.map(weaver_sandbox::SandboxChild::wait_with_output);
+    let spawned = Sandbox::new(profile).spawn(SandboxCommand::new(&program));
     let after = sorted_environment();
-    let how = match &waited {
-        Ok(_) => String::from("the spawn ran"),
-        Err(err) => err.to_string(),
-    };
     ensure!(
         before == after,
-        "the environment changed across the spawn ({how}): {before:?} became {after:?}"
+        "the environment changed across the spawn: {before:?} became {after:?}"
     );
-    Ok(())
+    match spawned {
+        Ok(child) => {
+            child.wait_with_output().context("wait for the child")?;
+            Ok(())
+        }
+        // `birdcage` refused to activate (a denied namespace, say). Nothing
+        // shows it got as far as stripping the environment, so restoration was
+        // not exercised: report that instead of passing.
+        Err(SandboxError::Activation(err)) => Err(Skipped(format!(
+            "birdcage did not activate, so restoration was not exercised: {err}"
+        ))
+        .into()),
+        Err(other) => bail!("the spawn failed before the sandbox was reached: {other}"),
+    }
 }
 
 /// Spawns `program` under an empty profile and returns the rejection.
