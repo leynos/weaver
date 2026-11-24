@@ -5,10 +5,12 @@ use crate::dispatch::act::apply_patch::{
     types::{DiffHeaderLine, FilePath, PatchOperation, PatchText},
 };
 
+mod chunk;
 mod paths;
 mod state;
 
 use self::{
+    chunk::ChunkParser,
     paths::parse_diff_paths,
     state::{CreateContentCapture, SearchReplaceParser},
 };
@@ -30,24 +32,6 @@ impl LineInfo {
             line_type,
             start,
             end,
-        }
-    }
-}
-
-/// Mutable parser state for search/replace operations.
-struct ParserState<'a> {
-    /// Operation mode inferred so far.
-    mode: &'a mut OperationMode,
-    /// Accumulator for `SEARCH`/`REPLACE` blocks.
-    search_replace: &'a mut SearchReplaceParser,
-}
-
-impl<'a> ParserState<'a> {
-    /// Creates the state view used while processing one marker line.
-    const fn new(mode: &'a mut OperationMode, search_replace: &'a mut SearchReplaceParser) -> Self {
-        Self {
-            mode,
-            search_replace,
         }
     }
 }
@@ -127,84 +111,13 @@ fn slice_at_offsets<'a>(patch: &'a str, offsets: &[usize]) -> Vec<&'a str> {
 /// Returns a parse error when the chunk header is invalid, a `SEARCH` block
 /// cannot be matched, or the captured operation fails validation.
 fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
-    let (path_text, mut offset) = parse_header(chunk)?;
-    let path = FilePath::new(path_text);
-    let mut mode = OperationMode::Unknown;
-    let mut search_replace = SearchReplaceParser::new();
-    let mut create_capture = CreateContentCapture::new();
-
-    let remainder = chunk.get(offset..).unwrap_or_default();
+    let (path_text, start) = parse_header(chunk)?;
+    let mut parser = ChunkParser::new(FilePath::new(path_text), start);
+    let remainder = chunk.get(start..).unwrap_or_default();
     for line in remainder.split_inclusive('\n') {
-        let line_start = offset;
-        let line_end = offset + line.len();
-        let trimmed = trim_line(line);
-        let line_type = classify_line(trimmed);
-        let line_info = LineInfo::new(line_type, line_start, line_end);
-
-        if matches!(
-            line_type,
-            LineType::SearchMarker | LineType::Separator | LineType::ReplaceMarker
-        ) {
-            let mut state = ParserState::new(&mut mode, &mut search_replace);
-            if handle_search_replace_marker(&line_info, &mut state, chunk, &path)? {
-                offset = line_info.end;
-                continue;
-            }
-        }
-        if search_replace.is_open() {
-            offset = line_end;
-            continue;
-        }
-
-        mode = detect_mode_transition(trimmed, mode);
-        if matches!(
-            line_type,
-            LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent
-        ) {
-            validate_line_type(line_type, trimmed)?;
-            handle_mode_specific_capture(mode, line_type, line, &mut create_capture);
-        }
-
-        offset = line_end;
+        parser.advance(chunk, line)?;
     }
-
-    search_replace.validate_complete(&path)?;
-    construct_operation(mode, path, search_replace, create_capture)
-}
-
-/// Handles SEARCH/REPLACE marker lines without mutating the cursor offset.
-///
-/// # Errors
-///
-/// Returns [`ApplyPatchError::UnclosedReplaceBlock`] when a replace marker
-/// cannot be recorded.
-// Required to pass explicit marker context without threading local structs.
-fn handle_search_replace_marker(
-    line_info: &LineInfo,
-    state: &mut ParserState<'_>,
-    chunk: &str,
-    path: &FilePath,
-) -> Result<bool, ApplyPatchError> {
-    match line_info.line_type {
-        LineType::SearchMarker => {
-            *state.mode = state.mode.promote(OperationMode::Modify);
-            state.search_replace.handle_search_marker(line_info.end);
-            Ok(true)
-        }
-        LineType::Separator => {
-            state
-                .search_replace
-                .handle_separator(chunk, line_info.start);
-            Ok(true)
-        }
-        LineType::ReplaceMarker => {
-            state
-                .search_replace
-                .handle_replace_marker(chunk, line_info.start, path)?;
-            Ok(true)
-        }
-        _ => Ok(false),
-    }
+    parser.finish()
 }
 
 /// Applies mode transitions for create/delete markers.
@@ -294,6 +207,16 @@ enum LineType {
     CreateContent,
     /// Any other line that carries no parsing meaning.
     Other,
+}
+
+impl LineType {
+    /// Reports whether the line carries mode-specific metadata or content.
+    const fn is_structured(self) -> bool {
+        matches!(
+            self,
+            Self::HunkHeader | Self::DiffHeader | Self::CreateContent
+        )
+    }
 }
 
 /// Classifies a trimmed patch line by its marker prefix.
