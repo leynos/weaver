@@ -10,12 +10,10 @@ use std::{
 
 use anyhow::{Context as _, Result, ensure};
 
-use crate::cases::{CASES, Case, SCENARIO_ENV, Skipped};
+use crate::cases::{CASES, Case, SCENARIO_ENV};
 
 /// Names the variable whose presence makes this binary run a case itself.
 const CHILD_MARKER: &str = "WEAVER_SANDBOX_PROCESS_CHILD";
-/// Prefix of the line a child prints when its case was skipped.
-const SKIP_MARKER: &str = "SKIPPED: ";
 
 /// Writes one line to standard output; a closed pipe is not worth failing for.
 fn say(line: std::fmt::Arguments<'_>) { writeln!(std::io::stdout().lock(), "{line}").ok(); }
@@ -108,10 +106,6 @@ fn run_in_child(name: &str) -> Result<()> {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines().filter(|line| line.starts_with(SKIP_MARKER)) {
-        say(format_args!("{name}: {line}"));
-    }
     Ok(())
 }
 
@@ -120,13 +114,7 @@ fn run_case((name, body): &Case) -> Result<()> {
     if env::var_os(CHILD_MARKER).is_none() {
         return run_in_child(name);
     }
-    match body() {
-        Err(err) if err.downcast_ref::<Skipped>().is_some() => {
-            say(format_args!("{SKIP_MARKER}{err}"));
-            Ok(())
-        }
-        other => other,
-    }
+    body()
 }
 
 /// Prints the selected case names in the format `cargo nextest` lists tests.
