@@ -249,6 +249,28 @@ alone. A fixture costs a nested `cargo` build that must be serialized against
 the other compiler-starting tests, and it asserts on rendered diagnostics that
 move with the compiler; the witness costs one line and fails on the same edit.
 
+`weaver-sandbox` splits its remaining tests by what they need.
+`crates/weaver-sandbox/src/unit_tests.rs` holds the cases that neither spawn a
+process nor read the environment (profile policy and the spawn preflight, using
+the `cfg(test)` thread-counter hook).
+`crates/weaver-sandbox/tests/sandbox_process.rs` holds the process-level cases.
+`Sandbox::spawn` needs a single-threaded process and `birdcage` rewrites that
+process's environment, so the target has its own `main` (`harness = false`) and
+runs each case in a child copy of the binary, started at `/` with
+`Command::env` and `Command::current_dir`.
+
+The target holds no case that runs a dynamically linked program (`cat` or
+`env`) inside the sandbox, because no host available to the project can run
+one: on a merged-`/usr` host the new root lacks the `/lib64` interpreter
+symlink, so `execve` fails with ENOENT, and on a host that forbids unprivileged
+user namespaces (hosted Ubuntu images) every sandboxed start fails with EPERM.
+Real exec coverage belongs with the runtime-mapping and runner-routing work.
+The environment restoration case spawns `/bin/true` but does not check whether
+it executes successfully: it passes only when the spawn call succeeded and the
+environment came back unchanged, and it fails with "restoration was not
+verified" when `birdcage` cannot activate (a denied namespace, say), because
+the runner has no outcome between pass and fail.
+
 ### 4.2 Environment access and injection seams
 
 Process environment reads go through an injected `mockable::Env` reader, never
