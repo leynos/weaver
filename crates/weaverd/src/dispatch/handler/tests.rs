@@ -39,20 +39,6 @@ fn json_at<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_
     path.iter().try_fold(value, |node, key| node.get(*key))
 }
 
-use tests_helpers::{
-    BackendManagerFixture,
-    HandlerTestHarness,
-    backend_manager,
-    capture_events,
-    harness,
-};
-
-use super::{
-    structured_event::{format_structured_event, serialize_structured_event},
-    *,
-};
-use crate::dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};
-
 fn runtime_paths(endpoint: SocketEndpoint) -> Result<RuntimePaths, String> {
     let config = Config {
         daemon_socket: endpoint,
@@ -238,10 +224,10 @@ fn capture_events_records_server_thread_events(
 #[test]
 fn request_too_large_serialization_maps_to_request_too_large_event() -> Result<(), String> {
     let temp_dir = std::env::temp_dir();
+    let endpoint_path = temp_dir.join("weaverd.sock");
     let runtime_paths = runtime_paths(SocketEndpoint::unix(
         endpoint_path.to_string_lossy().into_owned(),
     ))?;
-    let endpoint_path = temp_dir.join("weaverd.sock");
     let endpoint = endpoint_path.to_string_lossy().into_owned();
     let event = read_error_event(
         &DispatchError::request_too_large(

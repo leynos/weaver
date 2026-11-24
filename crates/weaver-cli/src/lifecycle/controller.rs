@@ -274,11 +274,9 @@ mod tests {
             paths: &paths,
             endpoint: config.daemon_socket(),
         };
-        let lifecycle = SystemLifecycle;
         let mut output = LifecycleOutput::new(Vec::new(), Vec::new());
 
-        lifecycle
-            .report_socket_without_pid(runtime, &mut output)
+        SystemLifecycle::report_socket_without_pid(runtime, &mut output)
             .expect("status message should be written");
 
         let stdout = String::from_utf8(output.stdout).expect("status output should be UTF-8");
