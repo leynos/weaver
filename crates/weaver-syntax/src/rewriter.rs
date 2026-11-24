@@ -21,7 +21,10 @@ use crate::{
 /// captured by the pattern can be referenced in the replacement.
 #[derive(Debug)]
 pub struct RewriteRule {
+    /// The pattern whose matches are replaced.
     pattern: Pattern,
+    /// The replacement template; `$VAR` references are substituted with the
+    /// corresponding capture's text at rewrite time.
     replacement: String,
 }
 
@@ -73,6 +76,7 @@ impl RewriteRule {
 
 /// Engine for applying structural rewrites.
 pub struct Rewriter {
+    /// The language rewritten source is parsed and re-parsed as.
     language: SupportedLanguage,
 }
 

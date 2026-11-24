@@ -17,7 +17,10 @@ use ortho_config::Localizer;
 mod actionable_guidance;
 mod cli;
 mod command;
+mod command_ir;
 mod command_surface;
+#[path = "command_surface/tree.rs"]
+mod command_tree;
 mod config;
 mod daemon_output;
 mod discoverability;
@@ -51,11 +54,11 @@ pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
 #[cfg(test)]
 pub(crate) use command_surface::READ_ONLY_COMMANDS;
+pub use command_tree::{DomainOperations, domain_operations};
 use config::prepare_cli_arguments;
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader, split_config_arguments};
 #[cfg(test)]
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
-pub use discoverability::DOMAIN_OPERATIONS;
 pub(crate) use errors::{AppError, is_daemon_not_running};
 use lifecycle::{
     LifecycleContext,
@@ -87,6 +90,7 @@ const CONFIG_CLI_FLAGS: &[&str] = &[
     "--capability-overrides",
     "--locale",
 ];
+/// Maximum consecutive empty daemon lines tolerated before the stream aborts.
 pub(crate) const EMPTY_LINE_LIMIT: usize = 10;
 /// Bundles the IO streams provided to the CLI runtime.
 ///
@@ -95,13 +99,34 @@ pub(crate) const EMPTY_LINE_LIMIT: usize = 10;
 /// streams so helpers can flush individual messages without
 /// threading the CLI runtime through every call.
 pub struct IoStreams<'a, R: Read, W: Write, E: Write> {
+    /// Reader supplying patch content and other standard input.
     pub(crate) stdin: &'a mut R,
+    /// Writer receiving command output.
     pub(crate) stdout: &'a mut W,
+    /// Writer receiving diagnostics and guidance.
     pub(crate) stderr: &'a mut E,
+    /// Whether standard output is attached to a terminal.
     stdout_is_terminal: bool,
 }
 impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
-    pub fn new(
+    /// Bundles the standard streams.
+    ///
+    /// `stdout_is_terminal` records whether standard output is attached to a
+    /// terminal, which callers use to decide how to render output.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io::Cursor;
+    ///
+    /// use weaver_cli::IoStreams;
+    ///
+    /// let mut stdin = Cursor::new(Vec::<u8>::new());
+    /// let mut stdout = Vec::new();
+    /// let mut stderr = Vec::new();
+    /// let _streams = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    /// ```
+    pub const fn new(
         stdin: &'a mut R,
         stdout: &'a mut W,
         stderr: &'a mut E,
@@ -115,19 +140,24 @@ impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
         }
     }
 
+    /// Reports whether standard output is attached to a terminal.
     pub(crate) const fn stdout_is_terminal(&self) -> bool { self.stdout_is_terminal }
 }
 impl Cli {
     /// Returns true when no domain, subcommand, or probe flag was supplied,
     /// indicating the operator needs short help guidance.
-    fn is_bare_invocation(&self) -> bool {
+    const fn is_bare_invocation(&self) -> bool {
         self.domain.is_none() && self.command.is_none() && !self.capabilities
     }
 }
 
+/// Drives one CLI invocation against injected streams and configuration.
 struct CliRunner<'a, R: Read, W: Write, E: Write, L: ConfigLoader> {
+    /// Standard streams used for input, output, and diagnostics.
     io: &'a mut IoStreams<'a, R, W, E>,
+    /// Configuration loader for this invocation.
     loader: &'a L,
+    /// Optional daemon binary override used by lifecycle commands.
     daemon_binary: Option<&'a OsStr>,
 }
 
@@ -138,7 +168,8 @@ where
     E: Write,
     L: ConfigLoader,
 {
-    fn new(io: &'a mut IoStreams<'a, R, W, E>, loader: &'a L) -> Self {
+    /// Builds a runner from streams and a configuration loader.
+    const fn new(io: &'a mut IoStreams<'a, R, W, E>, loader: &'a L) -> Self {
         Self {
             io,
             loader,
@@ -146,8 +177,9 @@ where
         }
     }
 
+    /// Overrides the daemon binary used by lifecycle commands.
     #[cfg(test)]
-    fn with_daemon_binary(mut self, daemon_binary: Option<&'a OsStr>) -> Self {
+    const fn with_daemon_binary(mut self, daemon_binary: Option<&'a OsStr>) -> Self {
         self.daemon_binary = daemon_binary;
         self
     }
@@ -165,32 +197,37 @@ where
             Ok(cli) => Ok(Some(cli)),
             Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => {
                 tracing::debug!("rendering clap help");
-                help::write_help_for_args(args, &mut *self.io.stdout)
-                    .map(|()| None)
-                    .map_err(|io_error| {
+                match help::write_help_for_args(args, &mut *self.io.stdout) {
+                    Ok(()) => Ok(None),
+                    Err(help::HelpWriteError::Construction(construction_error)) => {
+                        Err(AppError::ConstructHelp(construction_error))
+                    }
+                    Err(help::HelpWriteError::Write(write_error)) => {
                         tracing::warn!(
-                            error_kind = ?io_error.kind(),
-                            error = %io_error,
+                            error_kind = ?write_error.kind(),
+                            error = %write_error,
                             "failed to write clap help"
                         );
-                        AppError::EmitHelp(io_error)
-                    })
+                        Err(AppError::EmitHelp(write_error))
+                    }
+                }
             }
             Err(error) => Err(AppError::CliUsage(error)),
         }
     }
 
+    /// Runs the CLI using the system lifecycle handler.
     fn run<I>(&mut self, args: I) -> ExitCode
     where
         I: IntoIterator<Item = OsString>,
     {
         let localizer = build_localizer();
-        let mut lifecycle = SystemLifecycle;
         self.run_with_handler(args, localizer.as_ref(), |invocation, context, output| {
-            lifecycle.handle(invocation, context, output)
+            SystemLifecycle::handle(&invocation, context, output)
         })
     }
 
+    /// Runs the CLI with an injected lifecycle `handler` and `localizer`.
     fn run_with_handler<I, F>(
         &mut self,
         args: I,
@@ -205,10 +242,10 @@ where
             &mut LifecycleOutput<&mut W, &mut E>,
         ) -> Result<ExitCode, LifecycleError>,
     {
-        let args: Vec<OsString> = args.into_iter().collect();
-        let split = split_config_arguments(&args);
+        let raw_args: Vec<OsString> = args.into_iter().collect();
+        let split = split_config_arguments(&raw_args);
 
-        let parsed_cli = match self.parse_or_render_help(&args, &split) {
+        let parsed_cli = match self.parse_or_render_help(&raw_args, &split) {
             Ok(Some(cli)) => Ok(cli),
             Ok(None) => return ExitCode::SUCCESS,
             Err(e) => return self.map_result_to_exit_code(Err(e)),
@@ -259,11 +296,11 @@ where
         self.map_result_to_exit_code(result)
     }
 
+    /// Converts the outcome of an invocation into a process exit code.
     fn map_result_to_exit_code(&mut self, result: Result<ExitCode, AppError>) -> ExitCode {
         match result {
             Ok(exit_code) => exit_code,
-            Err(AppError::BareInvocation) => ExitCode::FAILURE,
-            Err(AppError::PreflightGuidance) => ExitCode::FAILURE,
+            Err(AppError::BareInvocation | AppError::PreflightGuidance) => ExitCode::FAILURE,
             Err(AppError::CliUsage(ref clap_err)) if !clap_err.use_stderr() => {
                 write!(self.io.stdout, "{clap_err}").ok();
                 ExitCode::SUCCESS
@@ -282,7 +319,6 @@ where
 }
 
 /// Runs the CLI using the provided arguments and IO handles.
-#[must_use]
 pub fn run<'a, I, R, W, E>(args: I, io: &'a mut IoStreams<'a, R, W, E>) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
@@ -293,7 +329,6 @@ where
     run_with_loader(args, io, &OrthoConfigLoader)
 }
 /// Runs the CLI with a custom configuration loader.
-#[must_use]
 pub(crate) fn run_with_loader<'a, I, R, W, E, L>(
     args: I,
     io: &'a mut IoStreams<'a, R, W, E>,

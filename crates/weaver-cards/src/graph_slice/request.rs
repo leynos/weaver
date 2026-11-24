@@ -45,8 +45,11 @@ pub enum SliceDirection {
 /// Error returned when a string does not match a known variant of a slice enum.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SliceParseError {
+    /// Human-readable category of the value being parsed, e.g. `"direction"`.
     kind: &'static str,
+    /// Comma-separated list of the accepted tokens, shown to help the caller.
     expected: &'static str,
+    /// The unrecognised token that was supplied.
     name: String,
 }
 

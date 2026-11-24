@@ -1,20 +1,18 @@
 //! Unix-socket helpers for the daemon listener.
 
 use std::{
-    fs,
     io,
-    os::unix::{
-        fs::FileTypeExt,
-        net::{UnixListener, UnixStream},
-    },
-    path::Path,
+    os::unix::net::{UnixListener, UnixStream},
+    path::{Path, PathBuf},
 };
 
+use cap_std::fs::{Dir, FileTypeExt};
 use tracing::warn;
 use weaver_config::SocketEndpoint;
 
 use super::{LISTENER_TARGET, ListenerError};
 
+/// Binds a Unix-domain listener after clearing any stale socket file.
 pub(super) fn bind_unix(path: &Path) -> Result<UnixListener, ListenerError> {
     ensure_bindable_unix_path(path)?;
     UnixListener::bind(path).map_err(|source| ListenerError::BindUnix {
@@ -23,19 +21,24 @@ pub(super) fn bind_unix(path: &Path) -> Result<UnixListener, ListenerError> {
     })
 }
 
+/// Verifies that `path` is absent or an already-stale Unix socket.
 fn ensure_bindable_unix_path(path: &Path) -> Result<(), ListenerError> {
-    if !path.exists() {
+    let (dir, filename) = socket_parent_dir(path)?;
+    if !socket_path_exists(&dir, &filename, path)? {
         return Ok(());
     }
-    ensure_unix_socket_file(path)?;
-    remove_stale_unix_socket(path)
+    ensure_unix_socket_file(&dir, &filename, path)?;
+    remove_stale_unix_socket(&dir, &filename, path)
 }
 
-fn ensure_unix_socket_file(path: &Path) -> Result<(), ListenerError> {
-    let metadata = fs::symlink_metadata(path).map_err(|source| ListenerError::UnixMetadata {
-        path: path.display().to_string(),
-        source,
-    })?;
+/// Rejects an existing filesystem entry that is not a Unix socket.
+fn ensure_unix_socket_file(dir: &Dir, filename: &Path, path: &Path) -> Result<(), ListenerError> {
+    let metadata =
+        dir.symlink_metadata(filename)
+            .map_err(|source| ListenerError::UnixMetadata {
+                path: path.display().to_string(),
+                source,
+            })?;
     if metadata.file_type().is_socket() {
         Ok(())
     } else {
@@ -45,16 +48,21 @@ fn ensure_unix_socket_file(path: &Path) -> Result<(), ListenerError> {
     }
 }
 
-fn remove_stale_unix_socket(path: &Path) -> Result<(), ListenerError> {
+/// Removes a socket file when no live process is listening on it.
+fn remove_stale_unix_socket(dir: &Dir, filename: &Path, path: &Path) -> Result<(), ListenerError> {
     match UnixStream::connect(path) {
         Ok(_stream) => Err(ListenerError::UnixInUse {
             path: path.display().to_string(),
         }),
         Err(error) if stale_unix_socket_error(&error) => {
-            fs::remove_file(path).map_err(|source| ListenerError::UnixCleanup {
-                path: path.display().to_string(),
-                source,
-            })?;
+            if let Err(source) = dir.remove_file(filename)
+                && source.kind() != io::ErrorKind::NotFound
+            {
+                return Err(ListenerError::UnixCleanup {
+                    path: path.display().to_string(),
+                    source,
+                });
+            }
             Ok(())
         }
         Err(error) => Err(ListenerError::UnixConnect {
@@ -64,6 +72,7 @@ fn remove_stale_unix_socket(path: &Path) -> Result<(), ListenerError> {
     }
 }
 
+/// Returns true when `error` indicates a socket with no live listener.
 fn stale_unix_socket_error(error: &io::Error) -> bool {
     matches!(
         error.kind(),
@@ -71,11 +80,15 @@ fn stale_unix_socket_error(error: &io::Error) -> bool {
     )
 }
 
+/// Removes the socket file for a Unix endpoint, if one is present.
 pub(super) fn cleanup_unix_socket(endpoint: &SocketEndpoint) {
     let SocketEndpoint::Unix { path } = endpoint else {
         return;
     };
-    if let Err(error) = fs::remove_file(path.as_std_path())
+    let Ok((dir, filename)) = socket_parent_dir(path.as_std_path()) else {
+        return;
+    };
+    if let Err(error) = dir.remove_file(filename)
         && error.kind() != io::ErrorKind::NotFound
     {
         warn!(
@@ -84,5 +97,38 @@ pub(super) fn cleanup_unix_socket(endpoint: &SocketEndpoint) {
             path = %path,
             "failed to remove unix socket file"
         );
+    }
+}
+
+/// Opens the parent directory capability and file name for a socket path.
+fn socket_parent_dir(path: &Path) -> Result<(Dir, PathBuf), ListenerError> {
+    let parent = path.parent().ok_or_else(|| ListenerError::UnixMetadata {
+        path: path.display().to_string(),
+        source: io::Error::new(io::ErrorKind::InvalidInput, "socket path has no parent"),
+    })?;
+    let filename = path
+        .file_name()
+        .ok_or_else(|| ListenerError::UnixMetadata {
+            path: path.display().to_string(),
+            source: io::Error::new(io::ErrorKind::InvalidInput, "socket path has no file name"),
+        })?;
+    let dir = Dir::open_ambient_dir(parent, cap_std::ambient_authority()).map_err(|source| {
+        ListenerError::UnixMetadata {
+            path: path.display().to_string(),
+            source,
+        }
+    })?;
+    Ok((dir, PathBuf::from(filename)))
+}
+
+/// Returns whether `filename` exists within the socket's parent directory.
+fn socket_path_exists(dir: &Dir, filename: &Path, path: &Path) -> Result<bool, ListenerError> {
+    match dir.symlink_metadata(filename) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(source) => Err(ListenerError::UnixMetadata {
+            path: path.display().to_string(),
+            source,
+        }),
     }
 }

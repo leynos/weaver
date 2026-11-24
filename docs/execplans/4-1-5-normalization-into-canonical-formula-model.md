@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETED - shipped canonical formula normalization, semantic
 validation, and `compile_yaml` query-plan construction.
@@ -16,7 +15,7 @@ validation, and `compile_yaml` query-plan construction.
 
 After this change, Sempai will normalize both legacy `pattern*` syntax and v2
 `match` syntax into a single canonical `Formula` model defined in
-`sempai_core`.  Semantic constraint checks will reject structurally invalid
+`sempai_core`. Semantic constraint checks will reject structurally invalid
 formulas — specifically `InvalidNotInOr` (negated branches inside disjunction)
 and `MissingPositiveTermInAnd` (conjunctions with no positive match-producing
 term) — with deterministic diagnostics using the existing `E_SEMPAI_*` error
@@ -72,7 +71,7 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
   - `sempai_yaml` owns the parsed `LegacyFormula` and `MatchFormula` types.
   - `sempai` (facade) wires parsing → normalization → validation → plan
     construction. Normalization lives in `crates/sempai/src/normalize.rs` and
-    semantic validation in `crates/sempai/src/semantic_check.rs`.
+    semantic validation in `crates/sempai/src/semantic_check/mod.rs`.
 - Maintain the stable diagnostics contract from 4.1.2:
   `code`, `message`, `primary_span`, and `notes` remain the only emitted fields.
 - Use `DiagnosticReport::validation_error(...)` for semantic constraint
@@ -116,10 +115,9 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
   raw `serde_json::Value`.  Normalization must interpret this structure without
   full schema coverage, which could lead to incomplete handling. Severity:
   medium Likelihood: medium Mitigation: Preserve `where_clauses` as opaque
-  `Value` slices inside `Decorated<Formula>` initially.  Only interpret
-  `focus`, `metavariable-regex`, and `metavariable-pattern` when they are
-  encountered.  All other clauses are stored verbatim and validated later in
-  4.2.x.
+  `Value` slices inside `Decorated<Formula>` initially.  Only interpret `focus`,
+  `metavariable-regex`, and `metavariable-pattern` when they are encountered.
+  All other clauses are stored verbatim and validated later in 4.2.x.
 
 - Risk: The `LegacyClause::Constraint(Value)` variant in `patterns` arrays
   carries metavariable constraints that are not formula nodes.  Normalization
@@ -286,15 +284,16 @@ Table: v2 `match` keys mapped to Canonical Formula types
 
 ### Stage A: Research and specification (no code changes)
 
-Review the current crate boundaries and confirm that the formula types belong
-in `sempai_core`.  Confirm the exact atom types needed for this milestone
+Review the current crate boundaries and confirm that the formula types belong in
+`sempai_core`.  Confirm the exact atom types needed for this milestone
 (pattern string and regex string; `TreeSitterQuery` can remain as a stub).
 
 Go/no-go: understanding is sufficient to define types with confidence.
 
 ### Stage B: Define canonical Formula types in `sempai_core`
 
-Add a new module `crates/sempai-core/src/formula.rs` (< 200 lines) containing:
+Add a new module `crates/sempai-core/src/formula.rs` (fewer than 200 lines)
+containing:
 
 - `Formula` enum — `Atom`, `Not`, `Inside`, `Anywhere`, `And`, `Or`.
 - `Atom` enum — `Pattern(PatternAtom)`, `Regex(RegexAtom)`,
@@ -302,9 +301,16 @@ Add a new module `crates/sempai-core/src/formula.rs` (< 200 lines) containing:
 - `PatternAtom` — wraps a pattern string (the raw host-language snippet).
 - `RegexAtom` — wraps a regex string.
 - `TreeSitterQueryAtom` — stub wrapping a query string (for escape hatch).
-- `Decorated<T>` — generic wrapper with `node: T`, `where_clauses:
-  Vec<WhereClause>`, `as_name: Option<String>`, `fix: Option<String>`, `span:
-  Option<SourceSpan>`.
+- `Decorated<T>` — generic wrapper with the following fields:
+
+  ```rust
+  node: T,
+  where_clauses: Vec<WhereClause>,
+  as_name: Option<String>,
+  fix: Option<String>,
+  span: Option<SourceSpan>,
+  ```
+
 - `WhereClause` — initially wraps `serde_json::Value` for opaque constraint
   storage; later milestones interpret specific clause types.
 
@@ -354,10 +360,10 @@ structurally equivalent `Formula` values.
 
 ### Stage D: Implement semantic validation
 
-Add a new module `crates/sempai/src/semantic_check.rs` (< 200 lines) with:
+Add a new module `crates/sempai/src/semantic_check/mod.rs` (< 200 lines) with
+the structural validation entrypoint and its `analysis.rs` helper:
 
-- `pub(crate) fn validate_formula(formula: &Decorated<Formula>)
-  -> Result<(), DiagnosticReport>`
+- `pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport>`
 - Internal checks:
   - `check_no_not_in_or(formula)` — walks every `Or` branch subtree and
     rejects any branch whose subtree contains a `Formula::Not`. Emits
@@ -532,7 +538,7 @@ the same results.  No destructive filesystem operations are performed.  If a
 stage fails partway through, the previous successful stage's state remains
 intact and the failed stage can be retried.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Key paired fixture example (to be created):
 
@@ -664,7 +670,7 @@ pub(crate) fn normalize_search_principal(
 ) -> Decorated<Formula>;
 ```
 
-### New functions in `crates/sempai/src/semantic_check.rs`
+### New functions in `crates/sempai/src/semantic_check/mod.rs`
 
 ```rust
 /// Validates semantic constraints on a normalized formula.

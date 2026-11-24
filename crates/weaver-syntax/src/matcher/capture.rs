@@ -7,7 +7,9 @@ use std::{collections::HashMap, ops::Range};
 /// A single captured AST node.
 #[derive(Debug, Clone)]
 pub struct CapturedNode<'a> {
+    /// The AST node matched by the pattern.
     node: tree_sitter::Node<'a>,
+    /// The source text spanned by `node`, sliced once at capture time.
     text: &'a str,
 }
 
@@ -28,8 +30,13 @@ impl<'a> CapturedNode<'a> {
 /// A capture for a multiple-node metavariable (`$$$NAME`).
 #[derive(Debug, Clone)]
 pub struct CapturedNodes<'a> {
+    /// The individual nodes matched by the `$$$NAME` capture, in source order.
     nodes: Vec<CapturedNode<'a>>,
+    /// The source text spanning from the first node to the last, inclusive of
+    /// any separators between them.
     text: &'a str,
+    /// The byte range covering `text`; degenerates to an empty range at the
+    /// anchor point when the capture matched zero nodes.
     byte_range: Range<usize>,
 }
 
@@ -94,12 +101,20 @@ impl<'a> CapturedValue<'a> {
     }
 }
 
+/// The set of metavariable bindings accumulated while matching a pattern
+/// against a single AST subtree.
 #[derive(Debug, Clone)]
 pub(super) struct Captures<'a> {
+    /// The full source text that `inner`'s captured ranges are sliced from.
     source: &'a str,
+    /// Metavariable name to bound value, keyed by the name written in the pattern.
     inner: HashMap<String, CapturedValue<'a>>,
 }
 
+/// Slices `source` at a tree-sitter byte range, returning `""` (and tripping
+/// a debug assertion) if the range falls outside `source`'s bounds — this
+/// should not happen for ranges tree-sitter itself produced, but guards
+/// against a corrupted or mismatched source string.
 fn slice_source_range(source: &str, range: Range<usize>) -> &str {
     let start = range.start;
     let end = range.end;
@@ -117,6 +132,7 @@ fn slice_source_range(source: &str, range: Range<usize>) -> &str {
 }
 
 impl<'a> Captures<'a> {
+    /// Creates an empty capture set over `source`.
     pub(super) fn new(source: &'a str) -> Self {
         Self {
             source,
@@ -124,8 +140,13 @@ impl<'a> Captures<'a> {
         }
     }
 
+    /// Consumes the capture set, yielding the raw name-to-value map for
+    /// attachment to a completed match.
     pub(super) fn into_inner(self) -> HashMap<String, CapturedValue<'a>> { self.inner }
 
+    /// Records a single-node capture for `name`, unless `name` is the
+    /// wildcard `_`, which is never bound. Returns `false` if `name` was
+    /// already bound to a value inconsistent with `node`.
     pub(super) fn capture_single(&mut self, name: &str, node: tree_sitter::Node<'a>) -> bool {
         if name == "_" {
             return true;
@@ -137,6 +158,11 @@ impl<'a> Captures<'a> {
         self.insert_consistent(name, value)
     }
 
+    /// Records a multi-node capture for `name`, unless `name` is the
+    /// wildcard `_`. `empty_anchor_byte` anchors the capture's byte range
+    /// when `nodes` is empty, since there is then no node to derive a range
+    /// from. Returns `false` if `name` was already bound to an inconsistent
+    /// value.
     pub(super) fn capture_multiple(
         &mut self,
         name: &str,
@@ -177,6 +203,10 @@ impl<'a> Captures<'a> {
         self.insert_consistent(name, value)
     }
 
+    /// Binds `name` to `next` if unbound, or if already bound to an
+    /// equivalent value (same node kind and text) — repeated captures of the
+    /// same metavariable within one pattern must agree. Returns whether the
+    /// binding succeeded.
     fn insert_consistent(&mut self, name: &str, next: CapturedValue<'a>) -> bool {
         let Some(existing) = self.inner.get(name) else {
             self.inner.insert(name.to_owned(), next);

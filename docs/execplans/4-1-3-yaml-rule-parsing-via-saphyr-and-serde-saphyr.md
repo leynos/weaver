@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -124,7 +123,7 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-3-make-nixie.log
   on the rule object, while this milestone only models a subset of keys.
   Severity: medium. Likelihood: high. Mitigation: accept and preserve or ignore
   unknown rule-level keys without parse failure, while still rejecting invalid
-  shapes for the modeled keys.
+  shapes for the modelled keys.
 
 - Risk: `Engine::compile_yaml` cannot produce real `QueryPlan` values until the
   normalization layer exists. Severity: medium. Likelihood: high. Mitigation:
@@ -172,13 +171,13 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-3-make-nixie.log
 - Observation: the 4.1.2 work already established
   `DiagnosticReport::parser_error` and the `primary_span` JSON contract in
   [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs).
-   Impact: 4.1.3 should reuse that contract rather than inventing a
+  Impact: 4.1.3 should reuse that contract rather than inventing a
   parser-local error shape.
 
 - Observation: the repository already carries a local parser-aligned Semgrep
   schema at
   [docs/semgrep-language-reference/semgrep-rule-schema.yaml](../semgrep-language-reference/semgrep-rule-schema.yaml).
-   Impact: the implementation can lock its model and test fixtures to that
+  Impact: the implementation can lock its model and test fixtures to that
   local source of truth instead of reverse-engineering the shape ad hoc.
 - Observation: `serde-saphyr` already reports byte-oriented error spans when
   parsing from `&str`, so `sempai_yaml` can use those locations directly for
@@ -289,7 +288,7 @@ at minimum:
   - Legacy: `pattern`, `pattern-regex`, `patterns`, `pattern-either`.
   - v2: `match` as string or structured object.
 - Pass-through compatibility for rule-level unknown keys that must not break
-  parsing merely because later milestones have not modeled them yet.
+  parsing merely because later milestones have not modelled them yet.
 
 This milestone does not need to produce a canonical `Formula`; that is 4.1.5.
 It does, however, need to preserve enough structure that 4.1.4 and 4.1.5 can

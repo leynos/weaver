@@ -5,16 +5,1097 @@ configuration framework internals, and implementation details that contributors
 need but operators do not. For user-facing behaviour see the
 [user's guide](users-guide.md).
 
-## Workspace baseline
+## 1 Spelling policy
 
-The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
+`make spelling` is the canonical en-GB-oxendict gate. It runs the shared
+[`typos-config-builder`](https://github.com/leynos/typos-config-builder) gate,
+which regenerates `typos.toml`, enforces the shared `[phrases.corrections]`
+policy, and then runs Typos over tracked Markdown. `make markdownlint` depends
+on this gate, and CI invokes `make spelling` in its sole spelling step.
+`TYPOS_CONFIG_BUILDER_VERSION` in the Makefile pins the builder locally and in
+CI.
 
-## Adding or renaming public commands
+`typos.toml` is generated output. The gate regenerates it on every run from the
+live shared estate dictionary and Weaver's narrow overlay in
+`typos.local.toml`, so a word added to the shared dictionary needs no change
+here. Because the dictionary is live, `typos.toml` must never be drift checked
+in continuous integration. Add narrow repository-specific identifier, API,
+proper-name, or fixture exceptions to `typos.local.toml`; hand-editing
+`typos.toml` is not supported and any edits are overwritten on the next run.
 
-ADR 007 makes the 0.1.0 public command surface resource-first and generated
+The shared `[phrases.corrections]` table covers punctuation-separated forms
+that Typos tokenizes as independent valid words. The builder's phrase stage
+scans tracked UTF-8 text with the merged file exclusions and ignore spans, and
+runs before Typos. Correct genuine maintained prose when it reports a phrase.
+Use inline or fenced code only for literal API, identifier, fixture, or
+quoted-source spelling that must remain unchanged.
+
+## 2 Workspace baseline
+
+The workspace targets `ortho_config` v0.10.0 and Rust 1.90. The `weaver-config`
+library retains a Rust 1.89 minimum: its runtime dependency graph passes a Rust
+1.89.0 check. Its test targets use the internal `weaver-test-macros` package,
+which follows the workspace's Rust 1.90 floor. The workspace floor follows
+`tree-sitter` 0.27.1, which requires Rust 1.90. Test-only `serial_test` 4.0.1
+requires Rust 1.93.1; `rust-toolchain.toml` pins a dated nightly for repository
+builds and full-suite tests.
+
+## 3 The build standard
+
+Development builds follow the estate's Rust build standard, which
+`.cargo/config.toml` sets and Cargo auto-discovers, so a bare `cargo build`
+gets it:
+
+- LLVM is the development-profile codegen backend. Cranelift is a recorded
+  exception, because the suite aborts under it (see
+  [3.1 The Cranelift codegen backend exception](#31-the-cranelift-codegen-backend-exception)).
+- Every `rustflags` source enables the parallel `rustc` frontend with
+  `-Zthreads=8`.
+- The `cfg(target_os = "linux")` source also links with `mold`. macOS and
+  Windows keep their platform linker.
+
+Cargo applies a single `rustflags` source rather than merging them, and an
+assigned `RUSTFLAGS` replaces every source. So each source repeats the frontend
+flag, and the Makefile restates both flags through `STANDARD_RUSTFLAGS` for the
+targets that assign `RUSTFLAGS` (`test`, the `lint` rustdoc and Clippy commands,
+`typecheck`, and `build`; the Whitaker command in `lint` assigns only
+`-D warnings`), adding them to any `RUSTFLAGS` the recipe inherits (setup-rust
+exports one in CI) rather than replacing it. `make release` assigns the
+inherited `RUSTFLAGS`, which is empty when the caller exports none, and so adds
+neither standard flag (it does not remove one the caller exports); a bare
+`cargo build --release` still reads the configuration and takes both, because
+Cargo does not select `rustflags` by profile, so release artefacts come from
+`make release` or CI, whose coverage and release actions run under their own
+`RUSTFLAGS`. The Makefile adds `mold` only when both the host and the
+compilation target are Linux. Make reads the target from `CARGO_BUILD_TARGET`
+(unset names the host, `host-tuple` is the host's own triple, and an Android
+triple is not Linux for `mold`). A `--target` passed through `TEST_FLAGS`,
+`CARGO_FLAGS` or `CLIPPY_FLAGS` is invisible to Make, so set
+`CARGO_BUILD_TARGET` as well when cross-compiling. A local Linux build needs
+`mold` on the `PATH` and a GCC driver of 12.1 or newer (or select clang with
+`CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang`); an empty `RUSTFLAGS`
+skips the linker flag. The CI job installs `mold` before the boundary manifest
+gate, which composes the same flags onto its `RUSTFLAGS`, and `make lint`.
+`tests/workflow_contracts/build_standard_test.py` holds the configuration and
+the Makefile recipes to this, `build_standard_ci_test.py` holds the install
+order (including the coverage lane, which `coverage-main.yml:coverage-upload`
+satisfies with `setup-rust`'s `install-mold: 'true'` input before
+`generate-coverage`, because the trybuild cases link scratch crates with
+`mold`) and the boundary gate's composed flags, and
+`build_standard_warnings_test.py` holds the default warning policy, and
+`build_standard_target_test.py` checks the target selection against
+`CARGO_BUILD_TARGET`. Every dry run starts from `build_standard_env.py`'s
+controlled environment, which removes the caller's exported targets, flag sets
+and Make options, and `build_standard_env_test.py` holds each helper to it.
+
+### 3.1 The Cranelift codegen backend exception
+
+The Concordat `rust-build-defaults` rule makes Cranelift the development
+default only where the repository's own suite passes under it. Weaver's does
+not, so it records an exception, and `.cargo/config.toml` carries no
+`codegen-backend` key (`tests/workflow_contracts/build_footprint_test.py`
+refuses one).
+
+Re-measured on `nightly-2026-11-06` (7 November 2026) with the same command
+under the Cranelift development default: 1,588 of 1,602 tests ran before
+nextest's 900 s global timeout, 49 failed and one timed out, so the exception
+stands. The 34 Python graph-slice snapshot cases in that count fail under LLVM
+too on a host with `pyrefly` installed (as this one is), so they are not
+evidence about the backend. The fuller account below was measured on
+`nightly-2026-10-27` (31 October 2026), with
+`cargo nextest run --workspace --all-targets --all-features --no-fail-fast`
+under the Cranelift development default: 1,564 tests ran and 48 failed, all
+with the same abort, `llvm.x86.sse2.pmulhu.w is not yet supported` (SIGABRT,
+from `rustc_codegen_cranelift` issue 171). The failing tests are every
+`observe graph-slice` test that builds the graph-slice code path:
+
+- `weaver-cards`: `tests::graph_slice_behaviour::graph_slice_schema_behaviour`
+  and seven `tests::graph_slice_snapshot_tests::snapshot_*` tests;
+- `weaverd`: six `dispatch::observe::graph_slice::tests::*` tests;
+- `weaver-e2e`: the 34 `graph_slice_snapshots` cases that run the
+  Cranelift-built `weaver` binary.
+
+The same suite under LLVM fails only the 18 Python graph-slice snapshot cases
+on a machine where `pyrefly` is installed (the snapshots expect it absent), so
+the backend is the cause. Re-measure on the next toolchain bump: remove the
+exception and restore the key only if the whole suite passes under Cranelift.
+
+### 3.2 The development-build footprint
+
+The Concordat `rust-dev-build-footprint` rule holds the size of a development
+`target` directory down, and `tests/workflow_contracts/build_footprint_test.py`
+holds the configuration to it:
+
+- `[profile.dev]` in the root `Cargo.toml` sets `incremental = false` (DF-001)
+  and `debug = 0` (DF-002). CI never reads incremental caches or debug data.
+- `[unstable] embed-metadata = false` in `.cargo/config.toml` (DF-003) is the
+  native Cargo key for the dated nightly pins from 2026-07-31. Never use raw
+  `rustc` metadata flags; they broke build scripts. A pin older than that date
+  would need `no-embed-metadata = true` instead.
+
+Debug data is off, so a debugger sees no variables in a development build. Set
+`CARGO_PROFILE_DEV_DEBUG=2` for a debugging session, and `make release` or a
+`--release` build for anything that ships.
+
+### 3.3 Tests that start a compiler
+
+The `weaver-e2e` binary support builds `weaver` with `cargo build --frozen`:
+the committed `Cargo.lock` and the dependency cache are required, so the nested
+build neither resolves nor reaches the index while it holds the package-cache
+lock. The CI job runs `cargo fetch --locked` after `setup-rust` and before the
+boundary manifest gate, lint and the coverage run, which fails the job if the
+lock and the cache disagree (the earlier formatting step runs `cargo fmt`,
+which does not touch the lock). Run `cargo fetch --locked` once before running
+the e2e tests offline.
+
+Some tests start a child `cargo` or `rustc` of their own: the `weaver-docs-gate`
+`load_manifest` binary runs the renderer example through `cargo`, and both
+`compile_time` binaries (`weaver-docs-gate` and `weaver-plugins`) build
+fixtures. Run beside each other they contend for Cargo's package-cache and
+build-directory locks, and a cold build then looks like a hang.
+`.config/nextest.toml` therefore puts those binaries in the
+`nested-cargo-builds` test group, which runs one test at a time, and gives them
+a longer allowance than the default:
+
+- The default profile warns after 60 seconds and terminates a test after 180
+  seconds (three periods), and the whole run after 15 minutes, which is below
+  the coverage job's own limit.
+- The `nested-cargo-builds` group terminates after 600 seconds (five
+  120-second periods). On CI the slowest of these tests took 26, 39 and 85
+  seconds; an instrumented from-scratch build is slower.
+
+The end-to-end binaries can also run `cargo build` to find the `weaver` binary,
+but only when it is missing and at most once per process, so they stay in the
+default pool. nextest runs each case in its own process, so on a clean tree a
+narrowed run such as `cargo nextest run -p weaver-e2e` could start several
+fallback builds that contend for Cargo's locks. Build the binary first with
+`cargo build -p weaver-cli --bin weaver`; the workspace-wide `make test` run
+builds it with the other targets before any test starts.
+`tests/workflow_contracts/nextest_config_test.py` reads the file with `tomllib`
+and checks the group, the override and the timeouts; it starts no `cargo`. The
+Concordat `nested-cargo-nextest` rule (NC-004, NC-005) holds the same property
+from outside. A new test binary that starts a compiler needs two entries in
+`.config/nextest.toml`, and leaving either out leaves it unprepared:
+
+- Add it to the override's `filter`, which puts it in the serial group.
+- Add a `[scripts.setup.warm-…]` script that runs it with
+  `cargo test --frozen --all-features -p <package> --test <binary>`, and a
+  `[[profile.default.scripts]]` rule whose `filter` selects that binary with
+  `binary_id(=<package>::<binary>)`, which the Concordat reader can follow
+  where it cannot follow an intersection. The script pays for the nested or
+  trybuild build once, before any selected test starts, so the timed body finds
+  it built.
+
+Each warm-up script has its own allowance of 300 seconds per period and
+terminates after three periods. A test in a warm-up that fails makes its script
+fail, and nextest then runs none of the tests that script serves and reports
+the failing test's own output. Each rule selects one binary, so a run that
+selects only some of these tests warms only those, and an unrelated failing
+binary cannot stop them. The isolation is between binaries, not between test
+cases: `cargo test --test <binary>` runs every non-ignored case in its binary,
+so a failing case in a binary blocks a run filtered to another case of the same
+binary. Every script uses `--frozen`, so it never resolves or touches the
+registry; run `cargo fetch --locked` first on a clean tree. The `weaver-binary`
+script builds `weaver` with the flags of `make test`, and must keep them in
+step with it, or it overwrites `target/debug/weaver` with a binary that lacks
+the features the snapshots need.
+
+## 4 Workspace lint policy
+
+The workspace lint tables include Rust and Clippy rules, but Cargo applies them
+to a package only when its manifest opts in with
+
+```toml
+[lints]
+workspace = true
+```
+
+That setting brings in the full workspace Clippy policy, including
+`clippy::missing_docs_in_private_items`, and the Rust rules, including
+`missing_docs`. A member without the opt-in is silently exempt from all of it,
+so the opt-in is the whole enforcement mechanism.
+
+Every workspace member carries the opt-in.
+`crates/weaver-cli/tests/missing_docs_policy.rs` reads each member manifest,
+checks that the workspace table still denies `missing_docs`, and uses
+`trybuild` fixtures to pin the accepted and rejected `missing_docs`
+diagnostics. The list of manifests mirrors the workspace `members` array, so
+adding a member means adding it to that test as well.
+
+Do not reintroduce a crate-local `[lints.rust]` or `[lints.clippy]` table in a
+member manifest. Cargo refuses to combine one with the opt-in, and a member
+that drops the opt-in to keep a local table falls outside the policy entirely.
+
+### 4.1 Pinning `const` on public accessors
+
+Cargo cannot express "this accessor must stay a `const fn`", so the crates that
+promise it pin the property with a compile-time witness: a `const fn` wrapper
+whose body calls the accessor. Rust rejects a non-`const` call from inside a
+`const fn` body, so the wrapper stops compiling the moment the accessor loses
+`const`. The wrappers are exercised from an ordinary test, because the
+workspace's warnings-as-errors gate rejects dead code.
+
+- `crates/weaver-config/tests/const_api.rs` covers `Config`'s accessors.
+- `crates/weaver-sandbox/tests/const_api.rs` covers `SandboxProfile` and
+  `NetworkPolicy`.
+- `crates/weaver-lsp-host/tests/const_api.rs` covers the public
+  `weaver-lsp-host` accessors.
+- `crates/weaver-lsp-host/src/tests/const_api.rs` covers the items only the
+  crate can name: the `pub(crate)` `LspHostError` constructors and the private
+  `CapabilitySummary` fields. An integration test cannot call either.
+
+Prefer this witness over a `trybuild` fixture when the property is const-ness
+alone. A fixture costs a nested `cargo` build that must be serialized against
+the other compiler-starting tests, and it asserts on rendered diagnostics that
+move with the compiler; the witness costs one line and fails on the same edit.
+
+`weaver-sandbox` splits its remaining tests by what they need.
+`crates/weaver-sandbox/src/unit_tests.rs` holds the cases that neither spawn a
+process nor read the environment (profile policy and the spawn preflight, using
+the `cfg(test)` thread-counter hook).
+`crates/weaver-sandbox/tests/sandbox_process.rs` holds the process-level cases.
+`Sandbox::spawn` needs a single-threaded process and `birdcage` rewrites that
+process's environment, so the target has its own `main` (`harness = false`) and
+runs each case in a child copy of the binary, started at `/` with
+`Command::env` and `Command::current_dir`.
+
+The target holds no case that runs a dynamically linked program (`cat` or
+`env`) inside the sandbox, because no host available to the project can run
+one: on a merged-`/usr` host the new root lacks the `/lib64` interpreter
+symlink, so `execve` fails with ENOENT, and on a host that forbids unprivileged
+user namespaces (hosted Ubuntu images) every sandboxed start fails with EPERM.
+Real exec coverage belongs with the runtime-mapping and runner-routing work.
+The environment restoration case spawns `/bin/true` but does not check whether
+it executes successfully: it passes only when the spawn call succeeded and the
+environment came back unchanged, and it fails with "restoration was not
+verified" when `birdcage` cannot activate (a denied namespace, say), because
+the runner has no outcome between pass and fail.
+
+### 4.2 Environment access and injection seams
+
+Process environment reads go through an injected `mockable::Env` reader, never
+through `std::env` directly. The workspace's eventual ban on ambient
+environment access can only be enforced once every call-site takes its reader
+as a parameter, so the seam is what makes the lint policy expressible at all.
+
+**Ownership boundary.** A function that needs an environment value takes
+`env: &impl Env` and reads what it needs. Composition boundaries — `main`,
+`run_daemon`, `default_runtime`, the lifecycle controller and the build scripts
+— construct `mockable::DefaultEnv` once and pass a reference down. Nothing
+below a composition boundary reaches for the process environment itself.
+
+**Accessor choice follows the data shape, not convenience.**
+
+| Accessor    | Returns                    | Use when                                                                             |
+| ----------- | -------------------------- | ------------------------------------------------------------------------------------ |
+| `string`    | `Option<String>`           | the value must be UTF-8, and absence and non-Unicode are the same answer             |
+| `os_string` | `Option<OsString>`         | a path or binary name that must survive non-Unicode values, such as `WEAVERD_BIN`    |
+| `path_buf`  | `Option<PathBuf>`          | the value is a path and nothing else                                                 |
+| `raw`       | `Result<String, VarError>` | absence and non-Unicode must stay distinguishable, as in `weaverd`'s `OUT_DIR` probe |
+
+Choosing `string` for a value that is legitimately an OS string silently
+discards a non-Unicode value and falls back to a default; choosing `raw` where
+`string` suffices adds a match for no benefit.
+
+**Tests inject instead of mutating.** Use `mockable::MockEnv` with `expect_*`
+and `returning` to fix one outcome per test, rather than reading the ambient
+environment and accepting either branch. `MockEnv` lives behind the crate's
+`mock` feature, so it belongs in `dev-dependencies`. Direct
+`std::env::{set_var, remove_var, set_current_dir}` in tests is forbidden: it
+mutates shared process state and races other tests in the same binary. The
+three methods are listed under `disallowed-methods` in `clippy.toml`, so
+`make lint` rejects a call; pass a directory in, or use `Command::env` and
+`Command::current_dir` to confine a change to a child process.
+
+**Build scripts follow the same rule.** `weaver-cli/build.rs`,
+`weaverd/build.rs` and `weaver-build-util` take their reader as a parameter for
+the same reason; a ban that exempted build scripts would leave the largest
+ambient reads in the tree untouched.
+
+The one deliberate exception is `crates/weaver-sandbox/src/env_guard.rs`, which
+snapshots and restores the parent environment around `birdcage`'s own
+environment stripping. It calls `unsafe { env::set_var / env::remove_var }`
+because `birdcage` 0.8.1 mutates the parent process environment before forking
+and offers no per-child environment API. Any replacement for that guard has to
+change the sandbox API, not the call-site. Its two calls carry an item-scoped
+`#[expect(clippy::disallowed_methods, reason = ...)]`, so any other call still
+fails the lint.
+
+## 5 Workflow pins and Dependabot
+
+Dependabot checks both ecosystems (`github-actions` and `cargo`) daily. The
+schedule does not guarantee a pull request each day: cooldown settings can
+delay eligible updates, and the limit of five open pull requests can defer
+additional version-update pull requests. Within each ecosystem, one catch-all
+group covers minor and patch updates. Major updates arrive in their own pull
+requests unless they match an unrestricted group, such as the Cargo
+`rstest-bdd` group or the GitHub Actions `shared-actions` group, which can
+group them. The `rstest-bdd` crates release in lockstep and one bumped alone
+does not build, so the `cargo` entry also has a narrow `rstest-bdd` group,
+which must precede the catch-all because Dependabot uses the first group that
+matches. The `github-actions` entry also has a narrow `shared-actions` group
+(`leynos/shared-actions*`, no `update-types`) ahead of its catch-all: a bump of
+a shared-actions pin moves one commit SHA to another and has no semver level,
+so the typed catch-all never takes it. Keep the schedule, the single catch-all
+group and these two exceptions when changing `.github/dependabot.yml`.
+
+Dependabot owns the upgrade of GitHub Actions and reusable workflows, including
+calls into `leynos/shared-actions`. Contract tests that assert a caller's exact
+commit SHA create a lockstep dependency: every time Dependabot opens a bump PR,
+the test fails until a human edits the pinned constant to match. That defeats
+the purpose of automated dependency updates and turns a routine bump into a
+manual chore.
+
+Contract tests may still verify the *shape* of a reusable-workflow caller. They
+must not verify the specific SHA value.
+
+- Do assert the workflow references the correct reusable workflow path.
+- Do assert the ref is pinned to a full 40-character commit SHA, not a
+  mutable branch such as `main` or `rolling`.
+- Do assert the expected `on:` triggers, least-privilege `permissions:`, and
+  the inputs the caller relies on.
+- Do not hard-code the current SHA value as an expected string. Match it with
+  a pattern instead.
+- Do not fail a test purely because Dependabot bumped the pinned SHA.
+
+```python
+import re
+
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+def test_uses_pinned_full_sha(caller_step):
+    ref = caller_step["uses"].split("@")[-1]
+    assert SHA_RE.match(ref), f"expected a 40-hex commit SHA, got {ref!r}"
+```
+
+If a workflow's behaviour genuinely depends on a feature only present from a
+particular commit onwards, express that as a comment or a changelog note, not
+as a test assertion on the SHA string.
+
+## 6 Mutation-testing workflow contract tests
+
+This repository runs scheduled, informational mutation testing through a thin
+caller workflow,
+[`.github/workflows/mutation-testing.yml`](../.github/workflows/mutation-testing.yml),
+which delegates to the shared reusable workflow
+`leynos/shared-actions/.github/workflows/mutation-cargo.yml`. The heavy lifting
+— running `cargo-mutants`, sharding, and summarizing survivors — lives in
+`shared-actions`; this repository carries only declarative configuration. The
+run is **informational only**: it never gates a pull request. Survivors are
+reported through the job summary and downloadable artefacts so they can be
+triaged into tests, not enforced as a blocking check.
+
+The workflow runs in two modes. A **daily schedule** fires a change-scoped run
+that mutates only the source files touched within the detection window, so
+quiet days are cheap no-ops. A **manual dispatch** (the Actions "Run workflow"
+control) mutates the whole workspace, fanned out across shards; select a branch
+in that control to exercise a feature branch.
+
+The caller passes a small set of configuration inputs, each carrying intent:
+
+- `paths` — comma-separated change-detection path prefixes used to match files
+  under those directories; here `crates/`, because every workspace crate lives
+  under that directory and there is no root `src/`.
+- `exclude-globs` — test infrastructure whose surviving mutants are noise
+  rather than genuine test gaps: the end-to-end harness crate (`weaver-e2e`),
+  the proc-macro fixture helpers (`weaver-test-macros`), and the feature-gated
+  `test_support` modules in `sempai-core` and `weaver-plugins`.
+- `extra-args` — `--all-features --test-workspace=true`, so the mutation run
+  matches the CI baseline (`make test` runs `--all-features` across the whole
+  workspace): feature-gated code is exercised, and each crate's mutants also
+  face the dependent crates' tests, avoiding false survivors in crates that are
+  only covered by a sibling crate's suite.
+
+The `uses:` reference pins the shared workflow to a full 40-character commit
+SHA rather than a branch or tag, so a force-push upstream cannot silently
+change what runs here. The contract test asserts only that the pin is a full
+commit SHA, not a particular value, so Dependabot bumps it automatically
+without any accompanying test edit, per the shape-only policy described above.
+
+Because the caller is configuration rather than code, a contract test in
+`tests/workflow_contracts/mutation_testing_test.py` pins the shape it must
+uphold, failing the pull request when the caller drifts — repointing the pin at
+a branch, widening the token scope, or dropping a configuration input — rather
+than letting the breakage surface only in a scheduled run. Run it locally with
+`make test-workflow-contracts`. The test validates:
+
+- the `uses:` reference targets `mutation-cargo.yml` pinned to a full commit
+  SHA;
+- the `with:` block is exactly the expected configuration (the workspace
+  path, scaffolding excludes, and feature-baseline arguments above);
+- job permissions are least-privilege (`contents: read`, `id-token: write`)
+  and the workflow-level default token scope is empty;
+- `concurrency` serializes runs per ref without cancelling one in progress;
+  and
+- the triggers keep the daily schedule and a plain `workflow_dispatch` with
+  no legacy branch input.
+
+## 7 GitHub Actions runner placement
+
+Each lane sits where the kind of work decides. Every Linux lane runs on
+Ubicloud, at a size its own workload decides. What stays GitHub-hosted is the
+macOS build, which needs hardware Ubicloud do not offer, and the FreeBSD leg,
+which is switched off and so has nothing to measure; there, public-repository
+minutes are free.
+
+| Workflow                | Job                 | Trigger                | Runner                | Ceiling  |
+| ----------------------- | ------------------- | ---------------------- | --------------------- | -------- |
+| `ci.yml`                | `build-test`        | pull request, dispatch | `ubicloud-standard-4` | 60 min   |
+| `coverage-main.yml`     | `coverage-upload`   | push, dispatch         | `ubuntu-latest`       | 60 min   |
+| `coverage-main.yml`     | `coverage-baseline` | push, dispatch         | `ubicloud-standard-2` | 15 min   |
+| `coverage-main.yml`     | `coverage-warmup`   | push, dispatch         | `ubicloud-standard-2` | 30 min   |
+| `release.yml`           | `metadata`          | tag push, dry run      | `ubicloud-standard-2` | 10 min   |
+| `release.yml`           | `release`           | tag push               | `ubicloud-standard-2` | 15 min   |
+| `release.yml`           | `build-linux`       | tag push, dry run      | `ubicloud-standard-4` | callee's |
+| `release.yml`           | `build-freebsd`     | tag push, dry run      | `ubuntu-latest`       | callee's |
+| `release.yml`           | `build-macos`       | tag push, dry run      | `macos-15`            | callee's |
+| `build-and-package.yml` | `build`             | called                 | caller's choice       | 30 min   |
+
+*Table 1: Where each lane runs, and what bounds it.*
+
+`mutation-testing.yml`, `dependabot-automerge.yml`, and `release-dry-run.yml`
+declare no runner and pass none, so their callees place them.
+
+### 7.1 Why these lanes, and what the measurements were
+
+Queue against work, from the last green run of each workflow on 2026-09-16:
+
+| Lane                  | Queue  | Work  |
+| --------------------- | ------ | ----- |
+| `build-test`          | 435 s  | 938 s |
+| `coverage-upload`     | 691 s  | 174 s |
+| `metadata`            | 96 s   | 14 s  |
+| `build-linux` amd64   | 1782 s | 198 s |
+| `build-linux` arm64   | 1442 s | 219 s |
+| `build-macos` x86\_64 | 656 s  | 343 s |
+| `build-macos` arm64   | 176 s  | 305 s |
+
+*Table 2: What each lane waited, and what it then did.*
+
+The release build matrix is the surprise in that table, and it is easy to miss
+from the workflow's name: `release-dry-run.yml` calls `release.yml` on every
+pull request, so those jobs are pull-request lanes. The two Linux legs waited
+half an hour and twenty-four minutes to do about three and a half minutes of
+work each, which was the largest single block of developer waiting in the
+repository.
+
+`build-macos` stays on `macos-15` because a macOS build needs a macOS runner
+and Ubicloud offer none. `build-freebsd` stays on `ubuntu-latest` for a
+different reason: it is switched off by the `ENABLE_FREEBSD_RELEASE_BUILDS`
+repository variable and has never run, so there is nothing to measure, nothing
+to speed up, and no way to observe that a move worked. Moving it would be a
+change to dead code. The contract pins it where it is, so staying put reads as
+a decision, and it moves when somebody re-enables the leg and can watch it run.
+
+### 7.2 Sizes
+
+`ubicloud-standard-4` for anything that compiles the workspace, and
+`ubicloud-standard-2` for the rest. Ubicloud's four vCPU are 1.5 to 2 times
+slower than a GitHub public runner's four for Rust compilation, measured on
+wireframe, so two vCPU would roughly triple a lane that already takes a quarter
+of an hour.
+
+`coverage-main.yml` is split three ways. `coverage-upload`, which measures and
+uploads, is GitHub-hosted (four vCPU, no compiler cache), because its whole
+cost is compiling and running the suite and Ubicloud minutes are the scarce
+ones. `coverage-baseline` saves the ratchet baseline on Ubicloud, where
+`ci.yml`'s ratchet reads it: the hosted job sets `publish-baseline: never` and
+hands the figure over as an artefact. `coverage-warmup` compiles the
+instrumented tests build-only on `ubicloud-standard-2`, so main's Ubicloud
+compiler cache stays warm for pull requests. The paragraphs below describe the
+trybuild margin, which held on the smaller shape and holds a fortiori on the
+hosted four vCPU.
+
+The measuring lane was the one compile-heavy lane on the smaller shape, and
+that was a computed margin rather than an oversight. The workspace has three
+trybuild cases which spawn their own cargo builds:
+`public_api_contracts_compile` in `weaver-config` and in `weaver-docs-gate`, and
+`test_support_exports_compile_downstream` in `weaver-plugins`. The two older
+cases took 20.5 and 25.4 seconds of a 50.3-second suite on four vCPU. nextest
+terminates a test after three 60-second periods by default, and those cases
+then sat under half that kill. An instrumented trybuild build grows with the
+downstream crate's dependency tree rather than with the fixture. On 2026-10-31
+the `weaver-config` case exceeded the default kill on the developer lane once
+the fixture grew to cover the generated metadata: its instrumented build alone
+took almost two minutes, and the fixture then ran past the remaining budget.
+`.config/nextest.toml` therefore allows five 120-second periods for the
+`compile_time` binaries alone. That budget fits a from-scratch instrumented
+build and still terminates a hung test inside the job timeout. It is not a
+general deadline increase: the remedy for a slow lane stays
+`ubicloud-standard-4`, not a longer deadline for every test. Nobody waits on
+the main coverage lane, which is why a slower runner was acceptable there.
+
+### 7.3 The fork fallback
+
+A pull request from a fork cannot obtain an Ubicloud runner, so every lane that
+meets forks falls back to a GitHub-hosted runner for forks and for pull
+requests Dependabot opened, and for nothing else. Hosted minutes cost nothing
+on a public repository and Dependabot opens many pull requests, which therefore
+build cold on the hosted pool. The guard tests the pull request's author, not
+`github.actor`, because the actor is whoever triggered the run, so a person
+pushing to a Dependabot branch would flip the runner:
+
+```yaml
+runs-on: >-
+  ${{ (github.event.pull_request.head.repo.fork
+  || github.event.pull_request.user.login == 'dependabot[bot]')
+  && 'ubuntu-latest' || 'ubicloud-standard-4' }}
+```
+
+The shared build job takes its runner from its caller's `runner` input, which
+carries the same expression.
+
+The continuation line sits at the same indent as the line above it. A
+more-indented continuation in a folded scalar keeps its line break, putting a
+newline inside the expression; GitHub evaluates the broken value and the job
+runs, so a green run is not evidence that the scalar is well-formed.
+
+Three lanes carry it: `ci.yml`'s `build-test`, and `release.yml`'s `metadata`
+and `build-linux`. The two release jobs need it because the dry run puts them
+on pull requests. `release.yml`'s `release` job does not, because it is gated on
+`should_publish` and is skipped on every dry run, and `coverage-upload` does
+not, because neither push nor dispatch carries a pull request. A constant guard
+would read as a decision nobody made.
+
+For `build-linux` the expression goes in the caller's `with:` block rather than
+on a `runs-on` line, because `build-and-package.yml` takes its runner as a
+`workflow_call` input.
+
+### 7.4 Ceilings
+
+A per-minute runner bills until something stops it, so GitHub's six-hour
+default is the expensive failure mode. A ceiling close to the measured work is
+the other one, because it cancels the run at the moment an overrun becomes
+interesting and discards the log that would explain it.
+
+Every ceiling above is measured except `release.yml`'s `release` job, which is
+skipped on every dry run and so has no green run to size from. That one is a
+judgement and says so in the workflow.
+
+The three release build legs carry no ceiling of their own, and cannot: GitHub
+rejects `timeout-minutes` on a job with `uses:`. What bounds them is
+`build-and-package.yml`'s own ceiling, one number for all three platforms
+because there is one job there and not three, sized for the slowest leg.
+
+### 7.5 The contract
+
+`tests/workflow_contracts/ci_runner_placement_test.py` holds all of the above,
+beside two modules it imports: `runner_placement_policy.py` for the reviewed
+decisions and the reason for each, and `runner_placement_reader.py` for the
+machinery that derives facts from the workflow tree.
+
+It reads every runner declaration from the parsed document and fails on an
+embedded line break; compares each guard (the fork test or the Dependabot
+author test) and both arms against exact strings; pins placement by
+`(workflow, job id)` coordinate and compares that set against the tree in both
+directions; reads `runner` inputs as placements, not just `runs-on` lines; pins
+each ceiling by value and separately walks the tree for any unbounded Ubicloud
+lane; asserts that delegating jobs declare neither a runner nor a ceiling;
+checks the reviewed tables are total against each other; and compares
+`.github/actionlint.yaml` against the labels in use in both directions.
+
+That last comparison is why the registry exists as a checked artefact rather
+than as a list someone remembers to update. A label registered and used nowhere
+silently permits a runner family nobody reviewed for whatever lane adopts it
+next.
+
+#### 7.5.1 Every form of `runs-on`, or a refusal
+
+GitHub accepts `runs-on` in three forms: a scalar label or expression, a
+sequence of labels a runner must all carry, and a mapping with `group` and
+`labels`. Every lane here is a scalar today, so a reader that mishandled the
+other two would pass against this tree whatever it did. The failure it would
+hide is expensive: a mapping read as one stringified label begins with `{`,
+which no Ubicloud prefix matches, so a paid lane would escape the ceiling walk.
+
+The reader therefore models all three, and refuses anything else rather than
+reading it as "declares no runner", because that reading exempts a lane from
+every placement, ceiling and registry assertion at once:
+
+- a mapping is read only when `labels` is its sole key, so a `group` is
+  refused. No lane here is placed by runner group, and a group selects runners
+  by an organization setting the contract cannot read; admitting one is a
+  reviewed decision with its own assertion;
+- an empty sequence, a non-string label, or any other type is refused;
+- an expression is read only in the two forms the tree uses, and refused
+  otherwise: the fork fallback `${{ <guard> && '<a>' || '<b>' }}`, which
+  selects both arms, and `${{ inputs.runner }}`, the reusable-workflow form
+  whose caller names the labels in `with.runner`. A reader that took any quoted
+  literal as enough would read `${{ matrix.os || 'ubuntu-latest' }}` as
+  selecting only the fallback, and one that passed any `inputs.<name>` would
+  miss a caller passing its runner under a key it never reads;
+- an explicit null `runs-on:` or `runner:` is a declaration to refuse, not the
+  absence of one.
+
+`runner_placement_reader_test.py` drives each form and each refusal with
+constructed jobs, and holds every job in the tree to a readable form, naming
+the coordinate when one is not. Both workflow contracts load the tree through
+`workflow_loader.py`, which refuses a duplicated mapping key, so a lane cannot
+declare `runs-on` twice and have the first value discarded unseen. Two
+reader-level tests point the reader at a temporary tree and registry, each
+declaring a key twice, and require the refusal, so a reader reverted to
+`yaml.safe_load` fails them.
+
+## 8 Where CodeScene may appear
+
+The CodeScene command-line tool is installed from a URL at job time and is not
+pinned to a version this repository chose: the shared action selects the
+archive from a committed manifest and verifies its digest, so the artefact is
+pinned, but what that artefact talks to is not. The tool calls CodeScene's API
+and refuses to run when the answer changes shape, and that has happened twice.
+Its output format moved, and more recently thirteen projects stopped returning
+a gates configuration at all, so the changed-line gate fails with "received
+project-config isn't valid" for a reason no change in the repository could have
+caused.
+
+So the tool runs in exactly one place: `coverage-main.yml`, on push to main or
+on manual dispatch. A failure there delays a coverage report. It cannot block a
+merge.
+
+A pull-request lane may still generate coverage, because the ratchet is
+repository-owned and runs offline with no network dependency. What it may not
+do is any of these six, each of which fails the shared CV-005 contract library,
+run by `make test-workflow-contracts`:
+
+| Forbidden in a pull-request lane               | Why it is read                                     |
+| ---------------------------------------------- | -------------------------------------------------- |
+| a step or job whose `uses:` names CodeScene    | the obvious form                                   |
+| a `run:` step invoking `cs-coverage`           | the same hazard with no action to notice           |
+| `CS_ACCESS_TOKEN` at any scope                 | a lane holding the token is one line from using it |
+| `codescene.io` anywhere                        | `curl` needs neither the action nor the tool       |
+| `secrets: inherit` on any call                 | forwards the token unnamed, and every other secret |
+| a call to this repository's workflow by `@ref` | runs a revision the contract has not read          |
+
+*Table 3: What the shared CV-005 contract refuses in a pull-request lane.*
+
+The third row is what makes the shared contract worth having. Deleting the step
+but leaving the token in the job environment looks clean in a diff and leaves
+the hazard in place, so the whole document is walked for the name rather than
+the three scopes that are meant to carry it: a `run` body, an action input, an
+`env` value under any key and a named `secrets:` forwarding are all found. The
+fifth row closes the one route the walk cannot see, since `secrets: inherit`
+names nothing, so it is refused wherever it points, including at a workflow in
+this repository: a called workflow has `GITHUB_TOKEN` without being forwarded
+it, and `release-dry-run.yml` forwards no secret.
+
+The shared CV-005 contract also guards the other direction. Without it the rule
+could be satisfied by deleting coverage reporting altogether, which is
+compliance by amputation, so the publisher is asserted to exist, to have
+exactly its reviewed triggers, not to be startable by a pull request, and to
+state `mode: upload` rather than inherit it. The trigger set is compared whole:
+a `pull_request` added beside `push` would make the publisher a pull-request
+lane, and any other addition or removal changes what it is for unreviewed.
+Stating the mode means the publisher cannot quietly become the pull-request
+check gate.
+
+The shared contract asserts two further properties of the publisher, both of
+which fail silently rather than loudly.
+
+The upload step's condition names `github.ref == 'refs/heads/main'` as well as
+the token. `workflow_dispatch` can be run from any branch, and CodeScene
+accepts an upload for the analysed branch whatever the payload came from, so
+without the ref test a dispatch from a feature branch publishes that branch's
+coverage as the trunk's and drags the ratchet baseline with it. The comparison
+is to the full ref, not a suffix: a branch named `not-main` ends in `main`.
+
+The token is bound in no `env` anywhere in `coverage-main.yml`. A step with id
+`codescene-token` runs exactly one command, with no `if:`:
+
+```sh
+echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+```
+
+The expression is evaluated to `true` or `false` before the shell runs, so the
+step writes the answer without holding the token, and the upload's condition,
+`steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'`,
+reads that output. The upload passes
+`access-token: ${{ secrets.CS_ACCESS_TOKEN }}` directly: the uploader is a
+composite action that hands its step's `env` to nested artefact and cache
+steps, and a job-scoped token would be readable by the tests that generate
+coverage, which a dispatch can run from any branch before the ref guard is
+reached. The earlier shape, a guard on `env.CS_ACCESS_TOKEN != ''`, passes with
+its binding deleted, and the upload then skips forever with nothing failing.
+The shared contract pins the command, its lack of a condition and of an `env`,
+its position before the upload, and the input, and refuses the token in any
+`env` on the job.
+
+Dependabot's automerge merges with the workflow's `GITHUB_TOKEN`, and a push
+made that way starts no workflow, so an automerged dependency bump never runs
+the publisher: a known exception, tracked in shared-actions issue #518. A
+dispatch that replaces a pending push run in the concurrency group uploads the
+dispatched commit's coverage, which leaves the baseline one commit behind the
+trunk until the next push; the same issue tracks it.
+
+The publisher declares a concurrency group keyed on the ref alone,
+`coverage-main-${{ github.ref }}`, with `cancel-in-progress: false`; the
+contract compares the group whole, so naming the event in it fails. Without a
+group, two pushes in quick succession upload at once and the baseline is set by
+whichever finishes last. With one, runs in the group never overlap, and a newer
+trigger replaces an older pending run. That is all the group promises: GitHub
+does not promise to start runs in trigger order, so no ordering of uploads by
+commit is claimed. A manual "Re-run jobs" keeps its original `run_id`, so it
+republishes that commit's coverage but replaces no baseline saved under a
+run-keyed cache key. Cancelling would instead abandon a running upload and its
+baseline write.
+
+The upload condition is compared whole rather than searched for parts. A
+containment test accepts this expression, which holds both halves and is true
+on every branch, so it would pass the one expression it exists to refuse:
+
+```yaml
+if: (github.ref == 'refs/heads/main' || true) && (env.CS_ACCESS_TOKEN != '' || true)
+```
+
+Appending `|| github.event_name == 'workflow_dispatch'` is the same defeat in
+another form: every conjunct is still present and all of them become optional.
+The equality comparison refuses both, so no conjunct-splitting rule is needed.
+The publisher's `push.branches` is pinned to `main` for a related reason: the
+step's ref guard would still refuse the upload from elsewhere, but an
+unrestricted trigger burns a runner on every branch push and leaves the two
+protections disagreeing about what the workflow is for.
+
+### 8.1 What must remain
+
+Everything above forbids something, so all of it is satisfied by a repository
+that measures no coverage at all. The shared contract says what must stay:
+`ci.yml` is still started by `pull_request` and still runs `generate-coverage`
+with `with-ratchet` and `publish-artefact: 'false'` (the ratchet reads the
+report; nothing else does). That is where a reviewer's number comes from once
+the CodeScene step is gone.
+
+It also requires that step to carry no `if:` at all. Presence is not
+reachability: `if: false` leaves the step in the file, where every other check
+still sees it, and runs it never. A condition here would be a way to switch the
+ratchet off while the diff looks untouched. If one is ever wanted, it is pinned
+in the shared contract by value.
+
+### 8.2 The pull-request lane is a closure, not a list
+
+The prohibitions apply to every workflow a pull request can reach, not only to
+those carrying a pull-request trigger. `release-dry-run.yml` is triggered by
+`pull_request` and calls `release.yml`, which calls `build-and-package.yml`.
+Reading only the roots would leave both outside every assertion while a pull
+request still runs them.
+
+The shared contract therefore follows `jobs.<id>.uses`, transitively, with a
+visited set so that two reusable workflows calling each other cannot hang it. A
+call is local when it resolves to a file directly under `.github/workflows/`
+once its prefix is stripped. That is matched by shape rather than by a list of
+spellings, with two prefixes stripped: `./`, the documented form, and `$/`.
+Accepting a spelling GitHub might refuse only widens the set the prohibitions
+run over; missing one GitHub accepts hides a workflow from all of them.
+
+A local call with a ref, such as `./.github/workflows/release.yml@main` or
+`$/.github/workflows/release.yml@main`, is not valid syntax: GitHub rejects it,
+and it runs at no ref. The contract refuses it rather than reading it as local.
+A qualified call to this repository's workflows
+(`leynos/weaver/.github/workflows/release.yml@main`) is valid and runs at the
+named ref, not at the pull request's head, so the file the closure would read
+is not the file that runs, and the named revision could hold a CodeScene step
+every clause passes over; it is refused rather than followed. No workflow here
+uses the form; one that needs this repository's workflow calls it with `./`.
+For the same reason `secrets: inherit` into such a call is refused like any
+other.
+
+References to other repositories are not followed: their content is not in this
+tree. That is why `secrets: inherit` into one is refused outright rather than
+traced.
+
+A workflow declaring only `workflow_call` is the case this exists for. It has
+no pull-request trigger, so a trigger-only reading never opens it, yet a
+pull-request job that calls it with `secrets: inherit` hands it the token.
+
+`pull_request_target`, `merge_group`, `workflow_run`, `pull_request_review`,
+`pull_request_review_comment` and `issue_comment` count as pull-request
+triggers here. `pull_request_target` runs on a pull request with write
+permissions, which makes it more dangerous than `pull_request`, not less.
+`merge_group` runs the checks a pull request needs to leave the merge queue, so
+a red one blocks the merge. `workflow_run` runs after a pull-request workflow,
+with the repository's secrets. A review, a review comment or a comment on the
+pull request each start a workflow for it. `workflow_dispatch` does not count:
+a dispatch is not a pull request, which is why the publisher may carry one.
+
+### 8.3 How the readings are proved
+
+`make test-workflow-contracts` runs `cv005-contracts check`, the shared
+contract library in `leynos/shared-actions` (`packages/cv005-contracts`), from
+a full commit named by `CV005_CONTRACTS_REF` in the Makefile, and then the
+pytest contracts in `tests/workflow_contracts/`. A fix to the CodeScene rules
+is therefore a pin bump. The target needs `uv`, which fetches the Python 3.13
+the library runs under. The repository's only parameter is `repository` in
+`.github/cv005.toml`. The library's own suite proves each rule refuses the
+shape it exists to refuse, so this repository keeps no copy of the closure over
+local calls, the secret and host readers, the call-by-`@ref` classifier or the
+publisher's clauses. What stays here is `workflow_loader.py`, which loads every
+workflow through a strict `SafeLoader` that refuses a duplicated mapping key,
+because PyYAML otherwise keeps the last `runs-on` or `env` and says nothing,
+and reads a `.YML` extension like `.yml`; the runner-placement and concurrency
+readers and their tests read through it.
+
+[`cv005_wiring_test.py`](../tests/workflow_contracts/cv005_wiring_test.py)
+holds the local wiring: the pin is a full commit, the target runs the pinned
+checker with `check --repository .` under Python 3.13, `.github/cv005.toml`
+names this repository, `make all` includes the target, and CI runs it. The
+decision is recorded in
+[ADR 0013](adrs/adr-0013-adopt-the-shared-cv005-contract-library.md).
+
+## 9 Cancelling superseded pull-request runs
+
+Every push to a pull request starts a fresh run of each gate. The run already
+in flight is answering a question about a commit nobody will merge, and left
+alone it holds a runner until it finishes, so the branch pays twice for one
+answer. Every workflow a pull request can start therefore carries a concurrency
+block:
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+```
+
+When there is no pull request the group falls back to `github.run_id`, so two
+pushes to `main` or two dispatches never share a group. A shared ref group
+would let a third run replace a still-pending second one, and that commit would
+never get CI; two trunk runs overlapping is the cheaper risk, because
+compiler-cache writes are content-addressed and a cache save of an existing key
+is refused harmlessly (estate rule "PR-lane concurrency fallback").
+
+Two halves matter, and each fails in a way nothing else would notice.
+
+- **The group keys on the pull request.** A group built from
+  `github.run_id` alone is unique to one run, so it matches no predecessor and
+  cancels nothing while reading exactly like a concurrency control. A constant
+  group is the opposite failure: every open pull request shares one queue, and
+  the first push anywhere cancels the gates running everywhere else.
+- **Cancellation is conditioned on the event.** A literal
+  `cancel-in-progress: true` reads as the stricter setting and is a regression.
+  A push to `main`, a schedule, and a dispatch have no successor waiting, and
+  the run on `main` writes the warm cache and records the coverage that no
+  later run repeats.
+
+`pull_request_target` workflows are out of scope. They run against the base
+repository to carry a token, and the one here, `dependabot-automerge.yml`,
+merges Dependabot pull requests rather than building, so cancelling it
+mid-flight is a hazard with no minutes to win.
+
+### 9.1 The pull-request workflows
+
+`ci.yml` and `release-dry-run.yml` carry the block above. The dry run calls
+`release.yml` through `workflow_call`, and a called workflow evaluates its own
+`release-${{ github.ref }}` group in the caller's context, where `github.ref` is
+`refs/pull/<n>/merge`; the caller's block makes the superseded dry run itself
+cancellable rather than leaving that to the callee.
+
+## 10 The Ubicloud cache proxy
+
+Ubicloud runs a cache proxy on the runner's private network, and the runner
+exposes its URL and token to action steps only. A `run:` step, such as the one
+that starts the sccache server, never sees them.
+`export-ubicloud-cache-credentials` reads them where they are visible and
+republishes them through the job environment.
+
+It also clears `ACTIONS_CACHE_SERVICE_V2`. sccache's GitHub Actions backend
+reads that variable to select the v2 cache service, and Ubicloud's proxy serves
+v1, so leaving the runner's value in place sends every write to an endpoint the
+proxy does not implement.
+
+Omitting the step does not fail anything, which is why it needs a contract.
+sccache falls through to GitHub's own cache endpoint from an Ubicloud runner,
+so the symptom is a slower build and metered egress that nothing reports.
+
+Every job here that compiles on a runner which can be Ubicloud declares the
+step:
+
+| Workflow                | Job               | Why the guard is needed                                           |
+| ----------------------- | ----------------- | ----------------------------------------------------------------- |
+| `ci.yml`                | `build-test`      | the fork arm is GitHub-hosted                                     |
+| `coverage-main.yml`     | `coverage-upload` | push and dispatch only; hosted, so no guard is needed             |
+| `build-and-package.yml` | `build`           | the runner is the caller's choice, and two of five legs are macOS |
+
+*Table 3: Where the credentials step belongs.*
+
+Two orderings are load-bearing and both are asserted by
+`tests/workflow_contracts/ci_ubicloud_cache_test.py`.
+
+The step comes before anything that configures sccache, because sccache reads
+its cache configuration when its server starts and keeps it for that server's
+life. Credentials published afterwards change nothing while looking correct.
+
+The step carries `if: runner.environment == 'self-hosted'`. The action fails
+closed on a GitHub-hosted runner rather than exporting that runner's endpoint
+under Ubicloud's name, so an unguarded step turns the fork arm and the macOS
+legs red. `runner.environment` is the runtime fact rather than a reading of the
+label, it resolves to `self-hosted` on Ubicloud, and it keeps working when a
+lane's label moves.
+
+The step's reference is a full 40-character lowercase commit SHA. The step
+handles the cache token, so a movable reference such as `@main` would let a
+push to shared-actions change what runs with it, and the other assertions
+compare the action without its reference.
+
+Six ways to break this were applied alone and reverted: dropping the step from
+each of the three lanes, widening the guard to always, swapping it for a label
+test, and moving the step after the Rust setup. Four more repin it to `@main`,
+to a short SHA, to an upper-case SHA and to a SHA with a suffix.
+
+## 11 CI tool installs: Whitaker and Merman
+
+CI installs its linting and rendering tools through pinned shared actions
+instead of compiling them on every run:
+
+- **Whitaker**, Weaver's external lint engine, comes from the
+  `install-whitaker` action, pinned to a full commit SHA in
+  `.github/workflows/ci.yml`. Its `cranelift: true` input provisions the
+  backend Whitaker's own lint build uses; Weaver's development profile builds
+  with LLVM. The action installs a digest-verified prebuilt installer and
+  rolling lint suite, and fails in `ci-mode` rather than falling back to a
+  source build. The suite follows Whitaker's default branch tip; the action
+  revision and installer version are pinned, but the suite itself is not.
+  `tests/workflow_contracts/tool_install_test.py` holds the caller to an
+  installer release that can refuse that fallback (`--no-source-fallback`
+  arrived in 0.2.9) and to the inputs that keep `ci-mode` on without pinning
+  the suite.
+
+  Whitaker also gates cognitive complexity. Clippy's `cognitive_complexity`
+  scores code after macro expansion, so it counts branching a macro generated,
+  and neither `Cargo.toml` nor `clippy.toml` enables it. Whitaker's experimental
+  `macro_aware_cognitive_complexity` gates it at `max_complexity = 9`,
+  CodeScene's ceiling. `dylint.toml` opts in with
+  `[whitaker] experimental = ["macro_aware_cognitive_complexity"]`. Fix a
+  finding by extracting named helpers, never by raising the threshold.
+- **Merman**, the Mermaid renderer used by `make nixie`, comes from
+  `install-nixie`. The action verifies Merman 0.7.0's release archive against
+  its pinned checksum and installs Nixie 1.1.0 on Python 3.14, which that
+  release requires.
+
+Until September 2026 both tools were compiled on every run.
+`cargo install merman-cli` built Merman from crates.io, a median 2.6 minutes,
+and the former Whitaker step built its installer, cloned the source and
+compiled the lint suite with Cranelift, a median 1.9 minutes: about a third of
+`build-test`'s 13-minute median on a paid runner.
+
+Prebuilt Whitaker libraries are published for the rolling suite tip. A new
+Whitaker lint can therefore fail `make lint` without a Weaver change; the fix
+belongs in the code it flags or upstream in Whitaker, rather than in a pinned
+suite revision.
+
+`tests/workflow_contracts/tool_install_test.py` prevents source installs from
+returning: no workflow may run `cargo install` or clone Whitaker, and the
+`build-test` job must provision Merman before `make nixie`. The separate
+`whitaker_provisioning_test.py` contract holds the current Whitaker action,
+Cranelift input and ordering in place.
+
+The source-build matchers collapse only Bash backslash-newline pairs before
+matching, preserving ordinary newlines as command boundaries. Bounded
+Hypothesis properties compare both detectors with a reference model.
+
+`make test-workflow-contracts` runs the shared CV-005 check and invokes
+`pytest tests/workflow_contracts -q` through `uv`, with `pytest>=8`,
+`pyyaml>=6` and `hypothesis>=6`. Hypothesis generates the cases used by the
+source-build properties.
+
+## 12 Adding or renaming public commands
+
+ADR 0007 makes the 0.1.0 public command surface resource-first and generated
 from OrthoConfig-backed command metadata plus Weaver-owned semantic adapters.
 Do not add new public command grammar by hand in `clap`, daemon routing, manual
 pages, help text, and docs independently.
+
+The [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md) is
+the source of truth for command-contract roadmap tasks. Before adding,
+renaming, or reclassifying a public command task, update
+`docs/orthoconfig-consumer-boundary.toml` and regenerate
+`docs/orthoconfig-consumer-boundary.md` with:
+
+```sh
+cargo run -p weaver-docs-gate --example render_boundary_matrix -- \
+  docs/orthoconfig-consumer-boundary.toml docs/orthoconfig-consumer-boundary.md
+```
+
+Use `consumes` only when the upstream OrthoConfig contract has shipped and the
+row can name the release or pinned SHA in `shipped_in`. Use `wraps` for a
+temporary Weaver adapter with a concrete removal gate, `pending` for an
+upstream contract that is not decided or shipped yet, and `divergent` only when
+ADR 0007 records the deliberate Weaver-owned divergence.
+
+The CI workflow runs the boundary manifest gate as a named
+`Boundary manifest gate` step before the wider coverage action. A failed
+invariant emits a structured message shaped as:
+
+```text
+boundary_manifest_gate failure code=<stable-code>
+message: <human-readable failure>
+remediation: update docs/orthoconfig-consumer-boundary.toml, regenerate
+docs/orthoconfig-consumer-boundary.md, then rerun cargo test -p weaver-docs-gate
+```
+
+Treat the `remediation` line as the recovery checklist. Update the TOML source
+of truth first, regenerate the Markdown matrix with the command above, and rerun
+`cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture`
+locally when you need the same visible failure output that CI reports.
+
+### 12.1 `weaver-docs-gate` boundary API
+
+The private `weaver-docs-gate` workspace member owns the generated OrthoConfig
+consumer boundary matrix and the referential-integrity checks that keep
+command-contract roadmap tasks classified. The crate is intentionally a
+developer tool, not a runtime dependency for `weaver` or `weaverd`.
+
+The public library API exposes the domain types used by the manifest,
+validation gate, and renderer. Those types deserialize directly from TOML with
+the manifest spellings used in `docs/orthoconfig-consumer-boundary.toml`; empty
+optional evidence strings deserialize as absent values so the checked-in
+manifest stays explicit without carrying separate DTO translation code:
+
+- `BoundaryState` is the four-state classification vocabulary: `consumes`,
+  `wraps`, `pending`, and `divergent`. Use `as_str()` when diagnostics or
+  generated text need the canonical manifest spelling.
+- `UpstreamRole` names the kind of OrthoConfig contract a Weaver task consumes
+  or waits for, such as `renderer`, `profile`, `delivery`, or
+  `execution_ledger`.
+- `UpstreamRef` pairs an upstream roadmap or design reference with an
+  `UpstreamRole`.
+- `BoundaryTask` is one classified Weaver roadmap task row. Its optional
+  evidence fields are state-specific: `shipped_in` for `consumes`,
+  `removal_gate` for `wraps`, `next_review_by` for `pending`, and `adr_anchor`
+  for `divergent`.
+- `BoundaryManifest` is the complete source-of-truth document. Its
+  `managed_tasks` registry must match the ordered `tasks` rows so new
+  command-contract roadmap items fail closed until explicitly classified.
+- `BoundaryError` reports path-free manifest parser failures. Match it when a
+  test or developer tool reads manifest bytes from an in-memory fixture, a
+  network response, or another non-filesystem source.
+- `BoundaryFileError` reports filesystem adapter failures. Match it when a
+  tool must distinguish a missing file, invalid path, unreadable manifest file,
+  or invalid boundary schema with file context.
+
+Use `load_manifest(reader)` when the caller already owns manifest bytes. Use
+`load_manifest_file(path)` when a tool needs the crate's capability-oriented
+filesystem adapter to read `docs/orthoconfig-consumer-boundary.toml`. Use
+`render_matrix(&manifest)` to produce the Markdown contents for
+`docs/orthoconfig-consumer-boundary.md`. The renderer escapes table cells,
+groups rows by roadmap phase, and sizes columns from the escaped cell content,
+so callers should pass domain values rather than preformatted Markdown rows.
+
+`load_manifest` and `load_manifest_file` emit `tracing` events on load
+attempts, successes, and failures using the
+`weaver_docs_gate::boundary_manifest` target. They also increment the
+`weaver_docs_gate_boundary_manifest_load_total` counter with bounded `source`
+and `outcome` labels. Libraries must not install a global subscriber or metrics
+recorder; callers that need diagnostics should install those at the application
+or CI harness boundary. Parser and file-adapter errors include the remediation
+step used by the CI gate so local developer tools and test output point at the
+same recovery path. The public Rustdoc for both load functions documents these
+observable side effects; downstream callers that require silent parsing should
+isolate calls behind their own adapter and install no subscriber or metrics
+recorder.
+
+The docs-gate test suite also treats the matrix regeneration example as an
+externally observable interface. `tests/load_manifest.rs` covers the example's
+success path and argument/error paths, `tests/support/boundary_properties.rs`
+covers generated date and state/evidence invariants, and
+`tests/compile_time.rs` uses `trybuild` to prove downstream callers can compile
+against the exported API and error trait surface.
 
 When adding or renaming a public command:
 
@@ -48,13 +1129,13 @@ Sections below that document `observe`, `act`, `verify`, or `act refactor`
 describe the current prototype implementation. They are useful for maintaining
 shipped code, but they do not define the 0.1.0 public command contract.
 
-## Sempai overview
+## 13 Sempai overview
 
 Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule YAML,
 normalizes supported search syntax into a canonical formula model, and prepares
 per-language query plans for later execution.
 
-## Sempai query pipeline (prototype archive milestone 4.1.5)
+## 14 Sempai query pipeline (prototype archive milestone 4.1.5)
 
 - Canonical model (`sempai_core::formula`):
   - `Formula` enum: `Atom`, `Not`, `Inside`, `Anywhere`, `And`, `Or`
@@ -68,7 +1149,7 @@ per-language query plans for later execution.
     `anywhere`, and decorated metadata propagation
   - Special handling: `r2c-internal-project-depends-on` lowers to
     `(__NONEXISTENT_NODE__) @_dependency_check`
-- Semantic validation (`crates/sempai/src/semantic_check.rs`):
+- Semantic validation (`crates/sempai/src/semantic_check/mod.rs`):
   - `InvalidNotInOr`
   - `MissingPositiveTermInAnd`
   - Span precedence rules: node span -> first child -> fallback
@@ -77,16 +1158,72 @@ per-language query plans for later execution.
     per-language `QueryPlan`
   - `QueryPlan::formula()` exposure for tests and integration
 
-## Configuration framework internals
+The Sempai implementation keeps the raw and semantic boundaries explicit:
 
-### `ortho_config` v0.8.0 integration
+- `crates/sempai-yaml/src/raw/mod.rs` defines the serde-facing raw YAML shapes;
+  `crates/sempai-yaml/src/raw/convert.rs` converts them into validated model
+  values and reports semantic diagnostics.
+- `crates/sempai/src/semantic_check/mod.rs` coordinates structural formula
+  validation; `crates/sempai/src/semantic_check/analysis.rs` performs the
+  recursive formula-tree analysis.
+- `crates/weaver-plugin-rope/src/lib.rs` owns the plugin entrypoint and
+  dispatch, while `crates/weaver-plugin-rope/src/rename.rs` contains the
+  focused path and patch helpers used by the rename operation.
+
+### 14.1 Constraint boundary and validation passes
+
+`crates/sempai/src/normalize_constraints.rs` is the serialization boundary for
+rule `where` clauses. It receives raw YAML-backed JSON values from the parser
+and converts them into `sempai_core::formula::Constraint` domain values so that
+core formula types can remain independent of transport formats.
+
+`sempai_core::formula::Constraint` currently has three variants:
+
+- `MetavariableRegex`
+- `MetavariablePattern`
+- `Other(String)`
+
+The `Other` variant is the only format-aware exception. It preserves unknown
+constraint shapes as JSON text so adapters can round-trip unsupported input,
+while any new domain variants are expected to be pure model types without
+serialization-format concerns.
+
+Engine validation runs in two stages after normalization:
+
+- `validate_formula` checks formula-tree structure and enforces
+  `MAX_FORMULA_DEPTH`.
+- `validate_constraints` walks each decorated formula node to check constraint
+  payload semantics; it is currently a placeholder pending execution-layer
+  context, including issue `#152`.
+
+### 14.2 Sempai test-support ownership and capture lifecycle
+
+`crates/sempai/src/tests/engine_test_support.rs` owns the `pub(super)` engine
+fixtures used by Sempai's engine and integration test modules. The helpers are
+test-only and may be consumed by sibling modules under
+`crates/sempai/src/tests`; they are not production adapters or a cross-crate
+test API. Keep setup and diagnostic conversion in this module so BDD steps can
+propagate failures without duplicating engine construction.
+
+`crates/sempai/src/tests/tracing_tests.rs` owns `TraceCaptureState` and its
+subscriber. The subscriber is installed once because `tracing`'s registry is
+process-wide, while `begin_capture` serializes active captures and resets the
+per-test state. Captures are limited to the current test thread; dropping the
+`TraceCaptureGuard` clears the recorded spans and events. A tracing test must
+hold the guard across the engine operation, inspect its snapshot before the
+guard is dropped, and must not expose this state to production code or other
+test crates.
+
+## 15 Configuration framework internals
+
+### 15.1 `ortho_config` v0.10.0 integration
 
 `weaver_config::Config` declares its discovery policy inline through the
 `#[ortho_config(discovery(...))]` attribute. The app name, dotfile, project
 file, and `--config-path` flag are all defined next to the struct, so every
 consumer shares the same generated loader without bespoke builders.
 
-The `ortho_config` v0.8.0 loader preserves the stricter discovery and parsing
+The `ortho_config` v0.10.0 loader preserves the stricter discovery and parsing
 model adopted in earlier releases: if any discovered configuration file fails
 to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
 Both the CLI and daemon bubble that error to the user instead of quietly
@@ -97,7 +1234,41 @@ Configuration is layered with `ortho_config`, producing the precedence order
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
 
-### Dependency-graph resolution
+An explicit CLI value takes precedence even when it equals the clap default.
+OrthoConfig derives accept an attached value for boolean fields, such as
+`--force=false` in the derive fixture; the space-separated form `--force false`
+is rejected. Weaver defines no `--force` option.
+
+`Config` enables OrthoConfig's `post_merge_hook` and owns the normalization of
+duplicate capability directives there. This keeps the invariant consistent for
+both generated production loading and `Config::merge_from_layers` policy tests;
+CLI and daemon adapters must not repeat the normalization.
+
+### 15.2 Configuration test boundary
+
+Configuration policy tests use `ortho_config::MergeComposer` to create owned
+defaults, file, environment, and CLI layers. The helper belongs only in tests:
+it exercises the `weaver-config` domain merge policy without changing the test
+process environment. Binary-level tests use `assert_cmd` with `env_clear()` and
+child-only `.env(...)` values to prove the real CLI environment adapter.
+
+OrthoConfig v0.10.0's `_with_sources` loaders accept `MapEnv` and explicit file
+sources for tests that exercise discovery and merging. Pass `--config-path`
+when a test needs to control a configuration file. When a scenario exercises
+the no-override path, pin `WEAVER_CONFIG_PATH` to an empty file rather than
+leaving the selector unset: discovery otherwise falls through to
+`/etc/xdg/weaver/config.toml`, an XDG base, or a `weaver.toml` in the working
+directory, so the result would depend on the host. Direct `std::env::set_var`
+and `std::env::remove_var` are forbidden in Weaver tests.
+
+`crates/weaver-config/tests/compile_time.rs` compiles a downstream-style
+fixture against the public API with `trybuild`. The OrthoConfig derive
+generates much of `Config`, so a fixture keeps the default configuration, its
+accessors, the capability matrix, the help lookup, the `ARG_IDS` localization
+identifiers, and the `get_doc_metadata()` documentation metadata callable from
+outside the crate after an upgrade changes the generated surface.
+
+### 15.3 Dependency-graph resolution
 
 The loader uses a dependency-graph model for layered configuration sources.
 Sources are merged in precedence order: built-in defaults are overridden by
@@ -106,7 +1277,7 @@ turn overridden by CLI flags. When multiple configuration files are discovered,
 they are merged in the order `--config-path` first, then XDG locations in
 standard search order. Later sources override earlier ones field-by-field.
 
-### TOML parsing semantics
+### 15.4 TOML parsing semantics
 
 All configuration inputs are parsed per TOML v1 rules. Anchors and tags are not
 applicable (those are YAML concepts); TOML scalars are strongly typed and
@@ -114,7 +1285,34 @@ preserve their declared type without implicit coercion. Boolean values must be
 `true` or `false` (the string `"yes"` is rejected as an invalid boolean, as
 shown in the user-facing error example).
 
-## Card extraction cache internals
+### 15.5 Socket parent normalisation
+
+`weaver-config`'s `socket::path_normalize::normalize_parent_path` folds the `.`
+and `..` components of a socket directory lexically, without touching the
+filesystem. A `..` pops the preceding name; at the root of an absolute path it
+is dropped, and in a relative path with nothing to pop it is kept. An empty
+result becomes `.`.
+
+`socket::preparation::validate_no_path_traversal` is its only caller. It
+canonicalises the parent directory, which resolves symlinks and removes `.` and
+`..` components, then requires the canonical path to end with the lexically
+folded parent. The check fails with `SocketPreparationError::PathTraversal`,
+carrying the folded parent and the canonical path, exactly when the canonical
+path does not end with the folded parent: for example, when a symlink in the
+configured path leads elsewhere. The fold stays textual so that the expected
+suffix does not depend on what the filesystem reports.
+
+### 15.6 Sandbox environment restoration
+
+`birdcage` strips the environment of the process that enters a sandbox, so
+`weaver-sandbox`'s `EnvGuard` captures the variables beforehand and restores
+them afterwards. `EnvGuard::restore` runs in two steps: `clear_environment`
+removes every variable currently present, then `apply_snapshot` reinstates each
+captured pair. Clearing first guarantees that a variable the sandbox added does
+not survive the restore. The source doc comments in `env_guard.rs` describe
+each step; this section records the order.
+
+## 16 Card extraction cache internals
 
 The `observe get-card` path is optimized around two shared resources in
 `crates/weaver-cards/`:
@@ -128,7 +1326,7 @@ The `observe get-card` path is optimized around two shared resources in
 constructs one extractor and reuses it across requests so cards and parsers
 stay warm across repeated lookups.
 
-### `CardCache` design
+### 16.1 `CardCache` design
 
 `CardCache` wraps `lru::LruCache<CardCacheKey, Arc<SymbolCard>>` behind a
 `Mutex`. The cached payload is stored as `Arc<SymbolCard>` so a cache hit can
@@ -176,7 +1374,7 @@ if let Some(card) = cache.get_shared(&key) {
 degrade into surprising behaviour, so callers must choose an explicit positive
 bound.
 
-### `CardCacheKey` composition
+### 16.2 `CardCacheKey` composition
 
 `CardCacheKey` combines the pieces of state that make one extraction result
 meaningfully different from another:
@@ -223,7 +1421,7 @@ The path component is matched by exact `PathBuf` equality. Relative paths,
 symlinked paths, and canonicalized paths do not collapse to one cache entry
 unless the caller normalizes them before building the key.
 
-### `ParserRegistry` pooling pattern
+### 16.3 `ParserRegistry` pooling pattern
 
 Tree-sitter parser construction is not free, so `ParserRegistry` keeps one
 `Parser` per `SupportedLanguage` in a shared map:
@@ -269,7 +1467,7 @@ Language Server Protocol (LSP). Tree-sitter extraction remains the baseline
 syntax pass, while LSP enrichment is added later by `weaverd` when a request
 asks for semantic detail and a backend is available.
 
-### Cache invalidation strategies
+### 16.4 Cache invalidation strategies
 
 The cache uses two invalidation paths, each for a different event:
 
@@ -309,7 +1507,7 @@ Because invalidation is exact-path based, callers that want symlink and
 relative-path stability should normalize paths at the boundary where requests
 enter the cacheable extraction flow.
 
-### `TreeSitterCardExtractor` integration
+### 16.5 `TreeSitterCardExtractor` integration
 
 `TreeSitterCardExtractor` is the orchestrator that ties cache keys, parser
 pooling, and language-specific extraction together.
@@ -351,12 +1549,12 @@ assert_eq!(card.symbol.name, "greet");
 # Ok::<(), weaver_cards::CardExtractionError>(())
 ```
 
-The plain `extract(...)` method remains available for callers that want an
-owned `SymbolCard`, but the daemon and other long-lived services should prefer
+The plain `extract(...)` method remains available for callers that want an owned
+`SymbolCard`, but the daemon and other long-lived services should prefer
 shared resources and `extract_shared(...)` so cache hits do not pay for extra
 deep clones.
 
-## Graph-slice request parsing architecture
+## 17 Graph-slice request parsing architecture
 
 The `observe graph-slice` request parsing pipeline lives in
 `crates/weaver-cards/src/graph_slice/` and is split across three internal
@@ -370,7 +1568,7 @@ modules:
 - `parse_helpers.rs` — value-level parsing functions that validate and
   convert raw string arguments into typed values.
 
-### `RequestBuilder` accumulator pattern
+### 17.1 `RequestBuilder` accumulator pattern
 
 `RequestBuilder` is a private struct with `Option<T>` fields for every flag.
 The parse flow is:
@@ -390,14 +1588,14 @@ The parse flow is:
 Unknown flags return `GraphSliceError::UnknownFlag`. Bare positional tokens
 return `GraphSliceError::UnknownArgument`.
 
-### `Flag` enum
+### 17.2 `Flag` enum
 
 `Flag` identifies which CLI flag is being processed. It implements `Display` to
 produce the `--flag-name` string for error messages and `Into<String>` for
 `GraphSliceError` construction. The enum lives in `parse.rs` with
 `pub(in crate::graph_slice)` visibility so `parse_helpers.rs` can reference it.
 
-### `parse_helpers` module
+### 17.3 `parse_helpers` module
 
 `parse_helpers.rs` contains pure parsing functions that accept a `RawValue` (a
 flag–value pair) and return a typed result or `GraphSliceError`. The key
@@ -419,18 +1617,18 @@ Each helper produces a `GraphSliceError::InvalidValue` with the originating
 flag name and a descriptive message on failure, so callers do not need to
 format error context themselves.
 
-## Graph-slice handler architecture
+## 18 Graph-slice handler architecture
 
 The `observe graph-slice` command handler lives in
 `crates/weaverd/src/dispatch/observe/graph_slice.rs`. It is the sole
 implementation of the stable same-file slice contract.
 
-### Entry point
+### 18.1 Entry point
 
 `handle(request, writer, backends)` is the public entry point wired by the
 router. It delegates to `build_response` which owns all domain logic.
 
-### Same-file discovery
+### 18.2 Same-file discovery
 
 `discover_same_file_cards(request, document, entry_symbol_id, backends)` drives
 sibling discovery:
@@ -444,71 +1642,110 @@ sibling discovery:
 3. Candidates matching the entry symbol ID are filtered out; remaining cards
    are deduplicated by `symbol_id` using a `BTreeMap`.
 
-### Budget and spillover
+### 18.3 Budget and spillover
 
 `apply_card_budget(entry_card, sibling_cards, max_cards)` partitions the sorted
 sibling list into an included set (up to `max_cards − 1` siblings plus the
 entry card) and a `SliceSpillover` frontier. The `apply_card_budget` branch for
 `max_cards == 0` is only a defensive internal check; the public request parser
-rejects `--max-cards 0` before dispatch, so callers cannot reach the
-zero-budget `SliceSpillover` path through the CLI.
+rejects `--max-cards 0` before dispatch, so callers cannot reach the zero-budget
+`SliceSpillover` path through the CLI.
 
-### Enrichment ordering
+### 18.4 Enrichment ordering
 
 LSP semantic enrichment is applied **after** budget truncation so that only
 cards included in the response pay the enrichment cost. The entry card is
-enriched before discovery; included sibling cards are enriched immediately
-after `apply_card_budget` returns.
+enriched before discovery; included sibling cards are enriched immediately after
+`apply_card_budget` returns.
 
-### Error mapping
+### 18.5 Error mapping
 
 `map_extraction_error` converts `CardExtractionError` variants into structured
 `GraphSliceResponse::Refusal` payloads. IO failures reading the source file are
 mapped to `DispatchError::invalid_arguments` because the caller is responsible
 for supplying a valid URI pointing to a readable file.
 
-### Stable card ordering
+### 18.6 Stable card ordering
 
 `stable_card_order` imposes a deterministic total order over `SymbolCard`
 values so that slice responses are reproducible regardless of extraction order.
 
-## E2E test support for graph-slice
+## 19 E2E test support for graph-slice
 
 The end-to-end graph-slice test harness lives in
-`crates/weaver-e2e/tests/graph_slice_snapshots.rs` and is backed by helpers in
-`crates/weaver-e2e/tests/test_support/mod.rs`.
+`crates/weaver-e2e/tests/graph_slice_snapshots.rs`. Shared daemon and
+transcript plumbing lives in `crates/weaver-e2e/tests/test_support/mod.rs`;
+command-specific request builders live in sibling files (`graph_slice.rs`,
+`get_card.rs`) so that each test binary compiles only the helpers it actually
+uses. `GraphSliceRequest<'a>` and `run_graph_slice` live in
+`crates/weaver-e2e/tests/test_support/graph_slice.rs`.
 
-### `GraphSliceRequest`
+### 19.1 `run_cli`
+
+`run_cli(command, cli_args)` (`test_support/mod.rs`) is the shared primitive
+that both `run_graph_slice` and `run_get_card` build on. It resolves the
+`weaver` binary, executes it with `cli_args`, and captures the result as a
+`Transcript`. `command` is the sanitized display form recorded in the snapshot:
+callers render it themselves, with the ephemeral daemon endpoint and any
+temporary fixture path already replaced by stable placeholders.
+
+### 19.2 Resolving the `weaver` binary
+
+`run_cli` locates the CLI binary via `resolve_or_build_weaver_binary_path()` in
+`crates/weaver-e2e/tests/support/weaver_binary.rs`. This resolver exists because
+`assert_cmd`'s usual `CARGO_BIN_EXE_weaver` environment lookup only works from
+the crate that owns the binary (`weaver-cli`); it is never set when tests run
+from `weaver-e2e`. The resolver first checks the target directory and the
+`CARGO_BIN_EXE_weaver` environment variable, then, on a cold cache, shells out
+to `cargo build -p weaver-cli --bin weaver` and writes the resulting artefacts
+into the workspace target directory.
+
+The outcome — success or failure — is memoized in a process-wide `OnceLock`, so
+the build runs at most once per test process and concurrent test threads cannot
+race to spawn competing builds. This cache is per process, not per test run: a
+failed build poisons every remaining test in that binary, and the next
+`cargo test` invocation starts afresh.
+`crates/weaver-e2e/tests/test_support/daemon_harness.rs` re-exports a thin
+wrapper of the same name, `resolve_or_build_weaver_binary_path`, adapting the
+`Result<&'static Path, &'static str>` return type to `io::Result<PathBuf>` for
+callers in that module.
+
+### 19.3 `GraphSliceRequest`
 
 `GraphSliceRequest<'a>` carries the parameters for one
 `weaver observe graph-slice` CLI invocation: `uri`, `line`, `column`,
 `entry_detail`, `node_detail`, and an optional `max_cards` budget.
 
-### `run_graph_slice`
+### 19.4 `run_graph_slice`
 
 `run_graph_slice(daemon, request)` invokes the CLI via the test daemon socket
-and returns a `Transcript` containing `stdout` (the JSONL response envelope)
-and `stderr`.
+and returns a `Transcript` containing `stdout` (the JSONL response envelope) and
+`stderr`. It builds the real `cli_args` list first, then derives the recorded
+`command` string from that same list with a private `display_command` helper,
+which swaps the ephemeral daemon endpoint and fixture URI for stable
+placeholders. Deriving the display form from the real arguments keeps the
+snapshot's command string and the arguments actually passed to the CLI from
+drifting apart.
 
-### `fixture_uri`
+### 19.5 `fixture_uri`
 
 `fixture_uri(temp_dir, case)` materializes a `CardFixtureCase` source file into
 `temp_dir` and returns its `file://` URI so that snapshot tests operate on a
 real filesystem path.
 
-### `assert_named_snapshot`
+### 19.6 `assert_named_snapshot`
 
 `assert_named_snapshot(name, content)` wraps `insta::assert_snapshot!` with an
 explicit snapshot name, storing results under
 `crates/weaver-e2e/tests/snapshots/<name>.snap`.
 
-### Fixture batteries
+### 19.7 Fixture batteries
 
 `crates/weaver-e2e/src/graph_slice_fixtures/` re-exports `PYTHON_CASES` (20
 entries) and `RUST_CASES` (20 entries) from the shared `card_fixtures`
 catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
 
-### Snapshot test structure
+### 19.8 Snapshot test structure
 
 `graph_slice_snapshots.rs` contains four `#[rstest]` tests:
 
@@ -524,9 +1761,9 @@ catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
   an out-of-range position and asserts
   `refusal.reason == "position_out_of_range"`.
 
-## Public API additions in prototype archive milestone 7.2.1
+## 20 Public API additions in prototype archive milestone 7.2.1
 
-### `handle` signature — `FusionBackends` parameter
+### 20.1 `handle` signature — `FusionBackends` parameter
 
 `handle(request, writer, backends)` now accepts
 `&mut FusionBackends<SemanticBackendProvider>` as a third argument (wired by
@@ -534,7 +1771,7 @@ the router from `BackendManager`). This parameter provides access to the card
 extractor and LSP enrichment backend. It is consumed by `build_response` and
 passed through to `discover_same_file_cards` and `enrich_card_if_requested`.
 
-### Trait derivations enabling deterministic ordering
+### 20.2 Trait derivations enabling deterministic ordering
 
 Two enums gained `PartialOrd` and `Ord` so that `stable_card_order` can sort
 cards without a custom comparator:
@@ -550,15 +1787,15 @@ The derived order follows Rust's default discriminant ordering (declaration
 order in the `enum`). Tests in each crate's `ordering_tests` module lock this
 contract.
 
-### `schema_version` field on `GraphSliceResponse` variants
+### 20.3 `schema_version` field on `GraphSliceResponse` variants
 
-Both `GraphSliceResponse::Success` and `GraphSliceResponse::Refusal` now carry
-a `schema_version: String` field set to `"graph_slice.v1"`. All constructors
+Both `GraphSliceResponse::Success` and `GraphSliceResponse::Refusal` now carry a
+`schema_version: String` field set to `"graph_slice.v1"`. All constructors
 (including `not_yet_implemented`) populate this field. Cucumber contract tests
 in `crates/weaver-cards/tests/features/graph_slice_schema.feature` assert its
 presence.
 
-### `TestDaemon` API changes
+### 20.4 `TestDaemon` API changes
 
 `TestDaemon::join(mut self)` now takes ownership of the optional
 `join_handle: Option<thread::JoinHandle<()>>`, joins the daemon thread, and
@@ -570,25 +1807,32 @@ the thread finishes.
 `thread::JoinHandle<()>`) to allow the join to consume the handle via
 `Option::take`.
 
-### `test_support` visibility promotions
+### 20.5 `test_support` command-specific modules
 
-The following fields were promoted from `pub(crate)` to `pub` to allow access
-from the new `graph_slice_snapshots.rs` test binary:
+Get-card and graph-slice each have their own request builders, kept apart from
+the shared `test_support/mod.rs` plumbing:
 
-| Struct               | Fields promoted                                 |
-| -------------------- | ----------------------------------------------- |
-| `CacheTranscript`    | `first`, `second`, `cache_hits`, `cache_misses` |
-| `GetCardRequest<'a>` | `uri`, `line`, `column`, `detail`               |
+| Module                        | Types                                                   |
+| ----------------------------- | ------------------------------------------------------- |
+| `test_support/get_card.rs`    | `CacheTranscript`, `GetCardRequest<'a>`, `run_get_card` |
+| `test_support/graph_slice.rs` | `GraphSliceRequest<'a>`, `run_graph_slice`              |
 
-*Table: Visibility promotions in `test_support`*
+*Table: Command-specific request builders in `test_support`*
 
-`GraphSliceRequest<'a>` was added as a new `pub(crate)` struct with fields
-`uri`, `line`, `column`, `entry_detail`, `node_detail`, and
-`max_cards: Option<u32>`.
+`CacheTranscript` bundles the `first` and `second` transcripts, plus
+`cache_hits` and `cache_misses` counters, from a two-request caching sequence.
+`GetCardRequest<'a>` carries `uri`, `line`, `column`, and `detail` for a single
+`weaver observe get-card` invocation.
 
-## CLI help and preflight internals
+Both struct types are themselves `pub(crate)`, so they are only reachable from
+within the `weaver-e2e` integration-test crate; only their *fields* are `pub`.
+That inner `pub` lets sibling modules within the crate construct and read them
+with plain struct literals, without needing accessor methods — it does not
+widen visibility beyond the crate boundary set by the struct itself.
 
-### 2.1 CLI help rendering architecture
+## 21 CLI help and preflight internals
+
+### 21.1 CLI help rendering architecture
 
 The runtime parser strips `--config-path`, `--daemon-socket`, `--log-filter`,
 `--log-format`, `--capability-overrides`, and `--locale` from `argv` before it
@@ -606,6 +1850,14 @@ flags dynamically from `ortho_config` metadata. Each visible field becomes a
 surface. The help-only parser deliberately does not attach config value
 validators because runtime config parsing owns case handling and validation.
 
+The structured command descriptions live once in
+`crates/weaver-cli/src/command_surface/tree.rs`. `command_ir` projects that
+tree into recursive `DocMetadata`, and `help_metadata` applies the projection
+to the parser-shaped help command. Add a command or its long flags to the tree
+first, add its Fluent identifiers, then update runtime parsing only where the
+wire contract actually changes. Do not recreate the operation catalogue in clap
+attributes, Fluent entries, or the manual-page build script.
+
 The augmented command is used in both places that need truthful help text:
 
 - runtime `--help` rendering, where the CLI prints help without invoking the
@@ -613,7 +1865,21 @@ The augmented command is used in both places that need truthful help text:
 - `clap_mangen` man page generation in `crates/weaver-cli/build.rs`, so the
   generated roff output stays aligned with the runtime help surface.
 
-### 2.2 Augmented command pattern
+The build script directly includes `cli.rs`, `command_surface/tree.rs`,
+`command_ir/mod.rs`, and `help.rs` because it cannot link its own library. Its
+`cargo:rerun-if-changed` inputs additionally include `command_surface/mod.rs`,
+alongside those directly included files. When changing any of these metadata
+inputs, keep the corresponding rerun entry in `crates/weaver-cli/build.rs` so
+packaging regenerates the manual page from the same projection.
+
+The daemon routing catalogue remains private in production. The
+`weaverd::test_support::routing_catalogue()` accessor, its internal re-export,
+and its router definition are all compiled only with the `test-support` feature.
+`crates/weaver-e2e` enables that feature in its development dependency to
+compare the CLI's discoverability catalogue with daemon routing; production
+dependencies must not enable it.
+
+### 21.2 Augmented command pattern
 
 The CLI deliberately uses two clap command shapes:
 
@@ -625,15 +1891,12 @@ This split preserves the current runtime contract that configuration flags take
 effect only when they appear before the command domain. It also avoids teaching
 clap to accept post-domain configuration flags that the loader would ignore.
 
-The augmented builder promotes clap argument IDs, long flag names, value names,
-and any future possible-value metadata to `&'static str` values. Clap requires
-`'static` lifetimes for dynamically constructed arguments, so the builder
-intentionally leaks those bounded allocations with `Box::leak`. The leaked
-strings live for the process lifetime and are intentionally never freed; the
-augmented command is cached once per process, so repeated help rendering does
-not allocate another set of argument metadata.
+The augmented builder passes owned strings directly to Clap. Clap 4 accepts
+owned argument IDs, long names, and value names, so help construction does not
+leak process-lifetime allocations. The augmented command remains cached once
+per process.
 
-### 2.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
+### 21.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
 
 `handle_preflight` runs after `argv` splitting and before configuration
 loading. At that point, the CLI has enough information to reject certain
@@ -656,7 +1919,7 @@ There are two preflight paths:
 This boundary exists specifically to keep operator guidance local, immediate,
 and side effect free.
 
-### 2.4 `Locale` type (`crates/weaver-config/src/locale.rs`)
+### 21.4 `Locale` type (`crates/weaver-config/src/locale.rs`)
 
 `Locale` is a small newtype around `ortho_config::LanguageIdentifier`. It
 accepts only well-formed BCP 47 language tags, so invalid locale strings are
@@ -675,7 +1938,7 @@ formatted. The current `Locale` type exists, so the configuration contract is
 real now, and the later localization bootstrap can reuse the validated domain
 value.
 
-### 2.5 Daemon command execution glue (`crates/weaver-cli/src/runner_glue.rs`)
+### 21.5 Daemon command execution glue (`crates/weaver-cli/src/runner_glue.rs`)
 
 `runner_glue` extracts the daemon transport path from `lib.rs` so the top-level
 runtime stays small enough to scan. Its two `pub(crate)` entry points are:
@@ -699,9 +1962,18 @@ tolerates socket-bind lag after daemon startup, and `write_error_and_fail`, a
 small helper that writes a display message to `stderr` and returns
 `ExitCode::FAILURE`.
 
-## Test infrastructure for rename-symbol coverage
+### 21.6 CLI BDD output expectations
 
-### `test-support` feature (`weaver-plugins`)
+`crates/weaver-cli/src/tests/behaviour.rs` keeps `OutputStream` and
+`OutputCheck` private to the feature-bound CLI BDD steps. `OutputStream`
+selects stdout or stderr and reads its text, while `OutputCheck` pairs that
+stream with the unchanged `OutputAssertion` comparison kind before
+`assert_output` reads the selected stream. Do not promote these types to shared
+test support unless a second CLI BDD module needs this exact contract.
+
+## 22 Test infrastructure for rename-symbol coverage
+
+### 22.1 `test-support` feature (`weaver-plugins`)
 
 The `weaver-plugins` crate exposes shared contract fixtures behind the
 `test-support` Cargo feature. Activate it in a crate's `[dev-dependencies]` to
@@ -713,35 +1985,53 @@ access:
   the canonical fixture collections consumed by plugin contract tests.
 - `rename_symbol_request_fixture_named(name)` /
   `rename_symbol_response_fixture_named(name)` — look up a single named request
-  or response fixture by key and panic when the requested fixture name is
-  unknown.
+  or response fixture by key and return `Result<_, FixtureError>` instead of
+  panicking; a miss yields `FixtureError::Missing { kind, name }`, where `kind`
+  is `"request"` or `"response"`.
 - `validate_rename_symbol_request_fixture(fixture)` /
   `validate_rename_symbol_response_fixture(fixture)` — run contract validation
   without panicking and return `Result<(), PluginError>` so callers can inspect
   the exact contract failure.
 - `assert_rename_symbol_request_fixture_contract` /
   `assert_rename_symbol_response_fixture_contract` — assertion helpers that
-  validate a fixture against the `RenameSymbolContract` and panic with a
-  descriptive message on failure.
+  validate a fixture against the `RenameSymbolContract` and return
+  `Result<(), FixtureError>`, so callers assert (and panic, if desired) at the
+  test boundary rather than inside the shared helper.
+
+`FixtureError` (re-exported as `weaver_plugins::FixtureError`) is the shared
+error type for these fallible helpers. It carries three variants:
+`Missing { kind, name }` for an unknown fixture name,
+`UnexpectedSuccess { kind, name }` for a fixture that was expected to fail
+contract validation but did not, and `ContractMismatch { message }` for a
+validation failure. It derives `thiserror::Error`, so it converts cleanly into
+`anyhow::Error` at a `?`-propagating test boundary.
 
 ```toml
 [dev-dependencies]
 weaver-plugins = { path = "../weaver-plugins", features = ["test-support"] }
 ```
 
-Typical lookup and validation usage:
+Typical lookup and validation usage, propagating lookup failures with `?` at a
+`Result`-returning test boundary:
 
 ```rust
+use anyhow::Result;
 use weaver_plugins::{
     rename_symbol_request_fixture_named, validate_rename_symbol_request_fixture,
 };
 
-let fixture = rename_symbol_request_fixture_named("valid_request");
-let result = validate_rename_symbol_request_fixture(&fixture);
-assert!(result.is_ok(), "fixture should satisfy the shared contract");
+fn fixture_satisfies_contract() -> Result<()> {
+    let fixture = rename_symbol_request_fixture_named("valid_request")?;
+    let result = validate_rename_symbol_request_fixture(&fixture);
+    assert!(result.is_ok(), "fixture should satisfy the shared contract");
+    Ok(())
+}
 ```
 
-### `FakeDaemon` (`weaver-e2e/tests/test_support/daemon_harness.rs`)
+Prefer `.expect("valid_request fixture should exist")` in place of `?` when the
+surrounding test function does not return a `Result`.
+
+### 22.2 `FakeDaemon` (`weaver-e2e/tests/test_support/daemon_harness.rs`)
 
 `FakeDaemon` is a lightweight in-process TCP server used by end-to-end snapshot
 tests. It binds an ephemeral port, records incoming JSON request payloads, and
@@ -761,14 +2051,15 @@ Pass `endpoint()` to the `--daemon-socket` flag of the `weaver` binary under
 test. Call `join()` after the CLI exits to assert that the background thread
 did not panic.
 
-### Request-routing helpers (`weaver-e2e/tests/test_support/refactor_routing.rs`)
+### 22.3 Request-routing helpers (`weaver-e2e/tests/test_support/refactor_routing.rs`)
 
 `refactor_routing` provides the routing logic used inside `FakeDaemon` to
 produce capability-resolution payloads:
 
 - `request_arguments(&serde_json::Value)` — extracts the daemon request's flat
   CLI-style argument vector, for example a list containing `--refactoring`,
-  `rename`, `--file`, `src/main.py`, `new_name=renamed_symbol`, and `offset=4`.
+  `rename`, `--file`, `src/main.py`, `--position`, `1:5`, and
+  `new_name=renamed_symbol`.
 - `argument_value(arguments, "--file")` — returns the value paired with a flag
   from that flat argument vector, normalizing access to values such as
   `Some("src/main.py")`.
@@ -799,14 +2090,14 @@ let file = argument_value(&arguments, "--file").expect("refactor requests need -
 let payload = automatic_resolution_payload(std::path::Path::new(file));
 ```
 
-### `refactor_helpers` (`weaverd/src/dispatch/act/refactor/refactor_helpers.rs`)
+### 22.4 `refactor_helpers` (`weaverd/src/dispatch/act/refactor/refactor_helpers.rs`)
 
 `refactor_helpers` is a `#[cfg(test)]` support module for the daemon-side
 `act refactor` tests. It is split into small inline modules and then
 re-exported at the top-level so sibling test modules can import a compact test
 API instead of reaching into several implementation details.
 
-#### Sharing strategy and lint compliance
+#### 22.4.1 Sharing strategy and lint compliance
 
 The original sharing strategy had each test file use
 `#[path = "refactor_helpers.rs"]` to re-include the helper source. That made
@@ -883,15 +2174,15 @@ let mut backends = build_backends(&socket_path);
 
 That pattern lets a test build a request, inject a deterministic runtime, and
 then call `handle(...)` to assert on exit status, stderr, and any preserved
-workspace content. Tests that need fixture content or diff payloads layer in
-the `content` helpers instead of hand-writing patch strings.
+workspace content. Tests that need fixture content or diff payloads layer in the
+`content` helpers instead of hand-writing patch strings.
 
-### `requirements` (`weaverd/src/dispatch/act/refactor/requirements.rs`)
+### 22.5 `requirements` (`weaverd/src/dispatch/act/refactor/requirements.rs`)
 
-`requirements` is the single source of truth for the operator-facing contract
-of `act refactor`. It is a non-test module consumed by both the
-argument-parsing layer and the test suite to keep validation, guidance text,
-and supported-value lists in one place.
+`requirements` is the single source of truth for the operator-facing contract of
+`act refactor`. It is a non-test module consumed by both the argument-parsing
+layer and the test suite to keep validation, guidance text, and supported-value
+lists in one place.
 
 The module exposes seven `pub(crate)` functions. The exact signatures live in
 Rustdoc; this section records each helper's contract, so the Markdown remains
@@ -926,19 +2217,228 @@ readable after automated wrapping:
 - `missing_requirements_error() -> DispatchError` — builds the deterministic
   `DispatchError::InvalidArguments` with `act refactor requires ...`, every
   required flag (`--provider <plugin>`, `--refactoring <operation>`,
-  `--file <path>`), valid provider and refactoring values, and a next-command
-  example derived from the first supported provider/refactoring or the
-  `<plugin>` / `<operation>` placeholders. Called by the argument-builder when
-  one or more required flags are absent.
+  `--file <path>`, `--position <line:col>`), valid provider and refactoring
+  values, and a next-command example derived from the first supported
+  provider/refactoring or the `<plugin>` / `<operation>` placeholders. Called
+  by the argument-builder when one or more required flags are absent.
 
-## Dispatch lifecycle observability internals
+## 23 `weaver-lsp-host` BDD world rebuild guarantee
+
+`crates/weaver-lsp-host/src/tests/support/world.rs` defines `TestWorld`, the
+BDD fixture that owns the `LspHost` under test plus its registered stub
+language servers. Steps mutate a `TestWorld` through methods such as
+`request_definition`, `notify_did_open`, and `rebuild_host`, then assert on the
+recorded `last_error`, `last_definition`, `last_references`,
+`last_diagnostics`, or `last_capabilities` fields.
+
+`TestWorld::rebuild_host(overrides)` replaces the host and its stub-server
+registrations using the configs previously set with `TestWorld::set_configs`.
+Registration can fail partway through — for example when a config's
+`initialization_error` causes `RecordingLanguageServer::failing_initialize` to
+report a registration failure for one of several stub servers. `rebuild_host`
+builds the replacement `LspHost` and handle map in local variables and only
+assigns them to `self.host` and `self.handles` after every registration in the
+loop has succeeded. A mid-loop failure therefore returns `Err` without mutating
+`self.host`, `self.handles`, or `self.active_overrides`, leaving the previously
+built world exactly as it was before the failed call. Tests that want to
+exercise this path call `set_configs` with a config that is known to fail, call
+`rebuild_host` again, and assert that the pre-existing host and handles are
+unchanged.
+
+This guarantee is specific to `TestWorld::rebuild_host`; other crates
+(`weaverd`, `weaver-sandbox`, `weaver-cli`) have their own internal
+`TestWorld`-style harnesses that are not covered by this section.
+
+### 23.1 Capability sets and request dispatch
+
+`weaver-lsp-host` is split into four modules with a deliberate dependency
+direction:
+
+- `server` owns the `LanguageServer` trait and `ServerCapabilitySet`.
+- `capability` owns `CapabilityKind`, `CapabilitySource`, and
+  `CapabilitySummary`, and consumes `weaver-config`'s `CapabilityMatrix`
+  alongside them.
+- `host` owns `LspHost`, `Session`, `CallContext`, and the dispatch helpers.
+- `adapter` provides the process-backed `LanguageServer` implementation.
+
+`capability` depends on `server`, `weaver-config`, and `language`; `server`
+depends only on `capability::CapabilityKind`; and `host` depends on `server`,
+`capability`, and `weaver-config`. Adaptors implement the trait without knowing
+how negotiation or dispatch works. `host` combines the two at runtime, while
+`capability` itself imports `ServerCapabilitySet` to resolve each language's
+advertised capabilities.
+
+`ServerCapabilitySet` stores a `BTreeSet<CapabilityKind>` rather than one
+boolean per capability. New capabilities are added by extending
+`CapabilityKind` and adding a builder (`with_*`) plus accessor (`supports_*`)
+pair, so existing adaptors keep compiling and an unadvertised capability is
+unavailable by default. `supports(capability)` is the general query.
+Negotiation is `resolve_state` in `crates/weaver-lsp-host/src/capability.rs`,
+which calls `ServerCapabilitySet::supports(capability)` directly; the
+`supports_*()` accessors are convenience wrappers for callers outside the
+negotiation path.
+
+Every request routes through the same three stages:
+
+1. The public request method constructs a `CallContext` describing the
+   language, operation, and optional required capability. Capability-gated
+   requests reach it through `call_with_capability`, which pairs a `CallSpec`
+   (capability plus operation) with the context; notifications construct the
+   ungated context directly with `CallContext::for_operation`.
+2. `call_with_session` borrows the session and override matrix from
+   `session_mut`, initialises the server on first use, and then enforces the
+   capability: an unavailable capability returns
+   `LspHostError::CapabilityUnavailable` with the negotiation `source`.
+3. The closure runs against the server and any `LanguageServerError` is mapped
+   to `LspHostError::Server` carrying the operation that failed.
+
+Keeping the three stages separate means capability negotiation decisions live
+in exactly one function, and each public request method is a one-line
+composition rather than a copy of the checks. `session_mut` is private
+precisely so that no caller can hold a session borrow outside these stages;
+adding a public accessor would allow code to issue requests that bypass
+capability negotiation.
+
+### 23.2 Process adapter layout, cleanup and framing
+
+The adapter code lives in these files:
+
+- `host/mod.rs` holds `LspHost` and its dispatch helpers; `host/call_context.rs`
+  holds `CallContext` and `CallSpec`.
+- `adapter/process/mod.rs` holds `ProcessLanguageServer`; `process/debug.rs`
+  holds its `Debug` rendering, which survives a poisoned state mutex;
+  `process/tests.rs` holds its unit tests.
+- `adapter/lifecycle.rs` holds the child cleanup helpers, and
+  `adapter/lifecycle_tests.rs` their tests.
+- `adapter/transport/mod.rs` holds `StdioTransport`; `transport/framing.rs`
+  holds the header helpers.
+
+`ReapableChild` is the seam the cleanup helpers are generic over. It exposes
+the two operations cleanup needs, `kill` and `wait`; `std::process::Child`
+implements it by forwarding to its inherent methods, and the tests supply a
+`FakeChild` that can be told to refuse either call, because a real `Child`
+cannot be made to fail on demand. Two policies sit on top of it:
+
+- `kill_and_reap` attempts both steps whatever the first returns, because a
+  failed kill does not prove the process has gone. An unresponsive server uses
+  it, since the server must not outlive its deadline.
+- `kill_then_reap` waits only after a successful kill, because waiting on a
+  process that refused the signal can block teardown for as long as the process
+  lives. The drop path uses it.
+
+Each failed step logs one warning on the `weaver_lsp_host::adapter` target
+carrying the language and the error. The `FakeChild` tests pin the message,
+target, fields and call counts of each case. `stop_unresponsive` sets the
+adapter state to `Stopped` before cleanup runs, so the transition does not
+depend on either call succeeding.
+
+`transport/framing.rs` reads and writes only the LSP envelope:
+`Content-Length: <n>\r\n\r\n` followed by exactly `n` bytes. `write_framed`
+writes the header, the body and a flush. `read_content_length` reads header
+lines until the blank line that ends the block. After trimming, a line counts
+as the length header only if it begins with the exact prefix `Content-Length:`
+followed by one ASCII space, so `Content-Length: 7` is recognised and
+`Content-Length:7` is ignored; every other line is ignored too. A later
+duplicate wins. Its failures are `TransportError::Io` with `UnexpectedEof` when
+the stream closes inside the header block, `TransportError::InvalidHeader` when
+the value does not parse as a `usize` (non-numeric, negative or out of range),
+and `TransportError::MissingContentLength` when the block ends without one.
+
+## 24 Act-refactor position parsing and byte-offset conversion
+
+The daemon-side `act refactor` implementation accepts user-facing source
+positions and converts them into the internal plugin contract shape before
+dispatch. The E2E daemon harness mirrors the command argument shape documented
+in the earlier
+`Request-routing helpers (weaver-e2e/tests/test_support/refactor_routing.rs)`
+section; the production conversion path lives in the daemon modules described
+below.
+
+### 24.1 `positions` (`weaverd/src/dispatch/act/refactor/positions.rs`)
+
+`crates/weaverd/src/dispatch/act/refactor/positions.rs` owns parsing and
+conversion for human source positions.
+
+`LineCol` is the validated domain type for one-indexed line and
+Unicode-character column values.
+`parse_line_col(value: &str) -> Result<LineCol, DispatchError>` accepts
+`LINE:COL` values. Both components are one-indexed, and zero values are
+rejected before request construction continues.
+
+`line_col_to_byte_offset` has the signature
+`(content: &str, line: u32, column: u32) -> Result<usize, DispatchError>`. It
+converts a one-indexed line and Unicode character column into a UTF-8 byte
+offset. It iterates source text with `split_inclusive('\n')`, strips LF and
+CRLF endings via `trim_line_ending`, and walks `char_indices` so non-ASCII
+characters resolve to the correct byte boundary.
+
+The conversion accepts the column-past-end sentinel used by editor-style
+positions. A column equal to `visible_line.chars().count() + 1` maps to
+`visible_line.len()`, which is the byte offset immediately after the visible
+line content and before any line ending.
+
+### 24.2 `metrics` (`weaverd/src/dispatch/act/refactor/metrics.rs`)
+
+`crates/weaverd/src/dispatch/act/refactor/metrics.rs` defines
+`PositionMetrics`, the trait used to record parse and conversion failures.
+`AtomicPositionMetrics` is the production implementation; it uses private,
+process-local `AtomicU64` counters. `NullPositionMetrics` is the test-only
+no-op implementation.
+
+`parse_refactor_args` receives metrics and increments the parse-error counter
+when `parse_position_flag` rejects a value. `prepare_plugin_request` threads
+the same metrics into rename mapping and increments the conversion-error
+counter when `line_col_to_byte_offset` fails.
+
+Crate-visible accessors expose the current process-local counts. Exporter
+integration remains pending RFC 0001 and issue `#122`.
+
+### 24.3 `arguments` (`weaverd/src/dispatch/act/refactor/arguments.rs`)
+
+`RefactorArgs` carries the optional `position: Option<LineCol>` field alongside
+`provider`, `refactoring`, `file`, and trailing `KEY=VALUE` arguments. The
+internal `RefactorArgsBuilder` has the matching `position: Option<LineCol>`
+field so parsing stores the validated domain value instead of preserving a raw
+string for later reparsing.
+
+The `--position` flag path runs through `parse_position_flag`. That helper
+consumes the flag value, delegates to `parse_line_col` for early validation,
+and then stores the validated `LineCol` on `RefactorArgs`. The builder also
+rejects requests that provide both `--position` and deprecated trailing
+`offset=` before request building begins. The byte-offset conversion happens
+later, after request building has loaded the target file content.
+
+### 24.4 `request_building` (`weaverd/src/dispatch/act/refactor/request_building.rs`)
+
+`CapabilityMappingContext` carries the data needed to translate user-facing
+arguments into the plugin contract: `capability`, `file_path`, `file_content`,
+and `position`. `file_content` is deliberately part of the context because
+`LINE:COL` cannot be converted to a byte offset without the target source text.
+
+`apply_capability_argument_mapping` dispatches by `context.capability`.
+Currently only `CapabilityId::RenameSymbol` has a mapping; other capabilities
+leave plugin arguments unchanged.
+
+`apply_rename_symbol_mapping` applies the rename-specific argument rules in a
+fixed order:
+
+1. Reject the request when `position` already exists in `plugin_args`, because
+   trailing `position=` is reserved for the internal plugin contract.
+2. When `--position` is present, convert the parsed `LineCol` to a byte offset
+   with `line_col_to_byte_offset`.
+3. When only the deprecated form is present, consume `offset=` from
+   `plugin_args` and forward it as the plugin-contract `position` value.
+4. Return an invalid-arguments error when neither `--position` nor `offset=`
+   is available.
+
+## 25 Dispatch lifecycle observability internals
 
 This section documents the dispatch and startup-observability helpers added for
-daemon request handling and CLI lifecycle guidance. The pieces are intentionally
-small: dispatch owns request telemetry at the daemon boundary, while lifecycle
-monitoring owns the runtime files that explain daemon readiness.
+daemon request handling and CLI lifecycle guidance. The pieces are
+intentionally small: dispatch owns request telemetry at the daemon boundary,
+while lifecycle monitoring owns the runtime files that explain daemon readiness.
 
-### `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
+### 25.1 `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
 
 `crates/weaverd/src/dispatch/handler/` is split into three modules:
 
@@ -983,7 +2483,7 @@ large context object through parse and validation helpers, or lose the
 distinction between client disconnects, read failures, malformed JSON, invalid
 commands, and oversized requests.
 
-### Structured dispatch events
+### 25.2 Structured dispatch events
 
 `StructuredEventMetadata` carries optional domain, operation, size, and
 maximum-size fields for structured dispatch logs. Its constructors and builder
@@ -1022,7 +2522,7 @@ payloads.
 and serialized payload under the same target so downstream tracing filters can
 collect dispatch telemetry consistently.
 
-### `monitoring_readers` (`weaver-cli/src/lifecycle/monitoring_readers.rs`)
+### 25.3 `monitoring_readers` (`weaver-cli/src/lifecycle/monitoring_readers.rs`)
 
 `monitoring_readers` centralizes runtime-file reads for daemon lifecycle
 monitoring. It exists so health and PID files share the same missing-file,
@@ -1054,7 +2554,7 @@ The concrete readers have these return semantics:
   `Err(LifecycleError::ReadPid { .. })` when reading fails, and
   `Err(LifecycleError::ParsePid { .. })` when integer parsing fails.
 
-### `runtime_dir` in lifecycle errors
+### 25.4 `runtime_dir` in lifecycle errors
 
 `LifecycleError::LaunchDaemon` and `LifecycleError::StartupFailed` both carry
 `runtime_dir: PathBuf`. The CLI keeps this path with the error because startup
@@ -1067,3 +2567,11 @@ For launch failures, guidance can tell the operator where to inspect runtime
 artefacts even when the daemon process never starts. For startup failures,
 guidance derives `runtime_dir.join("weaverd.health")` and points directly at
 the health snapshot that should explain why readiness was not reached.
+
+## 26 Plugin protocol round-trip test helper
+
+The JSON round-trip assertion in `crates/weaver-plugins/src/protocol/tests.rs`
+is private to those protocol tests. It handles serialization, deserialization,
+and equality; each caller retains its protocol-specific assertions. Reuse it
+within that module only, rather than exporting a test-support API for an
+unrelated protocol.

@@ -59,6 +59,8 @@ pub(crate) fn write_workspace_file(
     Ok(absolute_path)
 }
 
+/// Rejects absolute paths and `..` traversal, then pairs the resulting
+/// filesystem path with a UTF-8 relative path suitable for `cap_std` calls.
 fn resolve_workspace_path(
     workspace_root: &Path,
     relative_path: &Path,
@@ -86,6 +88,9 @@ fn resolve_workspace_path(
     Ok((absolute_path, workspace_relative_path))
 }
 
+/// Opens (creating if necessary) the capability directory that will hold the
+/// target file, so the caller can write into it without ambient path access
+/// beyond `workspace_root`.
 fn open_workspace_target_dir(
     workspace_root: &Path,
     workspace_relative_path: &Utf8Path,
@@ -115,6 +120,9 @@ fn open_workspace_target_dir(
         })
 }
 
+/// Returns the parent of `workspace_relative_path`, or an empty path when the
+/// file sits directly at the workspace root (so callers can skip directory
+/// creation in that case).
 fn workspace_relative_parent_path(workspace_relative_path: &Utf8Path) -> Utf8PathBuf {
     workspace_relative_path
         .parent()

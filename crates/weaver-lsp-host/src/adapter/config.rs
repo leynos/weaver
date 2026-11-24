@@ -1,7 +1,8 @@
 //! Configuration for process-based language server adapters.
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
+use super::transport::DEFAULT_RESPONSE_TIMEOUT;
 use crate::Language;
 
 /// Configuration for spawning a language server process.
@@ -13,14 +14,19 @@ pub struct LspServerConfig {
     pub args: Vec<String>,
     /// Working directory for the spawned process.
     pub working_dir: Option<PathBuf>,
+    /// How long to wait for the server to answer one request before the
+    /// process is judged unresponsive and stopped.
+    pub response_timeout: Duration,
 }
 
 impl LspServerConfig {
+    /// Builds a configuration with no working directory and the default timeout.
     fn default_config(command: impl Into<PathBuf>, args: Vec<String>) -> Self {
         Self {
             command: command.into(),
             args,
             working_dir: None,
+            response_timeout: DEFAULT_RESPONSE_TIMEOUT,
         }
     }
 
@@ -34,13 +40,13 @@ impl LspServerConfig {
     ///
     /// Expects `pyrefly` to be available in PATH.
     #[must_use]
-    pub fn python_default() -> Self { Self::default_config("pyrefly", vec!["lsp".to_string()]) }
+    pub fn python_default() -> Self { Self::default_config("pyrefly", vec!["lsp".to_owned()]) }
 
     /// Default configuration for TypeScript (`tsgo --lsp`).
     ///
     /// Expects `tsgo` to be available in PATH.
     #[must_use]
-    pub fn typescript_default() -> Self { Self::default_config("tsgo", vec!["--lsp".to_string()]) }
+    pub fn typescript_default() -> Self { Self::default_config("tsgo", vec!["--lsp".to_owned()]) }
 
     /// Returns the default configuration for a given language.
     #[must_use]
@@ -50,6 +56,13 @@ impl LspServerConfig {
             Language::Python => Self::python_default(),
             Language::TypeScript => Self::typescript_default(),
         }
+    }
+
+    /// Sets how long to wait for the server to answer one request.
+    #[must_use]
+    pub const fn with_response_timeout(mut self, response_timeout: Duration) -> Self {
+        self.response_timeout = response_timeout;
+        self
     }
 
     /// Sets a custom working directory.
@@ -84,7 +97,7 @@ mod tests {
             config.args,
             expected_args
                 .iter()
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<_>>()
         );
     }
@@ -94,5 +107,23 @@ mod tests {
         let config = LspServerConfig::rust_default().with_working_dir("/workspace");
 
         assert_eq!(config.working_dir, Some(PathBuf::from("/workspace")));
+    }
+
+    #[rstest]
+    #[case(Language::Rust)]
+    #[case(Language::Python)]
+    #[case(Language::TypeScript)]
+    fn every_default_config_waits_the_default_response_timeout(#[case] language: Language) {
+        let config = LspServerConfig::for_language(language);
+
+        assert_eq!(config.response_timeout, DEFAULT_RESPONSE_TIMEOUT);
+        assert_eq!(DEFAULT_RESPONSE_TIMEOUT, Duration::from_secs(30));
+    }
+
+    #[rstest]
+    fn response_timeout_builder_overrides_the_default() {
+        let config = LspServerConfig::rust_default().with_response_timeout(Duration::from_secs(5));
+
+        assert_eq!(config.response_timeout, Duration::from_secs(5));
     }
 }

@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -60,7 +59,7 @@ Observable success for the eventual implementation:
   `crates/weaver-plugins/src/capability/` is already complete. This roadmap
   item resolves providers in the daemon; it must not redefine the contract
   schema introduced by 5.2.1.
-- Keep the CLI command shape stable. `--refactoring rename`, `offset`, and
+- Keep the CLI command shape stable. `--refactoring rename`, `--position`, and
   `new_name` remain the operator-facing inputs. `--provider` may become
   optional, but it must not be removed in 5.2.4 because 5.2.6 is the roadmap
   item that deprecates legacy provider-specific paths.
@@ -165,8 +164,8 @@ Observable success for the eventual implementation:
 
 - Discovery: `crates/weaverd/src/dispatch/act/refactor/mod.rs` already maps the
   CLI-facing `rename` request to the internal `rename-symbol` operation and
-  rewrites `offset` to `position`. The missing work in 5.2.4 is provider
-  resolution, not capability-contract translation.
+  rewrites CLI `--position` to plugin `position`. The missing work in 5.2.4 is
+  provider resolution, not capability-contract translation.
 
 - Discovery: the daemon runtime seam is currently
   `RefactorPluginRuntime::execute(&self, provider, request)`. Because it
@@ -231,8 +230,9 @@ The plugin registry already supports the lookups needed for resolution:
 The current missing pieces are:
 
 - There is no language inference step for `act refactor`.
-- There is no policy object that turns `(capability, language, explicit
-  provider?)` into a deterministic provider choice or refusal.
+- There is no policy object that turns
+  `(capability, language, explicit provider?)` into a deterministic provider
+  choice or refusal.
 - There is no structured rationale payload for that decision.
 - The CLI does not yet know how to render such a payload cleanly.
 

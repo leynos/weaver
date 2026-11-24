@@ -4,7 +4,7 @@
 //! backed card extraction to `weaver-cards`, and optionally enriches the card
 //! with LSP hover data when `--detail semantic` or higher is requested.
 
-use std::{fs, io::Write, path::PathBuf};
+use std::{io::Write, path::PathBuf};
 
 use url::Url;
 use weaver_cards::{
@@ -22,6 +22,7 @@ use crate::{
     backends::FusionBackends,
     dispatch::{
         errors::DispatchError,
+        filesystem,
         request::CommandRequest,
         response::ResponseWriter,
         router::DispatchResult,
@@ -47,7 +48,7 @@ pub fn handle<W: Write>(
         DispatchError::invalid_arguments(format!("invalid URI '{}': {error}", card_request.uri))
     })?;
     let path = resolve_file_path(&parsed_uri)?;
-    let source = fs::read_to_string(&path)?;
+    let source = filesystem::read_to_string(&path)?;
     let extractor = backends.provider().card_extractor();
 
     let response = match extractor.extract_shared(CardExtractionInput {
@@ -58,12 +59,12 @@ pub fn handle<W: Write>(
         detail: card_request.detail,
     }) {
         Ok(card) => {
-            let mut card = card.as_ref().clone();
+            let mut owned_card = card.as_ref().clone();
             if card_request.detail >= DetailLevel::Semantic {
-                apply_lsp_enrichment(&mut card, &source, backends);
+                apply_lsp_enrichment(&mut owned_card, &source, backends);
             }
             GetCardResponse::Success {
-                card: Box::new(card),
+                card: Box::new(owned_card),
             }
         }
         Err(error) => map_extraction_error(error, card_request.detail)?,
@@ -71,7 +72,6 @@ pub fn handle<W: Write>(
 
     let status = match &response {
         GetCardResponse::Success { .. } => 0,
-        GetCardResponse::Refusal { .. } => 1,
         _ => 1,
     };
     let json = serde_json::to_string(&response)?;
@@ -96,6 +96,7 @@ fn apply_lsp_enrichment(
     }
 }
 
+/// Validates that `uri` uses the `file` scheme and converts it to a path.
 fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
     if uri.scheme() != "file" {
         return Err(DispatchError::invalid_arguments(format!(
@@ -104,11 +105,12 @@ fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
         )));
     }
 
-    uri.to_file_path().map_err(|_| {
+    uri.to_file_path().map_err(|()| {
         DispatchError::invalid_arguments(format!("URI is not a valid file path: {uri}"))
     })
 }
 
+/// Converts a card extraction error into a refusal or a dispatch error.
 fn map_extraction_error(
     error: CardExtractionError,
     detail: weaver_cards::DetailLevel,

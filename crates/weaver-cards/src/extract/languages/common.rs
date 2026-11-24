@@ -236,6 +236,13 @@ fn detect_delimiter(literal: &str) -> Option<&'static str> {
     DELIMITERS.iter().copied().find(|&d| literal.starts_with(d))
 }
 
+/// Extracts the textual content of a Python string node, excluding quotes
+/// and any prefix such as `r` or `b`.
+///
+/// Prefers concatenating the node's `string_content`/`escape_sequence`
+/// children when the grammar exposes them; falls back to manually stripping
+/// the detected delimiter from the raw slice when it does not (older grammar
+/// versions or unusual literal shapes).
 fn extract_python_string_content(node: Node<'_>, source: &str) -> Option<String> {
     let mut cursor = node.walk();
     let parts: Vec<&str> = node
@@ -262,6 +269,13 @@ fn extract_python_string_content(node: Node<'_>, source: &str) -> Option<String>
     Some(content)
 }
 
+/// Collapses runs of whitespace to single spaces and trims the ends, while
+/// leaving whitespace inside quoted string/template literals untouched so
+/// signature and decorator text does not corrupt embedded string contents.
+///
+/// Tracks the active quote character (`"`, `'`, or `` ` ``) and counts
+/// trailing backslashes to detect an escaped quote versus a real closing
+/// quote, so escaped quote characters do not prematurely end literal mode.
 fn normalise_whitespace_preserving_literals(raw: &str) -> String {
     let mut result = String::new();
     let chars = raw.chars().peekable();

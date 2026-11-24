@@ -306,10 +306,15 @@ fn build_search_principal(
     build_legacy_principal(raw, rule_span.as_ref()).map(SearchQueryPrincipal::Legacy)
 }
 
+/// Remediation note shared by every diagnostic that rejects a rule for
+/// declaring the wrong combination of search principal keys.
 const fn search_principal_note() -> &'static str {
     "choose one of the legacy search keys, `match`, or `r2c-internal-project-depends-on`"
 }
 
+/// Fails when a rule combines `r2c-internal-project-depends-on` with a mode
+/// that has no meaning for it, blaming `rule_span` and naming `mode_name` so
+/// the author can see which mode is at fault.
 fn reject_project_depends_on(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,

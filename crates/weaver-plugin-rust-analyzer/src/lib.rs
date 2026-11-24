@@ -168,9 +168,16 @@ pub fn run_with_adapter<R: RustAnalyzerAdapter>(
 ///
 /// Returns an error if the response cannot be written.
 pub fn run(stdin: &mut impl BufRead, stdout: &mut impl Write) -> Result<(), PluginDispatchError> {
-    run_with_adapter(stdin, stdout, &RustAnalyzerLspAdapter)
+    let adapter = RustAnalyzerLspAdapter::from_env(&mockable::DefaultEnv);
+    run_with_adapter(stdin, stdout, &adapter)
 }
 
+/// Reads a single newline-delimited JSON request from the input stream.
+///
+/// # Errors
+///
+/// Returns a [`PluginFailure`] if the stream cannot be read, is closed before
+/// a request arrives, or the line is not a valid [`PluginRequest`].
 fn read_request(stdin: &mut impl BufRead) -> Result<PluginRequest, PluginFailure> {
     let mut line = String::new();
     let bytes_read = stdin
@@ -185,6 +192,13 @@ fn read_request(stdin: &mut impl BufRead) -> Result<PluginRequest, PluginFailure
         .map_err(|error| PluginFailure::plain(format!("invalid plugin request JSON: {error}")))
 }
 
+/// Dispatches a request to the handler for its operation.
+///
+/// # Errors
+///
+/// Returns a [`PluginFailure`] carrying [`ReasonCode::OperationNotSupported`]
+/// for any operation this plugin does not implement, plus whatever the
+/// selected handler reports.
 fn execute_request<R: RustAnalyzerAdapter>(
     adapter: &R,
     request: &PluginRequest,
@@ -198,6 +212,15 @@ fn execute_request<R: RustAnalyzerAdapter>(
     }
 }
 
+/// Performs a `rename-symbol` request against the adapter.
+///
+/// Exactly one file payload is required: the rename is applied to that file's
+/// content and returned as a diff rather than written to disk.
+///
+/// # Errors
+///
+/// Returns a [`PluginFailure`] if the arguments are incomplete, the payload
+/// does not carry exactly one file, or the adapter rejects the rename.
 fn execute_rename<R: RustAnalyzerAdapter>(
     adapter: &R,
     request: &PluginRequest,
@@ -261,6 +284,15 @@ fn execute_rename<R: RustAnalyzerAdapter>(
     }))
 }
 
+/// Renders the original and modified file contents as a search/replace patch.
+///
+/// A trailing newline is inserted after each section when the content lacks
+/// one, so the marker lines always start at column zero.
+///
+/// # Errors
+///
+/// Returns a [`PluginFailure`] if `path` cannot be rendered in slash-separated
+/// form.
 fn build_search_replace_patch(
     path: &Path,
     original: &str,

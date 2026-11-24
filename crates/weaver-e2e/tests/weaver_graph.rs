@@ -5,6 +5,10 @@
 
 #[path = "support/fixture_io.rs"]
 mod fixture_io;
+#[path = "support/pyrefly.rs"]
+mod pyrefly;
+#[path = "support/uri.rs"]
+mod uri;
 
 use std::path::Path;
 
@@ -14,14 +18,13 @@ use lsp_types::{
     CallHierarchyIncomingCallsParams,
     CallHierarchyOutgoingCallsParams,
     CallHierarchyPrepareParams,
-    Uri,
 };
+use pyrefly::require_pyrefly;
 use tempfile::TempDir;
-use url::Url;
+use uri::{FileUriError, file_uri};
 use weaver_e2e::{
     fixtures,
     lsp_client::{LspClient, LspClientError},
-    pyrefly_available,
 };
 use weaver_graph::{
     CallGraphProvider,
@@ -42,11 +45,8 @@ enum TestError {
     #[error("graph error: {0}")]
     Graph(#[from] GraphError),
 
-    #[error("invalid file path: cannot convert to URI")]
-    InvalidFilePath,
-
-    #[error("invalid URI: {0}")]
-    InvalidUri(String),
+    #[error(transparent)]
+    FileUri(#[from] FileUriError),
 
     #[error("invalid utf-8 path for file: {0}")]
     InvalidUtf8Path(String),
@@ -61,27 +61,9 @@ enum TestError {
     MissingEdge { caller: String, callee: String },
 }
 
-fn file_uri(path: &Path) -> Result<Uri, TestError> {
-    let url = Url::from_file_path(path).map_err(|()| TestError::InvalidFilePath)?;
-    url.as_str()
-        .parse()
-        .map_err(|_| TestError::InvalidUri(url.to_string()))
-}
-
 fn to_utf8_path(path: &Path) -> Result<Utf8PathBuf, TestError> {
     Utf8PathBuf::try_from(path.to_path_buf())
         .map_err(|_| TestError::InvalidUtf8Path(path.display().to_string()))
-}
-
-macro_rules! require_pyrefly {
-    () => {
-        if !pyrefly_available() {
-            eprintln!(
-                "Skipping test: Pyrefly not available (install with `uv tool install pyrefly`)"
-            );
-            return Ok(());
-        }
-    };
 }
 
 struct SharedClient {

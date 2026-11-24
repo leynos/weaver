@@ -5,35 +5,94 @@ name: CI
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    # The developer-blocking lane, and the one the placement rule moves. It
+    # waited 435 s for a GitHub-hosted runner on 2026-09-16 to do 938 s of
+    # work.
+    #
+    # Four vCPU rather than two. This lane builds Whitaker from source with
+    # Cranelift and then runs Clippy, Mermaid validation and the coverage
+    # suite, which includes two trybuild cases that spawn their own cargo
+    # builds. Ubicloud's four vCPU are already 1.5 to 2 times slower than a
+    # GitHub public runner's four for that kind of work (measured on
+    # wireframe), so two would roughly triple a fifteen-minute lane.
+    #
+    # A pull request from a fork cannot obtain an Ubicloud runner, so the
+    # expression falls back to a GitHub-hosted one for forks only. The
+    # continuation line sits at the SAME indent as the line above it: a
+    # more-indented continuation in a folded scalar keeps its line break and
+    # puts a newline inside the expression, which GitHub evaluates anyway, so
+    # a green run would not show it. On a `workflow_dispatch` the fork field
+    # is absent and the expression selects the Ubicloud arm, which is right:
+    # a dispatch is not a fork.
+    # Dependabot pull requests run on the hosted pool too (free on a public
+    # repository). The author is tested, not the actor, which changes when
+    # someone else pushes to the branch.
+    runs-on: >-
+      ${{ (github.event.pull_request.head.repo.fork
+      || github.event.pull_request.user.login == 'dependabot[bot]')
+      && 'ubuntu-latest' || 'ubicloud-standard-4' }}
+    # A PR run exceeded the previous ceiling while `make lint` was still
+    # compiling workspace dependencies. Allow for lint, tests, and coverage.
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      WHITAKER_INSTALLER_REV: f768c2e53c47df13658af1168a67851d388750bf
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      # Ubicloud runs a cache proxy on the runner's private network, and the
+      # runner exposes its URL and token to action steps only. This
+      # republishes them through the job environment and clears
+      # ACTIONS_CACHE_SERVICE_V2, which sccache's backend reads to select the
+      # v2 service that the proxy does not implement. Without it sccache
+      # reaches GitHub's cache endpoint from an Ubicloud runner instead.
+      #
+      # Ordering is load-bearing: sccache reads its cache configuration when
+      # its server starts and keeps it for that server's life, so this must
+      # precede the step that configures and starts it.
+      #
+      # The action fails closed on a GitHub-hosted runner rather than
+      # exporting that runner's endpoint under Ubicloud's name, so the guard
+      # is required wherever the lane can land on either. `runner.environment`
+      # is the runtime fact rather than a reading of the label, and it
+      # resolves to `self-hosted` on Ubicloud.
+      - name: Export Ubicloud cache credentials
+        if: runner.environment == 'self-hosted'
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@0eabb6bc07148981de5da395e30cd78d83f5c7c2
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@d400b079fb6a8fa92f7e7b6c57f3d1c92a4b2d54
+        uses: leynos/shared-actions/.github/actions/setup-rust@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+      - name: Install mdtablefix
+        # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
+        # first release with `--check` and `--git`.
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        with:
+          version: "0.6.1"
+
       - name: Format
         run: make check-fmt
       - name: Markdown lint
-        uses: DavidAnson/markdownlint-cli2-action@992badcdf24e3b8eb7e87ff9287fe931bcb00c6e  # v20
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff  # v24.2.0
         with:
-          globs: |
-            **/*.md
-            !**/target/**
-            !**/dist/**
+          globs: '**/*.md'
       - name: Install uv
-        uses: astral-sh/setup-uv@4cda7d73322c50eac316ad623a716f09a2db2ac7
-        # v3.1.2
+        # The same pin the estate's other consumers use. It runs on Node 24, and
+        # with no Python dependency manifest to key a cache on, caching is off.
+        uses: astral-sh/setup-uv@5e83ccf689000bf635d77af2cdbad36ca1397375
         with:
-          python-version: '3.11'
+          enable-cache: false
+      - name: Spelling (en-GB-oxendict)
+        run: make spelling
       - name: Install bun
-        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76  # v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
         with:
           bun-version: '1.2.21'
       - name: Install Mermaid CLI
@@ -42,32 +101,64 @@ jobs:
           bun install --no-progress --global @mermaid-js/mermaid-cli@11.9.0
           bun x @puppeteer/browsers browsers install chrome-headless-shell
           mmdc --version
-      - name: Install Nixie
-        run: uv tool install nixie-cli==1.0.0
+      # Merman comes from its checksum-verified release archive. `cargo
+      # install merman-cli` compiled it from crates.io on every run, 2.6
+      # minutes of a 13-minute job. Nixie installs on the action's default
+      # Python 3.14, which nixie-cli 1.1.0 requires; the uv setup above does
+      # not provide it, so uv fetches a managed 3.14 for the tool, as the
+      # step this replaces already did.
+      - name: Install Nixie and Merman
+        uses: leynos/shared-actions/.github/actions/install-nixie@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        with:
+          nixie-version: '1.1.0'
+          merman-version: '0.7.0'
       - name: Mermaid lint
         run: make nixie
-      - name: Install Whitaker
+      - name: Fetch locked dependencies
+        # Warm the package cache once, failing the job if it cannot be warmed, so
+        # the tests that start their own cargo resolve nothing under its lock.
+        run: cargo fetch --locked
+      - name: Install mold linker
+        # The boundary manifest gate and `make lint` add the build standard's
+        # mold flag, so the linker must be present before the first of them.
         run: |
-          cargo install --locked \
-            --git https://github.com/leynos/whitaker \
-            --rev "${WHITAKER_INSTALLER_REV}" \
-            whitaker-installer
-          # Test Whitaker's cranelift support from the pinned fix revision
-          # instead of installing rustc-codegen-cranelift separately here.
-          whitaker-installer --cranelift
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends mold
+      - name: Boundary manifest gate
+        # setup-rust exports `RUSTFLAGS`, which displaces the configuration's
+        # sources, so the step composes the standard flags onto it as the
+        # Makefile does.
+        run: >-
+          RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Zthreads=8 -Clink-arg=-fuse-ld=mold"
+          cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
+      - name: Install Whitaker
+        uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2 # shared-actions 0eabb6bc (whitaker-installer 0.2.12)
+        with:
+          cranelift: true
       - name: Lint
         run: make lint
+      - name: Workflow contract tests
+        run: make test-workflow-contracts
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@d400b079fb6a8fa92f7e7b6c57f3d1c92a4b2d54
+        uses: leynos/shared-actions/.github/actions/generate-coverage@0eabb6bc07148981de5da395e30cd78d83f5c7c2
         with:
           output-path: lcov.info
           format: lcov
-      - name: Upload coverage data to CodeScene
-        env:
-          CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
-        if: ${{ env.CS_ACCESS_TOKEN }}
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@d400b079fb6a8fa92f7e7b6c57f3d1c92a4b2d54
-        with:
-          format: lcov
-          access-token: ${{ env.CS_ACCESS_TOKEN }}
-          installer-checksum: ${{ vars.CODESCENE_CLI_SHA256 }}
+          with-ratchet: 'true'
+          # The nightly-2026-10-22 bump alone moved measured coverage from 78.35%
+          # to 77.08% (tests unchanged). The cached baseline is keyed by this
+          # path, so a new path resets it to the committed figure.
+          baseline-rust-file: .coverage-baseline-v2.rust
+          # The ratchet reads this report; nothing else does, so it is not
+          # published as an artefact. The input exists from shared-actions
+          # a5765019, which is why this action is pinned there.
+          publish-artefact: 'false'
+      # No CodeScene step belongs in this workflow. The CodeScene
+      # command-line tool is installed from a URL at job time and is not
+      # pinned to a service contract: it calls CodeScene's API, and a change
+      # in what that returns fails this lane for a reason no change here
+      # caused. The upload
+      # happens once, on push to main, in coverage-main.yml; the
+      # changed-line gate a reviewer sees is CodeScene's own check against
+      # that upload and needs nothing from here.
+      # Asserted by `make test-workflow-contracts`.

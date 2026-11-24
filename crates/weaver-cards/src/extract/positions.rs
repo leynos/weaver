@@ -6,6 +6,18 @@ use super::CardExtractionError;
 /// than 4 GiB, an edge case that is unreachable in normal operation.
 pub(super) fn usize_to_u32(value: usize) -> u32 { u32::try_from(value).unwrap_or(u32::MAX) }
 
+/// Converts a one-based line/column request into a byte offset into `source`.
+///
+/// Columns are counted in `char`s, not bytes, so multi-byte characters before
+/// the target column are accounted for correctly. A column one past the last
+/// character on a line is accepted, since that is where an inserted symbol
+/// would begin.
+///
+/// # Errors
+///
+/// Returns [`CardExtractionError::PositionOutOfRange`] when `line` or
+/// `column` is zero, when `line` exceeds the number of lines in `source`, or
+/// when `column` is beyond the end of the requested line.
 pub(super) fn position_to_byte(
     source: &str,
     line: u32,
@@ -30,6 +42,9 @@ pub(super) fn position_to_byte(
     Ok(line_start.saturating_add(column_offset))
 }
 
+/// Locates the one-based `target_line` in `source`, returning its starting
+/// byte offset and its slice including the trailing line terminator, if any.
+/// Returns `None` when `target_line` exceeds the number of lines present.
 fn line_entry(source: &str, target_line: u32) -> Option<(usize, &str)> {
     let mut start = 0usize;
     for (index, line) in source.split_inclusive('\n').enumerate() {
@@ -41,6 +56,8 @@ fn line_entry(source: &str, target_line: u32) -> Option<(usize, &str)> {
     None
 }
 
+/// Strips a trailing `\r\n` or `\n` line terminator, so column counts match
+/// visible characters rather than including the terminator itself.
 fn trim_line_ending(line: &str) -> &str {
     let without_newline = line.strip_suffix('\n').unwrap_or(line);
     without_newline

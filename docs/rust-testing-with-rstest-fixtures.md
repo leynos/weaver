@@ -20,7 +20,7 @@ objects used as a baseline for running tests. The primary purpose of a fixture
 is to ensure that there is a well-known and controlled environment in which
 tests are run so that results are repeatable. Test dependencies, such as
 database connections, user objects, or specific configurations, often require
-careful setup before a test can execute and, sometimes, teardown afterward.
+careful setup before a test can execute and, sometimes, teardown afterwards.
 Managing this setup and teardown logic within each test function can lead to
 considerable boilerplate code and repetition, making tests harder to read and
 maintain.
@@ -51,7 +51,7 @@ projects that may share the same name but operate in different ecosystems
 The `rstest` crate utilizes Rust's procedural macros, such as `#[rstest]` and
 `#[fixture]`, to achieve its declarative and expressive syntax. These macros
 allow developers to define fixtures and inject them into test functions simply
-by listing them as arguments. This compile-time mechanism analyzes test
+by listing them as arguments. This compile-time mechanism analyses test
 function signatures and fixture definitions to wire up dependencies
 automatically.
 
@@ -1344,20 +1344,20 @@ provided by `rstest`:
 
 **Table 2: Key** `rstest` **Attributes Quick Reference**
 
-| Attribute                    | Core Purpose                                                                                 |
-| ---------------------------- | -------------------------------------------------------------------------------------------- |
-| #[rstest]                    | Marks a function as an rstest test; enables fixture injection and parameterization.          |
-| #[fixture]                   | Defines a function that provides a test fixture (setup data or services).                    |
-| #[case(…)]                   | Defines a single parameterized test case with specific input values.                         |
-| #[values(…)]                 | Defines a list of values for an argument, generating tests for each value or combination.    |
-| #[once]                      | Marks a fixture to be initialized only once and shared (as a static reference) across tests. |
-| #[future]                    | Simplifies async argument types by removing impl Future boilerplate.                         |
-| #[awt]                       | (Function or argument level) Automatically .awaits future arguments in async tests.          |
-| #[from(original_name)]       | Allows renaming an injected fixture argument in the test function.                           |
-| #[with(…)]                   | Overrides default arguments of a fixture for a specific test.                                |
-| #[default(…)]                | Provides default values for arguments within a fixture function.                             |
-| #[timeout(…)]                | Sets a timeout for an asynchronous test.                                                     |
-| #[files("glob_pattern",…)]   | Injects file paths (or contents, with mode=) matching a glob pattern as test arguments.      |
+| Attribute                  | Core Purpose                                                                                 |
+| -------------------------- | -------------------------------------------------------------------------------------------- |
+| #[rstest]                  | Marks a function as an rstest test; enables fixture injection and parameterization.          |
+| #[fixture]                 | Defines a function that provides a test fixture (setup data or services).                    |
+| #[case(…)]                 | Defines a single parameterized test case with specific input values.                         |
+| #[values(…)]               | Defines a list of values for an argument, generating tests for each value or combination.    |
+| #[once]                    | Marks a fixture to be initialized only once and shared (as a static reference) across tests. |
+| #[future]                  | Simplifies async argument types by removing impl Future boilerplate.                         |
+| #[awt]                     | (Function or argument level) Automatically .awaits future arguments in async tests.          |
+| #[from(original_name)]     | Allows renaming an injected fixture argument in the test function.                           |
+| #[with(…)]                 | Overrides default arguments of a fixture for a specific test.                                |
+| #[default(…)]              | Provides default values for arguments within a fixture function.                             |
+| #[timeout(…)]              | Sets a timeout for an asynchronous test.                                                     |
+| #[files("glob_pattern",…)] | Injects file paths (or contents, with mode=) matching a glob pattern as test arguments.      |
 
 By mastering `rstest`, Rust developers can significantly elevate the quality
 and efficiency of their testing practices, leading to more reliable and

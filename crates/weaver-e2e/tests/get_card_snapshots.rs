@@ -2,22 +2,17 @@
 
 #[path = "support/fixture_io.rs"]
 mod fixture_io;
+#[path = "test_support/get_card.rs"]
+mod get_card_support;
 mod test_support;
 #[path = "support/weaver_binary.rs"]
 mod weaver_binary;
 
 use fixture_io::write_fixture_path;
+use get_card_support::{CacheTranscript, GetCardRequest, run_get_card};
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use test_support::{
-    CacheTranscript,
-    GetCardRequest,
-    TestDaemon,
-    assert_named_snapshot,
-    fixture_uri,
-    run_get_card,
-};
-use url::Url;
+use test_support::{TestDaemon, assert_named_snapshot, fixture_uri, path_uri};
 use weaver_e2e::card_fixtures::{PYTHON_CASES, RUST_CASES};
 
 struct WorkspaceUri {
@@ -45,33 +40,51 @@ struct SnapshotHarness {
 }
 
 impl SnapshotHarness {
-    #[expect(
-        clippy::expect_used,
-        reason = "test helper failures should panic with explicit setup messages"
-    )]
-    fn workspace_for_case(case: weaver_e2e::card_fixtures::CardFixtureCase) -> WorkspaceUri {
-        let temp_dir = TempDir::new().expect("creating temp dir");
-        let uri = fixture_uri(&temp_dir, case);
-        WorkspaceUri {
+    /// Creates a temporary workspace and delegates fixture-specific URI
+    /// creation to `build_uri`.
+    ///
+    /// The `TempDir` is retained in the returned [`WorkspaceUri`] so the
+    /// workspace outlives the URI it produced.
+    ///
+    /// # Errors
+    /// Returns a description if the temporary directory cannot be created, or
+    /// whatever `build_uri` reports.
+    fn workspace_with(
+        build_uri: impl FnOnce(&TempDir) -> Result<String, String>,
+    ) -> Result<WorkspaceUri, String> {
+        let temp_dir = TempDir::new().map_err(|error| format!("creating temp dir: {error}"))?;
+        let uri = build_uri(&temp_dir)?;
+        Ok(WorkspaceUri {
             _temp_dir: temp_dir,
             uri,
-        }
+        })
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "test helper failures should panic with explicit setup messages"
-    )]
-    fn unsupported_workspace() -> WorkspaceUri {
-        let temp_dir = TempDir::new().expect("creating temp dir");
-        let uri = unsupported_fixture_uri(&temp_dir);
-        WorkspaceUri {
-            _temp_dir: temp_dir,
-            uri,
-        }
+    /// Writes `case` into a fresh temporary workspace and returns its URI.
+    ///
+    /// # Errors
+    /// Returns a description if the temporary directory or the fixture file
+    /// cannot be created.
+    fn workspace_for_case(
+        case: weaver_e2e::card_fixtures::CardFixtureCase,
+    ) -> Result<WorkspaceUri, String> {
+        Self::workspace_with(|temp_dir| fixture_uri(temp_dir, case))
     }
 
-    fn daemon(self, expected_requests: Option<usize>) -> TestDaemon {
+    /// Builds a workspace holding a file the language router cannot classify.
+    ///
+    /// # Errors
+    /// Returns a description if the temporary directory or the fixture file
+    /// cannot be created.
+    fn unsupported_workspace() -> Result<WorkspaceUri, String> {
+        Self::workspace_with(unsupported_fixture_uri)
+    }
+
+    /// Starts a daemon expecting `expected_requests`, or the harness default.
+    ///
+    /// # Errors
+    /// Returns a description if the daemon cannot bind or start serving.
+    fn daemon(self, expected_requests: Option<usize>) -> Result<TestDaemon, String> {
         TestDaemon::start(expected_requests.unwrap_or(self.default_expected_requests))
     }
 
@@ -92,24 +105,24 @@ const fn snapshot_harness() -> SnapshotHarness {
     }
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "test helper failures should panic with explicit setup messages"
-)]
-fn unsupported_fixture_uri(temp_dir: &TempDir) -> String {
-    let path =
-        write_fixture_path(temp_dir, "notes.txt", "plain text\n").expect("write fixture path");
-    Url::from_file_path(&path)
-        .map(|uri| uri.to_string())
-        .expect("unsupported path to URI")
+/// Writes a plain-text fixture and returns its `file://` URI.
+///
+/// # Errors
+/// Returns a description if the file cannot be written or its path has no
+/// `file://` URI representation.
+fn unsupported_fixture_uri(temp_dir: &TempDir) -> Result<String, String> {
+    let path = write_fixture_path(temp_dir, "notes.txt", "plain text\n")
+        .map_err(|error| format!("write fixture path: {error}"))?;
+    path_uri(&path)
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "test helper failures should panic with explicit setup messages"
-)]
-fn render_snapshot<T: serde::Serialize>(transcript: &T) -> String {
-    serde_json::to_string_pretty(transcript).expect("serialize transcript")
+/// Serialises a transcript to pretty-printed JSON for snapshot comparison.
+///
+/// # Errors
+/// Returns a description if the transcript cannot be serialised.
+fn render_snapshot<T: serde::Serialize>(transcript: &T) -> Result<String, String> {
+    serde_json::to_string_pretty(transcript)
+        .map_err(|error| format!("serialize transcript: {error}"))
 }
 
 #[rstest]
@@ -156,9 +169,9 @@ fn render_snapshot<T: serde::Serialize>(transcript: &T) -> String {
 fn get_card_structure_snapshots_cover_python_and_rust_fixture_battery(
     #[case] case: weaver_e2e::card_fixtures::CardFixtureCase,
     snapshot_harness: SnapshotHarness,
-) {
-    let workspace = SnapshotHarness::workspace_for_case(case);
-    let daemon = snapshot_harness.daemon(None);
+) -> Result<(), String> {
+    let workspace = SnapshotHarness::workspace_for_case(case)?;
+    let daemon = snapshot_harness.daemon(None)?;
     let transcript = run_get_card(
         &daemon,
         SnapshotHarness::request(
@@ -169,9 +182,10 @@ fn get_card_structure_snapshots_cover_python_and_rust_fixture_battery(
                 detail: "structure",
             },
         ),
-    );
-    daemon.join();
-    assert_named_snapshot(case.name, &render_snapshot(&transcript));
+    )?;
+    daemon.join()?;
+    assert_named_snapshot(case.name, &render_snapshot(&transcript)?);
+    Ok(())
 }
 
 #[rstest]
@@ -181,10 +195,10 @@ fn get_card_structure_snapshots_cover_python_and_rust_fixture_battery(
 fn get_card_detail_levels_snapshot(
     #[case] detail: &'static str,
     snapshot_harness: SnapshotHarness,
-) {
+) -> Result<(), String> {
     let case = RUST_CASES[0];
-    let workspace = SnapshotHarness::workspace_for_case(case);
-    let daemon = snapshot_harness.daemon(None);
+    let workspace = SnapshotHarness::workspace_for_case(case)?;
+    let daemon = snapshot_harness.daemon(None)?;
     let transcript = run_get_card(
         &daemon,
         SnapshotHarness::request(
@@ -195,12 +209,13 @@ fn get_card_detail_levels_snapshot(
                 detail,
             },
         ),
-    );
-    daemon.join();
+    )?;
+    daemon.join()?;
     assert_named_snapshot(
         &format!("rust_detail_{detail}"),
-        &render_snapshot(&transcript),
+        &render_snapshot(&transcript)?,
     );
+    Ok(())
 }
 
 #[rstest]
@@ -225,26 +240,29 @@ fn get_card_detail_levels_snapshot(
 fn get_card_refusal_snapshots(
     #[case] refusal_case: RefusalCase,
     snapshot_harness: SnapshotHarness,
-) {
+) -> Result<(), String> {
     let workspace = if refusal_case.uses_unsupported_workspace {
-        SnapshotHarness::unsupported_workspace()
+        SnapshotHarness::unsupported_workspace()?
     } else {
-        SnapshotHarness::workspace_for_case(RUST_CASES[0])
+        SnapshotHarness::workspace_for_case(RUST_CASES[0])?
     };
-    let daemon = snapshot_harness.daemon(None);
+    let daemon = snapshot_harness.daemon(None)?;
     let transcript = run_get_card(
         &daemon,
         SnapshotHarness::request(&workspace.uri, refusal_case.request),
-    );
-    daemon.join();
-    assert_named_snapshot(refusal_case.snapshot_name, &render_snapshot(&transcript));
+    )?;
+    daemon.join()?;
+    assert_named_snapshot(refusal_case.snapshot_name, &render_snapshot(&transcript)?);
+    Ok(())
 }
 
 #[rstest]
-fn get_card_repeated_request_uses_cache_snapshot(snapshot_harness: SnapshotHarness) {
+fn get_card_repeated_request_uses_cache_snapshot(
+    snapshot_harness: SnapshotHarness,
+) -> Result<(), String> {
     let case = RUST_CASES[0];
-    let workspace = SnapshotHarness::workspace_for_case(case);
-    let daemon = snapshot_harness.daemon(Some(2));
+    let workspace = SnapshotHarness::workspace_for_case(case)?;
+    let daemon = snapshot_harness.daemon(Some(2))?;
     let request = SnapshotHarness::request(
         &workspace.uri,
         RequestSpec {
@@ -253,10 +271,10 @@ fn get_card_repeated_request_uses_cache_snapshot(snapshot_harness: SnapshotHarne
             detail: "structure",
         },
     );
-    let first = run_get_card(&daemon, request);
-    let second = run_get_card(&daemon, request);
-    let stats = daemon.cache_stats();
-    daemon.join();
+    let first = run_get_card(&daemon, request)?;
+    let second = run_get_card(&daemon, request)?;
+    let stats = daemon.cache_stats()?;
+    daemon.join()?;
 
     let transcript = CacheTranscript {
         first,
@@ -264,5 +282,6 @@ fn get_card_repeated_request_uses_cache_snapshot(snapshot_harness: SnapshotHarne
         cache_hits: stats.hits,
         cache_misses: stats.misses,
     };
-    assert_named_snapshot("cache_repeated_request", &render_snapshot(&transcript));
+    assert_named_snapshot("cache_repeated_request", &render_snapshot(&transcript)?);
+    Ok(())
 }

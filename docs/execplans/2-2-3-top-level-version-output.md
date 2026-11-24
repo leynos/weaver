@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -181,8 +180,8 @@ forward-compatible.
 
 ## Context and orientation
 
-The Weaver CLI is defined in `crates/weaver-cli/`. The main clap struct lives
-in `src/cli.rs` and is parsed by `src/lib.rs`. The build script at `build.rs`
+The Weaver CLI is defined in `crates/weaver-cli/`. The main clap struct lives in
+`src/cli.rs` and is parsed by `src/lib.rs`. The build script at `build.rs`
 includes `cli.rs` via `#[path = "src/cli.rs"]` for manpage generation. This
 dual-compilation means any code in `cli.rs` must compile in both contexts.
 

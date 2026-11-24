@@ -1,0 +1,11 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+#
+# The seed below was produced by deliberately reverting rebuild_host's
+# torn-state fix, to prove prop_failed_rebuild_preserves_world can fail.
+# It is the minimal config sequence that detects a torn rebuild.
+cc ea330ff6f93f68dab3fb580308188e319787bd49233855a3fb3fa37dcd9cd98f # shrinks to languages = [Rust, Rust]

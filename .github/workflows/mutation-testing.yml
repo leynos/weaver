@@ -1,0 +1,41 @@
+name: Mutation testing
+
+# Thin caller of the shared mutation-testing reusable workflow; caller
+# guide: leynos/shared-actions docs/mutation-cargo-workflow.md.
+# Scheduled runs mutate only files changed within the detection window;
+# manual dispatch runs mutate everything, fanned out across shards. To
+# test a branch, select it in the Actions "Run workflow" control.
+
+on:
+  schedule:
+    - cron: "20 3 * * *" # Daily, 03:20 UTC
+  workflow_dispatch:
+
+# Default the token to no scopes; the job opts in explicitly.
+permissions: {}
+
+# Serialize runs per ref: a dispatch during a scheduled run (or vice
+# versa) queues rather than racing. Runs are informational, so queued
+# runs wait instead of cancelling.
+concurrency:
+  group: mutation-testing-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mutation:
+    permissions:
+      contents: read
+      id-token: write # OIDC workflow-source resolution
+    uses: leynos/shared-actions/.github/workflows/mutation-cargo.yml@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+    with:
+      # All workspace crates live under crates/; there is no root src/.
+      paths: "crates/"
+      # Test infrastructure whose survivors are noise: the end-to-end
+      # harness crate, the proc-macro fixture helpers, and the
+      # feature-gated test-support modules compiled by --all-features.
+      exclude-globs: "crates/weaver-e2e/**,crates/weaver-test-macros/**,crates/sempai-core/src/test_support.rs,crates/weaver-plugins/src/capability/test_support.rs"
+      # Match the CI baseline (make test runs --all-features across the
+      # whole workspace): feature-gated tests run against mutants, and
+      # each crate's mutants face the dependent crates' tests too,
+      # avoiding false survivors in crates covered by siblings.
+      extra-args: "--all-features --test-workspace=true"

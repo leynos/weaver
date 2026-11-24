@@ -14,7 +14,13 @@ tracing = "0.1"
 
 [dev-dependencies]
 weaver-config = { path = "../weaver-config", features = ["cli"] }
+anyhow = { workspace = true }
+proptest = { workspace = true }
 rstest = { workspace = true }
 rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }
+tracing-subscriber = "0.3"
 weaver-test-macros = { path = "../weaver-test-macros" }
+
+[lints]
+workspace = true

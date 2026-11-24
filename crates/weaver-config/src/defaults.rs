@@ -24,23 +24,25 @@ pub const DEFAULT_TCP_PORT: u16 = 9779;
 pub const DEFAULT_LOG_FILTER: &str = "info";
 
 /// Default log filter expression used by the binaries.
-pub fn default_log_filter() -> &'static str { DEFAULT_LOG_FILTER }
+#[must_use]
+pub const fn default_log_filter() -> &'static str { DEFAULT_LOG_FILTER }
 
 /// Owned log filter value used where allocation is required (e.g. serde).
-pub fn default_log_filter_string() -> String { DEFAULT_LOG_FILTER.to_string() }
+pub fn default_log_filter_string() -> String { DEFAULT_LOG_FILTER.to_owned() }
 
 /// Default logging format for the binaries.
-pub fn default_log_format() -> crate::logging::LogFormat { crate::logging::LogFormat::Json }
+#[must_use]
+pub const fn default_log_format() -> crate::logging::LogFormat { crate::logging::LogFormat::Json }
 
 /// Computes the default socket endpoint for the daemon.
+#[must_use]
 pub fn default_socket_endpoint() -> SocketEndpoint { default_socket_endpoint_inner() }
 
+/// Builds the Unix socket endpoint, preferring the XDG runtime directory.
 #[cfg(unix)]
 fn default_socket_endpoint_inner() -> SocketEndpoint {
-    let (mut base, apply_namespace) = match runtime_base_directory() {
-        Some(dir) => (dir, false),
-        None => (fallback_base_directory(), true),
-    };
+    let (mut base, apply_namespace) = runtime_base_directory()
+        .map_or_else(|| (fallback_base_directory(), true), |dir| (dir, false));
 
     base.push("weaver");
     if apply_namespace {
@@ -51,26 +53,27 @@ fn default_socket_endpoint_inner() -> SocketEndpoint {
     SocketEndpoint::unix(socket_path)
 }
 
+/// Resolves the XDG runtime directory as a UTF-8 path, when available.
 #[cfg(unix)]
 fn runtime_base_directory() -> Option<Utf8PathBuf> {
     runtime_dir().and_then(|path| Utf8PathBuf::from_path_buf(path).ok())
 }
 
+/// Resolves the system temporary directory as a UTF-8 path.
 #[cfg(unix)]
 fn fallback_base_directory() -> Utf8PathBuf {
     let candidate = env::temp_dir();
-    match Utf8PathBuf::from_path_buf(candidate) {
-        Ok(path) => path,
-        Err(_) => Utf8PathBuf::from("/tmp"),
-    }
+    Utf8PathBuf::from_path_buf(candidate).unwrap_or_else(|_| Utf8PathBuf::from("/tmp"))
 }
 
+/// Namespaces the fallback directory by effective user identifier.
 #[cfg(unix)]
 fn user_namespace() -> String {
     let uid = unsafe { geteuid() };
     format!("uid-{uid}")
 }
 
+/// Builds the TCP loopback endpoint used on non-Unix targets.
 #[cfg(not(unix))]
 fn default_socket_endpoint_inner() -> SocketEndpoint {
     SocketEndpoint::tcp("127.0.0.1", DEFAULT_TCP_PORT)

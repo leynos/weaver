@@ -1,45 +1,21 @@
 //! Shared contract fixture coverage for the rope plugin crate.
+//!
+//! The suite walk itself lives in `weaver-plugins` so every rename-capable
+//! plugin exercises the same fixtures; this file only pins the coverage to
+//! this crate's test build.
 
 use rstest::rstest;
 use weaver_plugins::{
-    assert_rename_symbol_request_fixture_contract,
-    assert_rename_symbol_response_fixture_contract,
-    rename_symbol_request_fixtures,
-    rename_symbol_response_fixtures,
+    FixtureError,
+    assert_shared_request_fixtures_match_contract,
+    assert_shared_response_fixtures_match_contract,
 };
 
-fn validate_fixtures_against_contract<T>(
-    fixtures_name: &str,
-    fixtures: Vec<T>,
-    validate_fixture: impl Fn(&T),
-) {
-    assert!(
-        !fixtures.is_empty(),
-        "shared {fixtures_name} should not be empty; check plugin fixture wiring"
-    );
-
-    for fixture in fixtures {
-        validate_fixture(&fixture);
-    }
-}
-
-fn validate_request_fixtures() {
-    validate_fixtures_against_contract(
-        "rename_symbol_request_fixtures",
-        rename_symbol_request_fixtures(),
-        assert_rename_symbol_request_fixture_contract,
-    );
-}
-
-fn validate_response_fixtures() {
-    validate_fixtures_against_contract(
-        "rename_symbol_response_fixtures",
-        rename_symbol_response_fixtures(),
-        assert_rename_symbol_response_fixture_contract,
-    );
-}
+type SuiteCheck = fn() -> Result<(), FixtureError>;
 
 #[rstest]
-#[case(validate_request_fixtures as fn())]
-#[case(validate_response_fixtures as fn())]
-fn shared_fixtures_match_rename_symbol_contract(#[case] validate: fn()) { validate(); }
+#[case::requests(assert_shared_request_fixtures_match_contract as SuiteCheck)]
+#[case::responses(assert_shared_response_fixtures_match_contract as SuiteCheck)]
+fn shared_fixtures_match_rename_symbol_contract(#[case] check: SuiteCheck) {
+    check().expect("shared fixtures should match the rename-symbol contract");
+}

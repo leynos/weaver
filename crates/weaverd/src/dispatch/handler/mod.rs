@@ -32,9 +32,12 @@ use self::{
 #[cfg(test)]
 mod tests;
 
+/// Failure modes when reading and validating the next request.
 #[derive(Debug)]
 enum ReadRequestError {
+    /// The peer closed the connection before sending a request line.
     ClientDisconnected,
+    /// The request could not be read, parsed, or validated.
     BadRequest(DispatchError),
 }
 
@@ -45,14 +48,23 @@ enum ReadRequestError {
 /// response stream before closing the connection.
 #[derive(Debug)]
 pub struct DispatchConnectionHandler {
+    /// Router that maps validated commands to domain handlers.
     router: DomainRouter,
+    /// Shared backend manager consulted while routing.
     backends: BackendManager,
+    /// Endpoint label recorded in structured log events.
     endpoint: String,
+    /// Runtime directory whose health snapshot accompanies each request.
     runtime_dir: PathBuf,
 }
 
 impl DispatchConnectionHandler {
     /// Creates a new dispatch handler with a backend manager and workspace root.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `DispatchError` when `DomainRouter` cannot accept the supplied
+    /// workspace root.
     pub fn new(
         backends: BackendManager,
         workspace_root: PathBuf,
@@ -67,6 +79,7 @@ impl DispatchConnectionHandler {
         })
     }
 
+    /// Reads, routes, and answers a single request on the connection.
     fn dispatch(&self, mut stream: ConnectionStream) {
         let (request_bytes, request) = match self.receive_request(&mut stream) {
             Ok(request) => request,
@@ -96,9 +109,10 @@ impl DispatchConnectionHandler {
         );
         emit_structured_event(&event, "dispatching request", false);
 
-        self.route_request(request, request_bytes.len(), &mut writer);
+        self.route_request(&request, request_bytes.len(), &mut writer);
     }
 
+    /// Reads one JSONL request line and validates the parsed command.
     fn receive_request(
         &self,
         stream: &mut ConnectionStream,
@@ -151,18 +165,19 @@ impl DispatchConnectionHandler {
         Ok((request_bytes, request))
     }
 
+    /// Routes a validated request and writes its buffered response.
     fn route_request<W: std::io::Write>(
         &self,
-        request: CommandRequest,
+        request: &CommandRequest,
         request_size: usize,
         writer: &mut ResponseWriter<W>,
     ) {
         let mut response = Vec::new();
         let route_result = self.backends.with_backends(|backends| {
             let mut buffered_writer = ResponseWriter::new(&mut response);
-            self.router.route(&request, &mut buffered_writer, backends)
+            self.router.route(request, &mut buffered_writer, backends)
         });
-        let context = Self::request_context(&request, request_size);
+        let context = Self::request_context(request, request_size);
 
         match route_result {
             Ok(Ok(result)) => {
@@ -191,6 +206,7 @@ impl DispatchConnectionHandler {
         }
     }
 
+    /// Writes buffered domain output and reports whether it succeeded.
     fn write_buffered_response<W: std::io::Write>(
         &self,
         context: &RouteContext<'_>,
@@ -212,16 +228,18 @@ impl DispatchConnectionHandler {
         true
     }
 
-    fn request_context(request: &CommandRequest, request_size: usize) -> RouteContext<'_> {
+    /// Borrows the request and its size for route logging.
+    const fn request_context(request: &CommandRequest, request_size: usize) -> RouteContext<'_> {
         RouteContext {
             request,
             request_size,
         }
     }
 
-    fn with_metadata<'a>(
+    /// Builds a structured event carrying the routed request metadata.
+    fn with_metadata(
         &self,
-        context: &RouteContext<'a>,
+        context: &RouteContext<'_>,
         event_name: &'static str,
     ) -> StructuredDispatchEvent {
         StructuredDispatchEvent::new(
@@ -233,6 +251,7 @@ impl DispatchConnectionHandler {
         )
     }
 
+    /// Writes the command exit status, logging any transport failure.
     fn write_exit_status<W: std::io::Write>(
         &self,
         context: &RouteContext<'_>,
@@ -252,6 +271,7 @@ impl DispatchConnectionHandler {
         }
     }
 
+    /// Writes a dispatch error response, logging any transport failure.
     fn write_error_response<W: std::io::Write>(
         &self,
         context: &RouteContext<'_>,
@@ -273,9 +293,12 @@ impl DispatchConnectionHandler {
     }
 }
 
+/// Borrowed request and size used while logging a routed response.
 #[derive(Debug)]
 struct RouteContext<'a> {
+    /// Request being routed.
     request: &'a CommandRequest,
+    /// Size of the received request line in bytes.
     request_size: usize,
 }
 

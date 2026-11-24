@@ -204,9 +204,16 @@ fn match_children<'a>(
 /// Multiple metavariables (`$$$VAR`), trying all possible bindings to find a
 /// valid match.
 struct SequenceMatcher<'a, 'p, 'c> {
+    /// The source node whose children are being matched; used to derive an
+    /// anchor byte when a `$$$VAR` capture matches zero children.
     source_parent: tree_sitter::Node<'a>,
+    /// The candidate children being matched against `pattern_children`.
     source_children: &'c [tree_sitter::Node<'a>],
+    /// The pattern children, one of which contains the `$$$VAR` metavariable
+    /// driving the backtracking search.
     pattern_children: &'c [tree_sitter::Node<'p>],
+    /// Shared matching state (pattern text lookup, source text) for the
+    /// recursive per-node matches performed while backtracking.
     ctx: &'c MatchContext<'a, 'p>,
 }
 
@@ -214,7 +221,9 @@ struct SequenceMatcher<'a, 'p, 'c> {
 /// backtracking.
 #[derive(Clone, Copy)]
 struct MatchIndices {
+    /// Index of the next unmatched source child.
     source_idx: usize,
+    /// Index of the next unmatched pattern child.
     pattern_idx: usize,
 }
 

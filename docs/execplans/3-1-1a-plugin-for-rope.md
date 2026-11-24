@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE (2026-02-13)
 
@@ -380,9 +379,9 @@ The feature is accepted when all items below are true:
 - If markdown checks fail, run `make fmt` and re-run markdown validation before
   repeating Rust gates.
 
-## Artifacts and notes
+## Artefacts and notes
 
-Expected artifacts:
+Expected artefacts:
 
 - New crate: `crates/weaver-plugin-rope/`
 - New/updated refactor runtime wiring in `crates/weaverd/src/dispatch/`

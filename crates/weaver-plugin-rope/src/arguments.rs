@@ -8,7 +8,10 @@ use std::collections::HashMap;
 
 /// Validated rename-symbol arguments extracted from a plugin request.
 pub(crate) struct RenameSymbolArgs {
+    /// Byte offset into the document content, parsed from the request's
+    /// `position` field.
     offset: usize,
+    /// The replacement identifier requested by the caller.
     new_name: String,
 }
 

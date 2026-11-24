@@ -4,10 +4,15 @@ use rstest::rstest;
 use sempai_core::{
     DiagnosticCode,
     SourceSpan,
-    formula::{Atom, Decorated, Formula, PatternAtom},
+    formula::{Atom, Constraint, Decorated, Formula, PatternAtom, WhereClause},
 };
 
-use crate::semantic_check::validate_formula;
+use super::engine_test_support::first_diagnostic_of;
+use crate::semantic_check::{
+    count_constraint_validation_visits,
+    validate_constraints,
+    validate_formula,
+};
 
 fn make_pattern(text: &str) -> Decorated<Formula> {
     Decorated {
@@ -26,30 +31,28 @@ fn with_span(mut formula: Decorated<Formula>, span: SourceSpan) -> Decorated<For
     formula
 }
 
-fn assert_invalid_not_in_or(formula: &Decorated<Formula>) {
-    let result = validate_formula(formula);
-    let err = result.expect_err("should fail validation");
-    let first = err.diagnostics().first().expect("should have diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
+fn check_first_diagnostic_code(
+    formula: &Decorated<Formula>,
+    expected: DiagnosticCode,
+) -> anyhow::Result<()> {
+    let (code, _diagnostic) = first_diagnostic_of(validate_formula(formula))?;
+    anyhow::ensure!(code == expected, "expected {expected:?}, got {code:?}");
+    Ok(())
 }
 
-fn assert_missing_positive_term_in_and(formula: &Decorated<Formula>) {
-    let result = validate_formula(formula);
-    let err = result.expect_err("should fail validation");
-    let first = err.diagnostics().first().expect("should have diagnostic");
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
+fn check_invalid_not_in_or(formula: &Decorated<Formula>) -> anyhow::Result<()> {
+    check_first_diagnostic_code(formula, DiagnosticCode::ESempaiInvalidNotInOr)
 }
 
-fn first_validation_diagnostic(formula: &Decorated<Formula>) -> sempai_core::Diagnostic {
-    validate_formula(formula)
-        .expect_err("should fail validation")
-        .diagnostics()
-        .first()
-        .expect("should have diagnostic")
-        .clone()
+fn check_missing_positive_term_in_and(formula: &Decorated<Formula>) -> anyhow::Result<()> {
+    check_first_diagnostic_code(formula, DiagnosticCode::ESempaiMissingPositiveTermInAnd)
+}
+
+fn first_validation_diagnostic(
+    formula: &Decorated<Formula>,
+) -> anyhow::Result<sempai_core::Diagnostic> {
+    let (_code, diagnostic) = first_diagnostic_of(validate_formula(formula))?;
+    Ok(diagnostic)
 }
 
 fn make_not(inner: Decorated<Formula>) -> Decorated<Formula> {
@@ -92,17 +95,32 @@ fn make_inside(inner: Decorated<Formula>) -> Decorated<Formula> {
     }
 }
 
-fn sp(uri: &str, start: usize, end: usize) -> SourceSpan {
+fn make_anywhere(inner: Decorated<Formula>) -> Decorated<Formula> {
+    Decorated {
+        node: Formula::Anywhere(Box::new(inner)),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    }
+}
+
+fn with_constraint(mut formula: Decorated<Formula>, name: &str) -> Decorated<Formula> {
+    formula.where_clauses = vec![WhereClause {
+        constraint: Constraint::Other(name.to_owned()),
+    }];
+    formula
+}
+
+fn sp(uri: &str, start: usize, end: usize) -> anyhow::Result<SourceSpan> {
     let uri_opt = if uri.is_empty() {
         None
     } else {
         Some(uri.to_owned())
     };
-    SourceSpan::new(
-        u32::try_from(start).expect("span start fits u32"),
-        u32::try_from(end).expect("span end fits u32"),
-        uri_opt,
-    )
+    let start_offset = u32::try_from(start)?;
+    let end_offset = u32::try_from(end)?;
+    Ok(SourceSpan::new(start_offset, end_offset, uri_opt))
 }
 
 fn build_constraint_only_and(
@@ -116,13 +134,22 @@ fn build_constraint_only_and(
     }
 }
 
-fn assert_missing_positive_primary_span(formula: &Decorated<Formula>, expected: &SourceSpan) {
-    let first = first_validation_diagnostic(formula);
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+fn check_missing_positive_primary_span(
+    formula: &Decorated<Formula>,
+    expected: &SourceSpan,
+) -> anyhow::Result<()> {
+    let first = first_validation_diagnostic(formula)?;
+    anyhow::ensure!(
+        first.code() == DiagnosticCode::ESempaiMissingPositiveTermInAnd,
+        "expected missing-positive-term code, got {:?}",
+        first.code()
     );
-    assert_eq!(first.primary_span(), Some(expected));
+    anyhow::ensure!(
+        first.primary_span() == Some(expected),
+        "expected primary span {expected:?}, got {:?}",
+        first.primary_span()
+    );
+    Ok(())
 }
 
 #[test]
@@ -139,14 +166,14 @@ fn valid_or_with_positive_branches_passes() {
 #[test]
 fn or_with_not_branch_fails() {
     let formula = make_or(vec![make_pattern("foo"), make_not(make_pattern("baz"))]);
-    assert_invalid_not_in_or(&formula);
+    check_invalid_not_in_or(&formula).expect("Or containing Not should be rejected");
 }
 
 #[test]
 fn or_with_nested_not_branch_fails() {
     let nested_and = make_and(vec![make_pattern("foo"), make_not(make_pattern("bar"))]);
     let formula = make_or(vec![nested_and]);
-    assert_invalid_not_in_or(&formula);
+    check_invalid_not_in_or(&formula).expect("Or containing Not should be rejected");
 }
 
 #[test]
@@ -156,51 +183,103 @@ fn valid_and_with_positive_term_passes() {
 }
 
 #[test]
+fn validate_constraints_counts_single_node_without_where_clauses() {
+    let formula = make_pattern("foo");
+
+    validate_constraints(&formula).expect("constraint validation should pass");
+
+    assert_eq!(
+        count_constraint_validation_visits(&formula)
+            .expect("visit counting should use the constraint walker"),
+        (1, 0)
+    );
+}
+
+#[test]
+fn validate_constraints_visits_nested_nodes_and_where_clauses() {
+    let formula = with_constraint(
+        make_and(vec![
+            with_constraint(
+                make_or(vec![
+                    with_constraint(
+                        make_not(with_constraint(make_pattern("bad"), "not-pattern")),
+                        "not",
+                    ),
+                    with_constraint(make_pattern("ok"), "or-pattern"),
+                ]),
+                "or",
+            ),
+            with_constraint(
+                make_inside(with_constraint(
+                    make_anywhere(with_constraint(make_pattern("ctx"), "anywhere-pattern")),
+                    "anywhere",
+                )),
+                "inside",
+            ),
+        ]),
+        "root",
+    );
+
+    validate_constraints(&formula).expect("constraint validation should pass");
+
+    assert_eq!(
+        count_constraint_validation_visits(&formula)
+            .expect("visit counting should use the constraint walker"),
+        (8, 8)
+    );
+}
+
+#[test]
 fn and_with_only_constraints_fails() {
     let formula = make_and(vec![
         make_not(make_pattern("foo")),
         make_inside(make_pattern("bar")),
     ]);
-    assert_missing_positive_term_in_and(&formula);
+    check_missing_positive_term_in_and(&formula)
+        .expect("And without positive term should be rejected");
 }
 
 #[test]
 fn and_with_or_containing_only_constraints_fails() {
     let formula = make_and(vec![make_or(vec![make_inside(make_pattern("ctx"))])]);
-    assert_missing_positive_term_in_and(&formula);
+    check_missing_positive_term_in_and(&formula)
+        .expect("And without positive term should be rejected");
 }
 
 #[test]
 fn nested_or_in_and_with_not_fails() {
     let nested_or = make_or(vec![make_pattern("a"), make_not(make_pattern("b"))]);
     let formula = make_and(vec![make_pattern("foo"), nested_or]);
-    assert_invalid_not_in_or(&formula);
+    check_invalid_not_in_or(&formula).expect("Or containing Not should be rejected");
 }
 
 #[rstest]
 #[case::prefers_node_span(
-    Some(sp("", 10, 20)),
+    Some(sp("", 10, 20).expect("span offsets should fit u32")),
     vec![with_span(
         make_inside(make_pattern("bar")),
-        sp("", 30, 40),
+        sp("", 30, 40).expect("span offsets should fit u32"),
     )],
-    sp("", 10, 20),
+    sp("", 10, 20).expect("span offsets should fit u32"),
 )]
 #[case::uses_first_child_span_when_node_span_none(
     None,
     vec![with_span(
         make_inside(make_pattern("bar")),
-        sp("", 30, 40),
+        sp("", 30, 40).expect("span offsets should fit u32"),
     )],
-    sp("", 30, 40),
+    sp("", 30, 40).expect("span offsets should fit u32"),
 )]
 #[case::uses_first_available_child_span(
     None,
     vec![
         make_inside(make_pattern("foo")),
-        with_span(make_not(make_pattern("bar")), sp("", 35, 45)),
+        with_span(
+            make_not(make_pattern("bar")),
+            sp("", 35, 45).expect("span offsets should fit u32"),
+        ),
     ],
-    sp("", 35, 45),
+    sp("", 35, 45).expect("span offsets should fit u32"),
 )]
 fn missing_positive_term_in_and_primary_span_selection(
     #[case] node_span: Option<SourceSpan>,
@@ -208,7 +287,8 @@ fn missing_positive_term_in_and_primary_span_selection(
     #[case] expected_primary: SourceSpan,
 ) {
     let formula = build_constraint_only_and(node_span, children);
-    assert_missing_positive_primary_span(&formula, &expected_primary);
+    check_missing_positive_primary_span(&formula, &expected_primary)
+        .expect("diagnostic should carry the expected primary span");
 }
 
 #[test]
@@ -222,7 +302,8 @@ fn invalid_not_in_or_prefers_branch_span() {
         make_pattern("ok"),
     ]);
 
-    let branch_span_diagnostic = first_validation_diagnostic(&branch_span_formula);
+    let branch_span_diagnostic =
+        first_validation_diagnostic(&branch_span_formula).expect("should fail validation");
 
     assert_eq!(
         branch_span_diagnostic.code(),
@@ -236,7 +317,8 @@ fn invalid_not_in_or_prefers_branch_span() {
         fallback_span.clone(),
     );
 
-    let fallback_span_diagnostic = first_validation_diagnostic(&fallback_span_formula);
+    let fallback_span_diagnostic =
+        first_validation_diagnostic(&fallback_span_formula).expect("should fail validation");
 
     assert_eq!(
         fallback_span_diagnostic.code(),
@@ -260,7 +342,7 @@ fn invalid_not_in_or_prefers_nested_not_span_over_fallback() {
         fallback_span,
     );
 
-    let diagnostic = first_validation_diagnostic(&formula);
+    let diagnostic = first_validation_diagnostic(&formula).expect("should fail validation");
 
     assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiInvalidNotInOr);
     assert_eq!(diagnostic.primary_span(), Some(&not_span));
@@ -274,7 +356,7 @@ fn deeply_nested_or_with_negation_anywhere_fails() {
     ]);
     let formula = make_or(vec![nested_and, make_pattern("z")]);
 
-    assert_invalid_not_in_or(&formula);
+    check_invalid_not_in_or(&formula).expect("Or containing Not should be rejected");
 }
 
 #[test]

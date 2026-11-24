@@ -10,7 +10,15 @@ once_cell.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-rstest.workspace = true
-rstest-bdd.workspace = true
-rstest-bdd-macros.workspace = true
+anyhow = { workspace = true }
+cap-std = { workspace = true }
 tempfile.workspace = true
+
+# Has its own `main`: `Sandbox::spawn` needs a single-threaded process and
+# `birdcage` rewrites that process's environment, so each case runs in a child.
+[[test]]
+name = "sandbox_process"
+harness = false
+
+[lints]
+workspace = true

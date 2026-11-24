@@ -1,6 +1,6 @@
 # Prototype roadmap archive
 
-This archive preserves the pre-ADR-007 Weaver roadmap ledger. Its phase, step,
+This archive preserves the pre-ADR-0007 Weaver roadmap ledger. Its phase, step,
 and task numbers remain in the overall roadmap sequence as historical numbers
 `1` through `11`, so existing ExecPlans and completed implementation records
 remain uniquely addressable. The live forward roadmap starts at phase `12` in
@@ -524,8 +524,8 @@ phase* *with explicit parser, backend, and Weaver-integration milestones.*
 
 ### 4.1. Deliver Sempai core infrastructure
 
-*Outcome: Implement the Sempai front-end and normalization architecture from*
-*`docs/sempai-query-language-design.md`, including YAML parsing, one-liner*
+*Outcome: Implement the Sempai front-end and normalization architecture from* *
+`docs/sempai-query-language-design.md`, including YAML parsing, one-liner*
 *domain-specific language (DSL) parsing, semantic validation, and stable*
 *diagnostic contracts.*
 
@@ -724,8 +724,8 @@ new* *capabilities and specialist providers.*
 
 *Outcome: Implement the cross-language `extricate-symbol` capability model,*
 *command contract, and plugin-selection foundation defined in*
-*`docs/adr-001-plugin-capability-model-and-act-extricate.md`, including
-initial* *Python delivery and shared failure semantics.*
+*`docs/adrs/adr-0001-plugin-capability-model-and-act-extricate.md`, including*
+*initial Python delivery and shared failure semantics.*
 
 - [ ] 5.3.1. Add capability ID scaffolding and resolver policy for actuator
     capabilities (`rename-symbol`, `extricate-symbol`, `extract-method`,
@@ -798,8 +798,8 @@ initial* *Python delivery and shared failure semantics.*
 
 ### 5.5. Deliver additional actuator plugins
 
-*Outcome: Extend actuator coverage beyond `rename-symbol` and*
-*`extricate-symbol` with precision syntactic editing support.*
+*Outcome: Extend actuator coverage beyond `rename-symbol` and* *
+`extricate-symbol` with precision syntactic editing support.*
 
 - [ ] 5.5.1. Deliver the `srgn` actuator plugin to provide high-performance,
       precision syntactic editing via capability-routed patch generation.
@@ -900,9 +900,8 @@ Capability probe discoverability tasks:
 
 ### 6.1. Deliver `act apply-patch` command
 
-*Outcome: Provide a safety-locked patch application path that mirrors the*
-*`apply_patch` semantics for agents and integrates with the Double-Lock
-harness.*
+*Outcome: Provide a safety-locked patch application path that mirrors the* *
+`apply_patch` semantics for agents and integrates with the Double-Lock harness.*
 
 - [x] 6.1.1. Add JSONL request/response types and a `weaver act apply-patch`
       command
@@ -965,7 +964,7 @@ as first-class `observe` operations, then extend them to deterministic,
 budgeted history diffs over recent commits. This phase operationalizes the
 design in
 [`jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- within Weaver’s existing Semantic Fusion architecture.*
+within Weaver’s existing Semantic Fusion architecture.*
 
 ### 7.1. Deliver `observe get-card` (Tree-sitter first)
 
@@ -1591,8 +1590,8 @@ capability contract and plugin implementations are in place (5.2.1–5.2.4).[^6]
 Phase 10 reaches parity, this phase delivers Weaver's USP: budgeted graph-slice
 traversal, card-driven exploration, deterministic CLI contracts for agent tool
 loops, and the safety harness that makes write operations trustworthy. These
-are the features that justify choosing Weaver over a thinner LSP
-wrapper.[^3][^2][^7]*
+are the features that justify choosing Weaver over a thinner LSP wrapper.[^3]
+[^2][^7]*
 
 ### 11.1. Deliver `observe graph-slice` traversal
 
@@ -1697,6 +1696,6 @@ This is a key Weaver differentiator.[^7][^8]*
 [^3]: [`weaver-design.md`](weaver-design.md)
 [^4]: [`ui-gap-analysis.md`](ui-gap-analysis.md)
 [^5]: [`users-guide.md`](users-guide.md)
-[^6]: [`adr-001-plugin-capability-model-and-act-extricate.md`](adr-001-plugin-capability-model-and-act-extricate.md)
+[^6]: [`adrs/adr-0001-plugin-capability-model-and-act-extricate.md`](../adrs/adr-0001-plugin-capability-model-and-act-extricate.md)
 [^7]: [`weaver-design.md`](weaver-design.md) §5.1 and §6.1
 [^8]: [`formal-verification-methods-in-weaver.md`](formal-verification-methods-in-weaver.md)

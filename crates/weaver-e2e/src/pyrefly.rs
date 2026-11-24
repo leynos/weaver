@@ -9,6 +9,8 @@ use crate::lsp_client::{LspClient, LspClientError};
 
 /// A client for the Pyrefly Python language server.
 pub struct PyreflyClient {
+    /// The underlying generic LSP client, pre-configured to spawn Pyrefly
+    /// via `uvx`.
     client: LspClient,
 }
 

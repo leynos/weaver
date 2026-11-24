@@ -16,30 +16,46 @@ pub enum DispatchError {
     /// Request line could not be parsed as valid JSON.
     #[error("malformed JSONL: {message}")]
     MalformedJsonl {
+        /// Human-readable description of the parse failure.
         message: String,
+        /// Underlying serde error when the failure originated in the parser.
         #[source]
         source: Option<serde_json::Error>,
     },
 
     /// Request JSON structure does not match the `CommandRequest` schema.
     #[error("invalid request structure: {message}")]
-    InvalidStructure { message: String },
+    InvalidStructure {
+        /// Description of the schema violation.
+        message: String,
+    },
 
     /// Domain field contains an unrecognised value.
     #[error("unknown domain: {domain}")]
-    UnknownDomain { domain: String },
+    UnknownDomain {
+        /// Domain token supplied by the client.
+        domain: String,
+    },
 
     /// Operation field contains an unrecognised value for the given domain.
     #[error("unknown operation '{operation}' for domain '{domain}'")]
     UnknownOperation {
+        /// Domain in which the operation was requested.
         domain: String,
+        /// Operation token supplied by the client.
         operation: String,
+        /// Operations the domain recognizes, used to render suggestions.
         known_operations: &'static [&'static str],
     },
 
     /// Request exceeds the maximum allowed size.
     #[error("request too large: {size} bytes exceeds {max_size} byte limit")]
-    RequestTooLarge { size: usize, max_size: usize },
+    RequestTooLarge {
+        /// Size of the offending request in bytes.
+        size: usize,
+        /// Maximum request size the daemon accepts, in bytes.
+        max_size: usize,
+    },
 
     /// IO error during read or write.
     #[error("IO error: {0}")]
@@ -51,7 +67,10 @@ pub enum DispatchError {
 
     /// Invalid or missing command arguments.
     #[error("invalid arguments: {message}")]
-    InvalidArguments { message: String },
+    InvalidArguments {
+        /// Description of the argument validation failure.
+        message: String,
+    },
 
     /// Backend failed to start.
     #[error("backend startup failed: {0}")]
@@ -59,15 +78,26 @@ pub enum DispatchError {
 
     /// LSP host operation failed.
     #[error("LSP error for {language}: {message}")]
-    LspHost { language: String, message: String },
+    LspHost {
+        /// Language whose LSP host reported the failure.
+        language: String,
+        /// Description of the LSP failure.
+        message: String,
+    },
 
     /// File extension does not map to a supported language.
     #[error("unsupported language for extension: {extension}")]
-    UnsupportedLanguage { extension: String },
+    UnsupportedLanguage {
+        /// File extension that could not be mapped.
+        extension: String,
+    },
 
     /// Internal error (e.g., lock poisoned).
     #[error("internal error: {message}")]
-    Internal { message: String },
+    Internal {
+        /// Description of the internal failure.
+        message: String,
+    },
 }
 
 impl DispatchError {
@@ -75,7 +105,7 @@ impl DispatchError {
     ///
     /// Protocol violations and argument errors return status 1. Infrastructure
     /// failures (IO, serialization, internal) return status 2.
-    pub fn exit_status(&self) -> i32 {
+    pub const fn exit_status(&self) -> i32 {
         match self {
             Self::MalformedJsonl { .. }
             | Self::InvalidStructure { .. }
@@ -134,7 +164,7 @@ impl DispatchError {
     }
 
     /// Creates a request too large error.
-    pub fn request_too_large(size: usize, max_size: usize) -> Self {
+    pub const fn request_too_large(size: usize, max_size: usize) -> Self {
         Self::RequestTooLarge { size, max_size }
     }
 

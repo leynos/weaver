@@ -8,6 +8,12 @@ use super::{
 };
 use crate::CardSymbolKind;
 
+/// Collects top-level TypeScript entities from `root` using slices from
+/// `source`.
+///
+/// Returns one [`EntityCandidate`] per supported top-level declaration
+/// (functions, classes, interfaces, type aliases), plus methods nested under
+/// each class body.
 pub(super) fn collect(root: Node<'_>, source: &str) -> Vec<EntityCandidate> {
     let mut entities = Vec::new();
     let mut cursor = root.walk();
@@ -44,6 +50,9 @@ pub(super) fn collect(root: Node<'_>, source: &str) -> Vec<EntityCandidate> {
     entities
 }
 
+/// Collects `method_definition` entities from a class body, tagging each
+/// with `container` as its owning class name. Returns an empty vector when
+/// `class_node` has no body.
 fn class_methods(
     class_node: Node<'_>,
     source: &str,

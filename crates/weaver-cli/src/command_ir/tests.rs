@@ -1,0 +1,391 @@
+//! Tests for the recursive command-metadata projection.
+
+use std::sync::Arc;
+
+use ortho_config::{
+    FluentLocalizer,
+    Localizer,
+    MapEnv,
+    OrthoConfig,
+    SharedEnvSource,
+    SharedScanEnvSource,
+    docs::{
+        DocMetadata,
+        EnvMetadata,
+        FieldMetadata,
+        FileMetadata,
+        HeadingIds,
+        ORTHO_DOCS_IR_VERSION,
+        OrthoConfigDocs,
+        ValueType,
+    },
+};
+use proptest::prelude::*;
+use serde::{Deserialize, Serialize};
+
+use super::{MAX_COMMAND_DEPTH, ProjectionError, field_metadata, project};
+use crate::{
+    command_tree::{self, CommandArgument, CommandNode, CommandSemantics},
+    localizer::WEAVER_EN_US,
+};
+
+#[test]
+fn projection_preserves_the_structured_command_hierarchy_without_passthrough() {
+    let metadata =
+        project(command_tree::root()).expect("the built-in command tree should be bounded");
+
+    assert_eq!(metadata.ir_version, ORTHO_DOCS_IR_VERSION);
+    assert_eq!(metadata.app_name, "weaver");
+    assert_eq!(
+        metadata
+            .subcommands
+            .iter()
+            .map(|node| node.app_name.as_str())
+            .collect::<Vec<_>>(),
+        ["definitions", "daemon"],
+    );
+    let definitions = metadata
+        .subcommands
+        .first()
+        .expect("projection must expose the definitions command");
+    assert_eq!(
+        definitions
+            .subcommands
+            .iter()
+            .map(|node| node.app_name.as_str())
+            .collect::<Vec<_>>(),
+        ["definitions get"],
+    );
+}
+
+#[test]
+fn projection_preserves_required_definition_arguments() {
+    let metadata =
+        project(command_tree::root()).expect("the built-in command tree should be bounded");
+    let definitions = metadata
+        .subcommands
+        .first()
+        .expect("projection must expose the definitions command");
+    let definitions_get = definitions
+        .subcommands
+        .first()
+        .expect("projection must expose the definitions get command");
+
+    assert_eq!(
+        definitions_get
+            .fields
+            .iter()
+            .map(|field| (field.name.as_str(), field.required))
+            .collect::<Vec<_>>(),
+        [("uri", true), ("position", true)],
+    );
+}
+
+#[path = "tests/canonical_projection.rs"]
+mod canonical_projection;
+#[test]
+fn projection_serde_roundtrip_preserves_wire_format() {
+    let metadata =
+        project(command_tree::root()).expect("the built-in command tree should be bounded");
+    let json = serde_json::to_string(&metadata).expect("metadata should serialize");
+    let roundtrip: DocMetadata = serde_json::from_str(&json).expect("metadata should deserialize");
+
+    assert_eq!(roundtrip, metadata);
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, OrthoConfig)]
+#[ortho_config(prefix = "WEAVER")]
+struct DerivedFixture {
+    #[ortho_config(cli_long = "uri", cli(value_name = "URI"))]
+    uri: String,
+    #[ortho_config(cli_long = "force")]
+    force: bool,
+}
+
+#[test]
+fn hand_assembled_argument_metadata_matches_the_upstream_derive() {
+    let derived = DerivedFixture::get_doc_metadata();
+    let Some(uri) = derived_field("uri", Some("URI")) else {
+        panic!("hand-assembled URI fixture field must be CLI-visible");
+    };
+    let Some(force) = derived_field("force", None) else {
+        panic!("hand-assembled force fixture field must be CLI-visible");
+    };
+    let hand_assembled = vec![uri, force];
+
+    assert_eq!(hand_assembled, derived.fields);
+}
+
+/// Rebuilds the field metadata the `OrthoConfig` derive would emit for a
+/// fixture argument, so the hand-assembled projection can be compared against
+/// the real derive. Returns `None` when the argument has no CLI metadata.
+fn derived_field(long: &'static str, value_name: Option<&'static str>) -> Option<FieldMetadata> {
+    let mut field = field_metadata(&CommandArgument {
+        long,
+        value_name,
+        required: true,
+        help_id: if long == "uri" {
+            "weaver-args-uri-help"
+        } else {
+            "weaver-args-force-help"
+        },
+        help: "derived fixture fallback",
+    });
+    field.long_help_id = Some(format!("weaver-args-{long}-long_help"));
+    field.value = Some(if value_name.is_some() {
+        ValueType::String
+    } else {
+        ValueType::Bool
+    });
+    let is_boolean = value_name.is_none();
+    field.required = true;
+    let cli = field.cli.as_mut()?;
+    cli.short = long.chars().next();
+    cli.value_optional = is_boolean;
+    if is_boolean {
+        cli.value_name = Some("BOOL".to_owned());
+        cli.takes_value = true;
+        cli.possible_values = vec!["true".to_owned(), "false".to_owned()];
+    }
+    field.env = Some(EnvMetadata {
+        var_name: format!("WEAVER_{}", long.to_ascii_uppercase()),
+    });
+    field.file = Some(FileMetadata {
+        key_path: long.to_owned(),
+    });
+    Some(field)
+}
+
+#[test]
+fn projection_uses_the_installed_ortho_docs_ir_version() {
+    let metadata = project(command_tree::root()).expect("built-in command tree should be bounded");
+
+    assert_eq!(metadata.ir_version, ORTHO_DOCS_IR_VERSION);
+}
+
+#[test]
+fn boolean_cli_value_accepts_attached_false_over_environment_true() {
+    let environment = Arc::new(MapEnv::new().with_var("WEAVER_FORCE", "true"));
+    let discovery: SharedEnvSource = environment.clone();
+    let merge: SharedScanEnvSource = environment;
+    let config = DerivedFixture::load_from_iter_with_sources(
+        ["fixture", "--uri", "file:///fixture.rs", "--force=false"],
+        discovery,
+        merge,
+    )
+    .expect("an attached false value should override environment true");
+
+    assert!(!config.force);
+}
+
+#[test]
+fn boolean_cli_value_rejects_space_separated_false() {
+    let environment = Arc::new(MapEnv::new());
+    let discovery: SharedEnvSource = environment.clone();
+    let merge: SharedScanEnvSource = environment;
+    let result = DerivedFixture::load_from_iter_with_sources(
+        ["fixture", "--uri", "file:///fixture.rs", "--force", "false"],
+        discovery,
+        merge,
+    );
+
+    assert!(
+        result.is_err(),
+        "a boolean value must stay attached to its flag"
+    );
+}
+
+#[test]
+fn every_projected_identifier_resolves_from_the_embedded_catalogue() {
+    let localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
+        .expect("embedded Fluent catalogue must parse");
+    let metadata = project(command_tree::root()).expect("built-in command tree should be bounded");
+
+    assert_identifiers_resolve(&metadata, &localizer);
+}
+
+#[test]
+fn unresolved_identifiers_are_not_silently_accepted_by_the_test_helper() {
+    let localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
+        .expect("embedded Fluent catalogue must parse");
+
+    assert!(
+        localizer
+            .lookup("weaver-command-does-not-exist", None)
+            .is_none()
+    );
+}
+
+/// Walks the projected tree and asserts every Fluent identifier resolves from
+/// the embedded catalogue. Recursion keeps the check aligned with the
+/// hierarchy, so a new nested node cannot escape validation.
+fn assert_identifiers_resolve(metadata: &DocMetadata, localizer: &dyn Localizer) {
+    assert_resolves(&metadata.about_id, localizer);
+    assert_optional_resolves(metadata.synopsis_id.as_deref(), localizer);
+    assert_heading_ids_resolve(&metadata.sections.headings_ids, localizer);
+    assert_field_ids_resolve(&metadata.fields, localizer);
+    for child in &metadata.subcommands {
+        assert_identifiers_resolve(child, localizer);
+    }
+}
+
+/// Asserts every section-heading identifier resolves, including `commands`.
+fn assert_heading_ids_resolve(headings: &HeadingIds, localizer: &dyn Localizer) {
+    for id in [
+        &headings.name,
+        &headings.synopsis,
+        &headings.description,
+        &headings.options,
+        &headings.environment,
+        &headings.files,
+        &headings.precedence,
+        &headings.exit_status,
+        &headings.examples,
+        &headings.see_also,
+    ] {
+        assert_resolves(id, localizer);
+    }
+    assert_optional_resolves(headings.commands.as_deref(), localizer);
+}
+
+/// Asserts each field's help identifiers resolve, long help included.
+fn assert_field_ids_resolve(fields: &[FieldMetadata], localizer: &dyn Localizer) {
+    for field in fields {
+        assert_resolves(&field.help_id, localizer);
+        assert_optional_resolves(field.long_help_id.as_deref(), localizer);
+    }
+}
+
+/// Asserts an optional projected identifier resolves when one is present.
+fn assert_optional_resolves(maybe_id: Option<&str>, localizer: &dyn Localizer) {
+    if let Some(id) = maybe_id {
+        assert_resolves(id, localizer);
+    }
+}
+
+/// Asserts one projected identifier exists in the catalogue, naming the
+/// identifier in the panic so a broken resource key is easy to trace.
+fn assert_resolves(id: &str, localizer: &dyn Localizer) {
+    assert!(
+        localizer.lookup(id, None).is_some(),
+        "projected Fluent identifier {id:?} must resolve without a fallback"
+    );
+}
+
+const LABELS: &[&str] = &["zero", "one", "two", "three", "four"];
+
+/// Builds a synthetic command tree for property tests; `depth` counts the
+/// levels above a leaf and `branching` must not exceed the `LABELS` fixtures.
+/// The nodes are leaked because projection consumes `&'static` trees.
+fn generated_tree(depth: usize, branching: usize, label: &'static str) -> &'static CommandNode {
+    if depth == 0 {
+        return Box::leak(Box::new(CommandNode {
+            resource_path: &[],
+            verb: label,
+            summary_id: "weaver-command-root",
+            summary: "generated command",
+            arguments: &[],
+            semantics: CommandSemantics::Structured,
+            children: &[],
+        }));
+    }
+
+    let children = (0..branching)
+        .map(|index| {
+            let child_label = LABELS
+                .get(index)
+                .copied()
+                .expect("branching must stay within the LABELS fixtures");
+            *generated_tree(depth - 1, branching, child_label)
+        })
+        .collect::<Vec<_>>();
+    let child_nodes = Box::leak(children.into_boxed_slice());
+
+    Box::leak(Box::new(CommandNode {
+        resource_path: &[],
+        verb: label,
+        summary_id: "weaver-command-root",
+        summary: "generated command",
+        arguments: &[],
+        semantics: CommandSemantics::Structured,
+        children: child_nodes,
+    }))
+}
+
+/// Recursively asserts the projection preserves the source tree's shape: one
+/// subcommand per child, in order, with matching names. Panics on the first
+/// divergence so a structural regression is reported at its node.
+fn assert_shape_preserved(node: &CommandNode, metadata: &DocMetadata) {
+    assert_eq!(metadata.subcommands.len(), node.children.len());
+    for (child, child_metadata) in node.children.iter().zip(&metadata.subcommands) {
+        assert_eq!(child_metadata.app_name, child.verb);
+        assert_shape_preserved(child, child_metadata);
+    }
+}
+
+proptest! {
+    #[test]
+    fn projection_preserves_generated_tree_shape(
+        depth in 0usize..=4,
+        branching in 0usize..=5,
+    ) {
+        let tree = generated_tree(depth, branching, "root");
+        let metadata = project(tree).expect("generated trees remain within the depth bound");
+
+        assert_shape_preserved(tree, &metadata);
+    }
+}
+
+#[test]
+fn projection_handles_a_leaf_only_tree_without_filtering_cases() {
+    let tree = generated_tree(0, 0, "root");
+    assert_shape_preserved(tree, &project(tree).expect("leaf should project"));
+}
+
+#[test]
+fn projection_handles_a_tree_with_at_least_two_levels_without_filtering_cases() {
+    let tree = generated_tree(2, 2, "root");
+    assert_shape_preserved(tree, &project(tree).expect("nested tree should project"));
+}
+
+/// Builds a linear chain of `depth` parent nodes around a leaf, so tests can
+/// probe exactly one command per level of the projection depth bound. The
+/// nodes are leaked to satisfy the `&'static` projection input.
+fn chain(depth: usize) -> &'static CommandNode {
+    let mut node = Box::leak(Box::new(CommandNode {
+        resource_path: &[],
+        verb: "leaf",
+        summary_id: "weaver-command-root",
+        summary: "leaf",
+        arguments: &[],
+        semantics: CommandSemantics::Structured,
+        children: &[],
+    }));
+    for _ in 0..depth {
+        node = Box::leak(Box::new(CommandNode {
+            resource_path: &[],
+            verb: "parent",
+            summary_id: "weaver-command-root",
+            summary: "parent",
+            arguments: &[],
+            semantics: CommandSemantics::Structured,
+            children: std::slice::from_ref(node),
+        }));
+    }
+    node
+}
+
+#[test]
+fn projection_accepts_trees_at_the_supported_depth_bound() {
+    assert!(project(chain(MAX_COMMAND_DEPTH)).is_ok());
+}
+
+#[test]
+fn projection_rejects_a_tree_beyond_the_supported_depth_bound() {
+    assert_eq!(
+        project(chain(MAX_COMMAND_DEPTH + 1)),
+        Err(ProjectionError::DepthExceeded {
+            max_depth: MAX_COMMAND_DEPTH,
+        })
+    );
+}

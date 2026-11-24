@@ -201,7 +201,7 @@ suite. If formatting or linting fails, apply fixes and re-run the same command
 until it passes. Keep documentation edits small so `make fmt` can be applied
 multiple times without drift.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Example Gherkin snippet for the behavioural test (stored in the feature file):
 

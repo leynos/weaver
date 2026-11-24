@@ -25,11 +25,17 @@ pub const DEFAULT_CACHE_CAPACITY: usize = 128;
 /// Composite cache key for symbol-card lookups.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CardCacheKey {
+    /// Source file the card was extracted from.
     path: PathBuf,
+    /// SHA-256 digest of the source text, so a stale revision misses the cache.
     content_hash: [u8; 32],
+    /// Detected source language, since the same span parses differently per grammar.
     language: SupportedLanguage,
+    /// Requested detail level, since a summary and a full card are distinct entries.
     detail: DetailLevel,
+    /// One-based request line.
     line: u32,
+    /// One-based request column.
     column: u32,
 }
 
@@ -80,10 +86,16 @@ pub struct CacheStats {
 
 /// LRU cache for extracted symbol cards.
 pub struct CardCache {
+    /// Bounded store of extracted cards, evicted least-recently-used.
     inner: Mutex<LruCache<CardCacheKey, Arc<SymbolCard>>>,
+    /// Keys currently being populated by another thread, so concurrent misses
+    /// on the same key wait rather than duplicate the extraction work.
     in_flight: Mutex<HashSet<CardCacheKey>>,
+    /// Signalled when a key leaves `in_flight`, waking threads blocked on it.
     in_flight_ready: Condvar,
+    /// Running count of successful lookups.
     hits: AtomicU64,
+    /// Running count of failed lookups.
     misses: AtomicU64,
 }
 
@@ -176,10 +188,15 @@ impl CardCache {
             .and_then(|mut guard| guard.get(key).cloned())
     }
 
+    /// Records a successful lookup for the `stats()` counters.
     pub(crate) fn record_hit(&self) { self.hits.fetch_add(1, Ordering::Relaxed); }
 
+    /// Records a failed lookup for the `stats()` counters.
     pub(crate) fn record_miss(&self) { self.misses.fetch_add(1, Ordering::Relaxed); }
 
+    /// Removes every entry whose key satisfies `predicate`.
+    ///
+    /// Backs [`Self::invalidate`] and [`Self::invalidate_stale_revisions`].
     fn evict_matching<F>(&self, predicate: F)
     where
         F: Fn(&CardCacheKey) -> bool,
@@ -232,7 +249,9 @@ impl std::fmt::Debug for CardCache {
 
 /// Guard that serializes cache population for a single [`CardCacheKey`].
 pub(crate) struct CachePopulationGuard<'a> {
+    /// Cache the guard releases the in-flight lock on when dropped.
     cache: &'a CardCache,
+    /// Key held for the duration of the population lock.
     key: CardCacheKey,
 }
 
@@ -246,6 +265,7 @@ impl Drop for CachePopulationGuard<'_> {
 
 /// Pool of reusable Tree-sitter parsers keyed by language.
 pub struct ParserRegistry {
+    /// One shared, mutex-guarded parser per language, created lazily on first use.
     parsers: Mutex<HashMap<SupportedLanguage, Arc<Mutex<Parser>>>>,
 }
 
@@ -262,7 +282,7 @@ impl ParserRegistry {
     ///
     /// # Errors
     ///
-    /// Returns a parser initialisation or parse error, or an internal error if
+    /// Returns a parser initialization or parse error, or an internal error if
     /// one of the parser mutexes has been poisoned.
     pub fn parse(
         &self,
@@ -276,6 +296,13 @@ impl ParserRegistry {
         guard.parse(source)
     }
 
+    /// Returns the shared parser for `language`, constructing and caching one
+    /// on first request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an internal error if the registry mutex has been poisoned, or a
+    /// parser initialization error if a new parser cannot be built.
     fn parser(&self, language: SupportedLanguage) -> Result<Arc<Mutex<Parser>>, SyntaxError> {
         let mut guard = self
             .parsers
@@ -322,6 +349,11 @@ impl std::fmt::Debug for ParserRegistry {
 #[must_use]
 pub fn content_hash(source: &str) -> [u8; 32] { Sha256::digest(source.as_bytes()).into() }
 
+/// Converts a capacity to `NonZeroUsize` for [`LruCache::new`].
+///
+/// # Panics
+///
+/// Panics if `capacity` is zero.
 fn non_zero_capacity(capacity: usize) -> NonZeroUsize {
     assert!(
         capacity > 0,
@@ -333,6 +365,11 @@ fn non_zero_capacity(capacity: usize) -> NonZeroUsize {
     non_zero
 }
 
+/// Unwraps a lock result, recovering the guard from a poisoned mutex instead
+/// of propagating the panic that poisoned it.
+///
+/// The cache treats poisoning as non-fatal: a panicking holder should not
+/// permanently wedge population tracking for every other thread.
 fn recover_guard<'a, T>(
     result: Result<MutexGuard<'a, T>, std::sync::PoisonError<MutexGuard<'a, T>>>,
 ) -> MutexGuard<'a, T> {

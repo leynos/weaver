@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -115,9 +114,9 @@ Observable behaviour after implementation:
   (6 tests in `enrich.rs`). Updated existing `get_card.rs` unit tests to pass
   `backends` via a rstest fixture.
 - [x] (2026-03-15) Stage E: BDD tests pass unchanged — the degraded
-  path is naturally exercised since no real language servers are registered.
-  The `behaviour.rs` BDD test in `weaver-lsp-host` needed `hover: None` added
-  to `sample_responses()` and `.with_hover(true)` added to `all_caps`.
+  path is naturally exercised since no real language servers are registered. The
+  `behaviour.rs` BDD test in `weaver-lsp-host` needed `hover: None` added to
+  `sample_responses()` and `.with_hover(true)` added to `all_caps`.
 - [x] (2026-03-15) Stage F: Updated `docs/archive/prototype-roadmap.md` (ticked
       7.1.3
   checkboxes) and `docs/users-guide.md` (documented enrichment and degradation
@@ -130,9 +129,9 @@ Observable behaviour after implementation:
 - Observation: The existing `behaviour.rs` BDD test for
   `weaver-lsp-host` iterates over all capability states and asserts every one
   is enabled. Adding `Hover` to the capability system caused this test to fail
-  because the test's `all_caps` did not include hover. Evidence: Test failure
-  in `lsp_host_behaviour` asserting "capability Hover should be enabled".
-  Impact: Required adding `.with_hover(true)` to the test's capability set and
+  because the test's `all_caps` did not include hover. Evidence: Test failure in
+  `lsp_host_behaviour` asserting "capability Hover should be enabled". Impact:
+  Required adding `.with_hover(true)` to the test's capability set and
   `hover: None` to `sample_responses()`.
 
 ## Decision log

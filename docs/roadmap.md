@@ -1,13 +1,21 @@
 # Weaver roadmap
 
 This roadmap translates `docs/weaver-design.md`,
-`docs/adr-007-agent-native-command-surface.md`,
+`docs/adrs/adr-0007-agent-native-command-surface.md`,
+`docs/adrs/adr-0008-workspace-scoped-daemon-tenancy.md`,
+`docs/adrs/adr-0009-workspace-scoped-language-server-lifecycle.md`,
+`docs/adrs/adr-0010-workspace-local-concurrency.md`,
+`docs/adrs/adr-0011-sempai-query-input-syntax.md`,
+`docs/adrs/adr-0012-versioned-selector-streams.md`,
 `docs/sempai-query-language-design.md`,
-`docs/jacquard-card-first-symbol-graph-design.md`, and the existing ADR set
-into an outcome-oriented delivery sequence. It does not promise dates. Phases
-carry testable product ideas, steps validate or falsify those ideas, and tasks
-are review-sized execution units with explicit dependencies and observable
-success criteria.
+`docs/jacquard-card-first-symbol-graph-design.md`,
+`docs/rfcs/rfc-0001-local-daemon-observability.md`,
+`docs/rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md`,
+`docs/rfcs/rfc-0003-sempai-query-to-selector-vertical-slice.md`, and the
+existing ADR set into an outcome-oriented delivery sequence. It does not
+promise dates. Phases carry testable product ideas, steps validate or falsify
+those ideas, and tasks are review-sized execution units with explicit
+dependencies and observable success criteria.
 
 The current forward plan is the source of truth for future work. The historical
 ledger in [`docs/archive/prototype-roadmap.md`](archive/prototype-roadmap.md)
@@ -39,16 +47,33 @@ from rediscovering the same dependency and migration questions.
 
 This step answers which generic command-contract pieces come from OrthoConfig
 and which temporary Weaver adapters are allowed. Its outcome informs every
-command-surface and renderer task. See ADR 007 and the OrthoConfig roadmap.
+command-surface and renderer task. See ADR 0007 and the OrthoConfig roadmap.
+Boundary classifications for this step are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
-- [ ] 12.1.1. Track the downstream consumer boundary.
+- [x] 12.1.1. Track the downstream consumer boundary.
   - Depends on OrthoConfig 5.2.3.
+  - Implemented by ADR 0007 boundary vocabulary,
+    `docs/orthoconfig-consumer-boundary.toml`,
+    `docs/orthoconfig-consumer-boundary.md`, and the
+    `weaver-docs-gate` manifest tests.
+  - Follow-up test refactors typed path and field-label helper arguments and
+    consolidated state evidence validation without changing the boundary
+    contract.
+  - Follow-up observability work added a named CI boundary-manifest gate,
+    structured remediation messages, and library trace/metric events for
+    manifest load outcomes.
+  - Follow-up review coverage documents those observable load side effects,
+    adds example CLI error-path tests, property tests for date/evidence
+    invariants, and trybuild public API checks.
   - Success: every command-contract task says whether it consumes OrthoConfig,
-    wraps it temporarily, or records a deliberate divergence in ADR 007.
-- [ ] 12.1.2. Consume recursive command metadata.
+    wraps it temporarily, or records a deliberate divergence in ADR 0007.
+- [x] 12.1.2. Consume recursive command metadata.
   - Depends on OrthoConfig 6.1.1 and 6.1.2.
-  - Success: generated help, manpage, completion, and context output converge
-    on the OrthoConfig recursive metadata shape.
+  - Success: generated help and the manual page converge on the OrthoConfig
+    recursive metadata shape. This item establishes the input shape for shell
+    completion and `weaver context --json`; those outputs remain deferred to
+    13.3.3 and 13.3.1 respectively.
 - [ ] 12.1.3. Consume compact context and skill metadata.
   - Depends on OrthoConfig 6.2.1 through 6.3.2.
   - Success: Weaver-specific capability fields extend the reusable context and
@@ -90,6 +115,59 @@ either hidden scope or a competing implementation plan.
     provider-first commands, or root `--output` are not executable backlog
     items; their product intent is carried by resource-first live tasks.
 
+### 12.3. Prove workspace-scoped daemon isolation and bounded execution
+
+This step answers whether one per-user daemon can safely amortize backend cost
+across several repositories before product slices depend on that service. It
+implements the boundaries proposed by:
+
+- [RFC 0002](rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md);
+- [ADR 0008](adrs/adr-0008-workspace-scoped-daemon-tenancy.md);
+- [ADR 0009](adrs/adr-0009-workspace-scoped-language-server-lifecycle.md); and
+- [ADR 0010](adrs/adr-0010-workspace-local-concurrency.md).
+
+The work remains internal to the daemon protocol and runtime; it does not add
+an OrthoConfig command-contract consumer.
+
+- [ ] 12.3.1. Ratify the multi-workspace daemon contracts.
+  - Requires 12.2.3.
+  - Success: RFC 0002 and ADRs 0008 through 0010 are accepted or revised with no
+    unresolved contradiction between workspace identity, language-server
+    lifecycle, mutation isolation, and bounded admission.
+- [ ] 12.3.2. Carry canonical workspace identity across the daemon protocol.
+  - Requires 12.3.1.
+  - Success: every routable request carries a versioned workspace locator; the
+    daemon validates and canonicalizes it before routing, rejects incompatible
+    clients explicitly, and proves that aliases do not create duplicate mutable
+    state.
+- [ ] 12.3.3. Introduce workspace-owned state and lifecycle.
+  - Requires 12.3.2.
+  - Success: a `WorkspaceManager` performs single-flight lookup and creation;
+    caches, revisions, server pools, and mutation coordination belong to one
+    `WorkspaceState`; registry locks are not held across routing or external
+    input/output; and active leases prevent premature eviction.
+- [ ] 12.3.4. Scope language servers by workspace and execution identity.
+  - Requires 12.3.3.
+  - Success: process and LSP roots are explicit; Rust repositories select and
+    launch their active toolchains deterministically; configuration or
+    toolchain changes retire stale servers; and health, restart, process-budget,
+    and idle-eviction policies are bounded and tested.
+- [ ] 12.3.5. Replace daemon-wide serialization with bounded workspace-local
+      coordination.
+  - Requires 12.3.3 and 12.3.4.
+  - Success: unrelated workspaces and supported server operations make
+    concurrent progress; one workspace mutation holds an exclusive lease;
+    same-workspace readers cannot observe staged documents; and saturation
+    returns stable retryable reasons and records the saturation evidence that
+    RFC 0001 requires instead of silently dropping admitted work.
+- [ ] 12.3.6. Prove the multi-workspace service boundary end to end.
+  - Requires 12.3.5.
+  - Success: one per-user daemon safely serves simultaneous temporary Rust,
+    Python, and TypeScript repositories; the suite covers distinct stable and
+    dated-nightly Rust toolchains, toolchain changes, server crashes, restart
+    limits, overload, cancellation, eviction, and workspace-local mutation
+    ordering.
+
 ## 13. Command contract proving slice
 
 Idea: if Weaver can expose one tiny resource-first command loop through the
@@ -105,12 +183,14 @@ introspection, and agent-grade CLI hardening into one acceptance surface.
 ### 13.1. Ratify the reset boundary and command-surface adapter
 
 This step answers whether Weaver-specific semantic metadata can sit on top of
-OrthoConfig command contracts without duplicating them. See ADR 007 and
-`docs/weaver-design.md` §§2.1.1-2.1.4.
+OrthoConfig command contracts without duplicating them. See ADR 0007 and
+`docs/weaver-design.md` §§2.1.1-2.1.4. Boundary classifications for these tasks
+are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
-- [x] 13.1.1. Record the agent-native command-surface reset as ADR 007.
+- [x] 13.1.1. Record the agent-native command-surface reset as ADR 0007.
   - Records the forward OrthoConfig dependency boundary that 12.1 validates.
-  - Success: ADR 007 defines the dual renderer contract, capability routing,
+  - Success: ADR 0007 defines the dual renderer contract, capability routing,
     OrthoConfig dependencies, and lack of compatibility promise for the
     prototype grammar.
 - [x] 13.1.2. Implement the Weaver command-surface adapter for one read-only
@@ -124,14 +204,15 @@ OrthoConfig command contracts without duplicating them. See ADR 007 and
 - [x] 13.1.3. Define the temporary-adapter removal policy.
   - Requires 13.1.2.
   - Success: every local generic helper names the OrthoConfig task expected to
-    replace it or records a permanent divergence in ADR 007.
+    replace it or records a permanent divergence in ADR 0007.
 
 ### 13.2. Prove the dual renderer on a real command
 
 This step answers whether the same command contract can serve humans and agents
 without forking command behaviour. It migrates prototype archive work 3.2.2
 through 3.3.4 and 11.3.1 through 11.3.4. See `docs/weaver-design.md` §§2.1.3,
-2.1.7, 2.1.10, and 2.1.11.
+2.1.7, 2.1.10, and 2.1.11. Boundary classifications for these tasks are tracked
+in the [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 13.2.1. Implement the localized human renderer for `definitions get`.
   - Requires 13.1.2 and depends on OrthoConfig 7.2.2.
@@ -158,7 +239,9 @@ through 3.3.4 and 11.3.1 through 11.3.4. See `docs/weaver-design.md` §§2.1.3,
 This step answers whether humans and agents can discover the command contract
 from generated surfaces instead of hard-coded catalogues. It migrates prototype
 archive work 3.2.3 through 3.2.6, 5.7.1 through 5.7.5, and 11.3.2. See
-`docs/weaver-design.md` §§2.1.4 and 6.1.
+`docs/weaver-design.md` §§2.1.4 and 6.1. Boundary classifications for these
+tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 13.3.1. Implement `weaver context --json` for the pilot command family.
   - Requires 13.2.3 and depends on OrthoConfig 6.2.1 through 6.2.3.
@@ -181,6 +264,52 @@ archive work 3.2.3 through 3.2.6, 5.7.1 through 5.7.5, and 11.3.2. See
     skill, vocabulary, stdout/stderr, and JSON-schema drift for the pilot
     command family.
 
+### 13.4. Prove the local daemon observability contract
+
+This step answers whether local users and automation can diagnose daemon
+startup, request, transport, and lifecycle failures without adding a metrics
+endpoint or distributed tracing backend. It converts RFC 0001 into bounded
+local signals that support later read, mutation, and workflow slices. See RFC
+0001:
+
+- [Observability primitives](rfcs/rfc-0001-local-daemon-observability.md#observability-primitives)
+- [Failure modes that warrant actionable signals](rfcs/rfc-0001-local-daemon-observability.md#failure-modes-that-warrant-actionable-signals)
+- [Delivery mechanisms](rfcs/rfc-0001-local-daemon-observability.md#delivery-mechanisms)
+- [RequestTooLarge rejection](rfcs/rfc-0001-local-daemon-observability.md#requesttoolarge-rejection)
+- [Health snapshot](rfcs/rfc-0001-local-daemon-observability.md#health-snapshot)
+- [Acceptance criteria](rfcs/rfc-0001-local-daemon-observability.md#acceptance-criteria)
+
+<!-- Separate the reference list above from the task checklist below. -->
+
+- [ ] 13.4.1. Define canonical daemon event names and structured fields.
+  - Requires 13.2.2, 13.2.3, and 12.3.5.
+  - Success: lifecycle, request, dispatch, and listener events have stable
+    names and the minimum diagnostic fields required by RFC 0001.
+- [ ] 13.4.2. Emit bounded structured events for daemon lifecycle and
+      transport paths.
+  - Requires 13.4.1.
+  - Success: lifecycle, dispatch, request rejection, socket, and listener
+    paths emit deterministic `tracing` fields without sensitive payload data.
+- [ ] 13.4.3. Unify CLI guidance for pre-daemon and transport failures.
+  - Requires 13.4.2 and 13.3.2.
+  - Success: pre-daemon and transport failures report what failed, the relevant
+    evidence path or endpoint, and the next useful operator action.
+- [ ] 13.4.4. Make request-size rejections diagnosable on both sides of the
+      daemon boundary.
+  - Requires 13.4.2.
+  - Success: CLI-side and daemon-side size failures include the observed
+    request size, `JSONL_REQUEST_MAX_LINE_BYTES`, the affected command where
+    known, and user guidance to reduce or split the payload.
+- [ ] 13.4.5. Bound `weaverd.health` retention and stale-state handling.
+  - Requires 13.4.2.
+  - Success: health persistence is bounded, rotates deterministically, and
+    treats out-of-window data as stale.
+- [ ] 13.4.6. Cover RFC 0001 failure modes in documentation and regression
+      tests.
+  - Requires completion of 13.4.2 through 13.4.5.
+  - Success: tests and docs cover the RFC 0001 failure taxonomy and foreground
+    debug recipe.
+
 ## 14. Code-reading loop slice
 
 Idea: if Weaver can answer common code-reading questions through the new
@@ -198,9 +327,11 @@ cards-first context, same-file graph slices, and agent-grade compact output.
 This step answers whether existing semantic backends fit the resource-first
 surface without provider-specific commands. It migrates prototype archive work
 10.1.1 through 10.3.2. See `docs/weaver-design.md` §§2.2, 3.1, and 6.1.
+Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 14.1.1. Implement `weaver definitions get`.
-  - Requires phase 13.
+  - Requires phase 13 and 12.3.6.
   - Success: position references return localized human output by default and
     stable JSON under `--json`, with provider provenance in machine output.
 - [ ] 14.1.2. Implement `weaver references list`.
@@ -222,7 +353,9 @@ surface without provider-specific commands. It migrates prototype archive work
 This step answers whether compact symbol cards are enough to guide a user or
 agent to the next useful read. It migrates prototype archive work 7.1.1 through
 7.1.4, 9.2.1 through 9.2.3, and 10.2.1 through 10.2.2. See
-`docs/jacquard-card-first-symbol-graph-design.md` §§5-11.
+`docs/jacquard-card-first-symbol-graph-design.md` §§5-11. Boundary
+classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 14.2.1. Implement `weaver cards get` for position references.
   - Requires 14.1.1 and reuses prototype archive work 7.1.1 through 7.1.4.
@@ -242,6 +375,8 @@ agent to the next useful read. It migrates prototype archive work 7.1.1 through
 This step answers whether structural grep should graduate now or wait for the
 Sempai selector slice. It migrates the product intent of prototype archive work
 10.4.1 through 10.4.2 and 5.5.1 without forcing provider-specific commands.
+Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 14.3.1. Prototype `weaver symbols list --pattern` over `weaver-syntax`
       and optional `srgn`.
@@ -252,45 +387,60 @@ Sempai selector slice. It migrates the product intent of prototype archive work
 - [ ] 14.3.2. Decide whether the static-search pilot graduates into the live
       command contract.
   - Requires 14.3.1.
-  - Success: ADR 007 or the roadmap records one of three outcomes: graduate as
-    `symbols list --pattern`, fold into `symbols list --query`, or defer.
+  - Success: RFC 0003 either accepts the pilot behind
+    `symbols list --query` as an explicit compatibility executor or defers it.
+    `symbols list --pattern` does not become stable public grammar.
 
-## 15. Sempai selector-to-context slice
+## 15. Sempai query-to-selector slice
 
-Idea: if Sempai one-liners can select symbols and immediately feed cards plus
-one-hop graph context, Weaver proves that query language work pays off as a
-composable product loop rather than as a standalone parser layer.
+Idea: if one positive Sempai query can emit versioned selector records and
+those records can cross an ordinary shell pipeline, Weaver proves the product
+loop before completing every Semgrep-compatible operator.
 
-This phase validates Sempai as a selector engine without reducing the original
-backend and integration scope to a vague parser task. It migrates archive work
-from Sempai DSL parsing, Tree-sitter execution, query routing, symbol-first
-cards, and the Sempai-to-Jacquard vertical slice.
+This phase validates Sempai as a composable selector engine. It pulls the
+smallest executable path ahead of the full backend while preserving the full
+parser, matcher, language, and compatibility scope as the replacement path. It
+implements
+[RFC 0003](rfcs/rfc-0003-sempai-query-to-selector-vertical-slice.md), [ADR 0011](adrs/adr-0011-sempai-query-input-syntax.md),
+and [ADR 0012](adrs/adr-0012-versioned-selector-streams.md), and migrates
+archive work from Sempai DSL parsing, Tree-sitter execution, query routing,
+symbol-first cards, and the Sempai-to-Jacquard vertical slice.
 
-### 15.1. Prove a minimal one-liner selector with honest diagnostics
+### 15.1. Prove minimal query compilation and honest recovery
 
-This step answers whether the target one-liner grammar can select real symbols
-without overbuilding the full query engine. It migrates prototype archive work
-4.1.6 through 4.1.7, 4.3.3, and 9.1.1. See
-`docs/sempai-query-language-design.md` §§3-6.
+This step answers whether bare positive patterns and rich expressions can share
+the canonical formula model without making the complete Pratt grammar an entry
+fee for useful search. It migrates prototype archive work 4.1.6 through 4.1.7,
+4.3.3, and 9.1.1. See RFC 0003 §§6.1-6.3 and
+`docs/sempai-query-language-design.md` §§3-6. Boundary classifications for
+these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
-- [ ] 15.1.1. Implement one-liner tokenization and Pratt parsing for positive
-      symbol patterns.
+- [ ] 15.1.1. Implement one-liner tokenization and Pratt parsing for query
+      inputs.
   - Requires 13.2.2.
-  - Success: valid one-liners compile to canonical formula form, malformed
-    input produces stable `E_SEMPAI_*` diagnostics, and recovery preserves
-    partial anchors where safe.
+  - Success: bare `--query` patterns lower directly to canonical positive
+    pattern atoms; `--expr` inputs use spanned Logos tokens and a recovering
+    Chumsky Pratt parser; malformed input produces stable, possibly multiple
+    `E_SEMPAI_*` diagnostics; recovery retains partial nodes only for further
+    guidance; and no query with error-severity diagnostics reaches execution.
 - [ ] 15.1.2. Define selector record schemas for one-liner matches.
   - Requires 15.1.1.
-  - Success: selector records carry identity, range, language, query, capture,
-    confidence, and provider provenance needed for safe downstream context or
-    mutation.
+  - Success: `weaver.selector.v1` records carry selector, stream, sequence,
+    workspace, URI, range, language, query, capture, source-digest or revision,
+    capability, and provider identities. A terminal
+    `weaver.selector-stream-end.v1` record proves successful completion.
+    Deterministic structural evidence and compatibility provenance replace an
+    invented floating-point confidence value.
 
-### 15.2. Prove the Sempai Tree-sitter backend
+### 15.2. Prove and graduate the full Sempai Tree-sitter backend
 
-This step answers whether Semgrep-style matching can run accurately enough on
-real syntax with bounded execution semantics. It preserves prototype archive
-work 4.2.1 through 4.2.12 instead of compressing the backend into a single
-"matching" task. See `docs/sempai-query-language-design.md` §§7-12.
+This step answers whether the complete Semgrep-style subset can replace the
+first compatibility executor without changing query syntax, selector schemas,
+or ordering. It preserves prototype archive work 4.2.1 through 4.2.12 instead
+of compressing the backend into a single "matching" task. Its completion is not
+a prerequisite for the first positive query in step 15.3. See RFC 0003 §7.4 and
+`docs/sempai-query-language-design.md` §§7-12.
 
 - [ ] 15.2.1. Implement language profiles and wrapper registry for Rust,
       Python, TypeScript, and Go, with optional HashiCorp Configuration
@@ -357,33 +507,42 @@ work 4.2.1 through 4.2.12 instead of compressing the backend into a single
   - Success: safety limits are configurable, deterministic, and enforced
     across execution paths.
 
-### 15.3. Prove Sempai Weaver integration and readiness
+### 15.3. Prove the first public selector stream and full-engine graduation
 
-This step answers whether the backend can be exposed through Weaver's
-resource-first command surface with stable schemas, cache behaviour,
-diagnostics, quality gates, and default-enablement rules. It preserves
-prototype archive work 4.3.1 through 4.3.9 under the new public command shape.
-See `docs/weaver-design.md` §2.1.2.
+This step answers whether Sempai can expose one useful query through Weaver's
+resource-first command surface before the full matcher lands, then replace its
+compatibility executor without changing the user pipe. It preserves prototype
+archive work 4.3.1 through 4.3.9 under the new public command shape. See RFC
+0003, ADRs 0011-0012, and `docs/weaver-design.md` §2.1.2. Boundary
+classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 15.3.1. Add Sempai execution routing in `weaverd` for selector-backed
       `symbols list`.
-  - Requires 15.2.12.
-  - Success: daemon execution paths compile and execute Sempai plans for
-    supported languages and return structured match streams.
+  - Requires 15.1.2 and 12.3.3.
+  - Success: positive Rust, Python, and TypeScript plans execute through an
+    explicitly labelled `weaver-syntax` compatibility adapter; unsupported
+    constructs refuse rather than drift semantically; and daemon execution
+    returns canonical matches with visible capability and provider provenance.
 - [ ] 15.3.2. Add `weaver symbols list --query` with `--lang`, `--uri`, and
-      `--rule-file|--rule|--query` inputs.
-  - Requires 15.3.1 and 14.2.1.
-  - Success: the CLI validates input combinations and supports YAML rule files,
-    inline YAML rules, and one-liner query workflows with stable error
-    messaging. `weaver observe query` remains archive provenance only.
+      explicit query-source inputs.
+  - Requires 15.3.1 and phase 13.
+  - Success: the CLI implements ADR 0011 with mutually exclusive
+    `--query|--query-file|--expr|--expr-file|--rule|--rule-file` inputs,
+    accepts `-` on file forms for standard input, enumerates invalid
+    combinations, and keeps `weaver observe query` as archive provenance only.
 - [ ] 15.3.3. Define stable JSONL request and response schemas for Sempai query
       operations, with snapshot coverage.
   - Requires 15.3.2.
-  - Success: schema fixtures lock field names and payload shapes, and streaming
-    output remains deterministic.
+  - Success: `--json` emits zero or more deterministic
+    `weaver.selector.v1` records followed by one
+    `weaver.selector-stream-end.v1` completion record. Zero matches emit the
+    completion record only; producer failure omits completion; source identity
+    and provenance are present; and schema fixtures lock field names, ordering,
+    bounds, completion, and error separation.
 - [ ] 15.3.4. Integrate parse-cache adapter keyed by URI, language, and
       revision, aligned with daemon document lifecycle.
-  - Requires 15.3.3.
+  - Requires 15.3.3 and 12.3.3.
   - Success: repeated queries against unchanged revisions hit cache in
     integration tests, revision changes invalidate cached parses
     deterministically, and cache misses or invalidations preserve semantic
@@ -391,45 +550,58 @@ See `docs/weaver-design.md` §2.1.2.
 - [ ] 15.3.5. Implement actuation handoff contract using focus-first selection
       with span fallback and optional capture targeting.
   - Requires 15.3.3.
-  - Success: downstream mutation commands can consume Sempai output
-    deterministically for target selection without hidden state.
+  - Success: consumers read or spool complete bounded streams from
+    `--selectors <path|->`, validate the terminal completion record before
+    planning, use focus, match, or explicit capture spans without hidden state,
+    reject stale or cross-workspace source identities, and expose deterministic
+    zero-, one-, and many-match policy.
 - [ ] 15.3.6. Add diagnostics conformance suites for YAML, domain-specific
       language (DSL), semantic, compilation, and execution error categories.
   - Requires 15.3.3.
-  - Success: each diagnostic category is covered by deterministic snapshots and
-    stable `E_SEMPAI_*` error codes.
+  - Success: each diagnostic category has deterministic snapshots and stable
+    `E_SEMPAI_*` codes; expression recovery reports independent errors where
+    possible; and recovered queries with error-severity diagnostics never emit
+    a successful completion record.
 - [ ] 15.3.7. Add layered quality suites for parser and execution behaviour.
   - Requires 15.3.6.
   - Success: unit, snapshot, corpus, property, and fuzz suites run under
-    repository gates and include representative language corpora plus
-    malformed-input coverage.
+    repository gates and include representative language corpora, malformed
+    input, compatibility-adapter conformance, truncated streams, and
+    bounded-output coverage.
 - [ ] 15.3.8. Publish compatibility boundaries for supported operators, modes,
       constraints, and escape-hatch behaviour.
   - Requires 15.3.7.
-  - Success: user-facing docs distinguish supported, unsupported, and
-    parse-only behaviours with stable terminology.
+  - Success: user-facing docs distinguish implemented, compatibility-subset,
+    parse-only, unsupported, and planned behaviour; provider provenance makes
+    the active execution route visible without adding provider-specific public
+    commands.
 - [ ] 15.3.9. Define release gates for enabling Sempai by default.
-  - Requires 15.3.8.
-  - Success: crash-free requirements, diagnostics parity, and documentation
-    parity are codified in CI policy and block default enablement when
-    thresholds are not met.
+  - Requires 15.2.12 and 15.3.8.
+  - Success: the full Sempai executor replaces compatibility paths only after
+    selector schema and ordering conformance passes; crash-free requirements,
+    diagnostics parity, compatibility boundaries, and documentation parity are
+    codified in CI policy and block default enablement when thresholds are not
+    met.
 
 ### 15.4. Prove query output composes with context commands
 
-This step answers whether one-liner selectors can feed product commands rather
-than remaining search output. It migrates prototype archive work 9.1.4 through
-9.3.2 and 11.2.1. See `docs/weaver-design.md` §2.1.2.
+This step answers whether completed versioned selector streams can feed product
+commands rather than remaining terminal search output. It migrates prototype
+archive work 9.1.4 through 9.3.2 and 11.2.1. See RFC 0003 §§6.7-6.8, ADR 0012,
+and `docs/weaver-design.md` §2.1.2.
 
 - [ ] 15.4.1. Allow `cards get` and one-hop relation summaries to consume
       Sempai selectors.
   - Requires 15.3.5 and 14.2.3.
   - Success: one query-to-card-to-relation workflow works in one command and
-    in a pipeline, with deterministic zero-, one-, and many-match behaviour.
+    through `--selectors <path|->`, with deterministic zero-, one-, and
+    many-match behaviour, completion validation, and stale-selector refusal.
 - [ ] 15.4.2. Add Sempai selector conformance and pipeline E2E coverage.
   - Requires 15.4.1.
-  - Success: suites cover YAML-backed and one-liner selectors, malformed query
-    recovery, `jq` filtering, pager consumption, bounded output, and invalid
-    selector-stream rejection.
+  - Success: suites cover YAML-backed, bare-pattern, and expression selectors,
+    malformed query recovery, completion-preserving `jq -c` filtering, pager
+    consumption, bounded output, and malformed, truncated, stale, or
+    incompatible selector-stream rejection.
 
 ## 16. Safe change loop slice
 
@@ -437,68 +609,146 @@ Idea: if the same selector records can drive safe patches, renames, and symbol
 relocation through capability-routed actuators, Weaver proves that agent-native
 composition does not weaken the Double-Lock safety model.
 
-This phase validates the first end-to-end observe-to-act loop. It migrates
-archive work from apply-patch, rename-symbol, `extricate-symbol`, selector
-handoff, mutation metadata, and visible safety-harness reporting. In this
-roadmap, `extricate-symbol` means moving a selected symbol to another module or
-file while preserving meaning. It is distinct from `extract-method`, which
-extracts a selected code region into a new callable and is not compressed into
-the symbol-relocation tasks below.
+This phase validates the first end-to-end selector-to-change loop. It migrates
+archive work from patch application, rename-symbol, `extricate-symbol`,
+selector handoff, mutation metadata, and visible safety-harness reporting. In
+this roadmap, `extricate-symbol` means moving a selected symbol to another
+module or file while preserving meaning. It is distinct from `extract-method`,
+which extracts a selected code region into a new callable and is not compressed
+into the symbol-relocation tasks below.
 
-### 16.1. Prove patch application under the new command contract
+### 16.1. Prove a reusable mutation vertical slice
 
-This step answers whether the completed patch and Double-Lock foundations fit
-the resource-first grammar. It migrates prototype archive work 6.1.1 through
-6.1.4 and 11.4.1 through 11.4.2. See `docs/weaver-design.md` §§4.2-4.3.
+This step answers whether the completed patch and Double-Lock foundations can
+become one reusable mutation engine behind the resource-first command grammar.
+It migrates prototype archive work 6.1.1 through 6.1.4 and 11.4.1 through
+11.4.2. See `docs/weaver-design.md` §§4.2-4.3. Boundary classifications for
+command-contract tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
-- [ ] 16.1.1. Implement `weaver patches apply`.
+- [ ] 16.1.1. Define the shared mutation plan and result contract for
+      `weaver patches apply`.
   - Requires phase 13 and reuses prototype archive work 6.1.1 through 6.1.4.
-  - Success: `patches apply` preserves Double-Lock verification, atomic
-    transactions, `--dry-run`, structured safety results, universal `--json`,
-    and human-readable safety summaries.
-- [ ] 16.1.2. Add idempotency keys, transaction IDs, and retry matching for
-      patch application.
+  - Success: a syntax-independent plan represents create, replace, delete, and
+    move operations, expected content versions, verification and formatting
+    policies, idempotency, and dry-run state. The result records transaction
+    identity, changed paths, base and final digests, formatting, verification
+    availability, diagnostic deltas, rollback, and a bounded reference to
+    complete diagnostics. Human and JSON renderers consume the same contract,
+    and the public command remains noun-verb `weaver patches apply`.
+- [ ] 16.1.2. Add idempotency keys, transaction IDs, and retry matching to the
+      patch contract.
   - Requires 16.1.1 and depends on OrthoConfig 7.2.1.
-  - Success: repeated equivalent patch submissions return the existing
-    transaction or refusal instead of duplicating work.
+  - Success: repeated equivalent submissions return the existing transaction
+    or refusal instead of duplicating work, including after process restart;
+    atomically persist the idempotency record before patch commit, recover
+    incomplete records crash-consistently, and retain successful records for a
+    configured bounded window beginning only after the patch commit is durable.
+    Retain refusals for a separately configured bounded window beginning when
+    the refusal becomes terminal, and scope after-restart duplicate prevention
+    to the applicable window.
+    Duplicate prevention does not rely on 19.1.2.
 - [ ] 16.1.3. Standardize mutation `--dry-run`, `--force`, and structured
       safety metadata.
   - Requires 16.1.2 and depends on OrthoConfig 7.2.1.
-  - Success: mutating commands declare preview, destructive-operation, and
-    safety-harness policy in command-surface metadata.
+  - Success: mutating commands declare preview, destructive-operation, safety,
+    verification-availability, and force-policy metadata in the command
+    contract; `--force` cannot silently bypass invariant-preserving checks.
+- [ ] 16.1.4. Extract the mutation engine from daemon dispatch into a reusable
+      library boundary.
+  - Requires 16.1.1 and 12.3.3.
+  - Success: patch parsers, semantic actuators, the daemon, and in-process
+    consumers submit one shared mutation-plan type; adapters do not duplicate
+    verification, conflict detection, commit, or rollback behaviour.
+- [ ] 16.1.5. Verify complete workspace deltas through both safety locks.
+  - Requires 16.1.4, 12.3.4, and 12.3.5.
+  - Success: create, replace, delete, and move operations enter one staged
+    workspace view; Tree-sitter validates final content; Language Server
+    Protocol (LSP) verification observes the complete proposed delta and
+    flushes diagnostics once per language instead of checking files
+    independently. Missing semantic backends produce explicit `unavailable` or
+    `inconclusive` status and follow declared safety policy; no path silently
+    weakens the Double-Lock contract.
+- [ ] 16.1.6. Add stale-base checks and metadata-preserving transactions.
+  - Requires 16.1.4 and 12.3.5.
+  - Success: every existing source carries an expected content digest; commit
+    compares live content immediately before replacement; stale bases return a
+    structured refusal without overwriting newer work. Prepare, commit, and
+    rollback preserve permissions and executable state across create, replace,
+    delete, and move operations.
+- [ ] 16.1.7. Harden target resolution and repeated no-op handling.
+  - Requires 16.1.4 and 16.1.6.
+  - Success: exact, semantic-anchor, or fuzzy recovery applies only when one
+    candidate remains; ambiguity returns bounded candidate excerpts and makes
+    no changes. Byte-identical post-format mutations return an explicit no-op
+    result, and repeated equivalent no-op submissions trip a bounded circuit
+    breaker.
+- [ ] 16.1.8. Format staged content before final verification and commit.
+  - Requires 16.1.5 and 16.1.6.
+  - Success: configured formatters run only on touched staged files or a shadow
+    workspace; final diffs and digests are recalculated; both safety locks see
+    formatted content; formatter failure or partial execution cannot modify the
+    live workspace.
+- [ ] 16.1.9. Emit bounded post-mutation feedback from the shared result.
+  - Requires 16.1.5 and 16.1.8 and depends on OrthoConfig 7.2.4 through 7.2.6.
+  - Success: diagnostic comparison maps baseline ranges through final text
+    changes and distinguishes introduced, severity-worsened, resolved,
+    unchanged, and relocated diagnostics. Concise deltas stay inline; complete
+    diagnostics use a bounded spool reference. Project-defined verification
+    remains authoritative, and an LSP-clean result does not claim behavioural
+    correctness. Library, daemon JSONL, human, and `--json` surfaces expose the
+    same result contract.
+- [ ] 16.1.10. Implement `weaver patches apply` over the shared mutation engine
+      and prove the vertical slice end to end.
+  - Requires phase 13, 12.3.6, 16.1.2, 16.1.3, 16.1.4, 16.1.5, 16.1.6,
+    16.1.7, 16.1.8, and 16.1.9.
+  - Success: the noun-verb command supports `--file`, `--dry-run`, `--force`,
+    idempotency, universal `--json`, and human-readable summaries without a
+    second commit path. End-to-end coverage includes create, replace, delete,
+    move, multi-file semantic changes, stale bases, metadata preservation,
+    ambiguous targets, no-op retries, formatter changes and failures,
+    relocated diagnostics, unavailable LSP backends, rollback, retry matching,
+    daemon-to-CLI result parity, and isolation from simultaneous mutations in
+    other workspaces.
 
 ### 16.2. Prove capability-routed rename from positions and selectors
 
 This step answers whether provider-hidden actuators can mutate safely from both
 direct references and Sempai streams. It migrates prototype archive work 5.2.1
-through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001 and ADR 004.
+through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 0001, ADR 0004, and ADR
+0012. Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 16.2.1. Implement `weaver symbols rename` for position references.
-  - Requires 16.1.3 and reuses prototype archive work 5.2.1 through 5.2.5.
+  - Requires 16.1.10 and reuses prototype archive work 5.2.1 through 5.2.5.
   - Success: provider routing remains capability-first, mutation results
     include transaction ID, affected paths, provider provenance, and safety
     outcome.
 - [ ] 16.2.2. Add direct Sempai selector support to `symbols rename`.
   - Requires 15.3.5 and 16.2.1.
-  - Success: `symbols rename --query ...` handles zero, one, and many matches
-    deterministically and requires explicit policy for ambiguous mutation.
-- [ ] 16.2.3. Add `--from-stdin` selector stream consumption to mutation
-      commands.
+  - Success: `symbols rename --query ...` produces the same completed versioned
+    selector stream as `symbols list`, handles zero, one, and many matches
+    deterministically, and requires explicit policy for ambiguous mutation.
+- [ ] 16.2.3. Add typed selector stream consumption to mutation commands.
   - Requires 15.3.3, 15.3.5, and 16.2.2.
-  - Success: `weaver symbols list --query … --json | jq … | weaver symbols
-    rename --from-stdin …` works without hidden state.
+  - Success: a completion-preserving
+    `weaver symbols list --query … --json | jq -c … | weaver symbols rename
+    --selectors - …` pipeline works without hidden state. The actuator reads
+    the complete stream before planning; malformed, truncated, cross-workspace,
+    and stale records refuse; and resulting edits commit only through the
+    shared mutation engine.
 - [ ] 16.2.4. Add rename and selector-mutation combinatorial E2E coverage.
   - Requires 16.2.3.
-  - Success: coverage combines selector forms, `--json`, `--dry-run`,
-    idempotency, provider failures, syntactic failures, semantic failures, and
-    rollback assertions.
+  - Success: coverage combines selector forms, completed streams, `--json`,
+    `--dry-run`, idempotency, provider failures, stale selectors, syntactic
+    failures, semantic failures, and rollback assertions.
 
 ### 16.3. Prove the `extricate-symbol` contract with Python first
 
 This step answers whether symbol relocation can be expressed as one stable
 capability and public command before Weaver invests in Rust-specific
 orchestration. It migrates prototype archive work 5.3.1 through 5.3.6 under the
-canonical public command `weaver symbols move`. See ADR 001 and ADR 004.
+canonical public command `weaver symbols move`. See ADR 0001 and ADR 0004.
 `extract-method`, `replace-body`, and `extract-predicate` may be declared as
 distinct capability IDs, but this step does not implement those operations.
 
@@ -530,7 +780,7 @@ distinct capability IDs, but this step does not implement those operations.
     unsupported symbol shapes.
 - [ ] 16.3.5. Extend plugin and daemon failure schemas with deterministic
       refusal diagnostics and rollback guarantees for extrication.
-  - Requires 16.1.3 and 16.3.4.
+  - Requires 16.1.10 and 16.3.4.
   - Success: refusal paths emit structured diagnostics, include stable reason
     codes, enumerate valid alternatives where possible, and leave the
     filesystem unchanged.
@@ -610,8 +860,10 @@ ledger caching, and card-driven traversal.
 
 This step answers whether graph traversal gives enough extra value to justify
 its complexity. It preserves the completed prototype archive schema work 7.2.1
-and migrates prototype archive work 7.2.2 through 7.2.5, 11.1.1, and 11.2.2.
-See `docs/jacquard-card-first-symbol-graph-design.md` §12.1 through §12.3.
+and migrates prototype archive work 7.2.2 through 7.2.5, 11.1.1, and 11.2.2. See
+`docs/jacquard-card-first-symbol-graph-design.md` §12.1 through §12.3.
+Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 17.1.1. Implement a two-pass Tree-sitter extraction pipeline for graph
       slices.
@@ -650,7 +902,8 @@ See `docs/jacquard-card-first-symbol-graph-design.md` §12.1 through §12.3.
 This step answers whether historical graph reconstruction is stable enough to
 support change-risk narratives. It migrates prototype archive work 7.3.1
 through 7.3.5. See `docs/jacquard-card-first-symbol-graph-design.md` §13.1,
-§13.2, and §22.
+§13.2, and §22. Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 17.2.1. Implement git-backed blob loading for historical revisions
       without checkout.
@@ -785,8 +1038,8 @@ capability discoverability.
 
 This step answers whether Rope, rust-analyzer, `srgn`, `jedi`, static analysis,
 and future providers can share one public capability contract. It migrates
-prototype archive work 5.5.1, 5.6.1, and 5.8.1. See ADR 001, ADR 004, and ADR
-006.
+prototype archive work 5.5.1, 5.6.1, and 5.8.1. See ADR 0001, ADR 0004, and ADR
+0006.
 
 - [ ] 18.1.1. Add `srgn` or equivalent as an actuator or selector provider
       behind manifests.
@@ -808,7 +1061,9 @@ prototype archive work 5.5.1, 5.6.1, and 5.8.1. See ADR 001, ADR 004, and ADR
 This step answers whether humans and agents can debug provider selection when
 needed without making provider names normal command syntax. It migrates
 prototype archive work 5.7.1 through 5.7.5 and 5.2.6. See
-`docs/weaver-design.md` §6.1.
+`docs/weaver-design.md` §6.1. Boundary classifications for these tasks are
+tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 18.2.1. Wire provider summaries into `capabilities list` and
       `context --json`.
@@ -841,8 +1096,10 @@ formal verification, output delivery, feedback, profiles, and jobs.
 
 This step answers whether profiles, jobs, and delivery reduce repeated agent
 turns without making human usage worse. It migrates the product intent of ADR
-007 compounding primitives and prototype archive work 6.2.1. See
-`docs/weaver-design.md` §§2.1.5-2.1.6.
+0007 compounding primitives and prototype archive work 6.2.1. See
+`docs/weaver-design.md` §§2.1.5-2.1.6. Boundary classifications for these tasks
+are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 19.1.1. Implement profile storage, redaction, and root `--profile`.
   - Requires 13.3.1 and depends on OrthoConfig 9.1.
@@ -868,7 +1125,9 @@ turns without making human usage worse. It migrates the product intent of ADR
 
 This step answers whether richer human workflows can exist without weakening
 the non-interactive agent contract. It migrates prototype archive work 6.2.1
-through 6.2.3. See `docs/weaver-design.md` §§5-6.
+through 6.2.3. See `docs/weaver-design.md` §§5-6. Boundary classifications for
+these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 19.2.1. Recast project onboarding as a composition of resource-first
       commands.
@@ -889,7 +1148,7 @@ through 6.2.3. See `docs/weaver-design.md` §§5-6.
 
 This step answers whether formal and property-based checks catch regressions in
 Weaver-owned invariants. It migrates prototype archive work 8.1.1 through
-8.6.3. See `docs/formal-verification-methods-in-weaver.md` and ADR 005.
+8.6.3. See `docs/formal-verification-methods-in-weaver.md` and ADR 0005.
 
 - [ ] 19.3.1. Add pinned Kani and Verus tooling plus explicit formal targets.
   - Requires 16.1.1.
@@ -925,8 +1184,9 @@ the core Weaver promise.
 ### 20.1. Evaluate generated integrations
 
 This step answers whether external integration surfaces are wrappers over the
-same command metadata or a distracting second product. See ADR 007 and
-OrthoConfig 10.1.
+same command metadata or a distracting second product. See ADR 0007 and
+OrthoConfig 10.1. Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 20.1.1. Decide whether to generate MCP descriptions from
       `context --json`.
@@ -961,10 +1221,59 @@ new design rather than quiet re-entry into the core roadmap.
     performance shows the core ledger is insufficient for the supported
     history workflows.
 
-## Archive
+### 20.3. Evaluate deferred observability expansions
+
+This step answers whether optional observability surfaces have earned a new
+design after the local-first RFC 0001 contract exists. It keeps metrics,
+distributed tracing, retained diagnostics, and status expansion out of the core
+promise until their privacy, retention, endpoint, and command-latency costs are
+explicit. Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md). See
+RFC 0001:
+
+- [Open questions](rfcs/rfc-0001-local-daemon-observability.md#open-questions)
+- [Local request correlation](rfcs/rfc-0001-local-daemon-observability.md#local-request-correlation)
+- [status expansion](rfcs/rfc-0001-local-daemon-observability.md#deferred-path-status-subcommand-expansion)
+- [diagnostics artefact](rfcs/rfc-0001-local-daemon-observability.md#option-d-dedicated-diagnostics-artefact)
+- [metrics endpoint](rfcs/rfc-0001-local-daemon-observability.md#deferred-path-optional-metrics-endpoint)
+- [options considered](rfcs/rfc-0001-local-daemon-observability.md#options-considered)
+
+<!-- Separate the reference list above from the task checklist below. -->
+
+- [ ] 20.3.1. Decide whether CLI pre-daemon diagnostics need a minimal
+      `tracing` subscriber.
+  - Requires 13.4.6.
+  - Success: an ADR records either explicit stderr guidance for pre-daemon
+    diagnostics or a local subscriber contract without a remote telemetry
+    surface.
+- [ ] 20.3.2. Decide whether to add a local `request_id` to the CLI-to-daemon
+      JSONL schema.
+  - Requires 13.4.6.
+  - Success: an RFC 0001 update either accepts a bounded local correlation
+    field with schema and privacy rules or records why structured event fields
+    are enough.
+- [ ] 20.3.3. Decide whether `weaver daemon status --json` belongs in the
+      command contract.
+  - Requires 13.4.6 and 13.3.1.
+  - Success: a roadmap note records a bounded status-schema extension,
+    deliberate reliance on `weaverd.health` for machine-readable state, or a
+    deferral with rationale.
+- [ ] 20.3.4. Decide whether abnormal exits need a dedicated bounded
+      diagnostics artefact.
+  - Requires 13.4.6.
+  - Success: an ADR either specifies a separate retained diagnostics
+    artefact with privacy, retention, cleanup procedures, and rotation rules or
+    keeps foreground logs as the supported debug path.
+- [ ] 20.3.5. Reconfirm the metrics endpoint and distributed tracing boundary.
+  - Requires completion of 20.3.2 and 20.3.4.
+  - Success: an RFC 0001 update records that any metrics, tracing, dashboard,
+    or aggregation surface requires a follow-up RFC with local-binding,
+    feature-flag, privacy, and latency rules.
+
+**Archive:**
 
 Historical prototype roadmap entries live in
 [`docs/archive/prototype-roadmap.md`](archive/prototype-roadmap.md). Those
 entries keep numbers `1` through `11`; this live roadmap reserves numbers `12`
-through `20` for the forward ADR 007 build sequence. The archive is not an
+through `20` for the forward ADR 0007 build sequence. The archive is not an
 active implementation backlog.

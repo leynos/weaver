@@ -1,6 +1,6 @@
 //! Error types for process-based language server adapters.
 
-use std::{io, sync::Arc};
+use std::{io, sync::Arc, time::Duration};
 
 use thiserror::Error;
 
@@ -57,6 +57,21 @@ pub enum AdapterError {
     #[error("language server process exited unexpectedly")]
     ProcessExited,
 
+    /// The server was stopped after it stopped answering, and has not yet been
+    /// given another chance.
+    #[error("language server is unresponsive; not restarting it for {cooldown_secs}s")]
+    Unresponsive {
+        /// Seconds that must pass after the failure before a restart is tried.
+        cooldown_secs: u64,
+    },
+
+    /// The configured response timeout cannot be turned into a deadline.
+    #[error("response timeout {timeout:?} is too large to use as a deadline")]
+    InvalidResponseTimeout {
+        /// The timeout that overflowed the clock.
+        timeout: Duration,
+    },
+
     /// Maximum response iterations reached while waiting for response.
     #[error("maximum response iterations reached while waiting for response (id: {request_id})")]
     MaxResponseIterations {
@@ -66,6 +81,12 @@ pub enum AdapterError {
 }
 
 impl AdapterError {
+    /// Returns `true` when the server failed to answer before its deadline.
+    #[must_use]
+    pub const fn is_timeout(&self) -> bool {
+        matches!(self, Self::Transport(TransportError::TimedOut))
+    }
+
     /// Creates a server error from a JSON-RPC error.
     #[must_use]
     pub fn from_jsonrpc(error: JsonRpcError) -> Self {
@@ -82,6 +103,10 @@ pub enum TransportError {
     /// I/O error during read or write.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
+
+    /// No complete message arrived before the response deadline.
+    #[error("timed out waiting for the language server to respond")]
+    TimedOut,
 
     /// Missing Content-Length header.
     #[error("missing Content-Length header")]

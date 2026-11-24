@@ -24,16 +24,20 @@ pub struct TestWorld {
 
 impl TestWorld {
     /// Builds a world with a successful configuration loader.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            loader: Box::new(TestConfigLoader::new()),
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the loader's temporary runtime directory cannot be
+    /// created.
+    pub fn new() -> Result<Self, String> {
+        Ok(Self {
+            loader: Box::new(TestConfigLoader::new()?),
             reporter: Arc::new(RecordingHealthReporter::default()),
             provider: RecordingBackendProvider::default(),
             daemon: None,
             bootstrap_error: None,
             backend_result: None,
-        }
+        })
     }
 
     /// Installs a loader that always fails.
@@ -43,9 +47,10 @@ impl TestWorld {
     }
 
     /// Installs a loader that succeeds.
-    pub fn use_successful_loader(&mut self) {
-        self.loader = Box::new(TestConfigLoader::new());
+    pub fn use_successful_loader(&mut self) -> Result<(), String> {
+        self.loader = Box::new(TestConfigLoader::new()?);
         self.reset_results();
+        Ok(())
     }
 
     /// Runs the bootstrap sequence once.
@@ -75,9 +80,8 @@ impl TestWorld {
 
     /// Requests the specified backend via the daemon handle.
     pub fn request_backend(&mut self, kind: BackendKind) {
-        let daemon = match self.daemon.as_mut() {
-            Some(daemon) => daemon,
-            None => return,
+        let Some(daemon) = self.daemon.as_mut() else {
+            return;
         };
         self.backend_result = Some(daemon.ensure_backend(kind));
     }
@@ -99,10 +103,10 @@ impl TestWorld {
     }
 }
 
-impl Default for TestWorld {
-    fn default() -> Self { Self::new() }
-}
-
-/// Default test world fixture.
-#[must_use]
-pub fn world() -> RefCell<TestWorld> { RefCell::new(TestWorld::new()) }
+/// Creates the default test world fixture.
+///
+/// # Errors
+///
+/// Returns an error if the fixture's temporary runtime directory cannot be
+/// created.
+pub fn world() -> Result<RefCell<TestWorld>, String> { Ok(RefCell::new(TestWorld::new()?)) }

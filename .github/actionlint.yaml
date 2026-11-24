@@ -1,0 +1,22 @@
+# Runner labels actionlint cannot know about.
+#
+# actionlint validates `runs-on` against GitHub's own label set and reports
+# anything else as an unknown runner, so every non-hosted label this
+# repository uses has to be declared here.
+#
+# This file is new: weaver used only GitHub-hosted labels until the lanes a
+# developer waits on moved to Ubicloud.
+#
+# The registry is held to the labels actually in use, in both directions, by
+# tests/workflow_contracts/ci_runner_placement_test.py. A label registered
+# here and used nowhere is as much a defect as a label used and not
+# registered, because a stale entry silently permits a runner family nobody
+# reviewed for whatever lane adopts it next. "In use" is derived from both
+# arms of every conditional and from the `runner` inputs the release
+# workflow passes to its reusable build workflow, not only from `runs-on`
+# lines, because a label this repository chooses is this repository's to
+# register wherever it is written.
+self-hosted-runner:
+  labels:
+    - ubicloud-standard-2
+    - ubicloud-standard-4

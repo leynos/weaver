@@ -30,6 +30,7 @@
 
 mod backends;
 mod bootstrap;
+mod cap_fs;
 mod dispatch;
 mod health;
 mod process;
@@ -37,6 +38,24 @@ pub mod safety_harness;
 mod semantic_provider;
 mod telemetry;
 mod transport;
+
+#[cfg(feature = "test-support")]
+pub mod test_support {
+    //! Exposes daemon contracts to workspace integration tests only.
+
+    /// Returns the daemon's domain-to-operation routing catalogue.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let catalogue = weaverd::test_support::routing_catalogue();
+    /// assert!(catalogue.iter().any(|(domain, _)| *domain == "observe"));
+    /// ```
+    #[must_use]
+    pub const fn routing_catalogue() -> [(&'static str, &'static [&'static str]); 3] {
+        crate::dispatch::routing_catalogue()
+    }
+}
 
 pub use backends::{
     BackendKind,
@@ -68,5 +87,7 @@ pub use telemetry::{TelemetryError, TelemetryHandle};
 #[doc(hidden)]
 pub use transport::{ConnectionHandler, ConnectionStream};
 
+#[cfg(test)]
+mod test_helpers;
 #[cfg(test)]
 mod tests;

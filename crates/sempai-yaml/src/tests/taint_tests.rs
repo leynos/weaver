@@ -44,7 +44,8 @@ fn parse_taint_rule(#[case] yaml: &str, #[case] check: fn(&RulePrincipal) -> boo
     check_first_rule(yaml, |rule| {
         assert_eq!(rule.mode(), &RuleMode::Taint);
         assert!(check(rule.principal()));
-    });
+    })
+    .expect("taint rule should parse");
 }
 
 #[test]
@@ -63,7 +64,7 @@ fn reject_mixed_taint_forms() {
         "      - pattern: source()\n",
     );
 
-    let (code, message, _) = first_err_diagnostic(yaml);
+    let (code, message, _) = first_err_diagnostic(yaml).expect("schema validation should fail");
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(message.contains("taint rule must use either"));
 }
@@ -83,7 +84,7 @@ fn reject_taint_rule_with_match() {
         "    match: \"foo($X)\"\n",
     );
 
-    let (code, message, _) = first_err_diagnostic(yaml);
+    let (code, message, _) = first_err_diagnostic(yaml).expect("schema validation should fail");
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(message.contains("taint mode does not support `match`"));
 }

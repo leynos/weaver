@@ -14,6 +14,7 @@ use weaver_config::SocketEndpoint;
 
 use super::error::LifecycleError;
 
+/// Maximum time allowed for a single TCP or Unix socket connection probe.
 const SOCKET_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Ensures the socket endpoint is not currently in use.
@@ -29,7 +30,7 @@ pub(super) fn ensure_socket_available(endpoint: &SocketEndpoint) -> Result<(), L
 /// Checks whether the socket endpoint is reachable.
 pub(super) fn socket_is_reachable(endpoint: &SocketEndpoint) -> Result<bool, LifecycleError> {
     match try_connect(endpoint) {
-        Ok(_) => Ok(true),
+        Ok(()) => Ok(true),
         Err(error) if is_socket_available(&error) => Ok(false),
         Err(source) => Err(LifecycleError::SocketProbe {
             endpoint: endpoint.to_string(),
@@ -38,6 +39,12 @@ pub(super) fn socket_is_reachable(endpoint: &SocketEndpoint) -> Result<bool, Lif
     }
 }
 
+/// Attempts a connection to the given endpoint.
+///
+/// # Errors
+///
+/// Returns the underlying I/O error when the address cannot be resolved or the
+/// connection attempt fails.
 fn try_connect(endpoint: &SocketEndpoint) -> io::Result<()> {
     match endpoint {
         SocketEndpoint::Tcp { host, port } => {
@@ -48,6 +55,11 @@ fn try_connect(endpoint: &SocketEndpoint) -> io::Result<()> {
     }
 }
 
+/// Resolves `host` and `port` to the first available socket address.
+///
+/// # Errors
+///
+/// Returns an I/O error when resolution fails or yields no addresses.
 fn resolve_tcp(host: &str, port: u16) -> io::Result<SocketAddr> {
     let mut addrs = (host, port).to_socket_addrs()?;
     addrs
@@ -55,6 +67,11 @@ fn resolve_tcp(host: &str, port: u16) -> io::Result<SocketAddr> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::AddrNotAvailable, "no resolved address"))
 }
 
+/// Connects to a Unix domain socket at `path`.
+///
+/// # Errors
+///
+/// Returns an I/O error when the socket cannot be created or connected.
 #[cfg(unix)]
 fn connect_unix(path: &str) -> io::Result<()> {
     let socket = Socket::new(Domain::UNIX, Type::STREAM, None)?;
@@ -62,6 +79,11 @@ fn connect_unix(path: &str) -> io::Result<()> {
     socket.connect_timeout(&address, SOCKET_PROBE_TIMEOUT)
 }
 
+/// Reports that Unix domain sockets are unavailable on this platform.
+///
+/// # Errors
+///
+/// Always returns an `Unsupported` I/O error on non-Unix targets.
 #[cfg(not(unix))]
 fn connect_unix(_path: &str) -> io::Result<()> {
     Err(io::Error::new(
@@ -127,7 +149,7 @@ mod tests {
         ensure_socket_available(&endpoint).expect("socket becomes available");
     }
 
-    /// Tests that is_socket_available correctly classifies error kinds indicating
+    /// Tests that `is_socket_available` correctly classifies error kinds indicating
     /// the socket is available (no process listening).
     #[rstest]
     #[case::connection_refused(io::ErrorKind::ConnectionRefused, true)]
@@ -141,7 +163,7 @@ mod tests {
         assert_eq!(is_socket_available(&error), expected);
     }
 
-    /// Tests that is_socket_available correctly rejects error kinds that do NOT
+    /// Tests that `is_socket_available` correctly rejects error kinds that do NOT
     /// indicate availability (socket may be in use or other issues).
     #[rstest]
     #[case::permission_denied(io::ErrorKind::PermissionDenied)]
@@ -163,7 +185,7 @@ mod tests {
         let dir = TempDir::new().expect("create temp dir");
         let socket_path = dir.path().join("test.sock");
         let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
-        let endpoint = SocketEndpoint::unix(socket_path.to_str().expect("path to str").to_string());
+        let endpoint = SocketEndpoint::unix(socket_path.to_str().expect("path to str").to_owned());
 
         assert!(socket_is_reachable(&endpoint).expect("probe reachable"));
         drop(listener);

@@ -5,6 +5,7 @@
 //! executes a refactoring operation, and writes one JSONL response to stdout.
 
 mod arguments;
+mod rename;
 mod workspace_fs;
 
 #[cfg(test)]
@@ -13,7 +14,7 @@ mod tests;
 use std::{
     fmt,
     io::{BufRead, Write},
-    path::{Component, Path, PathBuf},
+    path::PathBuf,
     process::Command,
 };
 
@@ -34,7 +35,11 @@ use weaver_plugins::{
 use crate::arguments::parse_rename_symbol_arguments;
 pub(crate) use crate::workspace_fs::write_workspace_file;
 
+/// Interpreter used to run the embedded rename script; must be on `PATH` with
+/// the `rope` package installed.
 const PYTHON_BINARY: &str = "python3";
+/// Inline Python program that drives the `rope` library's rename refactor
+/// and prints the modified file to stdout; passed via `python3 -c`.
 const PYTHON_RENAME_SCRIPT: &str = concat!(
     "import os,sys\n",
     "from rope.base.project import Project\n",
@@ -82,7 +87,7 @@ impl RopeAdapter for PythonRopeAdapter {
             TempDir::new().map_err(|source| RopeAdapterError::WorkspaceCreate { source })?;
         write_workspace_file(workspace.path(), file.path(), file.content())?;
 
-        let relative_path = path_to_slash(file.path());
+        let relative_path = rename::path_to_slash(file.path());
         let mut command = Command::new(PYTHON_BINARY);
         command.arg("-c");
         command.arg(PYTHON_RENAME_SCRIPT);
@@ -183,7 +188,11 @@ pub enum RopeAdapterError {
 /// Structured failure carrying an optional reason code for diagnostics.
 #[derive(Debug)]
 pub(crate) struct PluginFailure {
+    /// Human-readable failure description, forwarded to the diagnostic
+    /// message shown to the caller.
     message: String,
+    /// Stable machine-readable classification, when the failure mode is
+    /// known; `None` for miscellaneous errors.
     reason_code: Option<ReasonCode>,
 }
 
@@ -247,6 +256,8 @@ pub fn run(stdin: &mut impl BufRead, stdout: &mut impl Write) -> Result<(), Plug
     run_with_adapter(stdin, stdout, &PythonRopeAdapter)
 }
 
+/// Reads and parses exactly one JSONL request line from `stdin`; an empty
+/// first read (EOF) is treated as a failure rather than silently succeeding.
 fn read_request(stdin: &mut impl BufRead) -> Result<PluginRequest, PluginFailure> {
     let mut line = String::new();
     let bytes_read = stdin
@@ -261,6 +272,8 @@ fn read_request(stdin: &mut impl BufRead) -> Result<PluginRequest, PluginFailure
         .map_err(|error| PluginFailure::plain(format!("invalid plugin request JSON: {error}")))
 }
 
+/// Dispatches a parsed request to the handler for its `operation`; this
+/// crate currently only implements `rename-symbol`.
 fn execute_request<R: RopeAdapter>(
     adapter: &R,
     request: &PluginRequest,
@@ -274,6 +287,10 @@ fn execute_request<R: RopeAdapter>(
     }
 }
 
+/// Validates the request, runs the rename via `adapter`, and packages the
+/// result as a search/replace diff. Requires exactly one file payload
+/// because rope renames a single file at a time; rejects a no-op rename so
+/// callers can detect a symbol that was not actually found.
 fn execute_rename<R: RopeAdapter>(
     adapter: &R,
     request: &PluginRequest,
@@ -295,7 +312,7 @@ fn execute_rename<R: RopeAdapter>(
         }
     };
 
-    validate_relative_path(file.path()).map_err(|error| {
+    rename::validate_relative_path(file.path()).map_err(|error| {
         PluginFailure::with_reason(error.to_string(), ReasonCode::IncompletePayload)
     })?;
 
@@ -315,65 +332,14 @@ fn execute_rename<R: RopeAdapter>(
         ));
     }
 
-    let patch = build_search_replace_patch(file.path(), file.content(), &modified);
+    let patch = rename::build_search_replace_patch(file.path(), file.content(), &modified);
     Ok(PluginResponse::success(PluginOutput::Diff {
         content: patch,
     }))
 }
 
-fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {
-    if path.is_absolute() {
-        return Err(RopeAdapterError::InvalidPath {
-            message: String::from("absolute paths are not allowed"),
-        });
-    }
-
-    if path.components().any(|c| matches!(c, Component::ParentDir)) {
-        return Err(RopeAdapterError::InvalidPath {
-            message: String::from("path traversal is not allowed"),
-        });
-    }
-    if path.components().any(|c| matches!(c, Component::Prefix(_))) {
-        return Err(RopeAdapterError::InvalidPath {
-            message: String::from("windows path prefixes are not allowed"),
-        });
-    }
-
-    Ok(())
-}
-
-fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> String {
-    let unix_path = path_to_slash(path);
-    let sep_after_original = if original.ends_with('\n') { "" } else { "\n" };
-    let sep_after_modified = if modified.ends_with('\n') { "" } else { "\n" };
-
-    format!(
-        concat!(
-            "diff --git a/{unix_path} b/{unix_path}\n",
-            "<<<<<<< SEARCH\n",
-            "{original}{sep_a}",
-            "=======\n",
-            "{modified}{sep_b}",
-            ">>>>>>> REPLACE\n",
-        ),
-        unix_path = unix_path,
-        original = original,
-        sep_a = sep_after_original,
-        modified = modified,
-        sep_b = sep_after_modified,
-    )
-}
-
-fn path_to_slash(path: &Path) -> String {
-    path.components()
-        .filter_map(|component| match component {
-            Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
-            _ => None,
-        })
-        .collect::<Vec<String>>()
-        .join("/")
-}
-
+/// Wraps a [`PluginFailure`] as a protocol response carrying one error
+/// diagnostic, attaching the machine-readable reason code when one is present.
 pub(crate) fn failure_response(failure: PluginFailure) -> PluginResponse {
     let mut diagnostic = PluginDiagnostic::new(DiagnosticSeverity::Error, failure.message);
     if let Some(code) = failure.reason_code {

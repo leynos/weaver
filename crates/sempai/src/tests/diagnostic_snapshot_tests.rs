@@ -59,8 +59,8 @@ fn redact_path_value(value: &mut serde_json::Value) {
     }
 }
 
-fn redacted_report_json(report: &DiagnosticReport) -> String {
-    let mut value = serde_json::to_value(report).expect("serialize diagnostic report");
+fn redacted_report_json(report: &DiagnosticReport) -> serde_json::Result<String> {
+    let mut value = serde_json::to_value(report)?;
     if let Some(diagnostics) = value
         .get_mut("diagnostics")
         .and_then(serde_json::Value::as_array_mut)
@@ -69,7 +69,7 @@ fn redacted_report_json(report: &DiagnosticReport) -> String {
             redact_diagnostic_spans(diagnostic);
         }
     }
-    serde_json::to_string_pretty(&value).expect("stringify diagnostic report")
+    serde_json::to_string_pretty(&value)
 }
 
 #[rstest]
@@ -131,5 +131,8 @@ fn snapshot_diagnostic_report(
     assert_eq!(first.code(), expected_code);
     assert!(first.message().contains(expected_msg_fragment));
 
-    assert_snapshot!(snapshot_name, redacted_report_json(&report));
+    assert_snapshot!(
+        snapshot_name,
+        redacted_report_json(&report).expect("diagnostic report should serialize")
+    );
 }

@@ -600,7 +600,7 @@ Direction: plugin -> weaverd (stdout). A single JSONL line:
 Plugin stderr is captured for diagnostic logging but is not part of the
 protocol.
 
-## Artifacts and notes
+## Artefacts and notes
 
 (To be populated during implementation with transcripts of test runs and any
 notable code snippets.)

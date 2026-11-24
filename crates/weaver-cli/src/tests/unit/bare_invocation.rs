@@ -11,7 +11,7 @@ use std::{
 };
 
 use ortho_config::{FluentLocalizer, Localizer, NoOpLocalizer};
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use weaver_config::Config;
 
 use crate::{
@@ -22,45 +22,33 @@ use crate::{
     handle_preflight,
     localizer::{WEAVER_EN_US, write_bare_help},
     run_with_loader,
+    tests::support,
 };
 
-/// A config loader that panics if called, proving that bare invocation
-/// short-circuits before configuration loading.
-struct PanickingLoader;
-
-impl ConfigLoader for PanickingLoader {
-    fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-        panic!("bare invocation must not attempt configuration loading");
-    }
-}
-
 /// Renders the bare help block using the given localizer.
-fn render_help(localizer: &dyn Localizer) -> String {
+fn render_help(localizer: &dyn Localizer) -> anyhow::Result<String> {
     let mut buf = Vec::new();
-    write_bare_help(&mut buf, localizer).expect("write bare help");
-    String::from_utf8(buf).expect("utf8")
+    write_bare_help(&mut buf, localizer)?;
+    Ok(String::from_utf8(buf)?)
 }
 
-/// Runs the CLI with no arguments (bare invocation) using a
-/// [`PanickingLoader`] and returns the exit code plus captured output.
-fn run_bare_invocation() -> (ExitCode, Vec<u8>, Vec<u8>) {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
-    let exit = run_with_loader(vec![OsString::from("weaver")], &mut io, &PanickingLoader);
-    (exit, stdout, stderr)
+/// Runs the CLI with no arguments (bare invocation) using the shared
+/// panicking loader, proving the path under test short-circuits before
+/// configuration loading. Returns the exit code plus captured output.
+#[fixture]
+fn bare_invocation() -> (ExitCode, Vec<u8>, Vec<u8>) {
+    support::run_with_panicking_loader(vec![OsString::from("weaver")])
 }
 
-#[test]
-fn bare_invocation_exits_with_failure() {
-    let (exit, ..) = run_bare_invocation();
+#[rstest]
+fn bare_invocation_exits_with_failure(bare_invocation: (ExitCode, Vec<u8>, Vec<u8>)) {
+    let (exit, ..) = bare_invocation;
     assert_eq!(exit, ExitCode::FAILURE);
 }
 
-#[test]
-fn bare_invocation_emits_help_to_stderr() {
-    let (_, _, stderr) = run_bare_invocation();
+#[rstest]
+fn bare_invocation_emits_help_to_stderr(bare_invocation: (ExitCode, Vec<u8>, Vec<u8>)) {
+    let (_, _, stderr) = bare_invocation;
     let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
     assert!(stderr_text.contains("Usage: weaver"));
     assert!(stderr_text.contains("observe"));
@@ -74,9 +62,9 @@ fn bare_invocation_emits_help_to_stderr() {
 ///   error: <problem>
 ///   <alternatives>
 ///   Next command: <command>
-#[test]
-fn bare_invocation_uses_three_part_template() {
-    let (_, _, stderr) = run_bare_invocation();
+#[rstest]
+fn bare_invocation_uses_three_part_template(bare_invocation: (ExitCode, Vec<u8>, Vec<u8>)) {
+    let (_, _, stderr) = bare_invocation;
     let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
 
     // Part 1: error line
@@ -124,9 +112,9 @@ fn bare_invocation_uses_three_part_template() {
     );
 }
 
-#[test]
-fn bare_invocation_produces_no_stdout() {
-    let (_, stdout, _) = run_bare_invocation();
+#[rstest]
+fn bare_invocation_produces_no_stdout(bare_invocation: (ExitCode, Vec<u8>, Vec<u8>)) {
+    let (_, stdout, _) = bare_invocation;
     assert!(
         stdout.is_empty(),
         "bare invocation must not write to stdout"
@@ -134,13 +122,20 @@ fn bare_invocation_produces_no_stdout() {
 }
 
 /// Asserts that the rendered help block contains the expected fragments.
-fn assert_help_text(localizer: &dyn Localizer) {
-    let text = render_help(localizer);
-    assert!(text.contains("Usage: weaver"));
-    assert!(text.contains("observe"));
-    assert!(text.contains("act"));
-    assert!(text.contains("verify"));
-    assert!(text.contains("weaver --help"));
+fn assert_help_text(localizer: &dyn Localizer) -> anyhow::Result<()> {
+    let text = render_help(localizer)?;
+    anyhow::ensure!(
+        text.contains("Usage: weaver"),
+        "bare help must contain its usage line"
+    );
+    anyhow::ensure!(text.contains("observe"), "bare help must list observe");
+    anyhow::ensure!(text.contains("act"), "bare help must list act");
+    anyhow::ensure!(text.contains("verify"), "bare help must list verify");
+    anyhow::ensure!(
+        text.contains("weaver --help"),
+        "bare help must include its help pointer"
+    );
+    Ok(())
 }
 
 #[rstest]
@@ -150,19 +145,26 @@ fn write_bare_help_produces_english(#[case] use_fluent: bool) {
     if use_fluent {
         let localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
             .expect("embedded Fluent catalogue must parse");
-        assert_help_text(&localizer);
+        assert_help_text(&localizer).expect("Fluent bare help must contain all expected fragments");
     } else {
-        assert_help_text(&NoOpLocalizer);
+        assert_help_text(&NoOpLocalizer)
+            .expect("fallback bare help must contain all expected fragments");
     }
 }
 
 #[test]
 fn config_only_invocation_emits_bare_help() {
+    /// Reports that the config-only path reached the config loader.
+    ///
+    /// Diverging rather than returning keeps the panic out of the loader's
+    /// `Result`-returning `load`, which the workspace lint table forbids.
+    fn must_not_load() -> ! {
+        panic!("config-only bare invocation must not attempt configuration loading");
+    }
+
     struct PanickingConfigOnlyLoader;
     impl ConfigLoader for PanickingConfigOnlyLoader {
-        fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-            panic!("config-only bare invocation must not attempt configuration loading");
-        }
+        fn load(&self, _args: &[OsString]) -> Result<Config, AppError> { must_not_load() }
     }
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -188,8 +190,8 @@ fn config_only_invocation_emits_bare_help() {
 fn fluent_and_fallback_outputs_are_identical() {
     let fluent_localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
         .expect("embedded Fluent catalogue must parse");
-    let fluent_output = render_help(&fluent_localizer);
-    let fallback_output = render_help(&NoOpLocalizer);
+    let fluent_output = render_help(&fluent_localizer).expect("Fluent help must render as UTF-8");
+    let fallback_output = render_help(&NoOpLocalizer).expect("fallback help must render as UTF-8");
     assert_eq!(
         fluent_output, fallback_output,
         "Fluent catalogue and fallback strings have diverged"
@@ -198,13 +200,13 @@ fn fluent_and_fallback_outputs_are_identical() {
 
 #[test]
 fn bare_help_contains_usage_line() {
-    let text = render_help(&NoOpLocalizer);
+    let text = render_help(&NoOpLocalizer).expect("bare help must render as UTF-8");
     assert!(text.contains("Usage:"));
 }
 
 #[test]
 fn bare_help_contains_single_help_pointer() {
-    let text = render_help(&NoOpLocalizer);
+    let text = render_help(&NoOpLocalizer).expect("bare help must render as UTF-8");
     let count = text.matches("weaver --help").count();
     assert_eq!(count, 1, "expected exactly one --help pointer");
 }

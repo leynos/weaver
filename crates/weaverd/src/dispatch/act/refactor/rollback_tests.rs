@@ -1,5 +1,6 @@
 //! Rollback-oriented tests for `act refactor` failure paths.
 
+use serial_test::serial;
 use tempfile::TempDir;
 use weaver_plugins::{PluginOutput, PluginResponse};
 
@@ -9,7 +10,10 @@ use super::refactor_helpers::{
     resolutions::{RefusedResolution, SelectedResolution, refused_resolution},
     rollback::{ExecuteResult, RollbackRuntime, rollback_runtime, selected_runtime},
 };
-use crate::dispatch::act::refactor::{RefactorContext, ResponseWriter, handle};
+use crate::{
+    dispatch::act::refactor::{RefactorContext, ResponseWriter, handle},
+    tests::support::fs as test_fs,
+};
 
 struct RollbackOutcome {
     status: i32,
@@ -33,7 +37,7 @@ fn refused_runtime() -> RollbackRuntime {
 
 fn rope_python_runtime(execute_result: ExecuteResult) -> RollbackRuntime {
     selected_runtime(
-        SelectedResolution {
+        &SelectedResolution {
             capability: weaver_plugins::CapabilityId::RenameSymbol,
             language: "python",
             provider: "rope",
@@ -44,11 +48,11 @@ fn rope_python_runtime(execute_result: ExecuteResult) -> RollbackRuntime {
     )
 }
 
-fn run_failure_case(runtime: RollbackRuntime) -> Result<RollbackOutcome, String> {
+fn run_failure_case(runtime: &RollbackRuntime) -> Result<RollbackOutcome, String> {
     let workspace = TempDir::new().map_err(|e| format!("workspace: {e}"))?;
     let file = "notes.py";
     let file_path = workspace.path().join(file);
-    std::fs::write(&file_path, original_content_for(file_path.as_path()))
+    test_fs::write(&file_path, original_content_for(file_path.as_path()))
         .map_err(|e| format!("write file: {e}"))?;
 
     let request = command_request(standard_rename_args_for_provider(file, "rope"));
@@ -63,7 +67,7 @@ fn run_failure_case(runtime: RollbackRuntime) -> Result<RollbackOutcome, String>
         RefactorContext {
             backends: &mut backends,
             workspace_root: workspace.path(),
-            runtime: &runtime,
+            runtime,
         },
     )
     .map_err(|e| format!("dispatch should complete: {e}"))?;
@@ -71,7 +75,7 @@ fn run_failure_case(runtime: RollbackRuntime) -> Result<RollbackOutcome, String>
     Ok(RollbackOutcome {
         status: result.status,
         stderr: String::from_utf8(output).map_err(|e| format!("stderr utf8: {e}"))?,
-        content: std::fs::read_to_string(&file_path).map_err(|e| format!("read file: {e}"))?,
+        content: test_fs::read_to_string(&file_path).map_err(|e| format!("read file: {e}"))?,
     })
 }
 
@@ -85,22 +89,31 @@ fn assert_rollback_invariants(outcome: &RollbackOutcome, stderr_fragment: &str) 
 }
 
 #[test]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn refused_resolution_leaves_target_file_unchanged() -> Result<(), String> {
-    let outcome = run_failure_case(refused_runtime())?;
+    let outcome = run_failure_case(&refused_runtime())?;
     assert_rollback_invariants(&outcome, "unsupported_language");
     Ok(())
 }
 
 #[test]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn plugin_runtime_error_leaves_target_file_unchanged() -> Result<(), String> {
-    let outcome = run_failure_case(rope_python_runtime(ExecuteResult::MissingPlugin("rope")))?;
+    let outcome = run_failure_case(&rope_python_runtime(ExecuteResult::MissingPlugin("rope")))?;
     assert_rollback_invariants(&outcome, "act refactor failed");
     Ok(())
 }
 
 #[test]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn successful_non_diff_response_leaves_target_file_unchanged() -> Result<(), String> {
-    let outcome = run_failure_case(rope_python_runtime(ExecuteResult::Success(
+    let outcome = run_failure_case(&rope_python_runtime(ExecuteResult::Success(
         PluginResponse::success(PluginOutput::Analysis {
             data: serde_json::json!({ "unexpected": true }),
         }),

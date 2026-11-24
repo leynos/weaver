@@ -8,17 +8,35 @@
 
 use std::{env, ffi::OsString};
 
+/// Removes one environment variable from the current process.
 #[inline]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "sandbox activation requires process-wide environment restoration"
+)]
 fn unset_env_var<K: AsRef<std::ffi::OsStr>>(key: K) { unsafe { env::remove_var(key) } }
 
+/// Sets one environment variable on the current process.
 #[inline]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "sandbox activation requires process-wide environment restoration"
+)]
 fn set_env_var<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, value: V) {
     unsafe { env::set_var(key, value) };
+}
+
+/// Removes every variable currently in the process environment.
+fn clear_environment() {
+    for (key, _) in env::vars_os() {
+        unset_env_var(&key);
+    }
 }
 
 /// Restores the parent process environment after `birdcage` strips variables.
 #[derive(Debug)]
 pub struct EnvGuard {
+    /// Environment captured before the sandbox stripped it.
     original: Vec<(OsString, OsString)>,
 }
 
@@ -31,13 +49,14 @@ impl EnvGuard {
         }
     }
 
+    /// Replaces the current environment with the captured snapshot.
     pub(crate) fn restore(&self) {
-        // Clear current environment.
-        for (key, _) in env::vars_os() {
-            unset_env_var(&key);
-        }
+        clear_environment();
+        self.apply_snapshot();
+    }
 
-        // Restore snapshot.
+    /// Reinstates every variable captured by [`EnvGuard::capture`].
+    fn apply_snapshot(&self) {
         for (key, value) in &self.original {
             set_env_var(key, value);
         }

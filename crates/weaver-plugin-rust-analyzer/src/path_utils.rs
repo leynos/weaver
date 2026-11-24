@@ -75,12 +75,22 @@ pub(crate) fn normalize_request_uri(uri: &str) -> Result<String, RustAnalyzerAda
     path_to_slash(relative_path.as_path())
 }
 
+/// Builds the shared error for a URI that is not an authority-free `file://` URI.
+///
+/// Kept deliberately vague about which check failed so the message does not
+/// disclose whether a path exists.
 fn invalid_file_uri_error() -> RustAnalyzerAdapterError {
     RustAnalyzerAdapterError::InvalidPath {
         message: String::from("uri argument must be a valid file:// URI without an authority"),
     }
 }
 
+/// Removes the leading root (and any Windows drive prefix) from a decoded URI path.
+///
+/// # Errors
+///
+/// Returns [`RustAnalyzerAdapterError::InvalidPath`] if the path is not
+/// absolute or the remainder is not a valid workspace-relative path.
 fn strip_file_uri_root(path: &Path) -> Result<PathBuf, RustAnalyzerAdapterError> {
     let mut components = path.components();
     match components.next() {

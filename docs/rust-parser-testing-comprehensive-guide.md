@@ -817,8 +817,8 @@ fn test_cst_snapshots(input: &Path) {
 While the raw `SyntaxNode` API is powerful, it is untyped. For semantic
 analysis, it is conventional to build a typed AST layer on top of the CST. This
 involves creating structs that wrap `SyntaxNode` and provide typed accessor
-methods for navigating the tree, as demonstrated in `rowan`'s
-`s_expressions.rs` example.[^31]
+methods for navigating the tree, as demonstrated in `rowan`'s `s_expressions.rs`
+example.[^31]
 
 For example, a `FunctionDef` struct might wrap a `SyntaxNode` of kind `FN_DEF`
 and provide methods like `name() -> Option<SyntaxToken>` and
@@ -888,9 +888,9 @@ The core workflow of property-based testing is:
    matching a regex, or complex, custom data structures).
 
 3. **Test and Shrink:** The test runner executes the property function hundreds
-   or thousands of times with different generated inputs. If an assertion
-   fails, `proptest` begins a shrinking process, iteratively simplifying the
-   failing input to find a minimal counterexample.
+   or thousands of times with different generated inputs. If an assertion fails,
+   `proptest` begins a shrinking process, iteratively simplifying the failing
+   input to find a minimal counterexample.
 
 For parsers, this approach is invaluable because it uncovers obscure bugs that
 would be nearly impossible to find with handwritten tests.

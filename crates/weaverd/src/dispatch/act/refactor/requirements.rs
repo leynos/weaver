@@ -8,19 +8,27 @@ use weaver_plugins::CapabilityId;
 use super::manifests::built_in_provider_names;
 use crate::dispatch::errors::DispatchError;
 
+/// Flags required by `act refactor`, in operator-facing order.
 const REQUIRED_FLAGS: &[&str] = &[
     "--provider <plugin>",
     "--refactoring <operation>",
     "--file <path>",
+    "--position <line:col>",
 ];
-const NEXT_COMMAND_SUFFIX: &str = "--file path/to/file.py offset=1 new_name=renamed_symbol";
+/// Example target arguments appended to the suggested next command.
+const NEXT_COMMAND_SUFFIX: &str = "--file path/to/file.py --position 1:1 new_name=renamed_symbol";
 
+/// Mapping between an operator-facing refactoring name and its capability.
 struct SupportedRefactoring {
+    /// Name accepted on the command line.
     user_facing: &'static str,
+    /// Operation name understood by the plugin capability resolver.
     capability_operation: &'static str,
+    /// Capability dispatched to the plugin.
     capability: CapabilityId,
 }
 
+/// Declares the canonical refactoring table and its user-facing name slice.
 macro_rules! supported_refactorings {
     (
         $(
@@ -52,11 +60,13 @@ supported_refactorings!({
 });
 
 /// Returns the canonical built-in provider names accepted by `act refactor`.
-pub(crate) fn supported_provider_names() -> &'static [&'static str] { built_in_provider_names() }
+pub(crate) const fn supported_provider_names() -> &'static [&'static str] {
+    built_in_provider_names()
+}
 
 /// Returns the supported user-facing refactoring names accepted by
 /// `act refactor`.
-pub(crate) fn supported_refactoring_names() -> &'static [&'static str] {
+pub(crate) const fn supported_refactoring_names() -> &'static [&'static str] {
     SUPPORTED_REFACTORING_NAMES
 }
 
@@ -111,6 +121,12 @@ pub(crate) fn capability_for_operation(operation: &str) -> Result<CapabilityId, 
         })
 }
 
+/// Validates a `value` of the given `kind` against the canonical supported list.
+///
+/// # Errors
+///
+/// Returns [`DispatchError::InvalidArguments`] when `value` is not in
+/// `supported`.
 fn validate_value(kind: &str, supported: &[&str], value: &str) -> Result<(), DispatchError> {
     if supported.contains(&value) {
         Ok(())
@@ -132,6 +148,7 @@ pub(crate) fn missing_requirements_error() -> DispatchError {
     ))
 }
 
+/// Builds the valid-alternatives and next-command guidance block.
 fn guidance_lines() -> String {
     let providers = supported_provider_names();
     let refactorings = supported_refactoring_names();
@@ -143,6 +160,7 @@ fn guidance_lines() -> String {
     )
 }
 
+/// Builds an example `act refactor` command from the first supported values.
 fn next_command_example(providers: &[&str], refactorings: &[&str]) -> String {
     let provider = providers.first().copied().unwrap_or("<plugin>");
     let refactoring = refactorings.first().copied().unwrap_or("<operation>");
@@ -156,6 +174,7 @@ fn next_command_example(providers: &[&str], refactorings: &[&str]) -> String {
     )
 }
 
+/// Builds the invalid-arguments error for an unsupported `kind` value.
 fn invalid_supported_value(kind: &str, value: &str) -> DispatchError {
     DispatchError::invalid_arguments(format!(
         "act refactor does not support {kind} '{value}'\n\n{}",
@@ -163,6 +182,7 @@ fn invalid_supported_value(kind: &str, value: &str) -> DispatchError {
     ))
 }
 
+/// Formats the required flags as a readable list with conjunctions.
 fn format_required_flags() -> String {
     match REQUIRED_FLAGS {
         [] => String::new(),
@@ -187,23 +207,18 @@ mod tests {
         validate_provider,
         validate_refactoring,
     };
-    use crate::dispatch::errors::DispatchError;
-
-    fn invalid_arguments_message(error: DispatchError) -> String {
-        match error {
-            DispatchError::InvalidArguments { message } => message,
-            other => panic!("expected invalid arguments error, got: {other:?}"),
-        }
-    }
+    use crate::dispatch::act::refactor::refactor_helpers::errors::invalid_arguments_message;
 
     #[test]
     fn missing_requirements_error_lists_full_contract() {
-        let message = invalid_arguments_message(missing_requirements_error());
+        let message = invalid_arguments_message(missing_requirements_error())
+            .expect("missing requirements should be an invalid-arguments error");
 
         for required in [
             "--provider <plugin>",
             "--refactoring <operation>",
             "--file <path>",
+            "--position <line:col>",
         ] {
             assert!(
                 message.contains(required),
@@ -218,7 +233,8 @@ mod tests {
     #[test]
     fn invalid_provider_error_lists_supported_values() {
         let message =
-            invalid_arguments_message(validate_provider("missing-provider").expect_err("invalid"));
+            invalid_arguments_message(validate_provider("missing-provider").expect_err("invalid"))
+                .expect("provider validation should be an invalid-arguments error");
 
         assert!(message.contains("does not support provider 'missing-provider'"));
         assert!(message.contains("Providers: rope, rust-analyzer"));
@@ -227,7 +243,8 @@ mod tests {
     #[test]
     fn invalid_refactoring_error_lists_supported_values() {
         let message =
-            invalid_arguments_message(validate_refactoring("extract-method").expect_err("invalid"));
+            invalid_arguments_message(validate_refactoring("extract-method").expect_err("invalid"))
+                .expect("refactoring validation should be an invalid-arguments error");
 
         assert!(message.contains("does not support refactoring 'extract-method'"));
         assert!(message.contains("Refactorings: rename"));

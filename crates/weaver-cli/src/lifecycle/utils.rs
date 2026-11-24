@@ -9,6 +9,7 @@ use std::{
 };
 
 use cap_std::fs::Dir;
+use mockable::DefaultEnv;
 use weaver_config::RuntimePaths;
 
 use super::{
@@ -19,7 +20,9 @@ use super::{
     types::{LifecycleContext, LifecycleInvocation},
 };
 
+/// Maximum time to wait for the daemon to report ready after an explicit start.
 pub(super) const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+/// Maximum time to wait for the daemon to report ready when auto-starting it.
 pub(super) const AUTO_START_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Validates that no extra arguments were provided to the lifecycle command.
@@ -77,6 +80,7 @@ pub(crate) fn try_auto_start_daemon<E: Write>(
         context.config_arguments,
         context.daemon_binary,
         runtime_dir.as_path(),
+        &DefaultEnv,
     )?;
     let started_at = SystemTime::now();
     wait_for_ready(&paths, &mut child, started_at, AUTO_START_TIMEOUT)?;
@@ -123,14 +127,17 @@ mod tests {
         }
     }
 
-    /// Tests for try_auto_start_daemon failure paths using a nonexistent daemon binary.
+    /// Tests for `try_auto_start_daemon` failure paths using a nonexistent
+    /// daemon binary.
     ///
     /// Both cases verify that when the daemon binary doesn't exist:
     /// 1. The "Waiting for daemon start..." message is written to stderr
-    /// 2. A LaunchDaemon error is propagated
+    /// 2. A `LaunchDaemon` error is propagated
     #[rstest]
-    fn try_auto_start_daemon_failure_behaviour(temp_paths: (TempDir, RuntimePaths)) {
-        let (dir, _paths) = temp_paths;
+    fn try_auto_start_daemon_failure_behaviour(
+        temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
+    ) {
+        let (dir, _paths) = temp_paths.expect("create temp runtime paths");
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
                 dir.path()
@@ -154,23 +161,26 @@ mod tests {
 
         // Verify the spawn failure is propagated.
         assert!(result.is_err(), "expected spawn failure");
-        let error = result.unwrap_err();
+        let error = result.expect_err("expected spawn failure");
         assert!(
             matches!(error, LifecycleError::LaunchDaemon { .. }),
             "expected LaunchDaemon error, got: {error:?}"
         );
     }
 
-    /// Success path: try_auto_start_daemon spawns daemon and returns Ok when
+    /// Success path: `try_auto_start_daemon` spawns daemon and returns Ok when
     /// health snapshot indicates ready.
     ///
-    /// This test exercises the complete auto-start flow through try_auto_start_daemon:
-    /// prepare_runtime → spawn_daemon → wait_for_ready, verifying that the function
-    /// returns Ok(()) when the daemon becomes ready.
+    /// This test exercises the complete auto-start flow through
+    /// `try_auto_start_daemon`: `prepare_runtime` → `spawn_daemon` →
+    /// `wait_for_ready`, verifying that the function returns Ok(()) when the
+    /// daemon becomes ready.
     #[cfg(unix)]
     #[rstest]
-    fn try_auto_start_daemon_succeeds_when_ready(temp_paths: (TempDir, RuntimePaths)) {
-        let (dir, _paths) = temp_paths;
+    fn try_auto_start_daemon_succeeds_when_ready(
+        temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
+    ) {
+        let (dir, _paths) = temp_paths.expect("create temp runtime paths");
         let health_path = dir.path().join("weaverd.health");
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
@@ -208,16 +218,19 @@ mod tests {
         );
     }
 
-    /// Timeout path: try_auto_start_daemon returns StartupTimeout when daemon
-    /// spawns but never becomes ready.
+    /// Timeout path: `try_auto_start_daemon` returns `StartupTimeout` when
+    /// daemon spawns but never becomes ready.
     ///
-    /// This test is marked #[ignore] because AUTO_START_TIMEOUT is 30 seconds.
-    /// It verifies the complete timeout flow through try_auto_start_daemon.
+    /// This test is marked `#[ignore]` because `AUTO_START_TIMEOUT` is 30
+    /// seconds. It verifies the complete timeout flow through
+    /// `try_auto_start_daemon`.
     #[cfg(unix)]
     #[ignore = "takes 30 seconds due to AUTO_START_TIMEOUT"]
     #[rstest]
-    fn try_auto_start_daemon_times_out_when_daemon_slow(temp_paths: (TempDir, RuntimePaths)) {
-        let (dir, _paths) = temp_paths;
+    fn try_auto_start_daemon_times_out_when_daemon_slow(
+        temp_paths: anyhow::Result<(TempDir, RuntimePaths)>,
+    ) {
+        let (dir, _paths) = temp_paths.expect("create temp runtime paths");
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
                 dir.path()
@@ -240,7 +253,7 @@ mod tests {
         let result = try_auto_start_daemon(context, &mut stderr);
 
         assert!(result.is_err(), "expected timeout error");
-        let error = result.unwrap_err();
+        let error = result.expect_err("expected timeout error");
         assert!(
             matches!(error, LifecycleError::StartupTimeout { .. }),
             "expected StartupTimeout, got: {error:?}"

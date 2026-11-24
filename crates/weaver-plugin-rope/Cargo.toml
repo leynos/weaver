@@ -13,6 +13,7 @@ thiserror.workspace = true
 weaver-plugins = { path = "../weaver-plugins" }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 mockall.workspace = true
 rstest.workspace = true
 rstest-bdd.workspace = true

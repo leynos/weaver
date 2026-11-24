@@ -8,7 +8,9 @@ use predicates::{
     prelude::PredicateBooleanExt,
     str::{contains, is_empty},
 };
-use weaver_cli::DOMAIN_OPERATIONS;
+use rstest::{fixture, rstest};
+use tempfile::TempDir;
+use weaver_cli::domain_operations;
 
 const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
     "--config-path <PATH>",
@@ -19,11 +21,83 @@ const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
     "--locale <LOCALE>",
 ];
 
-#[test]
-fn capabilities_probe_succeeds() {
+/// Builds a scratch `$HOME`/XDG environment and a `weaver` command
+/// pre-configured to use it, so integration tests never touch the
+/// invoking user's real configuration.
+#[fixture]
+fn isolated_environment() -> anyhow::Result<(TempDir, assert_cmd::Command)> {
+    let temp_dir = TempDir::new()?;
     let mut command = cargo_bin_cmd!("weaver");
+    command
+        .env_clear()
+        .env("HOME", temp_dir.path())
+        .env("XDG_CONFIG_HOME", temp_dir.path().join("xdg-config"))
+        .env("XDG_CACHE_HOME", temp_dir.path().join("xdg-cache"));
+    Ok((temp_dir, command))
+}
+
+#[rstest]
+fn capabilities_probe_succeeds(
+    isolated_environment: anyhow::Result<(TempDir, assert_cmd::Command)>,
+) {
+    let (_temp_dir, mut command) = isolated_environment.expect("build isolated environment");
     command.arg("--capabilities");
     command.assert().success();
+}
+
+#[rstest]
+fn invalid_child_environment_locale_fails_capabilities(
+    isolated_environment: anyhow::Result<(TempDir, assert_cmd::Command)>,
+) {
+    let (_temp_dir, mut command) = isolated_environment.expect("build isolated environment");
+    command.env("WEAVER_LOCALE", "not_a_locale");
+    command.arg("--capabilities");
+
+    command
+        .assert()
+        .failure()
+        .stderr(contains("locale"))
+        .stderr(contains("not_a_locale"));
+}
+
+#[rstest]
+fn cli_locale_overrides_invalid_child_environment_locale(
+    isolated_environment: anyhow::Result<(TempDir, assert_cmd::Command)>,
+) {
+    let (_temp_dir, mut command) = isolated_environment.expect("build isolated environment");
+    command
+        .env("WEAVER_LOCALE", "not_a_locale")
+        .args(["--locale", "en-GB", "--capabilities"]);
+
+    command.assert().success();
+}
+
+#[rstest]
+fn missing_extends_parent_is_reported_by_the_binary(
+    isolated_environment: anyhow::Result<(TempDir, assert_cmd::Command)>,
+) {
+    use cap_std::{ambient_authority, fs::Dir};
+
+    let (temp_dir, mut command) = isolated_environment.expect("build isolated environment");
+    let config_path = temp_dir.path().join("weaver.toml");
+    let missing_path = temp_dir.path().join("missing.toml");
+    let directory = Dir::open_ambient_dir(temp_dir.path(), ambient_authority())
+        .expect("open temporary configuration directory");
+    directory
+        .write("weaver.toml", "extends = \"missing.toml\"\n")
+        .expect("write extending configuration");
+
+    command.args([
+        "--config-path",
+        config_path.to_str().expect("temporary path is UTF-8"),
+        "--capabilities",
+    ]);
+
+    command
+        .assert()
+        .failure()
+        .stderr(contains(config_path.display().to_string()))
+        .stderr(contains(missing_path.display().to_string()));
 }
 
 #[test]
@@ -96,12 +170,13 @@ fn help_output_lists_all_domains_and_operations() {
         combined.contains("Domains and operations:"),
         "weaver --help output missing header"
     );
-    for (domain, _, ops) in DOMAIN_OPERATIONS {
+    for entry in domain_operations() {
         assert!(
-            combined.contains(domain),
-            "weaver --help output missing domain {domain:?}"
+            combined.contains(entry.domain),
+            "weaver --help output missing domain {:?}",
+            entry.domain,
         );
-        for op in *ops {
+        for op in entry.operations {
             assert!(
                 combined.contains(op),
                 "weaver --help output missing operation {op:?}"
@@ -169,6 +244,41 @@ fn daemon_start_help_lists_all_config_flags() {
 }
 
 #[test]
+fn definitions_get_help_exposes_localised_metadata_at_the_binary_boundary() {
+    let mut command = cargo_bin_cmd!("weaver");
+    command.args(["definitions", "get", "--help"]);
+    let output = command.output().expect("execute definitions get --help");
+    let stdout = String::from_utf8(output.stdout).expect("help output is UTF-8");
+    let stderr = String::from_utf8(output.stderr).expect("help errors are UTF-8");
+
+    assert!(
+        output.status.success(),
+        "definitions get --help should succeed"
+    );
+    assert!(
+        stdout
+            .lines()
+            .any(|line| line.trim() == "Returns the definition location for a source position"),
+        "definitions get help must include its localised summary; output was:\n{stdout}"
+    );
+    assert_token_sequence(&stdout, ["--uri", "<URI>"]);
+    assert_token_sequence(&stdout, ["--position", "<LINE:COLUMN>"]);
+    assert!(
+        stderr.is_empty(),
+        "help output must not write to stderr: {stderr}"
+    );
+}
+
+/// Asserts that adjacent help tokens are present without accepting substring matches.
+fn assert_token_sequence<const N: usize>(text: &str, expected: [&str; N]) {
+    let tokens = text.split_whitespace().collect::<Vec<_>>();
+    assert!(
+        tokens.windows(N).any(|window| window == expected),
+        "help output missing token sequence {expected:?}; output was:\n{text}"
+    );
+}
+
+#[test]
 fn generated_man_page_contains_all_shared_config_flags() {
     use cap_std::{ambient_authority, fs::Dir};
 
@@ -184,13 +294,13 @@ fn generated_man_page_contains_all_shared_config_flags() {
     let man_pages = ["debug", "release"]
         .map(|profile| format!("target/generated-man/{target}/{profile}/weaver.1"));
 
-    let content = man_pages.iter().find_map(|path| {
+    let man_page = man_pages.iter().find_map(|path| {
         workspace
             .read_to_string(path)
             .ok()
-            .map(|content| (path, content))
+            .map(|contents| (path, contents))
     });
-    let Some((man_page_path, content)) = content else {
+    let Some((man_page_path, content)) = man_page else {
         panic!("generated man page weaver.1 not found for target {target}");
     };
 
@@ -202,4 +312,20 @@ fn generated_man_page_contains_all_shared_config_flags() {
             "man page {man_page_path} missing flag {flag_name:?}",
         );
     }
+
+    let normalised = content
+        .replace("\\fB", "")
+        .replace("\\fI", "")
+        .replace("\\fR", "")
+        .replace("\\-", "-");
+    assert!(
+        normalised.contains("definitions get"),
+        "man page {man_page_path} missing definitions get command path"
+    );
+    assert!(
+        normalised.contains("Returns the definition location for a source position"),
+        "man page {man_page_path} missing localised definitions get summary"
+    );
+    assert_token_sequence(&normalised, ["--uri", "<URI>"]);
+    assert_token_sequence(&normalised, ["--position", "<LINE:COLUMN>"]);
 }

@@ -15,9 +15,13 @@ use super::resolution::{
 /// Groups routing metadata for refusal construction.
 #[derive(Debug)]
 pub(super) struct RoutingContext {
+    /// Capability that was being resolved.
     pub(super) capability: CapabilityId,
+    /// Target language, when the request identified one.
     pub(super) language: Option<SupportedLanguage>,
+    /// Provider the request asked for explicitly, if any.
     pub(super) requested_provider: Option<String>,
+    /// How the provider would have been selected.
     pub(super) selection_mode: SelectionMode,
 }
 

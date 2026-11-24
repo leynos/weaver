@@ -7,15 +7,14 @@ use std::path::Path;
 
 use insta::{assert_debug_snapshot, assert_snapshot};
 
-use weaver_syntax::{Parser, Pattern, SupportedLanguage, TreeSitterSyntacticLock};
+use weaver_syntax::{SupportedLanguage, TreeSitterSyntacticLock};
+
+use super::{parse_and_compile, parse_source};
 
 #[test]
 fn snapshot_parse_errors_rust() {
-    let mut parser =
-        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
-    let result = parser
-        .parse("fn broken() {\n    let x = \n}")
-        .unwrap_or_else(|err| panic!("parse: {err}"));
+    let result = parse_source(SupportedLanguage::Rust, "fn broken() {\n    let x = \n}")
+        .expect("broken source should still parse");
 
     let errors: Vec<_> = result.errors().iter().map(|e| e.message.clone()).collect();
     assert_snapshot!(format!("{errors:?}"));
@@ -26,7 +25,7 @@ fn snapshot_validation_failure_format() {
     let lock = TreeSitterSyntacticLock::new();
     let failures = lock
         .validate_file(Path::new("test.rs"), "fn broken() {")
-        .unwrap_or_else(|err| panic!("validate: {err}"));
+        .expect("validation should run");
 
     let formatted: Vec<_> = failures.iter().map(ToString::to_string).collect();
     assert_snapshot!(format!("{formatted:?}"));
@@ -53,12 +52,8 @@ fn snapshot_pattern_match_captures_across_languages() {
         source: &str,
         pattern: &str,
     ) -> Vec<BTreeMap<String, String>> {
-        let mut parser = Parser::new(language).unwrap_or_else(|err| panic!("parser: {err}"));
-        let parsed = parser
-            .parse(source)
-            .unwrap_or_else(|err| panic!("parse: {err}"));
-        let compiled_pattern =
-            Pattern::compile(pattern, language).unwrap_or_else(|err| panic!("pattern: {err}"));
+        let (parsed, compiled_pattern) = parse_and_compile(language, source, pattern)
+            .expect("fixture source and pattern should compile");
 
         compiled_pattern
             .find_all(&parsed)
@@ -93,10 +88,11 @@ fn snapshot_pattern_match_captures_across_languages() {
 
 #[test]
 fn snapshot_rewrite_result_includes_replacement_count() {
-    let (rule, rewriter) = super::setup_let_to_const_rewriter();
+    let (rule, rewriter) =
+        super::setup_let_to_const_rewriter().expect("rewrite rule should compile");
     let result = rewriter
         .apply(&rule, "fn main() { let a = 1; let b = 2; }")
-        .unwrap_or_else(|err| panic!("rewrite: {err}"));
+        .expect("rewrite should apply");
 
     assert_debug_snapshot!((result.num_replacements(), result.output().to_owned()));
 }

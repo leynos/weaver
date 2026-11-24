@@ -27,6 +27,7 @@
 //! host.register_language(Language::Rust, Box::new(server))?;
 //! ```
 
+mod clock;
 mod config;
 mod error;
 mod jsonrpc;
@@ -37,9 +38,12 @@ mod state;
 mod trait_impl;
 mod transport;
 
+#[cfg(test)]
+pub(crate) use clock::ManualClock;
+pub use clock::{Clock, Deadline, RestartCooldown, SystemClock};
 pub use config::LspServerConfig;
 pub use error::{AdapterError, TransportError};
 pub use jsonrpc::{JsonRpcError, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 pub use process::ProcessLanguageServer;
 pub use state::ProcessState;
-pub use transport::StdioTransport;
+pub use transport::{DEFAULT_RESPONSE_TIMEOUT, StdioTransport};

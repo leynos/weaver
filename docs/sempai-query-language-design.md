@@ -1,5 +1,16 @@
 # Sempai technical design for Weaver
 
+> **Status and precedence:** The language, parser, and engine architecture
+> described here remains the current proposed design. The prototype public CLI
+> and JSONL command/protocol sections are historical and superseded for
+> user-facing use by
+> [RFC 0003](rfcs/rfc-0003-sempai-query-to-selector-vertical-slice.md),
+> [ADR 0011](adrs/adr-0011-sempai-query-input-syntax.md), and
+> [ADR 0012](adrs/adr-0012-versioned-selector-streams.md). The current
+> resource-first contract is `weaver symbols list` with `--query`, `--expr`, or
+> `--rule`, emitting completed selector streams. The prototype examples below
+> are retained as non-authoritative historical material.
+
 This document specifies the implementation design for Sempai: a Semgrep-
 compatible query parser and Tree-sitter-backed query engine for feature
 extraction inside the Weaver workspace.
@@ -309,7 +320,7 @@ A Tree-sitter escape hatch is represented as an atom within the plan (see
 
    - YAML rule file parsing.
    - One-liner DSL parsing.
-2. Normalisation:
+2. Normalization:
 
    - Lower legacy and v2 syntaxes to a shared formula model.[^3]
 3. Validation:
@@ -327,7 +338,7 @@ A Tree-sitter escape hatch is represented as an atom within the plan (see
 
    - Produce `Match` objects with spans, captures, and focus.
 
-### Normalised formula model
+### Normalized formula model
 
 The internal model follows the operator set used in the precedence and guidance
 documents.[^3]
@@ -429,8 +440,8 @@ Legacy (`pattern*`) and v2 (`match`) syntaxes lower into the shared
 `sempai_core::formula::Formula` enum, while `r2c-internal-project-depends-on`
 is preserved as an opaque search principal and normalizes to a degenerate
 Tree-sitter query atom that cannot match real code. Semantic checks for
-`E_SEMPAI_INVALID_NOT_IN_OR` and `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND` live
-in `crates/sempai/src/semantic_check.rs`. `WhereClause` values are stored as
+`E_SEMPAI_INVALID_NOT_IN_OR` and `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND` live in
+`crates/sempai/src/semantic_check/mod.rs`. `WhereClause` values are stored as
 opaque `serde_json::Value` values and interpreted later. `extract`, `taint`,
 `join`, and forward-compatible unknown modes still fail deterministically with
 `E_SEMPAI_UNSUPPORTED_MODE`, preferring the `mode` field span before falling
@@ -479,7 +490,7 @@ Decorators:
 The DSL is intentionally minimal and deterministic. The primary objective is
 CLI ergonomics rather than expressive completeness.
 
-### Tokenisation
+### Tokenization
 
 Chumsky should consume a token stream produced by `logos`, not raw characters,
 to simplify spans and diagnostics.[^4]
@@ -1076,7 +1087,7 @@ using the guidance in the Rust parser testing document.[^6]
 Snapshot tests with `insta` should cover:
 
 - DSL parse trees and recovered error diagnostics.[^6]
-- Normalised formula output from both legacy and v2 inputs.
+- Normalized formula output from both legacy and v2 inputs.
 - Pattern IR compilation output (rewrites and wrapper selection).
 
 ### Corpus tests

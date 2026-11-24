@@ -87,6 +87,16 @@ libraries = [
 ]
 ```
 
+### Suite revision in CI
+
+Weaver takes the rolling Whitaker suite through the shared `install-whitaker`
+action and no longer pins the suite to a source revision. The earlier pin
+existed because upstream issue
+[#311](https://github.com/leynos/whitaker/issues/311) regressed recognition of
+helpers defined in out-of-line `cfg(test)` modules; the fix is in rolling suite
+build `88b49f0`. CI takes whichever rolling suite is current, which includes
+that fix and any later build.
+
 ### Selecting individual lints
 
 To load specific lints instead of the full suite, specify each lint explicitly:

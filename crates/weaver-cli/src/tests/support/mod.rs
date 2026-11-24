@@ -4,6 +4,7 @@
 //! loading fixtures so step definitions and unit tests remain focused on their
 //! assertions.
 
+mod cli_harness;
 mod fake_daemon;
 mod lifecycle;
 
@@ -17,6 +18,7 @@ use std::{
 
 use anyhow::{Context, Result, ensure};
 use cap_std::fs::Dir;
+pub(crate) use cli_harness::{EXPECTED_SHARED_CONFIG_HELP_FLAGS, run_with_panicking_loader};
 #[cfg(unix)]
 pub(super) use fake_daemon::accept_unix_connection;
 pub(super) use fake_daemon::{FakeDaemon, accept_tcp_connection, respond_to_request};
@@ -134,7 +136,7 @@ impl TestWorld {
             ensure_relative_dirs(temp_dir.path(), parent)?;
         }
         let uri = Url::from_file_path(&path)
-            .map_err(|_| anyhow::anyhow!("failed to convert path to URI"))?
+            .map_err(|()| anyhow::anyhow!("failed to convert path to URI"))?
             .to_string();
         Ok((temp_dir, path, uri))
     }
@@ -173,7 +175,7 @@ impl TestWorld {
             &loader,
             daemon_binary,
             &localizer,
-            |invocation, context, output| self.lifecycle.handle(invocation, context, output),
+            |invocation, context, output| self.lifecycle.handle(&invocation, context, output),
         );
         self.exit_code = Some(exit);
         if let Some(daemon) = self.daemon.as_mut() {
@@ -206,8 +208,7 @@ impl TestWorld {
         let exit = self.exit_code.context("exit code recorded")?;
         ensure!(
             exit == ExitCode::from(expected),
-            "expected exit code {expected}, got {:?}",
-            exit
+            "expected exit code {expected}, got {exit:?}"
         );
         Ok(())
     }
@@ -216,8 +217,7 @@ impl TestWorld {
         let exit = self.exit_code.context("exit code recorded")?;
         ensure!(
             exit == ExitCode::FAILURE,
-            "expected failure exit code, got {:?}",
-            exit
+            "expected failure exit code, got {exit:?}"
         );
         Ok(())
     }
@@ -328,9 +328,9 @@ pub(super) fn decode_utf8(buffer: Vec<u8>, label: &str) -> Result<String> {
 
 pub(super) fn default_daemon_lines() -> Vec<String> {
     vec![
-        "{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"daemon says hello\"}".to_string(),
-        "{\"kind\":\"stream\",\"stream\":\"stderr\",\"data\":\"daemon complains\"}".to_string(),
-        "{\"kind\":\"exit\",\"status\":17}".to_string(),
+        "{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"daemon says hello\"}".to_owned(),
+        "{\"kind\":\"stream\",\"stream\":\"stderr\",\"data\":\"daemon complains\"}".to_owned(),
+        r#"{"kind":"exit","status":17}"#.to_owned(),
     ]
 }
 
@@ -338,20 +338,20 @@ pub(super) fn default_daemon_lines() -> Vec<String> {
 ///
 /// This mirrors the structure of `default_daemon_lines` so sibling test helpers
 /// can emit deterministic stdout-only sequences with a trailing exit event.
-pub(super) fn daemon_lines_for_stdout(payload: &str) -> Vec<String> {
+pub(super) fn daemon_lines_for_stdout(payload: &str) -> anyhow::Result<Vec<String>> {
     let stream = serde_json::json!({
         "kind": "stream",
         "stream": "stdout",
         "data": payload,
     });
-    vec![
-        serde_json::to_string(&stream).expect("serialize stream"),
-        "{\"kind\":\"exit\",\"status\":0}".to_string(),
-    ]
+    Ok(vec![
+        serde_json::to_string(&stream)?,
+        r#"{"kind":"exit","status":0}"#.to_owned(),
+    ])
 }
 
 /// Builds a stderr stream entry plus exit record for a custom payload.
-pub(super) fn daemon_lines_for_stderr(payload: &str, status: i32) -> Vec<String> {
+pub(super) fn daemon_lines_for_stderr(payload: &str, status: i32) -> anyhow::Result<Vec<String>> {
     let stream = serde_json::json!({
         "kind": "stream",
         "stream": "stderr",
@@ -361,10 +361,10 @@ pub(super) fn daemon_lines_for_stderr(payload: &str, status: i32) -> Vec<String>
         "kind": "exit",
         "status": status,
     });
-    vec![
-        serde_json::to_string(&stream).expect("serialize stream"),
-        serde_json::to_string(&exit).expect("serialize exit"),
-    ]
+    Ok(vec![
+        serde_json::to_string(&stream)?,
+        serde_json::to_string(&exit)?,
+    ])
 }
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────

@@ -9,6 +9,17 @@
 //! with a [`ContractVersion`]. The [`CapabilityContract`] trait provides
 //! the validation interface that concrete contracts implement.
 
+/// Shared contract expectations for the `rename-symbol` fixtures.
+///
+/// This module is available only when the `test-support` feature is enabled.
+#[cfg(feature = "test-support")]
+pub mod fixture_contract;
+/// Error type shared by the `rename-symbol` fixture contract and fixture
+/// support modules.
+///
+/// This module is available only when the `test-support` feature is enabled.
+#[cfg(feature = "test-support")]
+pub mod fixture_error;
 pub mod reason_code;
 pub mod rename_symbol;
 /// Shared test fixtures and validation helpers for capability contract tests.
@@ -37,7 +48,7 @@ use crate::{
 ///
 /// Capability IDs are stable identifiers used for routing, manifest
 /// declarations, and contract lookup. The set is defined by
-/// Architecture Decision Record (ADR) 001 and extended only through
+/// Architecture Decision Record (ADR) 0001 and extended only through
 /// architectural review.
 ///
 /// # Example
@@ -105,7 +116,10 @@ impl std::fmt::Display for CapabilityId {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ContractVersion {
+    /// Breaking-change counter; contracts with different major versions are
+    /// never compatible.
     major: u16,
+    /// Additive-change counter; ignored by [`ContractVersion::is_compatible_with`].
     minor: u16,
 }
 

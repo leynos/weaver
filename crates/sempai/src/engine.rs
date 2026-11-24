@@ -20,19 +20,26 @@ use sempai_yaml::{Rule, RulePrincipal, parse_rule_file};
 use crate::{
     mode_validation::validate_supported_modes,
     normalize::normalize_search_principal,
-    semantic_check::validate_formula,
+    semantic_check::{validate_constraints, validate_formula},
 };
 
 /// A compiled query plan for one rule and target language.
 #[derive(Debug)]
 pub struct QueryPlan {
+    /// Identifier of the rule this plan was compiled from, carried through so
+    /// matches can be attributed back to their rule.
     rule_id: String,
+    /// Language the plan was compiled for; a plan is only valid against
+    /// snapshots of this language.
     language: Language,
-    /// The normalized canonical formula.
+    /// The normalized canonical formula, shared behind an [`Arc`] so a plan
+    /// can be cloned cheaply and reused across source files.
     formula: Arc<Decorated<Formula>>,
 }
 
 impl QueryPlan {
+    /// Assembles a plan from parts already validated by the compiler; callers
+    /// outside the crate obtain plans through [`Engine::compile_yaml`].
     pub(crate) const fn new(
         rule_id: String,
         language: Language,
@@ -85,6 +92,8 @@ impl QueryPlan {
 /// ```
 #[derive(Debug)]
 pub struct Engine {
+    /// Limits and language settings applied to every compilation and
+    /// execution performed by this engine.
     config: EngineConfig,
 }
 
@@ -105,7 +114,9 @@ impl Engine {
     #[tracing::instrument(level = "info", skip_all, fields(rules = tracing::field::Empty))]
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
         let file = parse_rule_file(yaml, None)?;
-        tracing::Span::current().record("rules", file.rules().len());
+        let rule_count = file.rules().len();
+        tracing::Span::current().record("rules", rule_count);
+        tracing::debug!(rules = rule_count, "yaml parsed successfully");
         validate_supported_modes(&file)?;
 
         file.rules()
@@ -120,9 +131,11 @@ impl Engine {
             .try_fold(Vec::new(), |mut plans, (rule, principal)| {
                 tracing::debug!(rule_id = rule.id(), "normalizing principal");
                 let formula = normalize_search_principal(principal, rule.rule_span())?;
+                tracing::debug!(rule_id = rule.id(), "principal normalized");
 
                 tracing::debug!(rule_id = rule.id(), "validating normalized formula");
                 validate_formula(&formula)?;
+                validate_constraints(&formula)?;
 
                 tracing::debug!(
                     rule_id = rule.id(),
@@ -189,6 +202,7 @@ fn compile_rule_plans(
                     vec![],
                 )
             })?;
+            tracing::debug!("query plan created");
             Ok(QueryPlan::new(
                 rule.id().to_owned(),
                 language,

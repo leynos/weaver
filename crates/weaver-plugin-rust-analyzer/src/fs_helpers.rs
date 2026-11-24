@@ -61,6 +61,15 @@ pub(crate) fn write_workspace_file(
     Ok(absolute_path)
 }
 
+/// Pairs the absolute destination path with its UTF-8 workspace-relative form.
+///
+/// The capability API works in UTF-8 paths, so a non-UTF-8 relative path is
+/// rejected here rather than deeper in the write.
+///
+/// # Errors
+///
+/// Returns [`RustAnalyzerAdapterError::InvalidPath`] if `relative_path` is not
+/// valid UTF-8.
 fn resolve_workspace_path(
     workspace_root: &Path,
     relative_path: &Path,
@@ -75,6 +84,14 @@ fn resolve_workspace_path(
     Ok((absolute_path, workspace_relative_path))
 }
 
+/// Opens the directory that will hold the target file, creating it if needed.
+///
+/// Returns the workspace root itself when the target sits directly in the root.
+///
+/// # Errors
+///
+/// Returns [`RustAnalyzerAdapterError::WorkspaceWrite`] if the workspace root
+/// cannot be opened or the parent directories cannot be created or opened.
 fn open_workspace_target_dir(
     workspace_root: &Path,
     workspace_relative_path: &Utf8Path,

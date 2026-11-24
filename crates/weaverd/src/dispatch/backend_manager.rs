@@ -16,12 +16,13 @@ use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider
 /// exposing the locking mechanism to callers.
 #[derive(Clone, Debug)]
 pub struct BackendManager {
+    /// Shared backends guarded by the mutex the manager encapsulates.
     inner: Arc<Mutex<FusionBackends<SemanticBackendProvider>>>,
 }
 
 impl BackendManager {
     /// Creates a new backend manager wrapping the given backends.
-    pub fn new(backends: Arc<Mutex<FusionBackends<SemanticBackendProvider>>>) -> Self {
+    pub const fn new(backends: Arc<Mutex<FusionBackends<SemanticBackendProvider>>>) -> Self {
         Self { inner: backends }
     }
 

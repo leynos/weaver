@@ -3,7 +3,11 @@
 //! Weaver patterns and rewrite templates use `$NAME` and `$$$NAME` metavariables.
 //! This module centralises the name rules so parsing stays consistent.
 
+/// Prefix wrapping a metavariable name when it is substituted into a pattern
+/// so the pattern still parses as valid host-language syntax.
 pub(crate) const METAVAR_PLACEHOLDER_PREFIX: &str = "__WEAVER_METAVAR_";
+/// Suffix closing a placeholder identifier opened by
+/// [`METAVAR_PLACEHOLDER_PREFIX`].
 pub(crate) const METAVAR_PLACEHOLDER_SUFFIX: &str = "__";
 
 /// Returns whether `c` is a valid first character for a metavariable name.

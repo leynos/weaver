@@ -4,17 +4,20 @@ use std::path::Path;
 
 use crate::{CardExtractionError, CardExtractionInput, DetailLevel, TreeSitterCardExtractor};
 
-fn extract(path: &'static Path, source: &'static str, line: u32, column: u32) -> crate::SymbolCard {
+fn extract(
+    path: &'static Path,
+    source: &'static str,
+    line: u32,
+    column: u32,
+) -> Result<crate::SymbolCard, CardExtractionError> {
     let absolute_path = super::absolute_test_path(path);
-    TreeSitterCardExtractor::new()
-        .extract(CardExtractionInput {
-            path: &absolute_path,
-            source,
-            line,
-            column,
-            detail: DetailLevel::Structure,
-        })
-        .expect("card extraction should succeed")
+    TreeSitterCardExtractor::new().extract(CardExtractionInput {
+        path: &absolute_path,
+        source,
+        line,
+        column,
+        detail: DetailLevel::Structure,
+    })
 }
 
 fn extract_error(
@@ -42,7 +45,8 @@ fn top_level_symbols_keep_preceding_doc_comments() {
         "/// Greets callers.\nfn greet() {}\n",
         2,
         4,
-    );
+    )
+    .expect("card extraction should succeed");
 
     let attachments = card.attachments.expect("attachments");
     assert_eq!(
@@ -68,7 +72,8 @@ fn crlf_positions_map_to_the_correct_symbol() {
         "fn first() {}\r\nfn second() {}\r\n",
         2,
         4,
-    );
+    )
+    .expect("card extraction should succeed");
 
     assert_eq!(card.symbol.symbol_ref.name, "second");
 }

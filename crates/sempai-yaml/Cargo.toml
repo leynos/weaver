@@ -12,6 +12,7 @@ serde-saphyr = { workspace = true }
 saphyr = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 sempai_core = { path = "../sempai-core", features = ["test-support"] }
 rstest = { workspace = true }
 rstest-bdd = { workspace = true }

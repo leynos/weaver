@@ -44,6 +44,8 @@ mod error;
 mod profile;
 mod runtime;
 mod sandbox;
+#[cfg(test)]
+mod unit_tests;
 
 pub use birdcage::process;
 pub use error::SandboxError;

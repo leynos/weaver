@@ -1,15 +1,20 @@
+//! Integration tests for real Weaver configuration discovery and source
+//! precedence through [`Config::load_from_iter`].
+
 #![cfg(feature = "cli")]
 
-use std::{
-    ffi::OsString,
-    sync::{LockResult, Mutex, MutexGuard, OnceLock},
-};
+use std::{cell::RefCell, collections::BTreeMap, ffi::OsString, sync::Arc};
 
 use cap_std::fs::Dir;
+use googletest::prelude::*;
+use ortho_config::{MapEnv, OrthoConfig, SharedEnvSource, SharedScanEnvSource};
+use pretty_assertions::assert_eq;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
 use weaver_config::{
+    CapabilityDirective,
+    CapabilityOverride,
     Config,
     SocketEndpoint,
     default_log_filter,
@@ -18,268 +23,384 @@ use weaver_config::{
 };
 use weaver_test_macros::allow_fixture_expansion_lints;
 
-/// Serialises environment mutations across test threads.
-///
-/// `std::env` is a global mutable resource. `ENV_LOCK` coordinates every
-/// `set_env` and `remove_var` call so concurrent test threads cannot observe
-/// each other's temporary environment changes.
-static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+const LOCALE_ENV: &str = "WEAVER_LOCALE";
+const SOCKET_ENV: &str = "WEAVER_DAEMON_SOCKET";
+const CAPABILITY_OVERRIDES_ENV: &str = "WEAVER_CAPABILITY_OVERRIDES";
+const CONFIG_PATH_ENV: &str = "WEAVER_CONFIG_PATH";
+const CONFIG_FILE_NAME: &str = "weaver.toml";
+type HarnessState = Result<Harness, String>;
 
 struct Harness {
     temp_dir: TempDir,
-    cli_args: std::cell::RefCell<Vec<OsString>>,
-    env_guard: std::cell::RefCell<Option<EnvGuard>>,
-    env_overrides: std::cell::RefCell<Vec<(String, Option<OsString>)>>,
-    loaded: std::cell::RefCell<Option<Config>>,
-    error: std::cell::RefCell<Option<String>>,
+    file_lines: RefCell<Vec<String>>,
+    environment: RefCell<BTreeMap<&'static str, String>>,
+    cli: RefCell<Vec<OsString>>,
+    resolved: RefCell<Option<Result<Config, String>>>,
 }
 
-/// Serialises environment mutations across test threads.
-///
-/// `std::env` is a global mutable resource. `EnvGuard` acquires a process-wide
-/// `Mutex` before any `set_env` / `remove_var` call and releases it when
-/// dropped, ensuring that concurrent test threads cannot observe each other's
-/// temporary environment changes.
-///
-/// The inner `MutexGuard` is retained for the lifetime of `EnvGuard` so the
-/// lock is held until the harness `Drop` impl has restored all overrides.
-struct EnvGuard {
-    _lock: MutexGuard<'static, ()>,
-}
-
-impl EnvGuard {
-    fn acquire() -> Self {
-        let lock = ENV_LOCK.get_or_init(|| Mutex::new(()));
-        // Recover from a poisoned mutex: if a previous test panicked while
-        // holding the environment lock, the mutex is poisoned but the
-        // underlying data (the unit value) is still valid. Recovering here
-        // prevents a cascade failure where all subsequent env-mutating tests
-        // fail with an unrelated "poisoned" error rather than the original
-        // assertion failure.
-        let guard = recover_env_lock(lock.lock());
-        Self { _lock: guard }
-    }
-}
-
-fn recover_env_lock(result: LockResult<MutexGuard<'static, ()>>) -> MutexGuard<'static, ()> {
-    result.unwrap_or_else(|e| e.into_inner())
-}
 impl Harness {
-    fn new() -> Self {
-        let temp_dir = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(error) => panic!("failed to create temporary directory: {error}"),
+    /// Creates a harness with a fresh temporary directory and empty file,
+    /// environment, and CLI inputs. Returns a `Result` because creating the
+    /// directory can fail before any scenario step runs.
+    fn new() -> HarnessState {
+        Ok(Self {
+            temp_dir: TempDir::new()
+                .map_err(|error| format!("create temporary directory: {error}"))?,
+            file_lines: RefCell::new(Vec::new()),
+            environment: RefCell::new(BTreeMap::new()),
+            cli: RefCell::new(Vec::new()),
+            resolved: RefCell::new(None),
+        })
+    }
+
+    fn add_file_line(&self, line: impl Into<String>) {
+        self.file_lines.borrow_mut().push(line.into());
+    }
+
+    fn set_environment(&self, key: &'static str, value: String) {
+        self.environment.borrow_mut().insert(key, value);
+    }
+
+    fn add_cli_arguments(&self, arguments: impl IntoIterator<Item = OsString>) {
+        self.cli.borrow_mut().extend(arguments);
+    }
+
+    fn add_file_locale(&self, locale: &str) { self.add_file_line(format!("locale = {locale:?}")); }
+
+    /// Appends a TOML daemon-socket line for a TCP endpoint, validating the
+    /// text through `SocketEndpoint` first. Non-TCP endpoints are rejected
+    /// because the precedence scenarios only exercise transport over TCP.
+    fn add_file_socket(&self, endpoint: &str) -> Result<(), String> {
+        let parsed_endpoint = endpoint
+            .parse::<SocketEndpoint>()
+            .map_err(|error| format!("parse file socket endpoint: {error}"))?;
+        let SocketEndpoint::Tcp { host, port } = parsed_endpoint else {
+            return Err(String::from(
+                "precedence tests require a TCP socket endpoint",
+            ));
         };
-        Self {
-            temp_dir,
-            cli_args: std::cell::RefCell::new(vec![OsString::from("weaver")]),
-            env_guard: std::cell::RefCell::new(None),
-            env_overrides: std::cell::RefCell::new(Vec::new()),
-            loaded: std::cell::RefCell::new(None),
-            error: std::cell::RefCell::new(None),
+        self.add_file_line(format!(
+            "daemon_socket = {{ transport = \"tcp\", host = {host:?}, port = {port} }}"
+        ));
+        Ok(())
+    }
+
+    /// Writes the accumulated file lines into the temporary directory and
+    /// returns the path. The path is always pinned through
+    /// `WEAVER_CONFIG_PATH`, even when no lines are queued, so discovery never
+    /// falls through to ambient candidates such as
+    /// `$XDG_CONFIG_HOME/weaver/config.toml`, `/etc/xdg/weaver/config.toml`, or
+    /// a `weaver.toml` in the working directory. An empty file is a valid
+    /// configuration layer that supplies no overrides.
+    fn write_file(&self) -> Result<std::path::PathBuf, String> {
+        let contents = self.file_lines.borrow();
+        let directory =
+            Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
+                .map_err(|error| format!("open temporary configuration directory: {error}"))?;
+        directory
+            .write(CONFIG_FILE_NAME, contents.join("\n").as_bytes())
+            .map_err(|error| format!("write temporary configuration file: {error}"))?;
+        Ok(self.temp_dir.path().join(CONFIG_FILE_NAME))
+    }
+
+    /// Loads configuration from the queued file, environment, and CLI inputs and
+    /// caches the outcome. Later calls return without reloading, so `config`
+    /// and `error` observe the same load even when it failed.
+    fn resolve(&self) -> Result<(), String> {
+        if self.resolved.borrow().is_some() {
+            return Ok(());
         }
+        let config_path = self.write_file()?;
+        let environment = self
+            .environment
+            .borrow()
+            .iter()
+            .fold(MapEnv::new(), |source, (key, value)| {
+                source.with_var(*key, value.clone())
+            })
+            .with_var(CONFIG_PATH_ENV, config_path.to_string_lossy().into_owned());
+        let shared_environment = Arc::new(environment);
+        let discovery: SharedEnvSource = shared_environment.clone();
+        let merge: SharedScanEnvSource = shared_environment;
+        let arguments = std::iter::once(OsString::from("weaver"))
+            .chain(self.cli.borrow().iter().cloned())
+            .collect::<Vec<_>>();
+        self.resolved.replace(Some(
+            Config::load_from_iter_with_sources(arguments, discovery, merge)
+                .map_err(|error| error.to_string()),
+        ));
+        Ok(())
     }
 
-    fn write_config(&self, socket: &SocketEndpoint) {
-        self.write_config_contents(match socket {
-            SocketEndpoint::Unix { path } => {
-                format!(
-                    "daemon_socket = {{ transport = \"unix\", path = \"{}\" }}\n",
-                    path
-                )
-            }
-            SocketEndpoint::Tcp { host, port } => format!(
-                "daemon_socket = {{ transport = \"tcp\", host = \"{}\", port = {} }}\n",
-                host, port
-            ),
-        });
+    /// Returns a clone of the cached configuration, failing when `resolve` has
+    /// not run or the load itself failed, so assertions never silently see
+    /// defaults.
+    fn config(&self) -> Result<Config, String> {
+        self.resolved
+            .borrow()
+            .as_ref()
+            .ok_or_else(|| String::from("configuration should load before assertions"))?
+            .clone()
     }
 
-    fn set_env(&self, key: &str, value: &str) {
-        let mut guard = self.env_guard.borrow_mut();
-        if guard.is_none() {
-            *guard = Some(EnvGuard::acquire());
-        }
-
-        let previous = std::env::var_os(key);
-        // The nightly toolchain marks environment mutation as `unsafe` while the
-        // API stabilises. The harness restores overrides in `Drop` to keep the
-        // wider process environment unchanged.
-        unsafe { std::env::set_var(key, value) };
-        self.env_overrides
-            .borrow_mut()
-            .push((key.to_string(), previous));
-    }
-
-    fn push_cli_arg(&self, arg: impl Into<OsString>) {
-        self.cli_args.borrow_mut().push(arg.into());
-    }
-
-    fn load(&self) {
-        if self.loaded.borrow().is_some() || self.error.borrow().is_some() {
-            return;
-        }
-
-        let args = self.cli_args.borrow().clone();
-        match Config::load_from_iter(args) {
-            Ok(config) => {
-                *self.loaded.borrow_mut() = Some(config);
-            }
-            Err(error) => {
-                *self.error.borrow_mut() = Some(error.to_string());
-            }
-        }
-    }
-
-    fn write_locale_config(&self, locale: &str) {
-        self.write_config_contents(format!("locale = \"{locale}\"\n"));
-    }
-
-    fn write_config_contents(&self, contents: String) {
-        let path = self.temp_dir.path().join("weaver.toml");
-        let dir = Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
-            .expect("open temp dir");
-        if let Err(error) = dir.write("weaver.toml", contents) {
-            panic!("failed to write configuration: {error}");
-        }
-
-        let mut args = self.cli_args.borrow_mut();
-        args.push(OsString::from("--config-path"));
-        args.push(path.into_os_string());
-    }
-}
-
-impl Drop for Harness {
-    fn drop(&mut self) {
-        let mut overrides = self.env_overrides.borrow_mut();
-        while let Some((key, value)) = overrides.pop() {
-            if let Some(os_value) = value {
-                unsafe { std::env::set_var(&key, os_value) };
-            } else {
-                unsafe { std::env::remove_var(&key) };
-            }
+    /// Returns the cached load error, or an error when resolution succeeded, so a
+    /// scenario asserting failure cannot pass against a valid configuration.
+    fn error(&self) -> Result<String, String> {
+        match self.config() {
+            Ok(config) => Err(format!("configuration should fail, got {config:?}")),
+            Err(error) => Ok(error),
         }
     }
 }
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn harness() -> Harness { Harness::new() }
+fn harness() -> HarnessState { Harness::new() }
 
-#[given("a configuration file setting the daemon socket to \"{socket}\"")]
-fn given_configuration_file(harness: &Harness, socket: String) {
-    let endpoint = match socket.parse::<SocketEndpoint>() {
-        Ok(endpoint) => endpoint,
-        Err(error) => panic!("invalid socket '{socket}': {error}"),
-    };
-    harness.write_config(&endpoint);
-}
-
-#[given("the environment overrides the daemon socket to \"{socket}\"")]
-fn given_environment_override(harness: &Harness, socket: String) {
-    harness.set_env("WEAVER_DAEMON_SOCKET", &socket);
+/// Unwraps the harness state for a BDD step, cloning any setup error so the
+/// step can propagate it with `?` instead of panicking.
+fn configured_harness(harness: &HarnessState) -> Result<&Harness, String> {
+    harness.as_ref().map_err(Clone::clone)
 }
 
 #[given("a configuration file setting the locale to \"{locale}\"")]
-fn given_configuration_file_locale(harness: &Harness, locale: String) {
-    harness.write_locale_config(&locale);
+fn given_file_locale(harness: &HarnessState, locale: String) -> Result<(), String> {
+    configured_harness(harness)?.add_file_locale(&locale);
+    Ok(())
 }
 
 #[given("the environment overrides the locale to \"{locale}\"")]
-fn given_environment_locale_override(harness: &Harness, locale: String) {
-    harness.set_env("WEAVER_LOCALE", &locale);
+fn given_environment_locale(harness: &HarnessState, locale: String) -> Result<(), String> {
+    configured_harness(harness)?.set_environment(LOCALE_ENV, locale);
+    Ok(())
 }
 
-#[when("the CLI sets the daemon socket to \"{socket}\"")]
-fn when_cli_override(harness: &Harness, socket: String) {
-    harness.push_cli_arg("--daemon-socket");
-    harness.push_cli_arg(OsString::from(&socket));
+#[given("a configuration file setting the daemon socket to \"{endpoint}\"")]
+fn given_file_socket(harness: &HarnessState, endpoint: String) -> Result<(), String> {
+    configured_harness(harness)?.add_file_socket(&endpoint)
+}
+
+#[given("the environment overrides the daemon socket to \"{endpoint}\"")]
+fn given_environment_socket(harness: &HarnessState, endpoint: String) -> Result<(), String> {
+    configured_harness(harness)?.set_environment(SOCKET_ENV, endpoint);
+    Ok(())
+}
+
+#[given("a configuration file allowing the Rust rename capability")]
+fn given_file_allows_rename(harness: &HarnessState) -> Result<(), String> {
+    configured_harness(harness)?.add_file_line(
+        "[[capability_overrides]]\nlanguage = \"Rust\"\ncapability = \
+         \"observe.rename\"\ndirective = \"allow\"",
+    );
+    Ok(())
+}
+
+#[given("the environment forces the Rust rename capability")]
+fn given_environment_forces_rename(harness: &HarnessState) -> Result<(), String> {
+    // OrthoConfig parses environment values with Figment's TOML-like inline
+    // syntax, not the directive's `Display` spelling or JSON, so a collection
+    // must be encoded as an array of inline tables.
+    configured_harness(harness)?.set_environment(
+        CAPABILITY_OVERRIDES_ENV,
+        String::from(
+            r#"[{language = "Rust", capability = "observe.rename", directive = "force"}]"#,
+        ),
+    );
+    Ok(())
 }
 
 #[when("the CLI sets the locale to \"{locale}\"")]
-fn when_cli_locale_override(harness: &Harness, locale: String) {
-    harness.push_cli_arg("--locale");
-    harness.push_cli_arg(OsString::from(&locale));
+fn when_cli_locale(harness: &HarnessState, locale: String) -> Result<(), String> {
+    let configured = configured_harness(harness)?;
+    configured.add_cli_arguments([OsString::from("--locale"), OsString::from(locale)]);
+    configured.resolve()
+}
+
+#[when("the configuration loads")]
+fn when_configuration_loads(harness: &HarnessState) -> Result<(), String> {
+    configured_harness(harness)?.resolve()
 }
 
 #[when("the configuration loads without overrides")]
-fn when_load_without_overrides(harness: &Harness) { harness.load(); }
-
-#[then("loading the configuration resolves the daemon socket to \"{socket}\"")]
-fn then_resolved_socket(harness: &Harness, socket: String) {
-    harness.load();
-
-    if let Some(error) = harness.error.borrow().as_ref() {
-        panic!("configuration failed to load: {error}");
-    }
-
-    let loaded = harness.loaded.borrow();
-    let config = match loaded.as_ref() {
-        Some(config) => config,
-        None => panic!("configuration was not loaded"),
-    };
-
-    let expected = match socket.parse::<SocketEndpoint>() {
-        Ok(endpoint) => endpoint,
-        Err(error) => panic!("invalid expected socket '{socket}': {error}"),
-    };
-
-    assert_eq!(config.daemon_socket(), &expected);
+fn when_defaults_load(harness: &HarnessState) -> Result<(), String> {
+    configured_harness(harness)?.resolve()
 }
 
-#[then("loading the configuration applies the built-in defaults")]
-fn then_defaults_applied(harness: &Harness) {
-    harness.load();
+#[when("the environment sets the locale to \"{locale}\"")]
+fn when_invalid_environment_locale(harness: &HarnessState, locale: String) -> Result<(), String> {
+    let configured = configured_harness(harness)?;
+    configured.set_environment(LOCALE_ENV, locale);
+    configured.resolve()
+}
 
-    if let Some(error) = harness.error.borrow().as_ref() {
-        panic!("configuration failed to load: {error}");
-    }
+#[when("the CLI sets the daemon socket to \"{endpoint}\"")]
+fn when_cli_socket(harness: &HarnessState, endpoint: String) -> Result<(), String> {
+    let configured = configured_harness(harness)?;
+    configured.add_cli_arguments([OsString::from("--daemon-socket"), OsString::from(endpoint)]);
+    configured.resolve()
+}
 
-    let loaded = harness.loaded.borrow();
-    let config = match loaded.as_ref() {
-        Some(config) => config,
-        None => panic!("configuration was not loaded"),
-    };
-
-    assert_eq!(config.daemon_socket(), &default_socket_endpoint());
-    assert_eq!(config.log_filter(), default_log_filter());
-    assert_eq!(config.log_format(), default_log_format());
-    assert_eq!(config.locale().to_string(), "en-US");
-
-    let matrix = config.capability_matrix();
-    assert!(
-        matrix.languages.is_empty(),
-        "expected no capability overrides"
-    );
+#[when("the CLI denies the Rust rename capability")]
+fn when_cli_denies_rename(harness: &HarnessState) -> Result<(), String> {
+    let configured = configured_harness(harness)?;
+    configured.add_cli_arguments([
+        OsString::from("--capability-overrides"),
+        OsString::from("rust:observe.rename=deny"),
+    ]);
+    configured.resolve()
 }
 
 #[then("loading the configuration resolves the locale to \"{locale}\"")]
-fn then_resolved_locale(harness: &Harness, locale: String) {
-    harness.load();
-
-    if let Some(error) = harness.error.borrow().as_ref() {
-        panic!("configuration failed to load: {error}");
-    }
-
-    let loaded = harness.loaded.borrow();
-    let config = match loaded.as_ref() {
-        Some(config) => config,
-        None => panic!("configuration was not loaded"),
-    };
-
-    assert_eq!(config.locale().to_string(), locale);
+fn then_locale_is(harness: &HarnessState, locale: String) -> Result<(), String> {
+    assert_eq!(
+        configured_harness(harness)?.config()?.locale().to_string(),
+        locale
+    );
+    Ok(())
 }
 
+#[then("loading the configuration applies the built-in defaults")]
+fn then_defaults_are_returned(harness: &HarnessState) -> Result<(), String> {
+    let config = configured_harness(harness)?.config()?;
+    assert_eq!(config.daemon_socket(), &default_socket_endpoint());
+    assert_eq!(config.log_filter(), default_log_filter());
+    assert_eq!(config.log_format(), default_log_format());
+    assert_eq!(config.locale(), Config::default().locale());
+    assert_that!(config.capability_matrix().languages, is_empty());
+    Ok(())
+}
+
+#[then("configuration loading reports an invalid locale")]
+fn then_invalid_locale_is_reported(harness: &HarnessState) -> Result<(), String> {
+    let error = configured_harness(harness)?.error()?;
+    assert_that!(error.as_str(), contains_substring("locale"));
+    Ok(())
+}
+
+#[then("loading the configuration resolves the daemon socket to \"{endpoint}\"")]
+fn then_socket_is(harness: &HarnessState, endpoint: String) -> Result<(), String> {
+    assert_eq!(
+        configured_harness(harness)?
+            .config()?
+            .daemon_socket()
+            .to_string(),
+        endpoint
+    );
+    Ok(())
+}
+
+#[then(
+    "loading the configuration resolves the capability matrix to deny the Rust rename capability"
+)]
+fn then_rename_is_denied(harness: &HarnessState) -> Result<(), String> {
+    let config = configured_harness(harness)?.config()?;
+    assert_eq!(
+        config.capability_overrides,
+        vec![CapabilityDirective::new(
+            "rust",
+            "observe.rename",
+            CapabilityOverride::Deny,
+        )]
+    );
+    assert_eq!(
+        config
+            .capability_matrix()
+            .override_for("rust", "observe.rename"),
+        Some(CapabilityOverride::Deny)
+    );
+    Ok(())
+}
+
+/// Guards the harness's discovery isolation. `OrthoConfig` takes the first
+/// existing candidate in selector, XDG, home, then project order, so an
+/// ambient configuration file would otherwise decide the defaults scenario.
+/// The harness pins `WEAVER_CONFIG_PATH` to its own empty file, which must
+/// shadow a discoverable XDG configuration.
 #[test]
-fn env_guard_recovers_from_poisoned_lock() {
-    use std::sync::PoisonError;
+fn defaults_harness_shadows_ambient_discovery() -> Result<(), String> {
+    let harness = Harness::new()?;
+    let ambient = TempDir::new().map_err(|error| format!("create ambient directory: {error}"))?;
+    write_ambient_xdg_configuration(&ambient)?;
+    harness.set_environment(
+        "XDG_CONFIG_HOME",
+        ambient.path().to_string_lossy().into_owned(),
+    );
 
-    let lock: &'static Mutex<()> = Box::leak(Box::new(Mutex::new(())));
-    let guard = lock.lock().expect("fresh mutex should lock");
-    let poisoned = Err(PoisonError::new(guard));
+    harness.resolve()?;
 
-    let _guard = recover_env_lock(poisoned);
+    assert_eq!(
+        harness.config()?.locale(),
+        Config::default().locale(),
+        "the pinned empty file must outrank an ambient XDG configuration"
+    );
+    Ok(())
 }
 
-#[scenario(path = "tests/features/configuration_precedence.feature")]
-fn configuration_precedence(#[from(harness)] _harness: Harness) {}
+/// Writes a distinguishable `weaver/config.toml` beneath `root`, so a scenario
+/// that leaked discovery would resolve the French locale rather than the
+/// built-in default.
+fn write_ambient_xdg_configuration(root: &TempDir) -> Result<(), String> {
+    let directory = Dir::open_ambient_dir(root.path(), cap_std::ambient_authority())
+        .map_err(|error| format!("open ambient configuration directory: {error}"))?;
+    directory
+        .create_dir_all("weaver")
+        .map_err(|error| format!("create ambient configuration directory: {error}"))?;
+    let weaver_directory = directory
+        .open_dir("weaver")
+        .map_err(|error| format!("open ambient weaver directory: {error}"))?;
+    weaver_directory
+        .write(CONFIG_FILE_NAME, b"locale = \"fr-FR\"\n")
+        .map_err(|error| format!("write ambient configuration file: {error}"))
+}
+
+// Bind every scenario by name. `#[scenario(path = ...)]` without `name` or
+// `index` expands only the first scenario in the file, which silently leaves
+// the rest unexercised.
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "CLI locale overrides environment and configuration file values"
+)]
+fn cli_locale_overrides_lower_layers(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Explicit CLI value equal to the default overrides lower layers"
+)]
+fn explicit_cli_default_overrides_lower_layers(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Environment locale overrides a configuration file value"
+)]
+fn environment_locale_overrides_file(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Configuration file locale overrides the built-in default"
+)]
+fn file_locale_overrides_builtin_default(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Defaults are returned when no configuration sources are provided"
+)]
+fn defaults_without_sources(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "Invalid environment locale fails closed"
+)]
+fn invalid_environment_locale_fails_closed(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "CLI daemon socket overrides environment and configuration file values"
+)]
+fn cli_socket_overrides_lower_layers(#[from(harness)] _harness: HarnessState) {}
+
+#[scenario(
+    path = "tests/features/configuration_precedence.feature",
+    name = "The last duplicate capability directive wins during configuration loading"
+)]
+fn last_duplicate_capability_directive_wins(#[from(harness)] _harness: HarnessState) {}

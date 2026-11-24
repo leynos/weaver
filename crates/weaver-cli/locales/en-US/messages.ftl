@@ -24,22 +24,28 @@ weaver-domain-guidance-help-hint =
 weaver-domain-guidance-help-hint-unknown-domain =
     Run 'weaver {$hint_domain} {$hint_operation} --help' for operation details.
 
-# After-help catalogue shown by 'weaver --help'.
-weaver-after-help-header = Domains and operations:
-weaver-after-help-observe-heading = observe — Query code structure and relationships
-weaver-after-help-observe-get-definition = get-definition
-weaver-after-help-observe-find-references = find-references
-weaver-after-help-observe-grep = grep
-weaver-after-help-observe-diagnostics = diagnostics
-weaver-after-help-observe-call-hierarchy = call-hierarchy
-weaver-after-help-observe-get-card = get-card
-weaver-after-help-observe-graph-slice = graph-slice
-weaver-after-help-act-heading = act — Perform code modifications
-weaver-after-help-act-rename-symbol = rename-symbol
-weaver-after-help-act-apply-edits = apply-edits
-weaver-after-help-act-apply-patch = apply-patch
-weaver-after-help-act-apply-rewrite = apply-rewrite
-weaver-after-help-act-refactor = refactor
-weaver-after-help-verify-heading = verify — Validate code correctness
-weaver-after-help-verify-diagnostics = diagnostics
-weaver-after-help-verify-syntax = syntax
+# Recursive command metadata consumed by help and manpage rendering.
+weaver-command-root = Semantic code intelligence tool for observing, acting on, and verifying code
+weaver-command-definitions = Query symbol definitions
+weaver-command-definitions-get = Returns the definition location for a source position
+weaver-command-definitions-get-uri = The document URI containing the reference position
+weaver-command-definitions-get-position = The 1-indexed line:column position to resolve
+weaver-command-daemon = Runs daemon lifecycle commands
+weaver-command-daemon-start = Starts the daemon and waits for readiness
+weaver-command-daemon-stop = Stops the daemon gracefully
+weaver-command-daemon-status = Prints daemon health information
+weaver-command-domain-operation = Passes a legacy domain and operation to the daemon
+weaver-command-domain-observe = Query code structure and relationships
+weaver-command-domain-act = Perform code modifications
+weaver-command-domain-verify = Validate code correctness
+weaver-doc-heading-name = NAME
+weaver-doc-heading-synopsis = SYNOPSIS
+weaver-doc-heading-description = DESCRIPTION
+weaver-doc-heading-options = OPTIONS
+weaver-doc-heading-environment = ENVIRONMENT
+weaver-doc-heading-files = FILES
+weaver-doc-heading-precedence = PRECEDENCE
+weaver-doc-heading-exit-status = EXIT STATUS
+weaver-doc-heading-examples = EXAMPLES
+weaver-doc-heading-see-also = SEE ALSO
+weaver-doc-heading-commands = COMMANDS

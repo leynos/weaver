@@ -21,4 +21,5 @@ pub(crate) use self::listener::ListenerHandle;
 pub(crate) use self::test_utils::CountingHandler;
 pub(crate) use self::{errors::ListenerError, listener::SocketListener};
 
+/// Logging target shared by transport modules.
 const LISTENER_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::transport");

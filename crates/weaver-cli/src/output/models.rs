@@ -55,7 +55,7 @@ pub(crate) struct DiagnosticItem {
 /// Parsed verification failure used for rendering safety harness output.
 #[derive(Debug, Clone)]
 pub(crate) struct VerificationFailure {
-    /// Optional phase label (for example "SemanticLock").
+    /// Optional phase label (for example `SemanticLock`).
     pub(crate) phase: Option<String>,
     /// Optional file path or URI string.
     pub(crate) location: Option<String>,
@@ -181,33 +181,52 @@ pub(crate) fn parse_unknown_operation(payload: &str) -> Option<UnknownOperationP
     Some(parsed)
 }
 
+/// Wire envelope for a verification-error payload.
+///
+/// Mirrors the daemon's error shape so failures can be parsed without pulling
+/// in daemon-side types.
 #[derive(Debug, Deserialize)]
 struct VerificationErrorEnvelope {
+    /// Error type discriminator, which must be `VerificationError` when set.
     #[serde(rename = "type")]
     kind: Option<String>,
+    /// Structured failure details, absent when the daemon omitted them.
     details: Option<VerificationErrorDetails>,
 }
 
+/// Failure details shared by verification diagnostics and failures.
 #[derive(Debug, Deserialize)]
 struct VerificationErrorDetails {
+    /// Optional phase name the entries belong to.
     phase: Option<String>,
+    /// Diagnostics reported under the `diagnostics` key.
     #[serde(default)]
     diagnostics: Vec<VerificationDiagnostic>,
+    /// Failures reported under the `failures` key.
     #[serde(default)]
     failures: Vec<VerificationDiagnostic>,
 }
 
+/// One diagnostic or failure entry in a verification-error payload.
 #[derive(Debug, Deserialize)]
 struct VerificationDiagnostic {
+    /// File path supplied under the `file` key.
     file: Option<String>,
+    /// File path supplied under the `path` key.
     path: Option<String>,
+    /// Document URI supplied under the `uri` key.
     uri: Option<String>,
+    /// Line number (1-indexed).
     line: Option<u32>,
+    /// Column number (1-indexed).
     column: Option<u32>,
+    /// Human-readable failure message.
     message: Option<String>,
 }
 
 impl VerificationDiagnostic {
+    /// Returns the source reference to render, preferring `file`, then `path`,
+    /// then `uri`.
     fn location(&self) -> Option<String> {
         self.file
             .clone()
@@ -227,8 +246,9 @@ mod tests {
         let payload = r#"[{"uri":"file:///tmp/test.rs","line":3,"column":5}]"#;
         let locations = parse_definitions(payload).expect("definitions");
         assert_eq!(locations.len(), 1);
-        assert_eq!(locations[0].line, 3);
-        assert_eq!(locations[0].column, 5);
+        let location = locations.first().expect("one definition");
+        assert_eq!(location.line, 3);
+        assert_eq!(location.column, 5);
     }
 
     #[test]
@@ -236,7 +256,8 @@ mod tests {
         let payload = r#"{"references":[{"uri":"file:///tmp/test.rs","line":1,"column":2}]}"#;
         let response: ReferenceResponse = serde_json::from_str(payload).expect("references");
         assert_eq!(response.references.len(), 1);
-        assert_eq!(response.references[0].column, 2);
+        let reference = response.references.first().expect("one reference");
+        assert_eq!(reference.column, 2);
     }
 
     #[test]
@@ -244,7 +265,8 @@ mod tests {
         let payload = r#"{"diagnostics":[{"line":10,"column":4,"message":"boom"}]}"#;
         let response: DiagnosticsResponse = serde_json::from_str(payload).expect("diagnostics");
         assert_eq!(response.diagnostics.len(), 1);
-        assert_eq!(response.diagnostics[0].message, "boom");
+        let diagnostic = response.diagnostics.first().expect("one diagnostic");
+        assert_eq!(diagnostic.message, "boom");
     }
 
     #[test]
@@ -261,8 +283,9 @@ mod tests {
 }"#;
         let failures = parse_verification_failures(payload).expect("verification");
         assert_eq!(failures.len(), 1);
-        assert_eq!(failures[0].phase.as_deref(), Some("SemanticLock"));
-        assert_eq!(failures[0].line, Some(42));
+        let failure = failures.first().expect("one failure");
+        assert_eq!(failure.phase.as_deref(), Some("SemanticLock"));
+        assert_eq!(failure.line, Some(42));
     }
 
     #[test]

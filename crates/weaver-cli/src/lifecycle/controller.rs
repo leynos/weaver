@@ -6,11 +6,19 @@
 
 use std::{io::Write, process::ExitCode, time::SystemTime};
 
-use weaver_config::{RuntimePaths, SocketEndpoint};
+use mockable::DefaultEnv;
+use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
 use super::{
     error::LifecycleError,
-    monitoring::{HEALTH_FILENAME, PID_FILENAME, read_health, read_pid, wait_for_ready},
+    monitoring::{
+        HEALTH_FILENAME,
+        HealthSnapshot,
+        PID_FILENAME,
+        read_health,
+        read_pid,
+        wait_for_ready,
+    },
     shutdown::{signal_daemon, wait_for_shutdown},
     socket::{ensure_socket_available, socket_is_reachable},
     spawning::spawn_daemon,
@@ -24,38 +32,51 @@ use super::{
     },
 };
 
+/// Observed liveness of a daemon that has no readable health snapshot.
 #[derive(Clone, Copy, Debug)]
 struct RuntimeProbe {
+    /// Whether the configured daemon socket accepts connections.
     reachable: bool,
+    /// Process identifier recorded in the PID file, when one exists.
     pid: Option<u32>,
 }
 
+/// Runtime paths and socket endpoint shared by the status-reporting helpers.
 #[derive(Clone, Copy, Debug)]
 struct RuntimeStatusContext<'a> {
+    /// Paths derived from the daemon configuration.
     paths: &'a RuntimePaths,
+    /// Endpoint the daemon would listen on.
     endpoint: &'a SocketEndpoint,
 }
 
 /// Production lifecycle controller.
+///
+/// The controller is stateless: every entry point is an associated function so
+/// the CLI can drive it without threading an instance through the runtime.
 #[derive(Debug, Default)]
 pub struct SystemLifecycle;
 
 impl SystemLifecycle {
+    /// Executes the lifecycle command carried by `invocation`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LifecycleError`] when the requested command fails.
     pub fn handle<W: Write, E: Write>(
-        &mut self,
-        invocation: LifecycleInvocation,
+        invocation: &LifecycleInvocation,
         context: LifecycleContext<'_>,
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, LifecycleError> {
         match invocation.command {
-            LifecycleCommand::Start => self.start(&invocation, context, output),
-            LifecycleCommand::Stop => self.stop(&invocation, context, output),
-            LifecycleCommand::Status => self.status(&invocation, context, output),
+            LifecycleCommand::Start => Self::start(invocation, context, output),
+            LifecycleCommand::Stop => Self::stop(invocation, context, output),
+            LifecycleCommand::Status => Self::status(invocation, context, output),
         }
     }
 
+    /// Starts the daemon and waits for it to report readiness.
     fn start<W: Write, E: Write>(
-        &mut self,
         invocation: &LifecycleInvocation,
         context: LifecycleContext<'_>,
         output: &mut LifecycleOutput<W, E>,
@@ -67,6 +88,7 @@ impl SystemLifecycle {
             context.config_arguments,
             context.daemon_binary,
             paths.runtime_dir(),
+            &DefaultEnv,
         )?;
         let started_at = SystemTime::now();
         let snapshot = wait_for_ready(&paths, &mut child, started_at, STARTUP_TIMEOUT)?;
@@ -74,8 +96,8 @@ impl SystemLifecycle {
         Ok(ExitCode::SUCCESS)
     }
 
+    /// Stops the daemon recorded in the runtime directory.
     fn stop<W: Write, E: Write>(
-        &mut self,
         invocation: &LifecycleInvocation,
         context: LifecycleContext<'_>,
         output: &mut LifecycleOutput<W, E>,
@@ -83,42 +105,21 @@ impl SystemLifecycle {
         ensure_no_extra_arguments(invocation)?;
         let paths = prepare_runtime(context)?;
         let dir = open_runtime_dir(&paths)?;
-        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
-        let Some(pid) = pid else {
-            if socket_is_reachable(context.config.daemon_socket())? {
-                return Err(LifecycleError::MissingPidWithSocket {
-                    path: paths.pid_path().to_path_buf(),
-                    endpoint: context.config.daemon_socket().to_string(),
-                });
-            }
-            output.stdout_line(format_args!(
-                "daemon is not running (pid file missing at {})",
-                paths.pid_path().display()
-            ))?;
-            return Ok(ExitCode::SUCCESS);
-        };
-        signal_daemon(pid)?;
-        wait_for_shutdown(&paths, context.config.daemon_socket())?;
-        output.stdout_line(format_args!("daemon pid {pid} stopped cleanly"))?;
-        output.stderr_line(format_args!(
-            "removed runtime artefacts from {}",
-            paths.runtime_dir().display()
-        ))?;
-        Ok(ExitCode::SUCCESS)
+
+        match read_pid(&dir, PID_FILENAME, paths.pid_path())? {
+            Some(pid) => stop_daemon(pid, &paths, context, output),
+            None => report_missing_pid(&paths, context, output),
+        }
     }
 
     /// Returns the daemon runtime paths from the current configuration.
-    fn check_daemon_paths(
-        &self,
-        config: &weaver_config::Config,
-    ) -> Result<RuntimePaths, LifecycleError> {
+    fn check_daemon_paths(config: &Config) -> Result<RuntimePaths, LifecycleError> {
         RuntimePaths::from_config_readonly(config).map_err(Into::into)
     }
 
     /// Reports daemon status when a valid health snapshot is available.
     fn report_healthy_status<W: Write, E: Write>(
-        &self,
-        snapshot: &super::monitoring::HealthSnapshot,
+        snapshot: &HealthSnapshot,
         context: &LifecycleContext<'_>,
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<(), LifecycleError> {
@@ -132,7 +133,6 @@ impl SystemLifecycle {
 
     /// Reports status when PID is present but health snapshot is missing.
     fn report_missing_health<W: Write, E: Write>(
-        &self,
         pid: u32,
         paths: &RuntimePaths,
         output: &mut LifecycleOutput<W, E>,
@@ -145,7 +145,6 @@ impl SystemLifecycle {
 
     /// Reports status when socket is reachable but PID file is missing.
     fn report_socket_without_pid<W: Write, E: Write>(
-        &self,
         runtime: RuntimeStatusContext<'_>,
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<(), LifecycleError> {
@@ -161,7 +160,6 @@ impl SystemLifecycle {
 
     /// Reports that the daemon is not running.
     fn report_not_running<W: Write, E: Write>(
-        &self,
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<(), LifecycleError> {
         output.stdout_line(format_args!(
@@ -171,56 +169,95 @@ impl SystemLifecycle {
 
     /// Reports daemon status when health snapshot is missing but runtime exists.
     fn report_degraded_status<W: Write, E: Write>(
-        &self,
         probe: RuntimeProbe,
         runtime: RuntimeStatusContext<'_>,
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<(), LifecycleError> {
         if let Some(pid) = probe.pid {
-            return self.report_missing_health(pid, runtime.paths, output);
+            return Self::report_missing_health(pid, runtime.paths, output);
         }
 
         if probe.reachable {
-            return self.report_socket_without_pid(runtime, output);
+            return Self::report_socket_without_pid(runtime, output);
         }
 
-        self.report_not_running(output)
+        Self::report_not_running(output)
     }
 
+    /// Reports the daemon's current status.
     fn status<W: Write, E: Write>(
-        &mut self,
         invocation: &LifecycleInvocation,
         context: LifecycleContext<'_>,
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, LifecycleError> {
         ensure_no_extra_arguments(invocation)?;
 
-        let paths = self.check_daemon_paths(context.config)?;
+        let paths = Self::check_daemon_paths(context.config)?;
 
         if !paths
             .runtime_dir()
             .try_exists()
             .map_err(LifecycleError::Io)?
         {
-            self.report_not_running(output)?;
+            Self::report_not_running(output)?;
             return Ok(ExitCode::SUCCESS);
         }
 
         let dir = open_runtime_dir(&paths)?;
-        let snapshot = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
+        let health = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
         let runtime = RuntimeStatusContext {
             paths: &paths,
             endpoint: context.config.daemon_socket(),
         };
 
-        if let Some(snapshot) = snapshot {
-            self.report_healthy_status(&snapshot, &context, output)?;
+        if let Some(snapshot) = health {
+            Self::report_healthy_status(&snapshot, &context, output)?;
             return Ok(ExitCode::SUCCESS);
         }
 
         let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
-        self.report_degraded_status(RuntimeProbe { reachable, pid }, runtime, output)?;
+        Self::report_degraded_status(RuntimeProbe { reachable, pid }, runtime, output)?;
         Ok(ExitCode::SUCCESS)
     }
+}
+
+/// Signals the daemon recorded by `pid` and reports the shutdown.
+fn stop_daemon<W: Write, E: Write>(
+    pid: u32,
+    paths: &RuntimePaths,
+    context: LifecycleContext<'_>,
+    output: &mut LifecycleOutput<W, E>,
+) -> Result<ExitCode, LifecycleError> {
+    signal_daemon(pid)?;
+    wait_for_shutdown(paths, context.config.daemon_socket())?;
+    output.stdout_line(format_args!("daemon pid {pid} stopped cleanly"))?;
+    output.stderr_line(format_args!(
+        "removed runtime artefacts from {}",
+        paths.runtime_dir().display()
+    ))?;
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Reports the stop outcome when no PID file records a daemon.
+///
+/// A reachable socket without a PID file is an inconsistent runtime state the
+/// operator has to resolve, so it stays an error rather than a plain message.
+fn report_missing_pid<W: Write, E: Write>(
+    paths: &RuntimePaths,
+    context: LifecycleContext<'_>,
+    output: &mut LifecycleOutput<W, E>,
+) -> Result<ExitCode, LifecycleError> {
+    if socket_is_reachable(context.config.daemon_socket())? {
+        return Err(LifecycleError::MissingPidWithSocket {
+            path: paths.pid_path().to_path_buf(),
+            endpoint: context.config.daemon_socket().to_string(),
+        });
+    }
+
+    output.stdout_line(format_args!(
+        "daemon is not running (pid file missing at {})",
+        paths.pid_path().display()
+    ))?;
+    Ok(ExitCode::SUCCESS)
 }

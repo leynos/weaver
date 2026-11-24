@@ -5,7 +5,7 @@ use tempfile::TempDir;
 
 use super::{
     super::{ContentChange, ContentTransaction, SafetyHarnessError, TransactionOutcome},
-    test_support::{LockFailureKind, temp_file},
+    test_support::{LockFailureKind, file_exists, open_workspace_dir, read_file, temp_file},
 };
 use crate::safety_harness::{
     error::VerificationFailure,
@@ -30,10 +30,10 @@ fn build_content_transaction<'a>(
 }
 
 #[test]
-fn content_transaction_commits_writes_and_deletes() -> Result<(), String> {
-    let dir = TempDir::new().map_err(|e| format!("temp dir: {e}"))?;
-    let keep_path = temp_file(&dir, "keep.txt", "hello")?;
-    let delete_path = temp_file(&dir, "delete.txt", "goodbye")?;
+fn content_transaction_commits_writes_and_deletes() {
+    let dir = TempDir::new().expect("create temp dir");
+    let keep_path = temp_file(&dir, "keep.txt", "hello").expect("create keep file");
+    let delete_path = temp_file(&dir, "delete.txt", "goodbye").expect("create delete file");
 
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::passing();
@@ -44,30 +44,30 @@ fn content_transaction_commits_writes_and_deletes() -> Result<(), String> {
         String::from("hello world"),
     ));
     transaction.add_change(ContentChange::delete(delete_path.clone()));
+    let workspace_dir = open_workspace_dir(dir.path()).expect("open workspace dir");
 
     let outcome = transaction
-        .execute()
-        .map_err(|e| format!("transaction failed: {e}"))?;
+        .execute(&workspace_dir, dir.path())
+        .expect("transaction should succeed");
     assert!(matches!(outcome, TransactionOutcome::Committed { .. }));
     assert_eq!(outcome.files_modified(), Some(2));
     assert_eq!(
-        std::fs::read_to_string(&keep_path).map_err(|e| format!("read keep file: {e}"))?,
+        read_file(&keep_path).expect("read keep file"),
         "hello world"
     );
-    assert!(!delete_path.exists(), "delete file should be removed");
-    Ok(())
+    assert!(
+        !file_exists(&delete_path).expect("check delete file"),
+        "delete file should be removed"
+    );
 }
 
 #[rstest]
 #[case::syntactic(LockFailureKind::Syntactic, "syntax error")]
 #[case::semantic(LockFailureKind::Semantic, "type error")]
-fn content_transaction_rejects_lock_failure(
-    #[case] kind: LockFailureKind,
-    #[case] message: &str,
-) -> Result<(), String> {
-    let dir = TempDir::new().map_err(|e| format!("temp dir: {e}"))?;
-    let keep_path = temp_file(&dir, "keep.txt", "hello")?;
-    let delete_path = temp_file(&dir, "delete.txt", "goodbye")?;
+fn content_transaction_rejects_lock_failure(#[case] kind: LockFailureKind, #[case] message: &str) {
+    let dir = TempDir::new().expect("create temp dir");
+    let keep_path = temp_file(&dir, "keep.txt", "hello").expect("create keep file");
+    let delete_path = temp_file(&dir, "delete.txt", "goodbye").expect("create delete file");
     let failure = VerificationFailure::new(keep_path.clone(), message);
 
     let (syntactic, semantic) = match kind {
@@ -87,9 +87,10 @@ fn content_transaction_rejects_lock_failure(
         keep_path.clone(),
         delete_path.clone(),
     );
+    let workspace_dir = open_workspace_dir(dir.path()).expect("open workspace dir");
     let outcome = transaction
-        .execute()
-        .map_err(|e| format!("transaction failed: {e}"))?;
+        .execute(&workspace_dir, dir.path())
+        .expect("transaction should succeed");
     match kind {
         LockFailureKind::Syntactic => {
             assert!(matches!(
@@ -104,17 +105,16 @@ fn content_transaction_rejects_lock_failure(
             ));
         }
     }
-    assert_eq!(
-        std::fs::read_to_string(&keep_path).map_err(|e| format!("read keep file: {e}"))?,
-        "hello"
+    assert_eq!(read_file(&keep_path).expect("read keep file"), "hello");
+    assert!(
+        file_exists(&delete_path).expect("check delete file"),
+        "delete file should remain"
     );
-    assert!(delete_path.exists(), "delete file should remain");
-    Ok(())
 }
 
 #[test]
 fn content_transaction_rejects_missing_delete() {
-    let dir = TempDir::new().expect("temp dir");
+    let dir = TempDir::new().expect("create temp dir");
     let missing = dir.path().join("missing.txt");
 
     let syntactic = ConfigurableSyntacticLock::passing();
@@ -122,7 +122,10 @@ fn content_transaction_rejects_missing_delete() {
 
     let mut transaction = ContentTransaction::new(&syntactic, &semantic);
     transaction.add_change(ContentChange::delete(missing.clone()));
+    let workspace_dir = open_workspace_dir(dir.path()).expect("open workspace dir");
 
-    let error = transaction.execute().expect_err("should error");
+    let error = transaction
+        .execute(&workspace_dir, dir.path())
+        .expect_err("should error");
     assert!(matches!(error, SafetyHarnessError::FileReadError { .. }));
 }

@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -19,7 +18,7 @@ semantic validation logic. Every emitted diagnostic payload will include:
 `code`, `message`, `primary_span`, and `notes`, with stable `E_SEMPAI_*` codes
 and snapshot-locked JSON output.
 
-This directly fulfills roadmap item 4.1.2 in
+This directly fulfils roadmap item 4.1.2 in
 [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md):
 
 - Define structured diagnostics with stable `E_SEMPAI_*` error codes and
@@ -109,9 +108,9 @@ make nixie        # exits 0
   but current contract wording and tests do not yet lock parser-vs-validator
   schema parity via snapshots. Evidence:
   [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs)
-   and
+  and
   [crates/sempai-core/src/tests/diagnostic_tests.rs](../../crates/sempai-core/src/tests/diagnostic_tests.rs).
-   Impact: Work should focus on schema hardening and path parity, not inventing
+  Impact: Work should focus on schema hardening and path parity, not inventing
   a new code set.
 
 - Observation: `rstest-bdd` v0.5.0 is already pinned at workspace level.
@@ -122,7 +121,7 @@ make nixie        # exits 0
   `insta` configuration, while `assert_snapshot!` is available and stable.
   Evidence:
   [crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs](../../crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs).
-   Impact: Snapshot tests should serialize deterministic pretty JSON strings
+  Impact: Snapshot tests should serialize deterministic pretty JSON strings
   and use `assert_snapshot!`.
 
 ## Decision log
@@ -342,7 +341,7 @@ Acceptance is satisfied when all are true:
 - If tolerance triggers are hit, stop and record escalation details in
   `Decision Log` before proceeding.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Capture the following during implementation:
 

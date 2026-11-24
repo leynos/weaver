@@ -13,15 +13,17 @@ path = "src/main.rs"
 test-support = []
 
 [dependencies]
+cap-std = { workspace = true }
 daemonize-me = "2.0.2"
-dirs = "5.0"
+dirs = "7.0"
 lsp-types.workspace = true
-nix = { version = "0.28", features = ["signal", "user"] }
+mockable = { workspace = true }
+nix = { version = "0.31", features = ["signal", "user"] }
 once_cell.workspace = true
 ortho_config.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-signal-hook = "0.3"
+signal-hook = "0.4"
 thiserror.workspace = true
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time"] }
@@ -35,14 +37,23 @@ weaver-syntax = { path = "../weaver-syntax" }
 tempfile.workspace = true
 
 [dev-dependencies]
-derive_more = { version = "1.0", features = ["as_ref", "deref"] }
+anyhow = { workspace = true }
+camino = { workspace = true }
+derive_more = { version = "2.1", features = ["as_ref", "deref"] }
 insta = { workspace = true, features = ["json", "redactions"] }
+mockable = { workspace = true, features = ["mock"] }
 mockall.workspace = true
+proptest = { workspace = true }
 rstest.workspace = true
 rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true
+serial_test = { workspace = true }
 weaver-test-macros = { path = "../weaver-test-macros" }
 
 [build-dependencies]
 camino = { workspace = true }
+mockable = { workspace = true }
 weaver-build-util = { path = "../weaver-build-util" }
+
+[lints]
+workspace = true

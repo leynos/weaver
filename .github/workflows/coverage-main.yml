@@ -1,0 +1,161 @@
+name: Coverage (main)
+
+# CodeScene accepts `cs-coverage upload` only for analysed branches, so
+# main-branch coverage is uploaded here on push (or on manual dispatch,
+# to re-run the upload without waiting for a new commit); pull requests
+# only run the test-and-coverage step in ci.yml, with no CodeScene step
+# of any kind. This is the only workflow in the repository that may
+# touch CodeScene: it is not a pull-request lane, so a move in the
+# unpinned CodeScene CLI can delay a coverage report here but cannot
+# block a merge. This workflow also advances the coverage ratchet baseline:
+# caches saved on main are readable by every pull-request run, so the
+# baseline written here is the one ci.yml's ratchet check compares
+# against.
+
+'on':
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One publisher at a time, and never cancelled. Two pushes to main in quick
+# succession would otherwise upload concurrently and advance the ratchet
+# baseline from whichever finished last, which is not necessarily the later
+# commit. `cancel-in-progress` is deliberately false: a cancelled run here
+# leaves the baseline reflecting a commit that is no longer the tip, and
+# nothing reports that.
+concurrency:
+  group: coverage-main-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  coverage-upload:
+    # The measuring job is GitHub-hosted: this job's whole cost is compiling
+    # and running the suite, and Ubicloud minutes are the scarce ones. It uses
+    # no compiler cache, because on a hosted runner sccache reaches only
+    # GitHub's store, which no Ubicloud lane reads. What Ubicloud lanes read
+    # from main is kept by the two Ubicloud jobs below. There is no fork arm:
+    # neither `push` nor `workflow_dispatch` carries a pull request.
+    #
+    # Hosted runners have four vCPU, so the two trybuild cases (20.5 s and
+    # 25.4 s on four vCPU) stay far below nextest's 180 s kill.
+    runs-on: ubuntu-latest
+    # The CodeScene token lives in this environment, whose deployment policy
+    # admits `main` alone; the codescene environment contract holds it to
+    # this job.
+    environment: codescene
+    # A cold hosted build compiles everything with no cache.
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+      BUILD_PROFILE: debug
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # Ubicloud's cache proxy, published before sccache is configured. See
+      # the note in ci.yml. This lane carries no fork arm, so it is always on
+      # Ubicloud, but the guard stays: it is what keeps the step correct if
+      # the lane ever gains one.
+        with:
+          persist-credentials: false
+      - name: Export Ubicloud cache credentials
+        if: runner.environment == 'self-hosted'
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+      # `.cargo/config.toml` selects `mold` for every Linux build, including
+      # the scratch crates the trybuild cases compile under `target/`, so the
+      # runner needs the linker before coverage runs. The input installs it
+      # and sets no flag; the Cargo configuration does that.
+      - name: Setup Rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        with:
+          install-mold: 'true'
+          use-sccache: 'false'
+          save-cache: 'false'
+      - name: Generate coverage
+        uses: leynos/shared-actions/.github/actions/generate-coverage@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        with:
+          output-path: lcov.info
+          format: lcov
+          with-ratchet: 'true'
+          # The nightly-2026-10-22 bump alone moved measured coverage from 78.35%
+          # to 77.08% (tests unchanged). The cached baseline is keyed by this
+          # path, so a new path resets it to the committed figure.
+          baseline-rust-file: .coverage-baseline-v2.rust
+          # `coverage-baseline` saves the baseline on Ubicloud, where the
+          # pull-request lane reads it; a baseline saved from this hosted
+          # job would land in GitHub's store, which that lane cannot see.
+          publish-baseline: never
+          baseline-artefact-name: coverage-baseline-handover
+      # Reports whether the token is configured without binding it anywhere:
+      # the expression is evaluated before the shell runs, so this step
+      # writes `available=true` or `available=false` and the token is in no
+      # `env`. The uploader is a composite action that hands its step's `env`
+      # to nested steps, so the token goes to it as an input instead.
+      - name: Check for the CodeScene token
+        id: codescene-token
+        run: echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - name: Upload coverage data to CodeScene
+        # The ref guard matters as much as the token. `workflow_dispatch` can
+        # be run from any branch, and CodeScene accepts an upload for the
+        # analysed branch whatever the payload actually came from, so a
+        # dispatch from a feature branch would publish that branch's coverage
+        # as the trunk's and move the ratchet baseline with it. Nothing would
+        # report it.
+        if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        with:
+          format: lcov
+          # Stated rather than left to the action's default, because this
+          # being the upload and not the pull-request check is the whole
+          # point of the split.
+          mode: upload
+          access-token: ${{ secrets.CS_ACCESS_TOKEN }}
+
+  coverage-baseline:
+    # Saves the ratchet baseline the measuring job hands over, into the store
+    # the Ubicloud pull-request lane reads. It does no compiling. The action
+    # publishes only on a push to `main`, so a dispatch leaves the baseline
+    # where it was.
+    needs: coverage-upload
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Publish the ratchet baseline
+        uses: leynos/shared-actions/.github/actions/publish-coverage-baseline@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        with:
+          artefact-name: coverage-baseline-handover
+          # The same path the generator and the pull-request lane use: it is
+          # part of the cache entry's version.
+          baseline-rust-file: .coverage-baseline-v2.rust
+
+  coverage-warmup:
+    # Build-only: compiles the same instrumented test binaries as the
+    # pull-request lane so their compiler-cache entries sit in main's
+    # Ubicloud scope, which a pull request reads only if a main job on
+    # Ubicloud writes it. It runs no test and uploads nothing.
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+      BUILD_PROFILE: debug
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Export Ubicloud cache credentials
+        if: runner.environment == 'self-hosted'
+        uses: leynos/shared-actions/.github/actions/export-ubicloud-cache-credentials@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+      - name: Setup Rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        with:
+          install-mold: 'true'
+      - name: Compile the instrumented tests
+        uses: leynos/shared-actions/.github/actions/generate-coverage@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        with:
+          output-path: lcov.info
+          format: lcov
+          build-only: 'true'

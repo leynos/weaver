@@ -2,7 +2,7 @@
 name = "weaver-config"
 edition.workspace = true
 version.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 
 [lib]
 doctest = false
@@ -20,7 +20,7 @@ ortho_config.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 percent-encoding = "2.3.2"
-strum = { version = "0.26.3", features = ["derive"] }
+strum = { version = "0.28.0", features = ["derive"] }
 url = { version = "2.5", features = ["serde"] }
 
 [target.'cfg(unix)'.dependencies]
@@ -28,6 +28,9 @@ dirs.workspace = true
 libc = "0.2"
 
 [dev-dependencies]
+googletest.workspace = true
+insta.workspace = true
+pretty_assertions.workspace = true
 rstest.workspace = true
 rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true
@@ -37,3 +40,7 @@ weaver-test-macros = { path = "../weaver-test-macros" }
 cap-std = { workspace = true }
 proptest = { workspace = true }
 serde_json = { workspace = true }
+trybuild = { workspace = true }
+
+[lints]
+workspace = true

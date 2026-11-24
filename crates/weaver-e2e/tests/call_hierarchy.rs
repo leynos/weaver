@@ -5,8 +5,10 @@
 
 #[path = "support/fixture_io.rs"]
 mod fixture_io;
-
-use std::path::Path;
+#[path = "support/pyrefly.rs"]
+mod pyrefly;
+#[path = "support/uri.rs"]
+mod uri;
 
 use fixture_io::write_fixture_path;
 use lsp_types::{
@@ -19,9 +21,10 @@ use lsp_types::{
     Uri,
     WorkDoneProgressParams,
 };
+use pyrefly::require_pyrefly;
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use url::Url;
+use uri::{FileUriError, file_uri, parse_uri};
 use weaver_e2e::{
     fixtures,
     lsp_client::{LspClient, LspClientError},
@@ -37,11 +40,8 @@ enum TestError {
     #[error("LSP client error: {0}")]
     LspClient(#[from] LspClientError),
 
-    #[error("invalid file path: cannot convert to URI")]
-    InvalidFilePath,
-
-    #[error("invalid URI: {0}")]
-    InvalidUri(String),
+    #[error(transparent)]
+    FileUri(#[from] FileUriError),
 
     #[error("no call hierarchy items returned")]
     NoCallHierarchyItems,
@@ -66,26 +66,6 @@ enum TestError {
 
     #[error("expected NotInitialized error, got: {actual}")]
     WrongErrorType { actual: String },
-}
-
-/// Creates a file URI from a path, handling cross-platform differences correctly.
-fn file_uri(path: &Path) -> Result<Uri, TestError> {
-    let url = Url::from_file_path(path).map_err(|()| TestError::InvalidFilePath)?;
-    url.as_str()
-        .parse()
-        .map_err(|_| TestError::InvalidUri(url.to_string()))
-}
-
-/// Skips the test if Pyrefly is not available.
-macro_rules! require_pyrefly {
-    () => {
-        if !pyrefly_available() {
-            eprintln!(
-                "Skipping test: Pyrefly not available (install with `uv tool install pyrefly`)"
-            );
-            return Ok(());
-        }
-    };
 }
 
 /// Runs a test implementation with an optional fixture context.
@@ -372,9 +352,7 @@ fn lsp_prepare_call_hierarchy_before_init_returns_error() -> Result<(), TestErro
 
     let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
 
-    let uri: Uri = "file:///tmp/test.py"
-        .parse()
-        .map_err(|_| TestError::InvalidUri("file:///tmp/test.py".to_owned()))?;
+    let uri = parse_uri("file:///tmp/test.py")?;
 
     let params = CallHierarchyPrepareParams {
         text_document_position_params: TextDocumentPositionParams {

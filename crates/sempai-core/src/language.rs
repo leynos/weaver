@@ -49,6 +49,7 @@ impl fmt::Display for Language {
 /// Error returned when a string does not match any known language name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LanguageParseError {
+    /// The unrecognized input string, echoed back in the error message.
     name: String,
 }
 

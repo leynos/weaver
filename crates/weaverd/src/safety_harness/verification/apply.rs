@@ -16,7 +16,7 @@ use crate::safety_harness::{edit::FileEdit, error::SafetyHarnessError};
 /// byte offsets from the original content rather than assuming fixed newline lengths.
 pub fn apply_edits(original: &str, file_edit: &FileEdit) -> Result<String, SafetyHarnessError> {
     let line_starts = compute_line_start_offsets(original);
-    let mut result = original.to_string();
+    let mut result = original.to_owned();
 
     // Sort edits in reverse order by position to avoid offset shifts
     let mut edits: Vec<_> = file_edit.edits().iter().collect();
@@ -123,15 +123,11 @@ mod tests {
     use super::*;
     use crate::safety_harness::edit::{FileEdit, Position, TextEdit};
 
-    /// Helper for testing successful edit application scenarios.
-    fn assert_edits_produce(original: &str, edits: Vec<TextEdit>, expected: &str) {
-        let path = PathBuf::from("test.txt");
-        let edit = FileEdit::with_edits(path, edits);
-        let result = match apply_edits(original, &edit) {
-            Ok(result) => result,
-            Err(error) => panic!("edit should succeed: {error}"),
-        };
-        assert_eq!(result, expected);
+    /// Applies `edits` to `original`, surfacing application failures to the
+    /// caller so the assertion stays in the test body.
+    fn edited_text(original: &str, edits: Vec<TextEdit>) -> Result<String, String> {
+        let edit = FileEdit::with_edits(PathBuf::from("test.txt"), edits);
+        apply_edits(original, &edit).map_err(|error| format!("edit should succeed: {error}"))
     }
 
     #[rstest]
@@ -147,25 +143,25 @@ mod tests {
     )]
     #[case::replace(
         "fn foo() {}",
-        vec![TextEdit::from_positions(Position::new(0, 3), Position::new(0, 6), "bar".to_string())],
+        vec![TextEdit::from_positions(Position::new(0, 3), Position::new(0, 6), "bar".to_owned())],
         "fn bar() {}"
     )]
     #[case::multiple_edits(
         "aaa bbb ccc",
         vec![
-            TextEdit::from_positions(Position::new(0, 0), Position::new(0, 3), "AAA".to_string()),
-            TextEdit::from_positions(Position::new(0, 8), Position::new(0, 11), "CCC".to_string()),
+            TextEdit::from_positions(Position::new(0, 0), Position::new(0, 3), "AAA".to_owned()),
+            TextEdit::from_positions(Position::new(0, 8), Position::new(0, 11), "CCC".to_owned()),
         ],
         "AAA bbb CCC"
     )]
     #[case::crlf_line_endings(
         "line one\r\nline two\r\nline three",
-        vec![TextEdit::from_positions(Position::new(1, 5), Position::new(1, 8), "TWO".to_string())],
+        vec![TextEdit::from_positions(Position::new(1, 5), Position::new(1, 8), "TWO".to_owned())],
         "line one\r\nline TWO\r\nline three"
     )]
     #[case::lf_multiline(
         "first\nsecond\nthird",
-        vec![TextEdit::from_positions(Position::new(1, 0), Position::new(1, 6), "SECOND".to_string())],
+        vec![TextEdit::from_positions(Position::new(1, 0), Position::new(1, 6), "SECOND".to_owned())],
         "first\nSECOND\nthird"
     )]
     #[case::end_of_file_position(
@@ -178,7 +174,9 @@ mod tests {
         #[case] edits: Vec<TextEdit>,
         #[case] expected: &str,
     ) {
-        assert_edits_produce(original, edits, expected);
+        let actual = edited_text(original, edits).expect("edits should apply cleanly");
+
+        assert_eq!(actual, expected);
     }
 
     #[test]

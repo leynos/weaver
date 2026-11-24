@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: IMPLEMENTED
 
@@ -16,8 +15,8 @@ repository root.
 
 ## Purpose / big picture
 
-Roadmap item `2.3.3` is the unification step that sits on top of completed
-items `2.2.1`, `2.2.4`, `2.3.1`, and `2.3.2`. Today the Level 10 failure paths
+Roadmap item `2.3.3` is the unification step that sits on top of completed items
+`2.2.1`, `2.2.4`, `2.3.1`, and `2.3.2`. Today the Level 10 failure paths
 already exist, but they still read like separate features:
 
 - bare invocation prints short help with no explicit error line;

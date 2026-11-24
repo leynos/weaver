@@ -6,11 +6,28 @@ focus because both binaries share the same loading pipeline and rely on the
 `weaver-config` crate to merge settings from files, environment variables, and
 command-line arguments.
 
+## Requirements
+
+On Linux, install the `mold` linker before building from source: the workspace
+`.cargo/config.toml` links Linux builds with it, and Cargo applies that
+configuration to a bare `cargo build --release` too, so a build without `mold`
+fails at the link step. Release artefacts from `make release` or CI add neither
+the frontend flag nor `mold`, though a flag the caller exports survives.
+
+Weaver's workspace targets require Rust 1.90 or newer because the `tree-sitter`
+0.27 dependency sets that minimum. The separately consumable `weaver-config`
+library retains its Rust 1.89 minimum, matching its runtime dependency graph.
+The repository's own checkout additionally needs the pinned Nightly toolchain
+(`nightly-2026-11-06`): its `.cargo/config.toml` uses Nightly-only options, so
+stable Rust is not sufficient for local Cargo builds there. The README lists
+the toolchain setup.
+
 ## 0.1.0 command-surface target
 
 Weaver is pre-0.1.0, so the current public command grammar is not a
-compatibility promise. [ADR 007](adr-007-agent-native-command-surface.md) and
-the [roadmap](roadmap.md) reset the future public interface around a
+compatibility promise.
+[ADR 0007](adrs/adr-0007-agent-native-command-surface.md) and the
+[roadmap](roadmap.md) reset the future public interface around a
 human-friendly, agent-native command contract.
 
 The 0.1.0 target keeps the human terminal experience first-class while making
@@ -31,14 +48,28 @@ agent usage reliable:
   skill, and execution-ledger contracts depend on OrthoConfig where the
   OrthoConfig roadmap already owns the generic machinery.
 
+The [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md)
+tracks which target command-contract tasks already consume OrthoConfig, which
+ones use temporary Weaver wrappers, and which ones are pending upstream
+OrthoConfig contracts. While those pending and wrapper rows remain open, users
+may see Weaver-owned help, output, profile, delivery, feedback, or job-ledger
+behaviour that is expected to converge on the named OrthoConfig contract before
+the 0.1.0 compatibility promise is made.
+
 Representative target commands look like this:
 
 ```sh
 weaver definitions get --uri file:///src/main.rs --position 10:5
 weaver references list --uri file:///src/main.rs --position 10:5 --json
-weaver symbols list --query 'fn $name(...)' --json \
-  | jq 'select(.name | startswith("old_"))' \
-  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+weaver symbols list --query 'fn $NAME(...)' --json \
+  | jq -c '
+      if .schema == "weaver.selector.v1" then
+        select((.captures.NAME.text? // "") | startswith("old_"))
+      else
+        .
+      end
+    ' \
+  | weaver symbols rename --selectors - --replace-prefix old_ --with-prefix new_
 weaver symbols rename --query 'fn process_request(...)' --new-name run_request
 weaver patches apply --file changes.patch --dry-run
 weaver context --json
@@ -63,6 +94,10 @@ order:
 Each successive layer overrides earlier sources. This guarantees that a
 parameter passed through the CLI is honoured even when a configuration file or
 environment variable also supplies the same field.
+
+An explicit CLI value wins even when it repeats the built-in default. For
+example, `--locale en-US` overrides a locale from an environment variable or
+configuration file.
 
 ### CLI flags
 
@@ -121,13 +156,18 @@ directive = "force"
 ### Validation and error reporting
 
 Invalid configuration files are treated as fatal. When `--config-path` points
-at a broken file, or when discovery finds a malformed
-`weaver.toml`/`.weaver.toml`, both the CLI and daemon abort with a
-`LoadConfiguration` error that lists every offending path. Remove or fix the
-reported files before retrying. If no configuration files exist at all, the
-loader still falls back to the built-in defaults described below. See the
+at a broken file, or when discovery finds a malformed `weaver.toml`/
+`.weaver.toml`, both the CLI and daemon abort with a `LoadConfiguration` error
+that lists every offending path. Remove or fix the reported files before
+retrying. If no configuration files exist at all, the loader still falls back
+to the built-in defaults described below. See the
 [developer's guide](developers-guide.md) for toolchain baseline and
 configuration framework internals.
+
+An `extends` entry is also strict. If a parent file is missing, Weaver exits
+non-zero and names both the configuration file containing `extends` and the
+resolved path of the missing parent. Correct the reference or create the parent
+file; Weaver never silently ignores an inheritance failure.
 
 Operators will see aggregated errors enumerated in the order discovery
 encounters them. For example:
@@ -194,10 +234,10 @@ target file locally, and returns a Tree-sitter-backed symbol card for supported
 Rust, Python, and TypeScript files. `graph-slice` accepts the same location
 arguments plus traversal, detail, and budget options, and returns a stable
 same-file graph-slice envelope. Missing or malformed arguments return
-structured error messages with exit status 1. Operations outside the
-implemented `observe` subcommands, and outside the implemented `act` and
-`verify` flows, may return "not yet implemented" responses while backend wiring
-is being completed.
+structured error messages with exit status 1. Operations outside the implemented
+`observe` subcommands, and outside the implemented `act` and `verify` flows,
+may return "not yet implemented" responses while backend wiring is being
+completed.
 
 The health snapshot is a single-line JSON document describing the current
 state, enabling operators and automation to poll readiness without speaking the
@@ -358,9 +398,12 @@ This output does not require a configuration file or a running daemon.
 Running `weaver --help` displays the full command reference to standard output
 and exits with code 0. The output includes a purpose statement, quick-start
 examples, global options, the `daemon` subcommand, and a catalogue of all
-domains and operations. It also includes the shared configuration flags
-`--config-path`, `--daemon-socket`, `--log-filter`, `--log-format`,
-`--capability-overrides`, and `--locale` in the `Options:` section:
+domains and operations. A `Commands:` section lists structured command paths
+and their long flags, including
+`definitions get --uri <URI> --position <LINE:COLUMN>`. It also includes the
+shared configuration flags `--config-path`, `--daemon-socket`, `--log-filter`,
+`--log-format`, `--capability-overrides`, and `--locale` in the `Options:`
+section:
 
 ```text
 Domains and operations:
@@ -387,8 +430,8 @@ The graph-slice operation uses this syntax:
 weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
 ```
 
-`weaver daemon start --help` exposes the same six configuration flags in its
-own `Options:` section. As with the top-level command, the help surface is
+`weaver daemon start --help` exposes the same six configuration flags in its own
+`Options:` section. As with the top-level command, the help surface is
 truthful about the shared config contract, but the flags still need to appear
 before `daemon start` at runtime in order to change behaviour.
 
@@ -965,8 +1008,8 @@ candidate symbols excluded from the response, not for symbols that discovery
 limits prevented Weaver from enumerating.
 
 The stable edge schema is already locked even though runtime edges are deferred
-to later milestones. When present, every edge will carry a `resolution_scope`
-of `full_symbol_table`, `partial_symbol_table`, or `lsp`.
+to later milestones. When present, every edge will carry a `resolution_scope` of
+`full_symbol_table`, `partial_symbol_table`, or `lsp`.
 
 #### observe grep
 
@@ -1073,7 +1116,7 @@ Double-Lock safety harness before any filesystem change is committed.
 Syntax:
 
 ```sh
-weaver act refactor --provider <PLUGIN> --refactoring <OP> --file <PATH> [KEY=VALUE...]
+weaver act refactor --provider <PLUGIN> --refactoring <OP> --file <PATH> --position <LINE:COL> [KEY=VALUE...]
 ```
 
 Arguments:
@@ -1085,6 +1128,7 @@ Table: act refactor command-line flags
 | `--provider`    | Required provider name for the registered plugin. Built-in values are `rope` for Python rename flows and `rust-analyzer` for Rust rename flows. |
 | `--refactoring` | Refactoring operation to request (currently `rename`). The handler maps `rename` to the `rename-symbol` capability contract internally.         |
 | `--file`        | Path to the target file (relative to workspace root).                                                                                           |
+| `--position`    | 1-indexed `LINE:COL` position of the symbol used as the rename anchor.                                                                          |
 | `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.                                                                                              |
 
 The plugin receives the file content in-band as part of the JSONL request and
@@ -1095,35 +1139,49 @@ output is refused as a failure: Weaver exits with status `1`, prints
 `act refactor failed: plugin succeeded but did not return diff output`, and
 leaves the filesystem unchanged.
 
-For the built-in actuators, `rename` requires `offset=<BYTE_OFFSET>` and
-`new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments. `weaverd`
-requires all three top-level flags in one request and rejects incomplete
-invocations before plugin resolution, file I/O, or backend startup.
+For the built-in actuators, `rename` requires `--position <LINE:COL>` and
+`new_name=<IDENTIFIER>`. `weaverd` requires all four top-level flags in one
+request and rejects incomplete invocations before plugin resolution, file I/O,
+or backend startup. The legacy `offset=<BYTE_OFFSET>` form is accepted only as
+a deprecated compatibility path and will be removed in a future release. When
+`offset=` is supplied without `--position`, `weaverd` writes the following
+warning to stderr before processing the request:
+
+```text
+Warning: 'offset=' is deprecated; use '--position LINE:COL' instead.
+```
+
+See the
+[rename position migration guide](weaver-act-refactor-rename-position-migration-guide.md)
+for upgrade examples.
 
 ### Parameter semantics and valid values
 
-The `act refactor` handler requires `--provider`, `--refactoring`, and
-`--file`, then forwards any additional `KEY=VALUE` pairs to the selected plugin.
+The `act refactor` handler requires `--provider`, `--refactoring`, `--file`, and
+`--position`, then forwards any additional `KEY=VALUE` pairs to the selected
+plugin.
 
 Table: act refactor parameter semantics and validation
 
-| Parameter       | Meaning                                                                                                                                                | Valid values                                                                             | Failure conditions                                                                                               |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `--provider`    | Provider to use for the refactoring request.                                                                                                           | Registered actuator name such as `rope` or `rust-analyzer`.                              | Missing flag, missing value, or unknown provider name causes failure.                                            |
-| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins.   | Missing flag, missing value, or unsupported operation name (for example `extract_method`) causes failure.        |
-| `--file`        | Target file to load and refactor.                                                                                                                      | Workspace-relative path to an existing readable file (for example `src/main.py`).        | Missing flag, missing value, absolute paths, parent traversal (`..`), or unreadable/missing files cause failure. |
-| `new_name`      | New symbol name used by `rename`.                                                                                                                      | Non-empty string value.                                                                  | Missing key, non-string value, or empty/whitespace-only value causes failure.                                    |
-| `offset`        | UTF-8 byte offset of the symbol occurrence used as rename anchor. The handler maps `offset` to the contract `position` field internally.               | Non-negative integer, provided as a number or numeric string (for example `4` or `"4"`). | Missing key, non-numeric value, or negative value causes failure.                                                |
+| Parameter       | Meaning                                                                                                                                                | Valid values                                                                           | Failure conditions                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--provider`    | Provider to use for the refactoring request.                                                                                                           | Registered actuator name such as `rope` or `rust-analyzer`.                            | Missing flag, missing value, or unknown provider name causes failure.                                            |
+| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins. | Missing flag, missing value, or unsupported operation name (for example `extract_method`) causes failure.        |
+| `--file`        | Target file to load and refactor.                                                                                                                      | Workspace-relative path to an existing readable file (for example `src/main.py`).      | Missing flag, missing value, absolute paths, parent traversal (`..`), or unreadable/missing files cause failure. |
+| `--position`    | Symbol occurrence used as the rename anchor.                                                                                                           | 1-indexed `LINE:COL` value, counting Unicode characters for the column.                | Missing flag, malformed value, zero line or column, or a position outside the file causes failure.               |
+| `new_name`      | New symbol name used by `rename`.                                                                                                                      | Non-empty string value.                                                                | Missing key, non-string value, or empty/whitespace-only value causes failure.                                    |
+| `offset`        | Deprecated compatibility spelling for older rename invocations.                                                                                        | Non-negative UTF-8 byte offset. Prefer `--position`.                                   | Cannot be combined with `--position`; malformed values are rejected by the daemon before plugin execution.       |
 
-For `offset`, count bytes from the start of the file (`0`-based), not line and
-column pairs. This matters when multibyte UTF-8 characters appear before the
-target symbol.
+The daemon converts `--position` to any provider-specific offset required by
+the current built-in plugins. Byte offsets are an internal compatibility
+detail, not the canonical command interface.
 
 ### Expected behaviour of the worked examples
 
 Both examples follow the same execution pipeline:
 
-1. `weaverd` parses `--provider`, `--refactoring`, and `--file`.
+1. `weaverd` parses `--provider`, `--refactoring`, `--file`, and
+   `--position`.
 2. It validates that `--provider` is a known actuator name and that
    `--refactoring` is a supported user-facing operation.
 3. It maps `rename` to `rename-symbol`, infers the target language from the
@@ -1142,14 +1200,14 @@ When required flags are missing, `act refactor` returns one deterministic
 actionable error instead of failing one flag at a time:
 
 ```text
-invalid arguments: act refactor requires --provider <plugin>, --refactoring <operation>, and --file <path>
+invalid arguments: act refactor requires --provider <plugin>, --refactoring <operation>, --file <path>, and --position <line:col>
 
 Valid alternatives:
   - Providers: rope, rust-analyzer
   - Refactorings: rename
 
 Next command:
-  weaver act refactor --provider rope --refactoring rename --file path/to/file.py offset=1 new_name=renamed_symbol
+  weaver act refactor --provider rope --refactoring rename --file path/to/file.py --position 1:1 new_name=renamed_symbol
 ```
 
 When validation fails, parameters are invalid, or the plugin reports an error,
@@ -1167,8 +1225,8 @@ Worked examples:
     --provider rope \
     --refactoring rename \
     --file src/main.py \
-    new_name=renamed_symbol \
-    offset=4
+    --position 1:5 \
+    new_name=renamed_symbol
   ```
 
   Example routing rationale emitted before the final success payload:
@@ -1213,8 +1271,8 @@ Worked examples:
     --provider rust-analyzer \
     --refactoring rename \
     --file src/main.rs \
-    new_name=renamed_name \
-    offset=3
+    --position 1:4 \
+    new_name=renamed_name
   ```
 
   Example final result:
@@ -1355,11 +1413,11 @@ response checks therefore stay aligned across Python and Rust rename flows.
 
 Table: Required fields for `rename-symbol` requests.
 
-| Field      | Type   | Description                                      |
-| ---------- | ------ | ------------------------------------------------ |
-| `uri`      | string | File URI of the symbol to rename.                |
-| `position` | string | Position of the symbol as a UTF-8 byte offset.   |
-| `new_name` | string | The new name for the symbol (must be non-empty). |
+| Field      | Type   | Description                                                                                                                                             |
+| ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uri`      | string | File URI of the symbol to rename.                                                                                                                       |
+| `position` | string | Internal position value used by the daemon-to-plugin request. The current built-in plugins receive a UTF-8 byte offset converted from CLI `--position`. |
+| `new_name` | string | The new name for the symbol (must be non-empty).                                                                                                        |
 
 Successful responses must contain a `Diff` output with a unified diff patch. If
 a plugin reports success with any other output shape, Weaver refuses the
@@ -1468,6 +1526,14 @@ Graceful shutdown is performed when the daemon stops: a `shutdown` request is
 sent to each running language server, followed by an `exit` notification. If a
 server does not exit within five seconds, it is terminated forcefully.
 
+Each request to a language server has a 30-second response deadline. A server
+that does not answer in time (for example because it is wedged or starved of
+CPU) is terminated and the request fails, so operations that treat the language
+server as optional, such as `--detail semantic` enrichment, degrade instead of
+stalling. The daemon does not start a replacement for that server for 60
+seconds, so a batch of requests fails quickly rather than waiting out one
+deadline per request.
+
 ## Double-Lock safety harness
 
 All `act` commands pass through a "Double-Lock" safety harness before any
@@ -1564,8 +1630,8 @@ workspace crates:
 - **`sempai_core`** — canonical data model including language identifiers
   (`Language`), source spans (`Span`, `LineCol`), match results (`Match`),
   capture bindings (`CaptureValue`, `CapturedNode`), structured diagnostics
-  (`DiagnosticReport`, `Diagnostic`, `DiagnosticCode`), and engine
-  configuration (`EngineConfig`).
+  (`DiagnosticReport`, `Diagnostic`, `DiagnosticCode`), and engine configuration
+  (`EngineConfig`).
 - **`sempai_yaml`** — Semgrep-compatible YAML parser built on `saphyr` and
   `serde-saphyr`, exposing schema-aligned rule models for legacy and v2 search
   principals plus parser-time handling for extract, join, and taint rules.

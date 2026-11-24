@@ -112,7 +112,10 @@ pub trait PluginExecutor {
 /// ```
 #[derive(Debug)]
 pub struct PluginRunner<E> {
+    /// Manifests of plugins that `execute` may resolve requests against.
     registry: PluginRegistry,
+    /// Strategy used to run a resolved plugin; swapped for a test double in
+    /// non-production code so no real process is spawned.
     executor: E,
 }
 

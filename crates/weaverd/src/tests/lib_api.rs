@@ -15,30 +15,42 @@ use crate::{BackendKind, bootstrap_with};
 /// Verifies that the public `bootstrap_with` re-export correctly initialises
 /// the daemon without eagerly starting backends.
 #[rstest]
-fn bootstrap_with_reexport_initialises_daemon() {
-    let loader = TestConfigLoader::new();
+fn bootstrap_with_reexport_initialises_daemon() -> Result<(), String> {
+    let loader = TestConfigLoader::new()?;
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
 
     let _daemon = bootstrap_with(&loader, reporter.clone(), provider.clone())
-        .expect("bootstrap should succeed");
+        .map_err(|error| format!("bootstrap should succeed: {error}"))?;
 
     let events = reporter.events();
-    assert!(events.contains(&HealthEvent::BootstrapStarting));
-    assert!(events.contains(&HealthEvent::BootstrapSucceeded));
-    assert!(provider.recorded_starts().is_empty());
+    if !events.contains(&HealthEvent::BootstrapStarting) {
+        return Err(format!("missing bootstrap start event: {events:?}"));
+    }
+    if !events.contains(&HealthEvent::BootstrapSucceeded) {
+        return Err(format!("missing bootstrap success event: {events:?}"));
+    }
+    let starts = provider.recorded_starts();
+    if !starts.is_empty() {
+        return Err(format!("expected no backend starts, got: {starts:?}"));
+    }
+    Ok(())
 }
 
 #[rstest]
-fn daemon_reexport_controls_backends() {
-    let loader = TestConfigLoader::new();
+fn daemon_reexport_controls_backends() -> Result<(), String> {
+    let loader = TestConfigLoader::new()?;
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
     let mut daemon = bootstrap_with(&loader, reporter.clone(), provider.clone())
-        .expect("bootstrap should succeed");
+        .map_err(|error| format!("bootstrap should succeed: {error}"))?;
 
     daemon
         .ensure_backend(BackendKind::Semantic)
-        .expect("backend should start");
-    assert_eq!(provider.recorded_starts(), vec![BackendKind::Semantic]);
+        .map_err(|error| format!("backend should start: {error}"))?;
+    let starts = provider.recorded_starts();
+    if starts != vec![BackendKind::Semantic] {
+        return Err(format!("expected semantic backend start, got: {starts:?}"));
+    }
+    Ok(())
 }

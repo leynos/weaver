@@ -16,11 +16,11 @@ This document targets software engineers implementing the Rust
 The design covers request contract changes, rust-analyzer Language Server
 Protocol (LSP) orchestration, edit-planning strategy, semantic verification,
 and test strategy. It aligns with
-[ADR 001](adr-001-plugin-capability-model-and-act-extricate.md).
+[ADR 0001](adrs/adr-0001-plugin-capability-model-and-act-extricate.md).
 
-## Relationship to ADR 001 provider model
+## Relationship to ADR 0001 provider model
 
-ADR 001 defines Rust extrication as a built-in provider responsibility in the
+ADR 0001 defines Rust extrication as a built-in provider responsibility in the
 daemon capability resolver. This document specifies a plugin-backed execution
 path that the built-in provider can delegate to during rollout.
 
@@ -54,21 +54,24 @@ its final location.
 
 ## System context
 
-The current Rust actuator plugin (`crates/weaver-plugin-rust-analyzer`)
-supports `rename` only and returns a unified diff through `PluginOutput::Diff`.
-The plugin protocol already supports multiple file payloads and structured
+The current Rust actuator plugin (`crates/weaver-plugin-rust-analyzer`) supports
+`rename` only and returns a unified diff through `PluginOutput::Diff`. The
+plugin protocol already supports multiple file payloads and structured
 arguments, which provides the substrate for multi-file extrication.
 
 Because plugin execution is sandboxed, the plugin cannot assume unrestricted
 filesystem access. The daemon must provide all file payloads required for
 analysis and patch generation.
 
-## ortho_config v0.8.0 impacts
+## ortho_config v0.10.0 impacts
 
-The Rust extricate flow inherits Weaver's current `ortho_config` v0.8.0
-behaviour model:
+The Rust extricate flow inherits Weaver's current `ortho_config` v0.10.0
+behaviour model. Explicit CLI values win over environment and file values even
+when they repeat a clap default, and boolean flags accept attached values such
+as `--flag=false`. The migration retains the existing fail-fast discovery and
+configuration error handling:
 
-- dependency-graph updates in v0.8.0 align parser features with the runtime and
+- dependency-graph updates in v0.9.0 align parser features with the runtime and
   macro contract,
 - discovery is fail-fast when discovered files are invalid, so configuration
   load errors must stop orchestration immediately,
@@ -84,13 +87,17 @@ These behaviours directly affect payload and transaction handling:
 - transaction validation should treat parser and discovery failures as hard
   preconditions, not recoverable warnings.
 
-Authoritative runbook:
-[Migration guide: Weaver adoption of v0.8.0](ortho-config-v0-8-0-migration-guide.md),
- especially sections:
+Authoritative Weaver adoption runbook:
+[Weaver's OrthoConfig v0.10.0 adoption runbook](execplans/issue-368-migrate-from-ortho-config-v0-9-0-to-v0-10-0.md).
+The
+[published OrthoConfig v0.10.0 migration guide](ortho-config-v0-10-0-migration-guide.md)
+documents the upstream package changes separately. The earlier
+[v0.9.0 migration guide](ortho-config-v0-9-0-migration-guide.md) remains the
+historical record for that release, especially its sections:
 
-- [Required migration steps](ortho-config-v0-8-0-migration-guide.md#required-migration-steps)
-- [YAML semantics changed, even though Weaver runtime config is TOML-first](ortho-config-v0-8-0-migration-guide.md#4-yaml-semantics-changed-even-though-weaver-runtime-config-is-toml-first)
-- [Documentation policy for this migration](ortho-config-v0-8-0-migration-guide.md#documentation-policy-for-this-migration)
+- [Required migration steps](ortho-config-v0-9-0-migration-guide.md#required-migration-steps)
+- [New declarative merge helpers](ortho-config-v0-9-0-migration-guide.md#2-new-declarative-merge-helpers)
+- [Documentation policy for this migration](ortho-config-v0-9-0-migration-guide.md#documentation-policy-for-this-migration)
 
 ## Capability and request contract
 

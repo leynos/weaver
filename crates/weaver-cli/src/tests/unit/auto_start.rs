@@ -35,21 +35,13 @@ fn make_invocation() -> CommandInvocation {
 }
 
 /// Exercises distinct auto-start failure paths:
-/// - Spawn failure: binary doesn't exist → LaunchDaemon error
-/// - Startup failure: binary exits with non-zero status → StartupFailed error
+/// - Spawn failure: binary doesn't exist → `LaunchDaemon` error
+/// - Startup failure: binary exits with non-zero status → `StartupFailed` error
 #[cfg(unix)]
 #[rstest]
-#[case("/nonexistent/weaverd", "failed to spawn", "spawn failure")]
-#[case(
-    "/bin/false",
-    "daemon exited before reporting ready",
-    "startup failure"
-)]
-fn auto_start_failure_paths(
-    #[case] daemon_binary: &str,
-    #[case] expected_substring: &str,
-    #[case] _description: &str,
-) {
+#[case::spawn_failure("/nonexistent/weaverd", "failed to spawn")]
+#[case::startup_failure("/bin/false", "daemon exited before reporting ready")]
+fn auto_start_failure_paths(#[case] daemon_binary: &str, #[case] expected_substring: &str) {
     // Socket on loopback port 1 reliably refuses connections on Unix
     // (privileged port, no service listening), triggering auto-start without
     // requiring daemon setup or mock servers.
@@ -84,7 +76,7 @@ fn auto_start_failure_paths(
 
 /// Verifies that missing daemon binary provides actionable guidance.
 /// Per roadmap 2.3.3, startup failures must use the three-part template
-/// and mention WEAVERD_BIN and installation checks.
+/// and mention `WEAVERD_BIN` and installation checks.
 #[cfg(unix)]
 #[test]
 fn auto_start_missing_binary_shows_actionable_guidance() {
@@ -177,28 +169,23 @@ fn spawn_delayed_unix_listener(
     })
 }
 
+/// Pure predicate: does the auto-start attempt match the expected success
+/// shape (exit 17, waiting message, no failure text, daemon stdout relayed)?
+#[cfg(unix)]
+fn auto_start_success_matches(exit: ExitCode, stderr_text: &str, stdout_text: &str) -> bool {
+    exit == ExitCode::from(17)
+        && stderr_text.contains("Waiting for daemon start...")
+        && !stderr_text.contains("failed to spawn")
+        && !stderr_text.contains("exited before")
+        && stdout_text.contains("daemon says hello")
+}
+
 #[cfg(unix)]
 fn assert_auto_start_success(exit: ExitCode, stderr_text: &str, stdout_text: &str) {
-    assert_eq!(
-        exit,
-        ExitCode::from(17),
-        "expected exit code 17, got {exit:?}; stderr: {stderr_text:?}"
-    );
     assert!(
-        stderr_text.contains("Waiting for daemon start..."),
-        "auto-start should write waiting message: {stderr_text:?}"
-    );
-    assert!(
-        !stderr_text.contains("failed to spawn"),
-        "should not contain spawn failure: {stderr_text:?}"
-    );
-    assert!(
-        !stderr_text.contains("exited before"),
-        "should not contain startup failure: {stderr_text:?}"
-    );
-    assert!(
-        stdout_text.contains("daemon says hello"),
-        "should receive daemon stdout: {stdout_text:?}"
+        auto_start_success_matches(exit, stderr_text, stdout_text),
+        "auto-start did not match expected success shape; exit: {exit:?}, stderr: \
+         {stderr_text:?}, stdout: {stdout_text:?}"
     );
 }
 
@@ -259,11 +246,11 @@ fn auto_start_succeeds_and_proceeds() {
     assert_auto_start_success(exit, &stderr_text, &stdout_text);
 }
 
-/// Timeout path: daemon spawns but never becomes ready within AUTO_START_TIMEOUT.
+/// Timeout path: daemon spawns but never becomes ready within `AUTO_START_TIMEOUT`.
 ///
 /// This test exercises the timeout scenario where the daemon binary runs but
 /// fails to write a ready health snapshot before the 30-second timeout elapses.
-/// Marked with #[ignore] because AUTO_START_TIMEOUT is 30 seconds.
+/// Marked with `#[ignore]` because `AUTO_START_TIMEOUT` is 30 seconds.
 #[cfg(unix)]
 #[ignore = "takes 30 seconds due to AUTO_START_TIMEOUT"]
 #[test]

@@ -2,6 +2,7 @@
 
 use std::{ffi::OsStr, io};
 
+use anyhow::{Result, ensure};
 use ortho_config::NoOpLocalizer;
 use rstest::rstest;
 
@@ -25,28 +26,31 @@ fn assert_three_part_output(
     error_text: &str,
     alternatives_text: &str,
     next_command_text: &str,
-) {
-    let error_pos = output
-        .find(error_text)
-        .expect("error text should be present");
-    let alt_pos = output
-        .find(alternatives_text)
-        .expect("alternatives text should be present");
-    let next_pos = output
-        .find("Next command:")
-        .expect("next command header should be present");
-    assert!(
+) -> Result<()> {
+    let Some(error_pos) = output.find(error_text) else {
+        anyhow::bail!("error text should be present: {error_text:?}\noutput:\n{output}");
+    };
+    let Some(alt_pos) = output.find(alternatives_text) else {
+        anyhow::bail!(
+            "alternatives text should be present: {alternatives_text:?}\noutput:\n{output}"
+        );
+    };
+    let Some(next_pos) = output.find("Next command:") else {
+        anyhow::bail!("next command header should be present\noutput:\n{output}");
+    };
+    ensure!(
         output.contains(next_command_text),
         "next-command text not found: {next_command_text:?}\noutput:\n{output}"
     );
-    assert!(
+    ensure!(
         error_pos < alt_pos,
         "error line must precede alternatives block\noutput:\n{output}"
     );
-    assert!(
+    ensure!(
         alt_pos < next_pos,
         "alternatives block must precede Next command\noutput:\n{output}"
     );
+    Ok(())
 }
 
 struct StartupGuidanceExpectation {
@@ -55,14 +59,15 @@ struct StartupGuidanceExpectation {
     socket_hint: Option<&'static str>,
 }
 
-fn assert_startup_guidance_template(error: &LifecycleError, expected: &StartupGuidanceExpectation) {
+fn assert_startup_guidance_template(
+    error: &LifecycleError,
+    expected: &StartupGuidanceExpectation,
+) -> Result<()> {
     let mut buf = Vec::new();
-    write_startup_guidance(&mut buf, error).expect("write must succeed");
-    let output = String::from_utf8(buf).expect("output must be valid UTF-8");
-    let expected_socket_hint = expected
-        .socket_hint
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| {
+    write_startup_guidance(&mut buf, error)?;
+    let output = String::from_utf8(buf)?;
+    let expected_socket_hint = expected.socket_hint.map_or_else(
+        || {
             if cfg!(unix) {
                 String::from(concat!(
                     "  - Check whether the daemon is listening on ",
@@ -71,42 +76,44 @@ fn assert_startup_guidance_template(error: &LifecycleError, expected: &StartupGu
             } else {
                 String::from("  - Check whether the daemon is listening on 127.0.0.1:9779")
             }
-        });
+        },
+        ToOwned::to_owned,
+    );
     let expected_next_command = if cfg!(unix) {
         "WEAVER_FOREGROUND=1 weaver daemon start"
     } else {
         "weaver daemon start"
     };
 
-    assert!(
+    ensure!(
         output.contains(&format!("error: {}", expected.problem)),
         "expected problem not found in output:\n{output}"
     );
-    assert!(
+    ensure!(
         output.contains("Next command:"),
         "`Next command:` not found in output:\n{output}"
     );
-    assert!(
+    ensure!(
         output.contains(expected.alternatives),
         "expected alternatives text '{}' not found in output:\n{output}",
         expected.alternatives
     );
-    assert!(
+    ensure!(
         output.contains(&expected_socket_hint),
         "expected socket hint '{expected_socket_hint}' not found in output:\n{output}"
     );
-    assert!(
+    ensure!(
         output.contains(expected_next_command),
-        "expected next command '{}' not found in output:\n{output}",
-        expected_next_command
+        "expected next command '{expected_next_command}' not found in output:\n{output}"
     );
+    Ok(())
 }
 
 #[test]
 fn write_actionable_guidance_produces_three_part_template() {
     let guidance = ActionableGuidance::new(
         "unknown domain 'foo'",
-        vec!["Valid domains: observe, act, verify".to_string()],
+        vec!["Valid domains: observe, act, verify".to_owned()],
         "weaver --help",
     );
 
@@ -119,7 +126,8 @@ fn write_actionable_guidance_produces_three_part_template() {
         "error: unknown domain 'foo'",
         "Valid domains: observe, act, verify",
         "  weaver --help",
-    );
+    )
+    .expect("actionable guidance must follow the three-part template");
 }
 
 #[test]
@@ -134,7 +142,8 @@ fn write_bare_invocation_guidance_includes_all_domains() {
             "missing domain {domain:?}\noutput:\n{output}"
         );
     }
-    assert_three_part_output(&output, "error:", "Usage:", "weaver --help");
+    assert_three_part_output(&output, "error:", "Usage:", "weaver --help")
+        .expect("bare invocation guidance must follow the three-part template");
 }
 
 #[test]
@@ -161,7 +170,8 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
         "error: failed to spawn daemon binary '/tmp/tools/custom-weaverd'",
         "Verify custom-weaverd exists and is executable",
         expected_next_command,
-    );
+    )
+    .expect("launch guidance must follow the three-part template");
     assert!(
         output.contains("  - Inspect runtime artefacts under /tmp/tools"),
         "runtime artefact hint not found in output:\n{output}"
@@ -205,7 +215,8 @@ fn startup_guidance_surfaces_problem_and_next_command(
     #[case] error: LifecycleError,
     #[case] expected: StartupGuidanceExpectation,
 ) {
-    assert_startup_guidance_template(&error, &expected);
+    assert_startup_guidance_template(&error, &expected)
+        .expect("startup guidance must follow the expected template");
 }
 
 #[test]
@@ -225,7 +236,8 @@ fn fallback_guidance_strips_existing_error_prefix() {
         "error: failed to write lifecycle output: error: unit-test fallback",
         "See error details above.",
         "weaver daemon status",
-    );
+    )
+    .expect("fallback guidance must follow the three-part template");
 }
 
 #[test]

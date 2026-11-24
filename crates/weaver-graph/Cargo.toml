@@ -12,6 +12,7 @@ camino = { workspace = true }
 url = "2.5"
 
 [dev-dependencies]
+anyhow = { workspace = true }
 rstest = { workspace = true }
 rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }

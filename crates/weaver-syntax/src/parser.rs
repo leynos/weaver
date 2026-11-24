@@ -15,8 +15,13 @@ use crate::{error::SyntaxError, language::SupportedLanguage, position::point_to_
 /// result may contain both a valid tree and error nodes.
 #[derive(Debug)]
 pub struct ParseResult {
+    /// The Tree-sitter syntax tree, which may contain ERROR nodes where
+    /// parsing could not recover.
     tree: tree_sitter::Tree,
+    /// The source text that produced `tree`; owned because callers may hold
+    /// a `ParseResult` beyond the lifetime of the original input string.
     source: String,
+    /// The grammar `tree` was parsed with.
     language: SupportedLanguage,
 }
 
@@ -120,7 +125,11 @@ impl SyntaxErrorInfo {
 /// Each parser instance is configured for a single language. Create multiple
 /// parsers if you need to parse multiple languages.
 pub struct Parser {
+    /// The underlying Tree-sitter parser, pre-configured with `language`'s
+    /// grammar.
     inner: tree_sitter::Parser,
+    /// The language this parser was configured for; tree-sitter grammars are
+    /// not interchangeable, so a new `Parser` is needed per language.
     language: SupportedLanguage,
 }
 
@@ -232,7 +241,7 @@ mod tests {
         let result = parser.parse(source).expect("parse");
 
         assert!(result.has_errors());
-        assert!(!result.errors().is_empty());
+        assert_ne!(result.errors().len(), 0);
     }
 
     #[test]
@@ -241,7 +250,7 @@ mod tests {
         let result = parser.parse("fn test() {\n    let x = \n}").expect("parse");
 
         let errors = result.errors();
-        assert!(!errors.is_empty());
+        assert_ne!(errors.len(), 0);
 
         let first_error = errors.first().expect("has error");
         assert!(first_error.line >= 1);

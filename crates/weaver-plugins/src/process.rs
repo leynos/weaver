@@ -261,32 +261,46 @@ fn handle_timeout(
         timeout_secs,
         "plugin timed out, killing process"
     );
-    let message = match child.kill() {
-        Ok(()) => match child.wait() {
-            Ok(status) => format!("terminated timed-out process with status {status}"),
-            Err(error) => format!("failed to wait for timed-out process after kill: {error}"),
-        },
-        Err(error) => match child.try_wait() {
-            Ok(Some(status)) => {
-                format!(
-                    "failed to kill timed-out process: {error}; process had already exited with \
-                     status {status}"
-                )
-            }
-            Ok(None) => {
-                format!("failed to kill timed-out process: {error}; process is still running")
-            }
-            Err(wait_error) => format!(
-                "failed to kill timed-out process: {error}; additionally failed to poll timed-out \
-                 process: {wait_error}"
-            ),
-        },
-    };
+    let message = kill_timed_out_child(child);
     Err(PluginError::Timeout {
         name: name.to_owned(),
         timeout_secs,
         message,
     })
+}
+
+/// Kills a timed-out child process and describes the state it was left in.
+fn kill_timed_out_child(child: &mut weaver_sandbox::SandboxChild) -> String {
+    match child.kill() {
+        Ok(()) => describe_wait(child.wait()),
+        Err(error) => describe_failed_kill(&error, child.try_wait()),
+    }
+}
+
+/// Describes the exit status observed after a timed-out child was killed.
+fn describe_wait(result: std::io::Result<std::process::ExitStatus>) -> String {
+    match result {
+        Ok(status) => format!("terminated timed-out process with status {status}"),
+        Err(error) => format!("failed to wait for timed-out process after kill: {error}"),
+    }
+}
+
+/// Describes why a timed-out child survived the kill, using a fresh poll.
+fn describe_failed_kill(
+    error: &std::io::Error,
+    poll: std::io::Result<Option<std::process::ExitStatus>>,
+) -> String {
+    match poll {
+        Ok(Some(status)) => format!(
+            "failed to kill timed-out process: {error}; process had already exited with status \
+             {status}"
+        ),
+        Ok(None) => format!("failed to kill timed-out process: {error}; process is still running"),
+        Err(wait_error) => format!(
+            "failed to kill timed-out process: {error}; additionally failed to poll timed-out \
+             process: {wait_error}"
+        ),
+    }
 }
 
 /// Waits for the child process to exit, enforcing the timeout.
@@ -321,3 +335,7 @@ fn parse_response(name: &str, line: &str) -> Result<PluginResponse, PluginError>
         source: Some(err),
     })
 }
+
+#[cfg(test)]
+#[path = "process_tests.rs"]
+mod process_tests;

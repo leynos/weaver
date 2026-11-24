@@ -5,6 +5,9 @@ use tree_sitter::Node;
 use super::normalise_whitespace;
 use crate::ParamInfo;
 
+/// Reports whether `kind` names a receiver or separator node rather than a
+/// real parameter, so callers can skip it instead of emitting a bogus
+/// [`ParamInfo`] with an empty or placeholder name.
 fn is_ignorable_parameter_kind(kind: &str) -> bool {
     matches!(
         kind,

@@ -13,14 +13,16 @@ fn rust_tuple_type_parameters_are_extracted_from_ast() {
         line: 1,
         column: 4,
         detail: DetailLevel::Signature,
-    });
+    })
+    .expect("Rust signature extraction should succeed");
     let repeated = extract(ExtractRequest {
         path: Path::new("fixture.rs"),
         source: "fn foo(pair: (u32, u32)) -> u32 {\n    pair.0 + pair.1\n}\n",
         line: 1,
         column: 4,
         detail: DetailLevel::Signature,
-    });
+    })
+    .expect("repeated Rust signature extraction should succeed");
     let params = &card.signature.as_ref().expect("signature").params;
 
     assert_eq!(params.len(), 1);
@@ -43,14 +45,16 @@ fn python_default_parameters_are_extracted_from_ast() {
         line: 1,
         column: 5,
         detail: DetailLevel::Signature,
-    });
+    })
+    .expect("Python signature extraction should succeed");
     let repeated = extract(ExtractRequest {
         path: Path::new("fixture.py"),
         source: "def bar(x, y=1):\n    return x + y\n",
         line: 1,
         column: 5,
         detail: DetailLevel::Signature,
-    });
+    })
+    .expect("repeated Python signature extraction should succeed");
     let params = &card.signature.as_ref().expect("signature").params;
 
     assert_eq!(params.len(), 2);
@@ -74,7 +78,8 @@ fn signature_display_preserves_literal_whitespace() {
         line: 1,
         column: 10,
         detail: DetailLevel::Signature,
-    });
+    })
+    .expect("TypeScript signature extraction should succeed");
 
     assert_eq!(
         card.signature
@@ -92,7 +97,8 @@ fn decorator_text_preserves_literal_whitespace() {
         line: 2,
         column: 5,
         detail: DetailLevel::Structure,
-    });
+    })
+    .expect("Python decorator extraction should succeed");
 
     assert_eq!(
         card.attachments

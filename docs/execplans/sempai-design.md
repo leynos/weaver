@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -118,7 +117,7 @@ Then inspect each log tail for failures.
 ## Surprises & Discoveries
 
 - Initial `make markdownlint` failed before formatting due to violations in
-  `docs/adr-001-plugin-capability-model-and-act-extricate.md`. Running
+  `docs/adrs/adr-0001-plugin-capability-model-and-act-extricate.md`. Running
   `make fmt` applied repository markdownlint autofixes, after which
   `make markdownlint` passed.
 

@@ -10,7 +10,9 @@ use crate::cache::{CardCache, CardCacheAddress, CardCacheKey, ParserRegistry};
 /// Tree-sitter-first extractor for `observe get-card`.
 #[derive(Debug, Clone)]
 pub struct TreeSitterCardExtractor {
+    /// Shared card cache, keyed by path, content hash, and requested address.
     cache: Arc<CardCache>,
+    /// Shared registry of reusable Tree-sitter parsers, one per language.
     parsers: Arc<ParserRegistry>,
 }
 

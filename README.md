@@ -1,5 +1,8 @@
 # Weaver
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](
+https://deepwiki.com/leynos/weaver)
+
 A human-friendly, agent-native semantic command-line tool.
 
 Weaver is your AI agent's best friend when it comes to understanding and
@@ -15,7 +18,7 @@ focused tools that communicate clearly and play nicely with existing shell
 utilities like `jq`, `xargs`, and `find`.
 
 Under the bonnet, Weaver runs a daemon (`weaverd`) that orchestrates language
-servers, syntax analysers, and specialised plugins—all sandboxed for
+servers, syntax analysers, and specialized plugins—all sandboxed for
 safety—while the lightweight CLI (`weaver`) lets you issue commands and stream
 results. Whether you're an AI agent planning a refactor or a human debugging a
 tricky rename, Weaver gives you the semantic primitives you need.
@@ -27,9 +30,9 @@ repository already contains the CLI/daemon architecture, shared configuration,
 Language Server Protocol (LSP) hosting, Tree-sitter syntax support, graph and
 card foundations, plugin infrastructure, sandboxing, and write-operation safety
 harness work. The public command surface is now being reset around
-[ADR 007](docs/adr-007-agent-native-command-surface.md), which makes the 0.1.0
-target human-friendly and agent-native without preserving compatibility with
-the prototype `observe` / `act` / `verify` grammar.
+[ADR 0007](docs/adrs/adr-0007-agent-native-command-surface.md), which makes the
+0.1.0 target human-friendly and agent-native without preserving compatibility
+with the prototype `observe` / `act` / `verify` grammar.
 
 Check the [roadmap](docs/roadmap.md) for the current build sequence and the
 [user's guide](docs/users-guide.md) for the split between current prototype
@@ -81,46 +84,49 @@ configuration layering, and the complete command reference.
 
 ## Building from source
 
-Weaver requires the pinned **Nightly Rust toolchain `nightly-2026-03-26`** for
+Weaver requires the pinned **Nightly Rust toolchain `nightly-2026-11-06`** for
 local builds. The workspace `.cargo/config.toml` uses options that require the
 Nightly toolchain, so stable Rust is not sufficient for local Cargo builds in
 this checkout. To build:
 
+On Linux, install the `mold` linker first: the workspace `.cargo/config.toml`
+links Linux builds with it, and Cargo applies that to a bare release build too.
+
 ```sh
-cargo +nightly-2026-03-26 build --release
+make release
 ```
+
+`make release` adds neither the configuration's frontend flag nor `mold`, and
+forwards any `RUSTFLAGS` you export. The bare equivalent,
+`cargo +nightly-2026-11-06 build --release`, takes the frontend flag (and
+`mold` on Linux) because Cargo applies the configuration to every build.
 
 To run the test suite:
 
 ```sh
-cargo +nightly-2026-03-26 test --workspace
+cargo +nightly-2026-11-06 test --workspace
 ```
 
 ### Toolchain prerequisites
 
-The workspace `.cargo/config.toml` enables Nightly-only build settings for the
-Cranelift codegen backend in development builds. Install the pinned toolchain
-and component with:
+The workspace `.cargo/config.toml` enables Nightly-only build settings (the
+parallel frontend and the native metadata key). Install the pinned toolchain
+with:
 
 ```sh
-rustup toolchain install nightly-2026-03-26
-rustup component add rustc-codegen-cranelift --toolchain nightly-2026-03-26
+rustup toolchain install nightly-2026-11-06
 ```
 
 Set a local override so Cargo uses that pinned Nightly automatically in this
 checkout:
 
 ```sh
-rustup override set nightly-2026-03-26
+rustup override set nightly-2026-11-06
 ```
 
-If any of these prerequisites are missing, the failure mode is often opaque:
-Cargo may report unstable `-Z` option errors or missing
-`rustc-codegen-cranelift`. When that happens, verify the pinned Nightly
-toolchain and the Cranelift component first.
-
-If local builds fail, verify the pinned Nightly override first, then confirm
-the Cranelift component is installed before investigating the workspace itself.
+If this prerequisite is missing, the failure mode is often opaque: Cargo may
+report unstable `-Z` option errors. When that happens, verify the pinned
+Nightly toolchain first, then investigate the workspace itself.
 
 ## Documentation
 

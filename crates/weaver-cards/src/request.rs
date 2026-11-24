@@ -41,8 +41,12 @@ pub struct GetCardRequest {
 /// Intermediate state while parsing CLI arguments.
 #[derive(Default)]
 struct ParseState {
+    /// Value of `--uri` once seen, or `None` if the flag has not been parsed yet.
     uri: Option<String>,
+    /// `(line, column)` decoded from `--position`, or `None` until parsed.
     position: Option<(u32, u32)>,
+    /// Value of `--detail`, defaulting to [`DetailLevel::default`] if the flag
+    /// is absent.
     detail: DetailLevel,
 }
 

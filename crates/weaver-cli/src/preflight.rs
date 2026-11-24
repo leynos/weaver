@@ -17,8 +17,11 @@ use crate::{
     },
 };
 
+/// Guidance the preflight pass should emit for the supplied domain.
 enum DomainGuidanceToEmit {
+    /// The domain is known, but the invocation omitted an operation.
     MissingOperation(KnownDomain),
+    /// The domain is not one of the domains the CLI recognises.
     UnknownDomain,
 }
 
@@ -73,6 +76,10 @@ fn emit_domain_guidance<ErrWriter: Write>(
     preflight_result(written)
 }
 
+/// Decides which guidance, if any, the preflight pass should emit.
+///
+/// Returns `None` when the domain is known and an operation was supplied, in
+/// which case the invocation continues to configuration loading.
 fn domain_guidance(cli: &Cli, raw_domain: &str) -> Option<DomainGuidanceToEmit> {
     let operation_is_missing = cli
         .operation
@@ -92,7 +99,7 @@ fn domain_guidance(cli: &Cli, raw_domain: &str) -> Option<DomainGuidanceToEmit> 
 
 /// Converts the `written` flag into either `Ok(())` or
 /// `Err(AppError::PreflightGuidance)`.
-fn preflight_result(written: bool) -> Result<(), AppError> {
+const fn preflight_result(written: bool) -> Result<(), AppError> {
     if written {
         Err(AppError::PreflightGuidance)
     } else {
@@ -133,15 +140,15 @@ mod tests {
     impl WriteFailureScenario {
         fn domain(&self) -> Option<&str> {
             match self {
-                WriteFailureScenario::BareInvocation => None,
-                WriteFailureScenario::DomainGuidance => Some("unknown-domain"),
+                Self::BareInvocation => None,
+                Self::DomainGuidance => Some("unknown-domain"),
             }
         }
 
         fn operation(&self) -> Option<&str> {
             match self {
-                WriteFailureScenario::BareInvocation => None,
-                WriteFailureScenario::DomainGuidance => Some("status"),
+                Self::BareInvocation => None,
+                Self::DomainGuidance => Some("status"),
             }
         }
     }
@@ -161,19 +168,22 @@ mod tests {
         fn flush(&mut self) -> io::Result<()> { Ok(()) }
     }
 
-    fn test_localizer() -> impl Localizer {
-        match FluentLocalizer::with_en_us_defaults([WEAVER_EN_US]) {
-            Ok(localizer) => localizer,
-            Err(error) => panic!("embedded Fluent catalogue must parse: {error}"),
-        }
+    /// Builds the embedded Fluent catalogue for preflight tests.
+    ///
+    /// Returns a `Result` (rather than panicking) so callers decide how to
+    /// report a malformed catalogue, per the fallible-fixture convention.
+    fn test_localizer() -> anyhow::Result<impl Localizer> {
+        let localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])?;
+        Ok(localizer)
     }
 
     #[fixture]
-    fn preflight_context() -> PreflightContext {
-        PreflightContext {
-            localizer: Box::new(test_localizer()),
+    fn preflight_context() -> anyhow::Result<PreflightContext> {
+        let localizer = test_localizer()?;
+        Ok(PreflightContext {
+            localizer: Box::new(localizer),
             stderr: Vec::new(),
-        }
+        })
     }
 
     fn cli(domain: Option<&str>, operation: Option<&str>) -> Cli {
@@ -181,8 +191,8 @@ mod tests {
             capabilities: false,
             output: OutputFormat::Auto,
             command: None,
-            domain: domain.map(str::to_string),
-            operation: operation.map(str::to_string),
+            domain: domain.map(str::to_owned),
+            operation: operation.map(str::to_owned),
             arguments: Vec::new(),
         }
     }
@@ -214,12 +224,12 @@ mod tests {
     })]
     fn preflight_guidance_paths_match_expected_contract(
         #[case] scenario: PreflightScenario,
-        preflight_context: PreflightContext,
+        preflight_context: anyhow::Result<PreflightContext>,
     ) {
         let PreflightContext {
             localizer,
             mut stderr,
-        } = preflight_context;
+        } = preflight_context.expect("build preflight context");
 
         let result = handle_preflight(
             &cli(scenario.domain, scenario.operation),
@@ -238,8 +248,11 @@ mod tests {
         }
 
         if let Some(needle) = scenario.expected_stderr_substring {
-            let stderr = String::from_utf8(stderr).expect("guidance must be valid UTF-8");
-            assert!(stderr.contains(needle), "stderr should contain {needle:?}");
+            let rendered = String::from_utf8(stderr).expect("guidance must be valid UTF-8");
+            assert!(
+                rendered.contains(needle),
+                "stderr should contain {needle:?}"
+            );
         } else {
             assert!(
                 stderr.is_empty(),
@@ -252,7 +265,7 @@ mod tests {
     #[case(WriteFailureScenario::BareInvocation)]
     #[case(WriteFailureScenario::DomainGuidance)]
     fn preflight_guidance_propagates_write_failure(#[case] scenario: WriteFailureScenario) {
-        let localizer = test_localizer();
+        let localizer = test_localizer().expect("build test localizer");
         let mut failing_writer = FailingWriter;
 
         let result = handle_preflight(

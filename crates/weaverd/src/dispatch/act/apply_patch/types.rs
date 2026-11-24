@@ -9,6 +9,7 @@ pub(crate) enum LineEnding {
     CrLf,
 }
 
+/// Declares a `String` newtype with `new` and `as_str` accessors.
 macro_rules! string_newtype {
     ($vis:vis struct $name:ident, $doc:literal) => {
         #[doc = $doc]
@@ -40,7 +41,7 @@ impl From<String> for PatchText {
 }
 
 impl From<&str> for PatchText {
-    fn from(value: &str) -> Self { Self(value.to_string()) }
+    fn from(value: &str) -> Self { Self(value.to_owned()) }
 }
 
 string_newtype!(pub(crate) struct DiffHeaderLine, "Diff header line from a patch stream.");
@@ -48,6 +49,7 @@ string_newtype!(pub(crate) struct DiffHeaderLine, "Diff header line from a patch
 string_newtype!(pub(crate) struct FilePath, "Path for a patch operation target.");
 
 impl FilePath {
+    /// Consumes the wrapper and returns the underlying path text.
     pub(crate) fn into_string(self) -> String { self.0 }
 }
 
@@ -63,8 +65,10 @@ string_newtype!(
 );
 
 impl FileContent {
+    /// Consumes the wrapper and returns the underlying file text.
     pub(crate) fn into_string(self) -> String { self.0 }
 
+    /// Replaces the byte range `range` with `replacement`.
     pub(crate) fn replace_range(&mut self, range: std::ops::Range<usize>, replacement: &str) {
         self.0.replace_range(range, replacement);
     }
@@ -83,22 +87,32 @@ string_newtype!(
 /// Search/replace block for modify operations.
 #[derive(Debug, Clone)]
 pub(crate) struct SearchReplaceBlock {
+    /// Text the block searches for in the target file.
     pub(crate) search: SearchPattern,
+    /// Text that replaces each match.
     pub(crate) replace: ReplacementText,
 }
 
 /// Parsed patch operation.
 #[derive(Debug, Clone)]
 pub(crate) enum PatchOperation {
+    /// Replaces matched text in an existing file.
     Modify {
+        /// Target file path.
         path: FilePath,
+        /// Blocks to apply, in order.
         blocks: Vec<SearchReplaceBlock>,
     },
+    /// Creates a new file with the supplied content.
     Create {
+        /// Target file path.
         path: FilePath,
+        /// Full contents to write.
         content: FileContent,
     },
+    /// Deletes an existing file.
     Delete {
+        /// Target file path.
         path: FilePath,
     },
 }

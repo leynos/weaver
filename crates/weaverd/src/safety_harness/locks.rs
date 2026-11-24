@@ -82,7 +82,7 @@ mod tests {
         )];
         let result = SyntacticLockResult::Failed { failures };
         assert!(!result.passed());
-        assert_eq!(result.failures().map(|f| f.len()), Some(1));
+        assert_eq!(result.failures().map(<[VerificationFailure]>::len), Some(1));
     }
 
     #[test]
@@ -100,6 +100,6 @@ mod tests {
         )];
         let result = SemanticLockResult::Failed { failures };
         assert!(!result.passed());
-        assert_eq!(result.failures().map(|f| f.len()), Some(1));
+        assert_eq!(result.failures().map(<[VerificationFailure]>::len), Some(1));
     }
 }

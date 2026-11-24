@@ -68,9 +68,9 @@ fn new_manifest_has_defaults() {
     assert_eq!(m.kind(), PluginKind::Actuator);
     assert_eq!(m.languages(), &["python"]);
     assert_eq!(m.executable(), PathBuf::from("/usr/bin/rope-plugin"));
-    assert!(m.args().is_empty());
+    assert_eq!(m.args().len(), 0);
     assert_eq!(m.timeout_secs(), 30);
-    assert!(m.capabilities().is_empty());
+    assert_eq!(m.capabilities().len(), 0);
 }
 
 #[test]
@@ -140,7 +140,7 @@ fn manifest_deserialise_defaults_timeout() {
     }"#;
     assert_manifest_from_json(json, |m| {
         assert_eq!(m.timeout_secs(), 30);
-        assert!(m.args().is_empty());
+        assert_eq!(m.args().len(), 0);
     });
 }
 
@@ -173,7 +173,7 @@ fn manifest_without_capabilities_deserialises_to_empty() {
         "executable": "/bin/test"
     }"#;
     assert_manifest_from_json(json, |m| {
-        assert!(m.capabilities().is_empty());
+        assert_eq!(m.capabilities().len(), 0);
     });
 }
 

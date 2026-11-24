@@ -2,7 +2,9 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
+use anyhow::{Context as _, Result};
 use mockall::mock;
+use rstest::fixture;
 use url::Url;
 use weaver_plugins::protocol::{FilePayload, PluginRequest};
 
@@ -50,6 +52,7 @@ pub(crate) fn adapter_returning_with_path(
 pub(crate) fn adapter_unused() -> MockAdapter { MockAdapter::new() }
 
 /// Returns a valid `rename-symbol` argument map.
+#[fixture]
 pub(crate) fn rename_arguments() -> HashMap<String, serde_json::Value> {
     let mut arguments = HashMap::new();
     arguments.insert(
@@ -80,30 +83,34 @@ pub(crate) fn request_with_args(arguments: HashMap<String, serde_json::Value>) -
 }
 
 /// Builds a request using the provided file payload path.
-pub(crate) fn request_with_path(path: &str) -> PluginRequest {
+///
+/// # Errors
+///
+/// Returns an error if `path` cannot be expressed as a `file://` URI.
+pub(crate) fn request_with_path(path: &str) -> Result<PluginRequest> {
     let mut arguments = rename_arguments();
     arguments.insert(
         String::from("uri"),
-        serde_json::Value::String(file_uri_for_path(path)),
+        serde_json::Value::String(file_uri_for_path(path)?),
     );
 
-    PluginRequest::with_arguments(
+    Ok(PluginRequest::with_arguments(
         "rename-symbol",
         vec![FilePayload::new(
             PathBuf::from(path),
             "fn old_name() -> i32 {\n    1\n}\n",
         )],
         arguments,
-    )
+    ))
 }
 
-fn file_uri_for_path(path: &str) -> String {
-    let mut url = Url::parse("file:///").expect("static file URL should parse");
+fn file_uri_for_path(path: &str) -> Result<String> {
+    let mut url = Url::parse("file:///").context("static file URL should parse")?;
     {
         let mut segments = url
             .path_segments_mut()
-            .expect("file URL should accept path segments");
+            .map_err(|()| anyhow::anyhow!("file URL should accept path segments"))?;
         segments.extend(path.split('/'));
     }
-    url.to_string()
+    Ok(url.to_string())
 }

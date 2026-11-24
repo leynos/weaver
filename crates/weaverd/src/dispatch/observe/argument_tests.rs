@@ -6,13 +6,34 @@ use url::Url;
 
 use super::{
     FusionBackends,
-    ResponseWriter,
     SemanticBackendProvider,
-    backends_fixture,
-    handle,
-    make_request,
+    support::{backends_fixture, make_request},
 };
-use crate::dispatch::errors::DispatchError;
+use crate::dispatch::{
+    errors::DispatchError,
+    observe::graph_slice::handle,
+    response::ResponseWriter,
+};
+
+/// Asserts a dispatch attempt failed with an `InvalidArguments` error whose
+/// message mentions every expected fragment.
+macro_rules! assert_invalid_arguments {
+    ($result:expr, $($expected:expr),+ $(,)?) => {{
+        match $result {
+            Ok(_) => panic!("expected invalid arguments error, dispatch succeeded"),
+            Err(DispatchError::InvalidArguments { message }) => {
+                $(
+                    assert!(
+                        message.contains($expected),
+                        "expected invalid-arguments message to contain {:?}, got: {message}",
+                        $expected
+                    );
+                )+
+            }
+            Err(other) => panic!("expected invalid arguments error, got: {other:?}"),
+        }
+    }};
+}
 
 #[rstest]
 #[case(&["--position", "10:5"], "missing required argument: --uri")]
@@ -35,23 +56,13 @@ fn invalid_arguments_return_dispatch_error(
     #[case] expected_substring: &str,
 ) -> Result<(), String> {
     let (mut backends, _temp_dir) = backends_fixture?;
-    let request = make_request(arguments);
+    let request = make_request(arguments)?;
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
+
     let result = handle(&request, &mut writer, &mut backends);
-    match result {
-        Ok(_) => panic!("expected invalid arguments error, dispatch succeeded"),
-        Err(error) => match error {
-            DispatchError::InvalidArguments { message } => {
-                assert!(
-                    message.contains(expected_substring),
-                    "expected invalid-arguments message to contain {expected_substring:?}, got: \
-                     {message}"
-                );
-            }
-            _ => panic!("expected invalid arguments error"),
-        },
-    }
+
+    assert_invalid_arguments!(result, expected_substring);
     Ok(())
 }
 
@@ -62,18 +73,12 @@ fn missing_source_file_returns_invalid_arguments(
     let (mut backends, temp_dir) = backends_fixture?;
     let path = temp_dir.path().join("missing.rs");
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&["--uri", &uri, "--position", "1:1"]);
+    let request = make_request(&["--uri", &uri, "--position", "1:1"])?;
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
-    match handle(&request, &mut writer, &mut backends) {
-        Ok(_) => panic!("expected invalid arguments error, dispatch succeeded"),
-        Err(error) => match error {
-            DispatchError::InvalidArguments { message } => {
-                assert!(message.contains("unable to read source file"));
-                assert!(message.contains("missing.rs"));
-            }
-            _ => panic!("expected invalid arguments error"),
-        },
-    }
+
+    let result = handle(&request, &mut writer, &mut backends);
+
+    assert_invalid_arguments!(result, "unable to read source file", "missing.rs");
     Ok(())
 }

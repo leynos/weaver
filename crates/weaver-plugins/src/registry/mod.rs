@@ -29,6 +29,8 @@ use crate::{
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct PluginRegistry {
+    /// Validated manifests keyed by plugin name; registration rejects a
+    /// second manifest under a name already present here.
     manifests: HashMap<String, PluginManifest>,
 }
 

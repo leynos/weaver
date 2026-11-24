@@ -20,21 +20,25 @@ cap-std = { workspace = true }
 url = { workspace = true }
 unicode-width = { workspace = true }
 tracing = { workspace = true }
+mockable = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-socket2 = { version = "0.5" }
+socket2 = { version = "0.6" }
 libc = "0.2"
 
 [build-dependencies]
 camino = { workspace = true }
 clap = { workspace = true }
-clap_mangen = "0.2"
+clap_mangen = "0.3"
+mockable = { workspace = true }
 ortho_config = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 weaver-build-util = { path = "../weaver-build-util" }
 weaver-config = { path = "../weaver-config", features = ["cli"] }
 
 [dev-dependencies]
+mockable = { workspace = true, features = ["mock"] }
 anyhow = { workspace = true }
 rstest = { workspace = true }
 rstest-bdd = { workspace = true }
@@ -45,3 +49,9 @@ tempfile = { workspace = true }
 weaver-test-macros = { path = "../weaver-test-macros" }
 insta = { workspace = true }
 proptest = { workspace = true }
+clap_mangen = "0.3"
+toml = { workspace = true }
+trybuild = { workspace = true }
+
+[lints]
+workspace = true

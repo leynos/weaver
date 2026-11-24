@@ -94,15 +94,21 @@ weaver context --json
 ```
 
 The historical `observe` / `act` / `verify` domain grammar is useful prototype
-evidence, but it is superseded by ADR 007 for the 0.1.0 target. The future
+evidence, but it is superseded by ADR 0007 for the 0.1.0 target. The future
 public surface describes resources, selectors, and capabilities directly.
 Observe-style resource commands emit selector records that act-style mutation
 commands can consume directly or after ordinary UNIX filtering:
 
 ```sh
-weaver symbols list --query 'fn $name(...)' --json \
-  | jq 'select(.name | startswith("old_"))' \
-  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+weaver symbols list --query 'fn $NAME(...)' --json \
+  | jq -c '
+      if .schema == "weaver.selector.v1" then
+        select((.captures.NAME.text? // "") | startswith("old_"))
+      else
+        .
+      end
+    ' \
+  | weaver symbols rename --selectors - --replace-prefix old_ --with-prefix new_
 ```
 
 Sempai one-liner queries are a first-class selector form, peer to position
@@ -193,11 +199,19 @@ classDiagram
         +did_open(language: Language, params: DidOpenTextDocumentParams) Result~(), LspHostError~
         +did_change(language: Language, params: DidChangeTextDocumentParams) Result~(), LspHostError~
         +did_close(language: Language, params: DidCloseTextDocumentParams) Result~(), LspHostError~
-        -call_with_capability(context: CallContext, call: FnOnce) Result~T, LspHostError~
-        -call_on_server(language: Language, operation: HostOperation, call: FnOnce) Result~T, LspHostError~
-        -ensure_initialised(language: Language, session: Session, overrides: CapabilityMatrix)
-          Result~CapabilitySummary, LspHostError~
-        -session_mut(language: Language) Result~Session, LspHostError~
+        +prepare_call_hierarchy(language: Language, params: CallHierarchyPrepareParams)
+          Result~Option~Vec~CallHierarchyItem~~, LspHostError~
+        +incoming_calls(language: Language, params: CallHierarchyIncomingCallsParams)
+          Result~Vec~CallHierarchyIncomingCall~, LspHostError~
+        +outgoing_calls(language: Language, params: CallHierarchyOutgoingCallsParams)
+          Result~Vec~CallHierarchyOutgoingCall~, LspHostError~
+        +hover(language: Language, params: HoverParams) Result~Option~Hover~, LspHostError~
+        -call_with_capability(language: Language, spec: &CallSpec, call: FnOnce)
+          Result~T, LspHostError~
+        -call_with_session(context: &CallContext, call: FnOnce) Result~T, LspHostError~
+        -ensure_initialized(language: Language, session: &mut Session,
+          overrides: &CapabilityMatrix) Result~CapabilitySummary, LspHostError~
+        -session_mut(language: Language) Result~(&mut Session, &CapabilityMatrix), LspHostError~
     }
 
     class Session {
@@ -213,8 +227,16 @@ classDiagram
 
     class CallContext {
         -Language language
-        -CapabilityKind capability
+        -Option~CapabilityKind~ capability
         -HostOperation operation
+        +for_operation(language: Language, operation: HostOperation) CallContext
+        +with_capability(language: Language, operation: HostOperation,
+          capability: CapabilityKind) CallContext
+    }
+
+    class CallSpec {
+        +CapabilityKind capability
+        +HostOperation operation
     }
 
     class LanguageServer {
@@ -226,16 +248,29 @@ classDiagram
         +did_open(params: DidOpenTextDocumentParams) Result~(), LanguageServerError~
         +did_change(params: DidChangeTextDocumentParams) Result~(), LanguageServerError~
         +did_close(params: DidCloseTextDocumentParams) Result~(), LanguageServerError~
+        +prepare_call_hierarchy(params: CallHierarchyPrepareParams)
+          Result~Option~Vec~CallHierarchyItem~~, LanguageServerError~
+        +incoming_calls(params: CallHierarchyIncomingCallsParams)
+          Result~Option~Vec~CallHierarchyIncomingCall~~, LanguageServerError~
+        +outgoing_calls(params: CallHierarchyOutgoingCallsParams)
+          Result~Option~Vec~CallHierarchyOutgoingCall~~, LanguageServerError~
+        +hover(params: HoverParams) Result~Option~Hover~, LanguageServerError~
     }
 
     class ServerCapabilitySet {
-        -bool definition
-        -bool references
-        -bool diagnostics
+        -BTreeSet~CapabilityKind~ supported
+        -Option~PositionEncodingKind~ position_encoding
         +new(definition: bool, references: bool, diagnostics: bool) ServerCapabilitySet
+        +with_call_hierarchy(supported: bool) ServerCapabilitySet
+        +with_hover(supported: bool) ServerCapabilitySet
+        +with_position_encoding(encoding: Option~PositionEncodingKind~) ServerCapabilitySet
+        +supports(capability: CapabilityKind) bool
         +supports_definition() bool
         +supports_references() bool
         +supports_diagnostics() bool
+        +supports_call_hierarchy() bool
+        +supports_hover() bool
+        +position_encoding() Option~&PositionEncodingKind~
     }
 
     class LanguageServerError {
@@ -251,6 +286,8 @@ classDiagram
         Definition
         References
         Diagnostics
+        CallHierarchy
+        Hover
         +key() &str
     }
 
@@ -297,6 +334,13 @@ classDiagram
         Definition
         References
         Diagnostics
+        DidOpen
+        DidChange
+        DidClose
+        PrepareCallHierarchy
+        IncomingCalls
+        OutgoingCalls
+        Hover
     }
 
     class LspHostError {
@@ -319,6 +363,8 @@ classDiagram
     LspHost --> CapabilityMatrix : uses overrides
     LspHost --> CapabilitySummary : returns
     LspHost --> LspHostError : returns
+    LspHost ..> CallContext : dispatches with
+    LspHost ..> CallSpec : gates with
     Session --> SessionState : has
     Session --> LanguageServer : owns
     CapabilitySummary --> CapabilityState : aggregates
@@ -397,7 +443,7 @@ operation result schemas.
 
 #### 2.1.1. Agent-native command surface
 
-ADR 007 defines the 0.1.0 command surface as a generated or validated contract
+ADR 0007 defines the 0.1.0 command surface as a generated or validated contract
 with two first-class renderers. Weaver depends on OrthoConfig for reusable
 documentation intermediate representation, agent-context, policy, renderer,
 profile, delivery, feedback, and execution-ledger contracts where the
@@ -432,6 +478,13 @@ ship a local adapter before the corresponding OrthoConfig dependency is
 available, the roadmap task must state the dependency, the temporary scope, and
 the removal condition.
 
+For roadmap 12.1.2, Weaver's pure command tree projects into OrthoConfig's
+recursive documentation IR. The projected value drives the shared Clap help
+command used by runtime help and manual-page generation. The legacy daemon
+domain catalogue is part of that tree and is checked against daemon routing;
+completion and `weaver context --json` remain deferred to their assigned
+roadmap items.
+
 #### 2.1.2. Selector and pipeline contract
 
 Selectors are first-class inputs. A selector is any stable way to identify one
@@ -449,12 +502,18 @@ act-style commands can consume either directly or after ordinary UNIX
 filtering. For example:
 
 ```sh
-weaver symbols list --query 'fn $name(...)' --json \
-  | weaver symbols rename --from-stdin --suffix _renamed
+weaver symbols list --query 'fn $NAME(...)' --json \
+  | weaver symbols rename --selectors - --suffix _renamed
 
-weaver symbols list --query 'fn $name(...)' --json \
-  | jq 'select(.name | startswith("old_"))' \
-  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+weaver symbols list --query 'fn $NAME(...)' --json \
+  | jq -c '
+      if .schema == "weaver.selector.v1" then
+        select((.captures.NAME.text? // "") | startswith("old_"))
+      else
+        .
+      end
+    ' \
+  | weaver symbols rename --selectors - --replace-prefix old_ --with-prefix new_
 
 weaver symbols rename --query 'fn process_request(...)' --new-name run_request
 
@@ -497,9 +556,9 @@ non-zero exit class. Field names, enum values, schema versions, error codes,
 capability IDs, and exit classes are protocol identifiers and are not
 localized. Agents must not need localized prose to decide the next action.
 
-The 0.1.0 target does not use root `--output auto|human|json` or
-operation-local `--format` as public machine-output controls. The canonical
-machine switch is `--json`.
+The 0.1.0 target does not use root `--output auto|human|json` or operation-local
+`--format` as public machine-output controls. The canonical machine switch is
+`--json`.
 
 #### 2.1.4. Structured introspection and skills
 
@@ -626,7 +685,7 @@ reader abandons the session after ten consecutive blank lines and treats the
 absence of a terminating `exit` message as a failure. This ensures operators do
 not mistake a partial or stalled response for a successful execution.
 
-The prototype capability probe is exposed as `weaver --capabilities`. ADR 007
+The prototype capability probe is exposed as `weaver --capabilities`. ADR 0007
 supersedes that root flag for the 0.1.0 target. Runtime capability availability
 moves to `weaver capabilities list --json`, while full command and workflow
 introspection moves to `weaver context --json`.
@@ -835,7 +894,7 @@ hierarchy edges, structural matches, rewrite results, and verification failures
 surfaced by the safety harness.
 
 The current prototype CLI exposes an `--output` flag with `auto`, `human`, and
-`json` values. ADR 007 supersedes that public target. The 0.1.0 design keeps
+`json` values. ADR 0007 supersedes that public target. The 0.1.0 design keeps
 the human context-block requirement but replaces `--output json` with universal
 `--json`, `--plain`, `--color`, `--no-pager`, and `--width` controls. The human
 renderer follows `miette`-style ASCII output even when a direct `miette`
@@ -932,14 +991,42 @@ and message IDs. The router, contextual-help renderer, `weaver help` topics,
 and test fixtures should all read from that catalogue so adding an operation
 updates validation, localization, and help output in one place.
 
-To take advantage of `ortho_config` v0.8.0 beyond runtime help, `weaver-config`
-should annotate config-backed fields with stable documentation IDs and expose
-`OrthoConfigDocs` metadata. Once the schema-backed operation-help work in the
-roadmap lands, `cargo orthohelp` can render localized intermediate
-representation (IR) files and manpages from the same Fluent catalogues,
-removing the current drift risk between clap-generated roff output and runtime
-help text. The packaging contract should still guarantee an `en-US` manpage,
-while allowing distributors to ship additional locales as optional artefacts.
+`weaver-config` annotates config-backed fields with stable documentation IDs
+and exposes `OrthoConfigDocs` metadata; shared CLI help consumes OrthoConfig's
+command metadata and projects the command tree into documentation IR 2.0. The
+separate `cargo orthohelp` installation and packaging workflow is not adopted.
+Runtime help continues to use Weaver's Fluent catalogues and shared help
+renderer.
+
+#### 2.1.12. Workspace identity and daemon tenancy
+
+The default `weaverd` endpoint is one local, per-user service boundary, not one
+repository boundary. Every routable CLI request must therefore carry a
+workspace locator derived from the invocation context or an explicit public
+override. Missing or incompatible request fields fail transport schema/version
+validation with stable reason codes. A present locator that fails
+accessibility, containment, canonicalization, or topology checks fails
+domain-shaped locator validation with a stable daemon-side reason code. Both
+checks happen before domain routing, after which the daemon selects
+workspace-owned state using the resulting key. A client path is untrusted
+input; it does not become filesystem authority merely because the client calls
+it canonical.
+
+The current implementation still captures one startup directory and retains it
+as the request handler's workspace root. Until the workspace request contract
+and registry land, separate configured sockets remain the only safe way to run
+one daemon against each repository.
+[RFC 0002](rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md)
+defines the migration from that implementation to the target per-user,
+multi-workspace service.
+[ADR 0008](adrs/adr-0008-workspace-scoped-daemon-tenancy.md) records the
+proposed tenancy boundary.
+
+The workspace key must be resolved before capability selection, cache lookup,
+language-server leasing, plugin execution, or mutation. Workspace-sensitive
+state never falls back to process working directory. Immutable registries may
+remain daemon-global, while path-, revision-, configuration-, document-, and
+toolchain-sensitive state belongs to one workspace.
 
 ### 2.2. Semantic, Syntactic, and Relational Fusion
 
@@ -1322,31 +1409,37 @@ Configuration is layered with `ortho-config`, producing the precedence order
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
 
-The workspace now targets `ortho_config` v0.8.0 and Rust 1.88. The
-`ortho_config` v0.8.0 switch lets `weaver_config::Config` declare its discovery
-policy inline through the `#[ortho_config(discovery(...))]` attribute. The app
-name, dotfile, project file, and `--config-path` flag are all defined next to
-the struct, so every consumer shares the same generated loader without bespoke
-builders.
+The workspace targets `ortho_config` v0.10.0 and Rust 1.90. The `weaver-config`
+library retains a Rust 1.89 minimum because its runtime dependency graph
+supports that floor. The workspace application floor is Rust 1.90 because
+`tree-sitter` 0.27.1 requires it. The OrthoConfig v0.9.0 release introduced
+inline discovery policy through the `#[ortho_config(discovery(...))]`
+attribute. The app name, dotfile, project file, and `--config-path` flag are
+all defined next to the struct, so every consumer shares the same generated
+loader without bespoke builders.
 
-The `ortho_config` v0.8.0 loader preserves the stricter discovery and parsing
+The `ortho_config` v0.10.0 loader preserves the stricter discovery and parsing
 model adopted in earlier releases: if any discovered configuration file fails
 to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
 Both the CLI and daemon bubble that error to the user instead of quietly
 falling back to defaults, making misconfigurations immediately visible.
 
-`ortho_config` v0.8.0 also resolves layered and overriding configuration
-sources through its dependency-graph model, so the effective merge order
-remains `defaults < files < environment < CLI` even when multiple discovered
-files and overrides participate in the same load. Later sources shadow earlier
-values without bespoke builder calls, because the generated loader derives the
-full precedence graph from the inline discovery contract. All configuration
-files are parsed according to TOML v1 rules, including explicit `true` and
-`false` booleans, TOML integer, float, and datetime formats, quoted and
-multiline string forms, table and dotted-key merging semantics, and the
-explicit typing rules for arrays and inline tables. TOML does not provide YAML
-anchors or aliases, and it does not perform implicit `yes` or `no` boolean
-conversion, so authored configuration must use TOML's explicit value syntax.
+`ortho_config` v0.10.0 also resolves layered and overriding configuration
+sources through its dependency-graph model, so the effective merge order remains
+`defaults < files < environment < CLI` even when multiple discovered files and
+overrides participate in the same load. Later sources shadow earlier values
+without bespoke builder calls, because the generated loader derives the full
+precedence graph from the inline discovery contract. All configuration files
+are parsed according to TOML v1 rules, including explicit `true` and `false`
+booleans, TOML integer, float, and datetime formats, quoted and multiline
+string forms, table and dotted-key merging semantics, and the explicit typing
+rules for arrays and inline tables. TOML does not provide YAML anchors or
+aliases, and it does not perform implicit `yes` or `no` boolean conversion, so
+authored configuration must use TOML's explicit value syntax.
+
+An explicit CLI value now wins even when it equals the clap default. Optional
+boolean values use an attached spelling such as `--force=false`; the spaced form
+`--force false` is rejected.
 
 The daemon transport defaults to a Unix domain socket placed under
 `$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent,
@@ -1407,20 +1500,30 @@ through a `StructuredHealthReporter` that records `bootstrap_starting`,
 events are logged as structured traces, matching the roadmap's requirement for
 supervised backends.
 
-Process supervision now enforces the singleton contract described in the
-roadmap. A dedicated `ProcessGuard` claims a lock file (`weaverd.lock`) under
-the runtime directory before any work begins. If the lock already exists the
-guard first checks whether a PID file is present: the absence of `weaverd.pid`
-is treated as "launch already in progress" so a second invocation refuses to
-start rather than racing the first instance. When a PID is recorded the guard
-probes the process using `kill(pid, 0)`. Live peers cause the launch to abort,
-while stale artefacts are removed before retrying. Successful launches then
-background the daemon via `daemonize-me`, write the current PID, and publish a
-JSON health snapshot to `weaverd.health`. Both artefacts are written atomically
-via a temporary file and rename so readers never observe a truncated payload.
-The snapshot records the lifecycle state (`starting`, `ready`, `stopping`), the
-PID, and a UNIX timestamp so external probes can consume the same readiness
-signal as the CLI.
+Process supervision now enforces one daemon per user and complete configured
+`SocketEndpoint`. Separate configured sockets can therefore run concurrently,
+including Unix sockets that share a parent directory. This singleton process is
+intended to host several isolated workspaces; it is not evidence that the
+daemon owns only its bootstrap directory. The default endpoint retains the
+`weaverd.lock`, `weaverd.pid`, and `weaverd.health` artefact names; non-default
+endpoints derive all three names from a deterministic, filesystem-safe endpoint
+identifier. A dedicated `ProcessGuard` claims the resulting lock file under the
+runtime directory before any work begins. The guard holds an advisory exclusive
+ownership lock on that persistent file, so a live owner cannot race a second
+daemon. If a pre-existing lock is actively owned, acquisition returns
+`LaunchError::StartupInProgress`; if it is not locked, the guard reclaims stale
+PID and health state and reuses the same lock inode. Clean shutdown retains the
+lock file and removes only the PID and health files, avoiding
+unlink-and-recreate races. This recovery covers termination after lock
+acquisition but before `write_pid`, and integration tests must prove that a
+subsequent launch recovers without permitting two live daemons. When a PID is
+recorded the guard probes the process using `kill(pid, 0)`. Live peers cause
+the launch to abort. Successful launches then background the daemon via
+`daemonize-me`, write the current PID, and publish a JSON health snapshot. Both
+artefacts are written atomically via a temporary file and rename, so readers
+never observe a truncated payload. The snapshot records the lifecycle state
+(`starting`, `ready`, `stopping`), the PID, and a UNIX timestamp, so external
+probes can consume the same readiness signal as the CLI.
 
 The daemon now binds a socket listener as part of startup. The listener binds
 to the configured `SocketEndpoint`, switches into a non-blocking accept loop,
@@ -1434,12 +1537,11 @@ placeholder handler reads a single JSONL request line, replies with a minimal
 `exit` message, and closes the connection, so CLI clients do not hang while
 waiting for a response.
 
-A `SystemShutdownSignal` built on `signal-hook` listens for `SIGTERM`,
-`SIGINT`, `SIGQUIT`, and `SIGHUP`, logging the event and giving the runtime a
-ten-second budget to shut down gracefully. Developers can opt into a foreground
-mode for debugging by setting the `WEAVER_FOREGROUND` environment variable,
-which bypasses daemonization while preserving the same PID/lock/health
-choreography.
+A `SystemShutdownSignal` built on `signal-hook` listens for `SIGTERM`, `SIGINT`,
+`SIGQUIT`, and `SIGHUP`, logging the event and giving the runtime a ten-second
+budget to shut down gracefully. Developers can opt into a foreground mode for
+debugging by setting the `WEAVER_FOREGROUND` environment variable, which
+bypasses daemonization while preserving the same PID/lock/health choreography.
 
 ```mermaid
 erDiagram
@@ -1481,11 +1583,61 @@ a backend has already started and surfaces errors using a dedicated
 paths, ensuring that lazy initialization and error propagation behave as
 designed.
 
+#### 2.3.3. Workspace registry and execution boundary
+
+The target daemon replaces one request-wide backend owner with a
+`WorkspaceManager`. The manager maps daemon-resolved canonical roots to
+reference-counted `WorkspaceState` values. Its lock covers lookup,
+reservation/publication, retirement marking, and removal only. For each
+workspace key, an `Arc<InFlightWorkspaceCreation>` reservation provides
+single-flight creation: the creator performs registry input/output and state
+initialization outside the manager lock, then publishes only a fully initialized
+`Arc<WorkspaceState>` under the registry lock. Concurrent first requests wait
+for and share the one creation result. If creation fails, the reservation is
+cleared and all waiters receive the same error; no partial state is published.
+Routing, filesystem input/output, plugin execution, server startup, and queue
+waits all occur after that lock has been released.
+
+For screen readers: the following diagram shows daemon-global admission and
+immutable registries feeding a short-lived workspace lookup, after which work
+continues inside independent workspace states.
+
+```mermaid
+flowchart TB
+    A[Bounded daemon admission] --> M[Workspace manager]
+    M --> W1[Workspace A state]
+    M --> W2[Workspace B state]
+    G[Immutable daemon registries] --> W1
+    G --> W2
+    W1 --> P1[Language-server pool]
+    W1 --> C1[Caches and revision]
+    W1 --> X1[Mutation coordinator]
+    W2 --> P2[Language-server pool]
+    W2 --> C2[Caches and revision]
+    W2 --> X2[Mutation coordinator]
+```
+
+*Figure 1: Daemon-global admission and isolated workspace-owned state.*
+
+Each workspace state owns caches, the committed revision, language-server
+lifecycle, and mutation coordination. Its lifecycle is explicit: creation is
+single-flight, active leases prevent eviction, draining refuses new work, and
+retirement occurs only after outstanding leases finish or are cancelled within
+a bounded shutdown policy. Server and workspace budgets are independent, so
+evicting one idle server does not require discarding all workspace metadata.
+
+Admission is bounded at daemon, workspace, and server scopes. Whenever the
+transport can respond, saturation must produce a structured, retryable result
+and must not silently drop the request; queue wait, execution time, rejection,
+restart, and eviction remain separate observability events governed by
+[RFC 0001](rfcs/rfc-0001-local-daemon-observability.md). [ADR 0010](adrs/adr-0010-workspace-local-concurrency.md)
+records the proposed concurrency boundary.
+
 ## 3. Core Components: A Technical Deep Dive
 
 This section provides a detailed examination of the core technologies that
 power the Weaver Intelligence Engine. It moves beyond a simple description of
-their features to analyze their limitations and detail the specific strategies
+their features to analyse their limitations and detail the specific strategies
 `Weaver` will employ to harden its implementation and ensure robust, reliable
 operation.
 
@@ -1523,7 +1675,7 @@ hardening mechanism. It allows users and the system itself to maintain an
 override file that can disable or modify the advertised capabilities for
 specific language servers (e.g., `"csharp-ls": {"renameProvider": false}`).
 This ensures that `Weaver` can work around known bugs and maintain stable
-behavior even when interacting with non-compliant servers.
+behaviour even when interacting with non-compliant servers.
 
 More problematic are the fundamental design flaws in the protocol itself,
 particularly concerning causality and state synchronization.^19^ LSP operates
@@ -1550,6 +1702,40 @@ then explicitly requests a fresh set of diagnostics from the LSP server to
 verify the semantic state. This approach makes `Weaver` resilient to the
 inherent race conditions and state inconsistencies of the Language Server
 Protocol.
+
+#### 3.1.1. Workspace-scoped server lifecycle and execution identity
+
+The target `LspHost` is owned beneath one `WorkspaceState`. It may reuse a
+healthy server only while the server's complete execution identity remains
+equal: language, configured command and arguments, resolved executable or
+toolchain, server configuration, adapter-declared environment inputs, and a
+server-root topology fingerprint derived from the process working directory,
+`rootUri`, and ordered `workspaceFolders`. Launch and `initialize` derive from
+that fingerprint. Unrelated repositories never share a process merely because
+they use the same language or Rust toolchain.
+
+Every server starts from the adapter-selected process root recorded in that
+fingerprint and initializes with matching `rootUri` and ordered
+`workspaceFolders` values when the server supports workspace folders. Open
+documents, document versions, pending diagnostics, and request correlation
+remain session-local. An adapter may select a nested project root inside a
+workspace, but it may not add an unrelated repository to the session.
+
+Rust server identity is resolved explicitly in the selected process root. When
+rustup manages the executable, Weaver records the active toolchain and launches
+`rustup run <toolchain> rust-analyzer` from that same selected process root; it
+does not rely on the target workspace or the daemon's working directory or
+silently fall back when the selected toolchain lacks the component. Changes to
+toolchain files, Cargo configuration, Weaver adapter configuration, declared
+environment inputs, or bounded external override freshness retire the stale
+server before a replacement receives work.
+
+Health checks, bounded restart backoff, circuit breaking, process budgets, and
+idle eviction complete the lifecycle contract.
+[ADR 0009](adrs/adr-0009-workspace-scoped-language-server-lifecycle.md) records
+the proposed decision, and
+[RFC 0002](rfcs/rfc-0002-multi-workspace-daemon-and-language-server-lifecycle.md)
+defines its migration and verification requirements.
 
 ### 3.2. The Syntactic Scaffolding: Precision and Safety with Tree-sitter
 
@@ -1589,7 +1775,7 @@ The key responsibilities of the `weaver-syntax` crate are:
 2. **Syntactic Guardrails:** Serving as the "Syntactic Lock" in the
     Double-Lock safety harness. Before any change is committed, this layer
     verifies that all modified files can be successfully parsed into a valid
-    syntax tree. This is a fast, crucial first line of defense against
+    syntax tree. This is a fast, crucial first line of defence against
     corrupted code.
 
 3. **Contextual Prompt Engineering:** Enabling agents to extract specific,
@@ -1617,7 +1803,7 @@ Static analysis struggles with dynamic dispatch, function pointers, and
 higher-order functions, often leading to an overapproximation of possible calls
 (including many that are infeasible in practice). Dynamic analysis, conversely,
 produces an exact graph for a specific execution but provides an
-underapproximation of all possible behaviors.^15^
+underapproximation of all possible behaviours.^15^
 
 Given this complexity, `Weaver` will not attempt to build a single, monolithic
 call graph generator. Instead, the `weaver-graph` crate will adopt a pragmatic,
@@ -1943,8 +2129,8 @@ language servers or parsers during development.
 
 **Lock traits**:
 
-- `SyntacticLock::validate(&self, context: &VerificationContext) ->
-  SyntacticLockResult` returns either `Passed` or `Failed { failures }`.
+- `SyntacticLock::validate(&self, context: &VerificationContext) -> SyntacticLockResult`
+  returns either `Passed` or `Failed { failures }`.
 - `SemanticLock::validate(...)` permits the semantic backend to surface
   unavailability errors separately from verification failures.
 
@@ -1960,8 +2146,8 @@ passes until the full LSP diagnostic comparison pipeline is wired through
 
 `ConfigurableSyntacticLock` and `ConfigurableSemanticLock` accept
 pre-determined results, enabling BDD scenarios to exercise pass, fail, and
-backend-unavailable paths without external dependencies. These doubles power
-the `safety_harness.feature` behavioural tests.
+backend-unavailable paths without external dependencies. These doubles power the
+`safety_harness.feature` behavioural tests.
 
 **Atomic commit strategy**:
 
@@ -2015,10 +2201,34 @@ routes the notifications to the appropriate server.
 - Failures in document sync map to `HostOperation::DidOpen`, `DidChange`, or
   `DidClose` for clearer error reporting in the safety harness.
 
+#### 4.2.3. Workspace-local mutation isolation
+
+The shared mutation engine belongs beneath one selected `WorkspaceState`. A
+mutation takes an exclusive workspace lease before capturing its baseline and
+holds that lease through staging, formatting, both safety locks,
+compare-and-swap checks, commit or rollback, and restoration of the shared LSP
+document view. Two workspaces may mutate concurrently; two mutations in one
+workspace may not commit concurrently.
+
+Read-only work may proceed concurrently when it observes the same committed
+revision and the selected backend supports concurrent requests. In the first
+implementation, reads in the same workspace wait while a mutation exposes
+staged documents to its live LSP session. This conservative rule prevents an
+unrelated reader from observing transaction-local `didChange` content.
+Transaction-scoped shadow servers remain a future optimization and require a
+separate decision if latency evidence justifies their process and lifecycle
+cost.
+
+Content digests and workspace revision checks remain the final commit guard;
+the mutation lease does not replace stale-base refusal. Disconnect and timeout
+handling must cancel queued work without abandoning a live commit or leaking a
+server lease. [ADR 0010](adrs/adr-0010-workspace-local-concurrency.md) records
+this proposed coordination model.
+
 ### 4.3. The current `act apply-patch` command and target patch surface
 
 This section records the implemented prototype patch path and the safety
-properties it proves. ADR 007 supersedes the public `act apply-patch` spelling
+properties it proves. ADR 0007 supersedes the public `act apply-patch` spelling
 for the 0.1.0 target; the future resource-first surface is
 `weaver patches apply`, backed by the same safety-locked transaction model.
 
@@ -2333,7 +2543,7 @@ potentially malicious or buggy.
 
 The threat model for `Weaver` assumes that any external tool it
 executes---including language servers, refactoring plugins, formatters, and
-static analyzers---could attempt to perform unauthorized actions. The primary
+static analysers---could attempt to perform unauthorized actions. The primary
 threats are:
 
 - **Unauthorized Filesystem Access:** Reading sensitive files (e.g.,
@@ -2629,12 +2839,12 @@ using other `weaver` commands.
 
 ## 7. Historical Development Roadmap Context (v4)
 
-This section records the roadmap context that preceded ADR 007. It remains
+This section records the roadmap context that preceded ADR 0007. It remains
 useful as history and as evidence for completed foundation work, but
-`docs/roadmap.md` and ADR 007 supersede any future public command grammar here.
-Prototype names such as `observe`, `act`, and `verify` in this section should
-be read as historical planning language until they are migrated under the
-resource-first 0.1.0 command contract.
+`docs/roadmap.md` and ADR 0007 supersede any future public command grammar
+here. Prototype names such as `observe`, `act`, and `verify` in this section
+should be read as historical planning language until they are migrated under
+the resource-first 0.1.0 command contract.
 
 The historical plan organized `Weaver` in a series of phased milestones. It
 prioritized the establishment of core safety features early in the development
@@ -2782,7 +2992,7 @@ incremental progression.
 
 - **Call Graph Generation:** The process of creating a directed graph
     representing the calling relationships between subroutines in a program.
-    **Static** call graphs are generated by analyzing source code and represent
+    **Static** call graphs are generated by analysing source code and represent
     all possible calls, but may be imprecise for dynamic languages. **Dynamic**
     call graphs are generated by observing a program's execution (e.g., with a
     profiler) and are precise for that run but provide incomplete coverage.
@@ -2818,6 +3028,17 @@ incremental progression.
 
 ### C. Design Decision Log
 
+#### 2026-08-12: Adopt `ortho_config` v0.9.0 without widening adapters
+
+Weaver replaces the temporary v0.8.0 Git revision with the published v0.9.0
+release and raises its Rust floor to 1.89. `weaver-config::Config` remains the
+owner of configuration policy; the existing CLI and daemon `ConfigLoader` seams
+remain the only adapter boundaries. The new `post_merge_hook` keeps
+capability-directive normalization invariant whether configuration comes from
+the generated loader or declarative test layers. Optional OrthoConfig command,
+agent-context, metrics, and YAML capabilities remain governed by ADR 0007 and
+are not consumed by this migration.
+
 #### 2025-11-12: Adopt `rstest-bdd` 0.1.0 for scenario tests
 
 The workspace dependency on `rstest-bdd`/`rstest-bdd-macros` moved from
@@ -2837,16 +3058,16 @@ same pin, so the entire stack aligns on stable releases.
 #### 2025-11-27: Introduce `weaver-lsp-host` with capability-aware routing
 
 The new `weaver-lsp-host` crate owns the lifecycle of language servers for
-Rust, Python, and TypeScript. Initialisation now records the capabilities the
+Rust, Python, and TypeScript. Initialization now records the capabilities the
 server advertises for `textDocument/definition`, `textDocument/references`, and
-diagnostics, and then folds in operator overrides from `weaver-config`.
-Explicit `force` directives enable missing features, while `deny` directives
-block requests even when the server reports support. Core observe/verify calls
-are routed through a small trait so higher layers can inject sandboxed or
-recording implementations without spawning real servers during tests. Requests
-fail fast with structured errors that surface both the language and the reason
-(server missing, override deny, or server error) to callers, keeping the
-capability matrix honest before the daemon adds sandboxing and transport.
+diagnostics, and then folds in operator overrides from `weaver-config`. Explicit
+`force` directives enable missing features, while `deny` directives block
+requests even when the server reports support. Core observe/verify calls are
+routed through a small trait so higher layers can inject sandboxed or recording
+implementations without spawning real servers during tests. Requests fail fast
+with structured errors that surface both the language and the reason (server
+missing, override deny, or server error) to callers, keeping the capability
+matrix honest before the daemon adds sandboxing and transport.
 
 #### 2025-12-03: Upgrade `rstest-bdd` from 0.1.0 to 0.2.0
 

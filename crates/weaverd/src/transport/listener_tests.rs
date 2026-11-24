@@ -14,6 +14,7 @@ use weaver_config::SocketEndpoint;
 use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::{ConnectionHandler, CountingHandler, ListenerError, listener::SocketListener};
+use crate::tests::support::fs as test_fs;
 
 #[derive(Clone)]
 struct CountingFixture {
@@ -52,8 +53,8 @@ fn tcp_listener_accepts_connections(
         .local_addr()
         .expect("listener should report local address");
     let CountingFixture { count, handler } = counting_fixture;
-    let handler: Arc<dyn ConnectionHandler> = handler;
-    let handle = listener.start(handler).expect("start listener");
+    let connection_handler: Arc<dyn ConnectionHandler> = handler;
+    let handle = listener.start(connection_handler).expect("start listener");
 
     TcpStream::connect(addr).expect("connect first client");
     TcpStream::connect(addr).expect("connect second client");
@@ -72,17 +73,16 @@ fn unix_tempdir() -> Result<tempfile::TempDir, String> {
 
 #[cfg(unix)]
 #[rstest]
-fn unix_listener_cleans_stale_socket_files(
-    unix_tempdir: Result<tempfile::TempDir, String>,
-) -> Result<(), String> {
-    let unix_tempdir = unix_tempdir?;
-    let path = unix_tempdir.path().join("weaverd.sock");
+fn unix_listener_cleans_stale_socket_files(unix_tempdir: Result<tempfile::TempDir, String>) {
+    let tempdir = unix_tempdir.expect("create temp dir");
+    let path = tempdir.path().join("weaverd.sock");
     {
         let _stale = std::os::unix::net::UnixListener::bind(&path).expect("bind stale listener");
     }
-    assert!(path.exists(), "stale socket should remain");
+    let stale_exists = test_fs::exists(&path).expect("check stale socket");
+    assert!(stale_exists, "stale socket should remain");
 
-    let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_string());
+    let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_owned());
     let listener = SocketListener::bind(&endpoint).expect("bind new listener");
     let (_, handler) = CountingHandler::new();
     let handle = listener.start(handler).expect("start listener");
@@ -91,24 +91,21 @@ fn unix_listener_cleans_stale_socket_files(
 
     handle.shutdown();
     handle.join().expect("join listener");
+    let socket_exists = test_fs::exists(&path).expect("check unix socket");
     assert!(
-        !path.exists(),
+        !socket_exists,
         "listener should remove unix socket on shutdown"
     );
-    Ok(())
 }
 
 #[cfg(unix)]
 #[rstest]
-fn unix_listener_rejects_in_use_socket(
-    unix_tempdir: Result<tempfile::TempDir, String>,
-) -> Result<(), String> {
-    let unix_tempdir = unix_tempdir?;
-    let path = unix_tempdir.path().join("weaverd.sock");
+fn unix_listener_rejects_in_use_socket(unix_tempdir: Result<tempfile::TempDir, String>) {
+    let tempdir = unix_tempdir.expect("create temp dir");
+    let path = tempdir.path().join("weaverd.sock");
     let _existing = std::os::unix::net::UnixListener::bind(&path).expect("bind existing listener");
 
-    let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_string());
+    let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_owned());
     let error = SocketListener::bind(&endpoint).expect_err("should fail bind");
     assert!(matches!(error, ListenerError::UnixInUse { .. }));
-    Ok(())
 }
