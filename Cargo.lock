@@ -365,9 +365,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.6.7"
+version = "4.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa8876b300ab35ba921adea3dfd70157a46249b33f95c9084ae5709785478946"
+checksum = "844c5c0b65be192cb68d570cca1b21a6444431d24e39c084dc0336177015337c"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -399,9 +399,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.6.7"
+version = "4.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9c751b79415d4e559e3d1fcf128e09e720eb673a06d26cf6f392d37d75b66e0"
+checksum = "b4c174f11f949b9ca8c60580925e282b9cbd5454750e506f08648b2038080cd7"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -417,9 +417,9 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "clap_mangen"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "211d617eaa4b735c96c9e0228fcbdb5120ef623f2b8cb67ffb84c3e02dbc28a4"
+checksum = "a3b6a8907b1723f211693e27b9af5899b86a9512ef5b08bd4a15b6bceb30da6d"
 dependencies = [
  "clap",
  "roff",
@@ -2261,9 +2261,9 @@ dependencies = [
 
 [[package]]
 name = "saphyr"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aa37a62b2a28868277e83b6f651dc9581751db73d1cb51132c73c0b4ec7f70a"
+checksum = "239ada9508355b353044d043e5806c6d84030234503b62ccb8785f549cd9359b"
 dependencies = [
  "encoding_rs",
  "hashlink",
@@ -2274,9 +2274,9 @@ dependencies = [
 
 [[package]]
 name = "saphyr-parser"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48cf5a82d41247a625f040af08e91008fec945bce3b0bffba992c44af092caa2"
+checksum = "c98d2738e44a25e6ba2e6d83d91805648df204768abc96f4f1278cb3d5c90bbe"
 dependencies = [
  "arraydeque",
  "thiserror 2.0.21",
@@ -3029,9 +3029,9 @@ dependencies = [
 
 [[package]]
 name = "trybuild"
-version = "1.0.122"
+version = "1.0.125"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62db9c92d704393fbf2132041720cc80b689f2d3f28521015c2ac866223c11b8"
+checksum = "9838b494ee14d28f1eeea490e8f4f10248fa6dd371d4bc874b635de499408245"
 dependencies = [
  "glob",
  "serde",
