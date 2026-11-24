@@ -145,11 +145,12 @@ fn require_exec() -> Result<()> {
         return Ok(());
     }
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let known =
+    let merged_usr =
         stderr.contains("sandboxing failure: No such file or directory") && lib64_is_symlink()?;
+    let namespaces_forbidden = stderr.contains("sandboxing failure: Operation not permitted");
     ensure!(
-        known,
-        "the probe failed for a reason other than the merged-/usr layout: {stderr:?}"
+        merged_usr || namespaces_forbidden,
+        "the probe failed for a reason other than a known host limitation: {stderr:?}"
     );
     let reason = format!("the host cannot exec in the sandbox: {}", stderr.trim());
     Err(Skipped(reason).into())
