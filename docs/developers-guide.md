@@ -955,6 +955,14 @@ instead of compiling them on every run:
   installer release that can refuse that fallback (`--no-source-fallback`
   arrived in 0.2.9) and to the inputs that keep `ci-mode` on without pinning
   the suite.
+
+  Whitaker also gates cognitive complexity. Clippy's `cognitive_complexity`
+  scores code after macro expansion, so it counts branching a macro generated,
+  and neither `Cargo.toml` nor `clippy.toml` enables it. Whitaker's experimental
+  `macro_aware_cognitive_complexity` gates it at `max_complexity = 9`,
+  CodeScene's ceiling. `dylint.toml` opts in with
+  `[whitaker] experimental = ["macro_aware_cognitive_complexity"]`. Fix a
+  finding by extracting named helpers, never by raising the threshold.
 - **Merman**, the Mermaid renderer used by `make nixie`, comes from
   `install-nixie`. The action verifies Merman 0.7.0's release archive against
   its pinned checksum and installs Nixie 1.1.0 on Python 3.14, which that
