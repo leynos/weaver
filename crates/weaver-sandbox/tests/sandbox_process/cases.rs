@@ -126,8 +126,10 @@ fn spawn(profile: SandboxProfile, command: SandboxCommand) -> Result<weaver_sand
 ///
 /// On a merged-`/usr` host the new root holds `/usr/lib64` but not the
 /// `/lib64` symlink that names the ELF interpreter, so every dynamically linked
-/// program fails to start there; the cases that launch one are skipped, loudly,
-/// rather than reported as sandbox regressions.
+/// program fails to start there. Only that known limitation skips the cases
+/// that launch one: the probe must fail with the sandbox's "No such file"
+/// start-up error *and* `/lib64` must be a symlink on this host. Any other
+/// probe failure is a regression and fails the case.
 fn require_exec() -> Result<()> {
     let program = resolve_binary(&["/bin/true", "/usr/bin/true"])?;
     let mut command = SandboxCommand::new(&program);
@@ -140,8 +142,21 @@ fn require_exec() -> Result<()> {
         return Ok(());
     }
     let stderr = String::from_utf8_lossy(&output.stderr);
+    let known =
+        stderr.contains("sandboxing failure: No such file or directory") && lib64_is_symlink()?;
+    ensure!(
+        known,
+        "the probe failed for a reason other than the merged-/usr layout: {stderr:?}"
+    );
     let reason = format!("the host cannot exec in the sandbox: {}", stderr.trim());
     Err(Skipped(reason).into())
+}
+
+/// Whether `/lib64` is a symlink, as on a merged-`/usr` host.
+fn lib64_is_symlink() -> Result<bool> {
+    let root = Dir::open_ambient_dir("/", ambient_authority()).context("open the root")?;
+    let metadata = root.symlink_metadata("lib64").context("inspect /lib64")?;
+    Ok(metadata.is_symlink())
 }
 
 /// Spawns `command` under `profile` with piped output and waits for it.
@@ -236,22 +251,41 @@ fn full_environment_can_be_inherited() -> Result<()> {
     Ok(())
 }
 
+/// The process environment as sorted pairs, so two snapshots compare equal
+/// whatever order the platform lists them in.
+fn sorted_environment() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
+    let mut vars: Vec<_> = env::vars_os().collect();
+    vars.sort();
+    vars
+}
+
 /// After a spawn `birdcage` has stripped the process environment; the
-/// sandbox's `EnvGuard` must have put every variable back. The child's own
-/// outcome is irrelevant (the stripping happens in the parent before the fork),
-/// so this case does not need the host to exec in the sandbox.
+/// sandbox's `EnvGuard` must have put every variable back. The case snapshots
+/// the whole environment before the spawn and requires the same set after it,
+/// and the scenario variables must be among them. The child's own outcome is
+/// irrelevant (the stripping happens in the parent before the fork), so this
+/// case does not need the host to exec in the sandbox.
+///
+/// Not ported from the deleted `EnvGuard` tests: a variable created while the
+/// guard is live and removal on drop, which need the `pub(crate)` guard itself.
 fn parent_environment_is_restored_after_spawn() -> Result<()> {
+    let before = sorted_environment();
+    for (key, value) in SCENARIO_ENV {
+        ensure!(
+            env::var(key).as_deref() == Ok(value),
+            "{key} was not set before the spawn"
+        );
+    }
     let program = resolve_binary(&["/bin/true", "/usr/bin/true"])?;
     let profile = SandboxProfile::new().allow_executable(&program);
     spawn(profile, SandboxCommand::new(&program))?
         .wait_with_output()
         .context("wait for the child")?;
-    for (key, value) in SCENARIO_ENV {
-        ensure!(
-            env::var(key).as_deref() == Ok(value),
-            "{key} was not restored after the spawn"
-        );
-    }
+    let after = sorted_environment();
+    ensure!(
+        before == after,
+        "the environment changed across the spawn: {before:?} became {after:?}"
+    );
     Ok(())
 }
 
@@ -289,7 +323,7 @@ fn missing_program_is_rejected() -> Result<()> {
 fn unlisted_program_is_rejected() -> Result<()> {
     let program = resolve_binary(&["/bin/echo", "/usr/bin/echo"])?;
     match spawn_rejection(&program)? {
-        SandboxError::ExecutableNotAuthorised { .. } => Ok(()),
+        SandboxError::ExecutableNotAuthorised { program: refused } if refused == program => Ok(()),
         other => bail!("unexpected error: {other:?}"),
     }
 }

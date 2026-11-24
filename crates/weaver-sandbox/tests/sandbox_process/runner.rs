@@ -29,40 +29,65 @@ fn matches_filter(name: &str, filter: &str, exact: bool) -> bool {
     }
 }
 
-/// Cases the libtest arguments select: `--exact` names or substring filters.
-fn selected(args: &[String]) -> Vec<&'static Case> {
-    let exact = args.iter().any(|arg| arg == "--exact");
-    let filters = positional(args);
-    let wanted = |name: &str| {
-        filters.is_empty()
-            || filters
-                .iter()
-                .any(|filter| matches_filter(name, filter, exact))
-    };
-    CASES.iter().filter(|(name, _)| wanted(name)).collect()
+/// What the libtest arguments ask for: names or filters, `--skip`s, `--exact`
+/// matching and `--ignored`.
+#[derive(Default)]
+struct Selection {
+    /// `--exact`: filters and skips name whole cases instead of substrings.
+    exact: bool,
+    /// `--ignored`: only ignored cases, and none of these is ignored.
+    ignored_only: bool,
+    /// Positional names or substrings; empty selects every case.
+    filters: Vec<String>,
+    /// `--skip` names or substrings, which remove cases again.
+    skips: Vec<String>,
 }
 
-/// Positional arguments, skipping flags and the values of valued flags.
-fn positional(args: &[String]) -> Vec<String> {
-    const VALUED: [&str; 5] = [
-        "--format",
-        "--test-threads",
-        "--skip",
-        "--color",
-        "--logfile",
-    ];
-    let mut out = Vec::new();
-    let mut skip_value = false;
-    for arg in args {
-        if skip_value {
-            skip_value = false;
-        } else if VALUED.contains(&arg.as_str()) {
-            skip_value = true;
-        } else if !arg.starts_with('-') {
-            out.push(arg.clone());
+impl Selection {
+    /// Whether this selection includes the case called `name`.
+    fn wants(&self, name: &str) -> bool {
+        let named = self.filters.is_empty()
+            || self
+                .filters
+                .iter()
+                .any(|filter| matches_filter(name, filter, self.exact));
+        let skipped = self
+            .skips
+            .iter()
+            .any(|skip| matches_filter(name, skip, self.exact));
+        named && !skipped && !self.ignored_only
+    }
+
+    /// The cases this selection includes, in listing order.
+    fn cases(&self) -> Vec<&'static Case> {
+        CASES.iter().filter(|(name, _)| self.wants(name)).collect()
+    }
+}
+
+/// Flags whose value is the next argument and which select nothing.
+const VALUED_FLAGS: [&str; 4] = ["--format", "--test-threads", "--color", "--logfile"];
+
+/// Reads the selection out of the libtest arguments.
+fn parse_selection(args: &[String]) -> Selection {
+    let mut selection = Selection::default();
+    let mut rest = args.iter();
+    while let Some(arg) = rest.next() {
+        match arg.as_str() {
+            "--exact" => selection.exact = true,
+            "--ignored" => selection.ignored_only = true,
+            "--skip" => selection.skips.extend(rest.next().cloned()),
+            flag if VALUED_FLAGS.contains(&flag) => {
+                rest.next();
+            }
+            flag if flag.starts_with('-') => {
+                selection
+                    .skips
+                    .extend(flag.strip_prefix("--skip=").map(str::to_owned));
+            }
+            name => selection.filters.push(name.to_owned()),
         }
     }
-    out
+    selection
 }
 
 /// Re-runs `name` in a child copy of this binary and reports its outcome.
@@ -104,12 +129,9 @@ fn run_case((name, body): &Case) -> Result<()> {
     }
 }
 
-/// Prints the case names in the format `cargo nextest` lists tests.
-fn list_cases(args: &[String]) {
-    if args.iter().any(|arg| arg == "--ignored") {
-        return;
-    }
-    for (name, _) in CASES {
+/// Prints the selected case names in the format `cargo nextest` lists tests.
+fn list_cases(selection: &Selection) {
+    for (name, _) in selection.cases() {
         say(format_args!("{name}: test"));
     }
 }
@@ -120,12 +142,13 @@ pub fn main() -> ExitCode {
         .skip(1)
         .filter_map(|arg| arg.into_string().ok())
         .collect();
+    let selection = parse_selection(&args);
     if args.iter().any(|arg| arg == "--list") {
-        list_cases(&args);
+        list_cases(&selection);
         return ExitCode::SUCCESS;
     }
     let mut failed = false;
-    for case in selected(&args) {
+    for case in selection.cases() {
         let outcome = run_case(case);
         failed |= outcome.is_err();
         match outcome {
