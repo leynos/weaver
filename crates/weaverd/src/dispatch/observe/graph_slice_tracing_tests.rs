@@ -16,102 +16,45 @@ use super::{
     MAX_SAME_FILE_DISCOVERY_POSITIONS,
     SemanticBackendProvider,
     assert_success_response,
-    support::{SourceRequest, backends_fixture, detail_value, dispatch_payload, prepare_request},
+    support::{backends_fixture, detail_value, dispatch_payload, render_functions},
+    tracing_support::{
+        BUDGET_MESSAGE,
+        DISCOVERY_CAP_MESSAGE,
+        ENRICHMENT_DONE_MESSAGE,
+        ENRICHMENT_SKIP_MESSAGE,
+        REQUEST_MESSAGE,
+        events_with_message,
+        field_of,
+        request_for,
+        sole_event,
+        with_captured_events,
+    },
 };
 use crate::{
-    dispatch::{
-        observe::test_support::{
-            StubLanguageServer,
-            markdown_hover,
-            semantic_backends_with_server,
-        },
-        request::CommandRequest,
-        router::DISPATCH_TARGET,
-        trace_capture::{CapturedEvent, capture_events},
+    dispatch::observe::test_support::{
+        StubLanguageServer,
+        markdown_hover,
+        semantic_backends_with_server,
     },
     test_helpers::{ensure_same, ensure_same_ref, ensure_true},
 };
 
-// The message text is the operator-facing part of the contract, so these tests
-// pin it literally rather than importing it from the instrumentation module. A
-// reworded event then fails a test instead of silently changing the contract.
-/// Message attached to the handler-entry event.
-const REQUEST_MESSAGE: &str = "handling graph-slice request";
-/// Message attached to the discovery-cap event.
-const DISCOVERY_CAP_MESSAGE: &str = "same-file discovery capped at maximum positions";
-/// Message attached to the budget-truncation event.
-const BUDGET_MESSAGE: &str = "budget truncation produced spillover frontier";
-/// Message attached to the enrichment-skip event.
-const ENRICHMENT_SKIP_MESSAGE: &str = "enrichment skipped due to detail level";
-/// Message attached to the enrichment-completion event.
-const ENRICHMENT_DONE_MESSAGE: &str = "card enrichment completed";
-
-/// Returns the captured `message` field, which the recording layer stores as
-/// the rendered format string.
-fn message_of(event: &CapturedEvent) -> Option<&str> {
-    event.fields.get("message").map(String::as_str)
+/// Reads the `cards` array from a success payload.
+fn cards_of(payload: &Value) -> Result<&Vec<Value>, String> {
+    payload
+        .get("cards")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "cards should be an array".to_owned())
 }
 
-/// Returns the dispatch-target events carrying `message`.
-fn events_with_message<'a>(events: &'a [CapturedEvent], message: &str) -> Vec<&'a CapturedEvent> {
-    events
-        .iter()
-        .filter(|event| event.target == DISPATCH_TARGET && message_of(event) == Some(message))
-        .collect()
-}
-
-/// Returns the single dispatch event carrying `message`.
-fn sole_event<'a>(events: &'a [CapturedEvent], message: &str) -> Result<&'a CapturedEvent, String> {
-    let matches = events_with_message(events, message);
-    ensure_same(matches.len(), 1, message)?;
-    matches
+/// Reads the `symbol.symbol_id` of the first card in a success payload.
+fn entry_symbol_id(payload: &Value) -> Result<&str, String> {
+    cards_of(payload)?
         .first()
-        .copied()
-        .ok_or_else(|| format!("expected exactly one {message} event"))
-}
-
-/// Returns the value of `field` on `event`, reporting a missing field.
-fn field_of<'a>(event: &'a CapturedEvent, field: &str) -> Result<&'a str, String> {
-    event.fields.get(field).map(String::as_str).ok_or_else(|| {
-        format!(
-            "event `{}` should carry `{field}`",
-            message_of(event).unwrap_or("")
-        )
-    })
-}
-
-/// Runs `action`, returning its value with the tracing events it emitted.
-fn with_captured_events<T>(action: impl FnOnce() -> T) -> (T, Vec<CapturedEvent>) {
-    let mut slot = None;
-    let events = capture_events(|| slot = Some(action()));
-    let value = slot.expect("capture action should run exactly once");
-    (value, events)
-}
-
-/// Renders `count` distinct single-symbol functions as Rust source.
-fn render_functions(count: usize) -> String {
-    (0..count).fold(String::new(), |mut source, index| {
-        source.push_str("fn item_");
-        source.push_str(&index.to_string());
-        source.push_str("() {}\n");
-        source
-    })
-}
-
-/// Builds a request against a fixture file, delegating to the shared support
-/// helper so these tests use the same request shape as the behaviour tests.
-fn request_for(
-    temp_dir: &TempDir,
-    filename: &str,
-    content: &str,
-    arguments: &[&str],
-) -> Result<CommandRequest, String> {
-    prepare_request(&SourceRequest {
-        temp_dir,
-        filename,
-        content,
-        arguments,
-    })
+        .and_then(|card| card.get("symbol"))
+        .and_then(|symbol| symbol.get("symbol_id"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| "entry card should carry a symbol_id".to_owned())
 }
 
 #[rstest]
@@ -263,11 +206,7 @@ fn budget_truncation_logs_included_and_frontier_counts(
         "2",
         "included card count",
     )?;
-    let cards = payload
-        .get("cards")
-        .and_then(Value::as_array)
-        .ok_or_else(|| "cards should be an array".to_owned())?;
-    ensure_same(cards.len(), 2, "emitted card count")?;
+    ensure_same(cards_of(&payload)?.len(), 2, "emitted card count")?;
     let frontier = payload
         .get("spillover")
         .and_then(|spillover| spillover.get("frontier"))
@@ -321,19 +260,9 @@ fn enrichment_skip_logs_symbol_id_and_outcome(
     assert_success_response(status, &payload);
 
     let skip_event = sole_event(&events, ENRICHMENT_SKIP_MESSAGE)?;
-    let card = payload
-        .get("cards")
-        .and_then(Value::as_array)
-        .and_then(|cards| cards.first())
-        .ok_or_else(|| "payload should carry an entry card".to_owned())?;
-    let expected_symbol_id = card
-        .get("symbol")
-        .and_then(|symbol| symbol.get("symbol_id"))
-        .and_then(Value::as_str)
-        .ok_or_else(|| "entry card should carry a symbol_id".to_owned())?;
     ensure_same_ref(
         field_of(skip_event, "symbol_id")?,
-        expected_symbol_id,
+        entry_symbol_id(&payload)?,
         "skipped card symbol id",
     )?;
     ensure_same_ref(field_of(skip_event, "outcome")?, "skipped", "skip outcome")
@@ -366,9 +295,10 @@ fn enrichment_completion_logs_degraded_outcome_without_lsp_server(
         "Degraded",
         "degraded outcome",
     )?;
-    ensure_true(
-        !field_of(done_event, "symbol_id")?.is_empty(),
-        "completion event to carry a symbol id",
+    ensure_same_ref(
+        field_of(done_event, "symbol_id")?,
+        entry_symbol_id(&payload)?,
+        "degraded card symbol id",
     )
 }
 

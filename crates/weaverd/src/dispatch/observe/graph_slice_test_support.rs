@@ -127,3 +127,16 @@ pub(crate) fn dispatch_source(
     let request = prepare_request(source)?;
     dispatch_payload(&request, backends)
 }
+
+/// Renders `count` distinct single-symbol functions as Rust source.
+///
+/// The rendering keeps every function on a single non-blank line so callers can
+/// reason about the number of discovery positions a fixture produces.
+pub(crate) fn render_functions(count: usize) -> String {
+    (0..count).fold(String::new(), |mut source, index| {
+        source.push_str("fn item_");
+        source.push_str(&index.to_string());
+        source.push_str("() {}\n");
+        source
+    })
+}
