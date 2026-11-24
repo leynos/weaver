@@ -2970,9 +2970,12 @@ the conjunction rule. The current constraint model stores a
 than as an `And` subtree, so no conjunction from that context reaches the
 check; the validator therefore needs no exemption branch.
 
-Diagnostics blame the tightest available location. Analysis prefers the
-offending node's own span, then the first child span, then the nearest
-inherited ancestor span.
+Diagnostics select a span per rule. `InvalidNotInOr` prefers the negation's own
+span, then the containing `Or` branch span, then the `Or` span or its inherited
+fallback. `MissingPositiveTermInAnd` prefers the `And` span, then the first
+branch that carries a span, then the inherited fallback. Normalization supplies
+the enclosing rule span as that fallback on every node it produces; it does not
+extract spans for individual formula nodes.
 
 For example, this tree is rejected because the disjunction contains a negation:
 
@@ -3045,7 +3048,8 @@ types independent of transport formats.
 - `metavariable-pattern` — becomes `Constraint::MetavariablePattern` with the
   `metavariable` and `pattern` strings.
 
-Any other clause is preserved verbatim as `Constraint::Other` holding its JSON
-text, so unknown shapes survive normalization. A recognized key with a
+Any other clause is preserved lossily as `Constraint::Other`, which holds the
+parsed JSON value re-serialized as text. YAML formatting and comments are not
+preserved, but unknown shapes survive normalization. A recognized key with a
 malformed body produces `E_SEMPAI_SCHEMA_INVALID`, blamed on the fallback span
 because the clause value carries no span of its own.
