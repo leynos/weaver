@@ -177,3 +177,7 @@ pub(super) fn process_is_alive(pid: u32) -> ScenarioResult<bool> {
         Err(error) => Err(format!("probe process {pid}: {error}")),
     }
 }
+
+#[cfg(test)]
+#[path = "artefacts_tests.rs"]
+mod tests;

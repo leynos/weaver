@@ -11,14 +11,7 @@ use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
 use super::{
     error::LifecycleError,
-    monitoring::{
-        HEALTH_FILENAME,
-        HealthSnapshot,
-        PID_FILENAME,
-        read_health,
-        read_pid,
-        wait_for_ready,
-    },
+    monitoring::{HealthSnapshot, read_health, read_pid, wait_for_ready},
     shutdown::{signal_daemon, wait_for_shutdown},
     socket::{ensure_socket_available, socket_is_reachable},
     spawning::spawn_daemon,

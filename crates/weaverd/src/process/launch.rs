@@ -1,6 +1,7 @@
 //! Supervises daemon launch sequencing and runtime orchestration.
 
 use std::{
+    env,
     io,
     path::PathBuf,
     sync::{Arc, Mutex},
