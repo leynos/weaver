@@ -257,10 +257,18 @@ the `cfg(test)` thread-counter hook).
 `Sandbox::spawn` needs a single-threaded process and `birdcage` rewrites that
 process's environment, so the target has its own `main` (`harness = false`) and
 runs each case in a child copy of the binary, started at `/` with
-`Command::env` and `Command::current_dir`. On a merged-`/usr` host the new root
-lacks the `/lib64` interpreter symlink, so the cases that run a dynamically
-linked program print `SKIPPED:` and pass; the cases that fail before exec still
-run.
+`Command::env` and `Command::current_dir`.
+
+The five cases that run a dynamically linked program (`cat` or `env`) are
+opt-in: they run only with `WEAVER_SANDBOX_EXEC_CASES=1`, and otherwise print
+`SKIPPED:` and pass. Two host limitations stop them today. On a merged-`/usr`
+host the new root lacks the `/lib64` interpreter symlink, so `execve` fails
+with ENOENT; on a host that forbids unprivileged user namespaces (hosted Ubuntu
+images) every sandboxed start fails with EPERM. `birdcage` reports those and
+unrelated failures with the same message, so the cases do not guess from it.
+Nextest hides the output of a passing test, so only `cargo test` shows the
+`SKIPPED:` lines. The cases that fail before exec, and the environment
+restoration case, always run.
 
 ### 4.2 Environment access and injection seams
 

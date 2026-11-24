@@ -122,45 +122,24 @@ fn spawn(profile: SandboxProfile, command: SandboxCommand) -> Result<weaver_sand
         .map_err(|err| anyhow::anyhow!("the sandbox rejected the spawn: {err}"))
 }
 
-/// Checks that a trivial program runs in the sandbox on this host.
+/// Names the variable that opts the cases that run a program into the run.
+const EXEC_OPT_IN: &str = "WEAVER_SANDBOX_EXEC_CASES";
+
+/// Opts the cases that launch a dynamically linked program in or out.
 ///
-/// On a merged-`/usr` host the new root holds `/usr/lib64` but not the
-/// `/lib64` symlink that names the ELF interpreter, so every dynamically linked
-/// program fails to start there. A host that forbids unprivileged user
-/// namespaces (hosted Ubuntu images do) fails every sandboxed start with
-/// "Operation not permitted". Only those two known limitations skip the cases
-/// that launch a program: the probe must fail with the sandbox's "No such file"
-/// start-up error *and* `/lib64` must be a symlink on this host, or with the
-/// "Operation not permitted" start-up error. Any other probe failure is a
-/// regression and fails the case.
+/// They need a host whose sandbox can start one, and neither a merged-`/usr`
+/// host (the new root lacks the `/lib64` interpreter symlink, so `execve`
+/// fails with ENOENT) nor a host that forbids unprivileged user namespaces
+/// (hosted Ubuntu images; every start fails with EPERM) is one. `birdcage`
+/// reports those failures and unrelated ones with the same message, so the
+/// cases do not guess from it: they run only when `WEAVER_SANDBOX_EXEC_CASES=1`
+/// is set, and then every failure is a failure. Unset, they skip, loudly.
 fn require_exec() -> Result<()> {
-    let program = resolve_binary(&["/bin/true", "/usr/bin/true"])?;
-    let mut command = SandboxCommand::new(&program);
-    command.stderr(Stdio::piped());
-    let profile = SandboxProfile::new().allow_executable(&program);
-    let output = spawn(profile, command)?
-        .wait_with_output()
-        .context("read the probe's output")?;
-    if output.status.success() {
+    if env::var_os(EXEC_OPT_IN).is_some_and(|value| value == "1") {
         return Ok(());
     }
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let merged_usr =
-        stderr.contains("sandboxing failure: No such file or directory") && lib64_is_symlink()?;
-    let namespaces_forbidden = stderr.contains("sandboxing failure: Operation not permitted");
-    ensure!(
-        merged_usr || namespaces_forbidden,
-        "the probe failed for a reason other than a known host limitation: {stderr:?}"
-    );
-    let reason = format!("the host cannot exec in the sandbox: {}", stderr.trim());
+    let reason = format!("set {EXEC_OPT_IN}=1 on a host whose sandbox can exec a dynamic binary");
     Err(Skipped(reason).into())
-}
-
-/// Whether `/lib64` is a symlink, as on a merged-`/usr` host.
-fn lib64_is_symlink() -> Result<bool> {
-    let root = Dir::open_ambient_dir("/", ambient_authority()).context("open the root")?;
-    let metadata = root.symlink_metadata("lib64").context("inspect /lib64")?;
-    Ok(metadata.is_symlink())
 }
 
 /// Spawns `command` under `profile` with piped output and waits for it.
@@ -282,14 +261,16 @@ fn parent_environment_is_restored_after_spawn() -> Result<()> {
     }
     let program = resolve_binary(&["/bin/true", "/usr/bin/true"])?;
     let profile = SandboxProfile::new().allow_executable(&program);
-    spawn(profile, SandboxCommand::new(&program))?
-        .wait_with_output()
-        .context("wait for the child")?;
+    let spawned = spawn(profile, SandboxCommand::new(&program));
+    let waited = spawned.map(weaver_sandbox::SandboxChild::wait_with_output);
+    // A refused spawn must leave the environment alone too, so compare before
+    // reporting how the spawn went.
     let after = sorted_environment();
     ensure!(
         before == after,
         "the environment changed across the spawn: {before:?} became {after:?}"
     );
+    waited?.context("wait for the child")?;
     Ok(())
 }
 
