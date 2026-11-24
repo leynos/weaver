@@ -249,6 +249,19 @@ alone. A fixture costs a nested `cargo` build that must be serialized against
 the other compiler-starting tests, and it asserts on rendered diagnostics that
 move with the compiler; the witness costs one line and fails on the same edit.
 
+`weaver-sandbox` splits its remaining tests by what they need.
+`crates/weaver-sandbox/src/unit_tests.rs` holds the cases that neither spawn a
+process nor read the environment (profile policy and the spawn preflight, using
+the `cfg(test)` thread-counter hook).
+`crates/weaver-sandbox/tests/sandbox_process.rs` holds the process-level cases.
+`Sandbox::spawn` needs a single-threaded process and `birdcage` rewrites that
+process's environment, so the target has its own `main` (`harness = false`) and
+runs each case in a child copy of the binary, started at `/` with
+`Command::env` and `Command::current_dir`. On a merged-`/usr` host the new root
+lacks the `/lib64` interpreter symlink, so the cases that run a dynamically
+linked program print `SKIPPED:` and pass; the cases that fail before exec still
+run.
+
 ### 4.2 Environment access and injection seams
 
 Process environment reads go through an injected `mockable::Env` reader, never
