@@ -353,8 +353,3 @@ fn health_snapshot_records_event() -> Result<(), String> {
 
 #[path = "pid_tests.rs"]
 mod pid_tests;
-// check' to verify your resolution
-// weave: run 'weave explain crates/weaverd/src/process/guard/tests.rs' for per-hunk detail, 'weave
-// check' to verify your resolution
-// weave: run 'weave explain crates/weaverd/src/process/guard/tests.rs' for per-hunk detail, 'weave
-// check' to verify your resolution

@@ -355,12 +355,3 @@ pub(super) mod test_support;
 
 #[cfg(test)]
 mod tests;
-// check' to verify your resolution
-// weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
-// check' to verify your resolution
-// weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
-// check' to verify your resolution
-// weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
-// check' to verify your resolution
-// weave: run 'weave explain crates/weaverd/src/process/guard/mod.rs' for per-hunk detail, 'weave
-// check' to verify your resolution

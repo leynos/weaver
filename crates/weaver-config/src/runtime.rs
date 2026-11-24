@@ -37,7 +37,6 @@ pub struct RuntimePaths {
     health_path: PathBuf,
 }
 
-
 impl RuntimePaths {
     /// Derives runtime paths from the shared configuration.
     ///
@@ -128,7 +127,6 @@ impl RuntimePaths {
     pub fn health_file_name(&self) -> &Path { self.health_file_name.as_path() }
 }
 
-
 impl RuntimePaths {
     /// Derives the four runtime artefact paths from the configuration.
     fn derive_paths(config: &Config) -> Result<Self, RuntimePathsError> {
@@ -146,7 +144,6 @@ impl RuntimePaths {
         })
     }
 }
-
 
 fn runtime_file_names(endpoint: &SocketEndpoint) -> (PathBuf, PathBuf, PathBuf) {
     if endpoint == &crate::default_socket_endpoint() {
