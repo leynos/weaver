@@ -208,7 +208,9 @@ Stop and escalate when any of these is reached:
 - More than 40 Fluent messages are added.
 - A public interface or dependency beyond `Interfaces and dependencies` is
   needed.
-- A change to `weaverd`, the wire protocol, or `OutputFormat` is needed.
+- A change to `weaverd`, the wire protocol, or the variants or `auto` behaviour
+  of `OutputFormat` is needed. Making `OutputFormat::resolve` crate-private is
+  expected.
 - Moving to `ortho_config` 0.11.0 needs more than the `renderer` field and
   mechanical corrections.
 - A gate still fails after three fix attempts.
@@ -258,7 +260,7 @@ the main omissions in earlier estimates.
 - [x] (2026-11-24) Reconnaissance by a five-agent Wyvern team completed.
 - [x] (2026-11-24) Initial draft completed (`2cfc1c75`).
 - [x] (2026-11-24) Five-reviewer design review applied; each verdict was
-  "revise".
+  "revise". Four rechecked the revision, and their corrections were applied.
 - [x] (2026-11-24) leynos/weaver#451 and leynos/weaver#452 raised at the user's
   request.
 - [ ] Plan approved by the user.
@@ -344,15 +346,18 @@ effective on user approval.
 - D6. The pager is `PAGER`, or `less` when `PAGER` is unset, split on ASCII
   whitespace without quoting and run without a shell. Empty or `cat` disables
   it. When `LESS` is unset the child receives `LESS=FRX`: quit if one screen,
-  pass SGR only, and do not clear the screen. While waiting, Weaver holds no-op
-  handlers for the interrupt and quit signals; they are not ignored, because an
-  ignored signal would be inherited. `NotStarted` (spawn failure, or exit
-  status 126 or 127) prints one line on standard error and writes the text
-  directly. `Failed` (another non-zero status or a signal) prints one line
-  naming `--no-pager` and does not write the text again. `Delivered` is
-  success, including a pager that closes its input early. No outcome changes
-  Weaver's exit status. Paging happens only when the response completed with
-  status zero.
+  pass SGR only, and do not clear the screen. From before the pager starts
+  until it has been waited for, Weaver holds handlers for the interrupt and
+  quit signals. They are registered conditionally, so that the default action
+  is restored afterwards, and the signals are not ignored, because an ignored
+  signal would be inherited. `NotStarted` (spawn failure, or exit status 126 or
+  127) writes the text directly and, unless the missing program is the default
+  `less`, prints one line on standard error. `Failed` (another non-zero status
+  or another signal) prints one line naming `--no-pager` and does not write the
+  text again. `Delivered` is success, including a pager that closes its input
+  early or ends by an interrupt, quit, or broken-pipe signal. No outcome
+  changes Weaver's exit status. Paging happens only when the response completed
+  with status zero.
 - D7. Progress appears only while waiting for the first response byte, only on
   standard error, and only when it is a terminal. It is animated on a capable
   terminal and one static line when `plain` is set, `TERM` is unusable, or the
@@ -398,19 +403,27 @@ effective on user approval.
   `rustix` for tests. Reasons are in Table 7.
 - D17. In human mode this operation collects all standard-output text until the
   exit message, concatenates it, then renders and delivers it. Reading stops at
-  the exit message, as the protocol allows. The cap is 16 MiB; beyond it the
-  held text is written neutralized and streaming continues unpaged.
+  the exit message, as the protocol allows. The collected text is capped at 16
+  MiB; beyond it the held text is written neutralized and streaming continues
+  unpaged. A single response line is read through a 64 MiB limit, sized for
+  JSON escaping, and a longer line is a read error.
 - D18. `IoStreams::new` takes `HostFacts` instead of a boolean, whose default
   has no terminal and no pager, so no in-process test can start a real pager.
-- D19. The response wait sets a 120-millisecond read timeout, treats
-  `WouldBlock`, `TimedOut`, and `Interrupted` as ticks, and clears the timeout
-  when data arrives. Failure to clear it is an error. No thread is used.
+- D19. When progress may appear, a 120-millisecond read timeout is set before
+  the request is sent and is never cleared. The reader treats `WouldBlock`,
+  `TimedOut`, and `Interrupted` as ticks throughout the response. If the
+  timeout cannot be set, Weaver waits without progress. Machine mode never sets
+  it. No thread is used. Rationale: changing a socket option after the peer has
+  closed can fail on macOS, a release target, and must not fail a complete
+  response.
 - D20. Source files are opened without blocking, must be regular files, and are
-  read up to 16 MiB; otherwise a localized note explains why. Each distinct
-  path is read at most once, and only displayed lines are neutralized.
+  read through a limit of 16 MiB on the open handle, because reported sizes can
+  be zero or stale; otherwise a localized note explains why. Each distinct path
+  is read at most once, and only displayed lines are neutralized.
 - D21. Invalid values in any file or environment layer are errors naming the
   setting, the accepted values, and the layer or file, even if a higher layer
-  would override them. Booleans accept `true`, `false`, `1`, and `0`.
+  would override them. Booleans accept `true`, `false`, `1`, and `0` in every
+  layer, through one parser shared with the flags.
 - D22. Reject a table, pager, spinner, colour, or `miette` dependency. Design
   §2.1.10 permits a renderer modelled on `miette`. It would replace only the
   context blocks, emits fixed English in its narrated form, and would need
@@ -623,7 +636,9 @@ invalid setting is rejected before connecting.
 - `INV-PROBE`: facts follow the environment as D4, D8, and D9 state. `dumb`
   holds when `TERM` is absent, empty, or `dumb`; an empty `NO_COLOR` counts as
   absent; unparseable or zero sizes are `None`; only standard output's own
-  descriptor supplies `out_size`.
+  descriptor supplies `out_size`; `pager_present` follows D6 for `PAGER` unset,
+  empty, `cat`, and blank; and colour is Forced ⇔ the command-line override is
+  `always`.
 - `INV-POLICY`:
   - styled ⇔ ¬plain ∧ (colour = Forced ∨ (colour = Auto ∧ out_tty ∧ ¬no_color
     ∧ ¬dumb));
@@ -650,8 +665,8 @@ invalid setting is rejected before connecting.
   definition's neutralized path, line, and column; removing exactly the
   two-cell continuation indent and joining recovers each value. Grouping uses
   the raw path, not its display form.
-- `INV-CONTEXT`: plain mode prints the same context lines, in the same order,
-  as the block layout, and marks the target in words.
+- `INV-CONTEXT`: for each definition, plain mode prints the lines of that
+  definition's unclipped context block, in order, and marks the target in words.
 - `INV-SELECT`: the table is used ⇔ ¬plain, the payload is non-empty, and the
   natural table fits; Unbounded always fits; a table has its heading row.
 - `INV-CARET`: the caret's column is that of the first piece representing the
@@ -665,17 +680,17 @@ invalid setting is rejected before connecting.
   settings or facts.
 - `INV-PAGER-TRUST`: no file layer can influence the executed program.
 - `INV-DELIVER`: collected text is handed to exactly one sink; a second sink is
-  used only after `NotStarted`; nothing is dropped when the stream ends in
-  success, failure, missing exit, malformed message, read error, or the
-  empty-line limit.
+  used only after `NotStarted`; the pager is never called unless the exit
+  status is zero; nothing is dropped when the stream ends in success, failure,
+  missing exit, malformed message, read error, or the empty-line limit.
 
 Lemmas, stated as hypotheses about the eventual argument:
 
 - `L-POINT`: the neutralization of every scalar contains no unsafe scalar and
   consists of pieces of at most two cells.
-- `L-CONCAT`: with n(c, x) neutralizing x from column c, and w its width,
-  n(c, x·y) = n(c, x) · n(c + w(n(c, x)), y), up to the zero-width run counter
-  carried alongside c.
+- `L-CONCAT`: with s = (column, zero-width run) and δ the state after a
+  prefix, n(s, x·y) = n(s, x) · n(δ(s, x), y). It is tested on an internal
+  `neutralize_from(s, line)`.
 - `L-IDEM`: neutralizing the text of neutralized text changes nothing. Needed
   because formatted messages are neutralized again.
 - `L-PARTITION`: `wrap(widths, first, rest)`, with every width at most the
@@ -684,10 +699,11 @@ Lemmas, stated as hypotheses about the eventual argument:
   with a zero-width piece; empty input gives no range.
 - `L-WINDOW`: `window(widths, focus, limit)`, where 0 ≤ focus ≤ len and every
   width is at most limit − 1, returns r such that r.start ≤ focus ≤ r.end; the
-  pieces before the focus, with one cell for the caret, total at most limit;
-  and r totals at most limit. r is the whole input when that fits with the
-  caret; otherwise r cannot be extended; and r.start is not a zero-width piece
-  unless it is 0.
+  pieces before the focus, with one cell for the caret, total at most limit; r
+  totals at most limit; and focus < r.end whenever focus < len, so the target
+  itself is visible. r is the whole input when that fits with the caret;
+  otherwise no strict superset range satisfies the other clauses. r.start is
+  not a zero-width piece unless it is 0.
 - `L-GUTTER`: a gutter is at most 13 cells (ten digits and three), so at the
   floor seven remain, enough for one clip marker at each end and a two-cell
   piece.
@@ -730,16 +746,18 @@ deliberately faulty test doubles and must reject them.
   `cargo nextest run -p weaver-cli presentation`; red because `resolve` is
   absent. Non-vacuity: every outcome occurs at least once; a double that ignores
   `out_tty` is rejected. Discharge: all combinations agree.
-- `INV-SIZE`. Every column value 0 to 65,535 and absence, against four
-  explicit widths, both terminal states, and three `COLUMNS` classes. Artefact
-  and command as above.
+- `INV-SIZE`. Every column value 0 to 65,535 and absence, against explicit
+  widths None, 20, 80, and 65,535, both values of plain, both terminal states,
+  and `COLUMNS` absent, malformed, and 100. Artefact and command as above.
 - `INV-PROBE`. `rstest` table over `MockEnv` and descriptor doubles.
   Non-vacuity: each rule has a positive and a negative row.
 - `L-POINT`, `L-IDEM`. All 1,112,064 scalars. Oracle: a checked-in list of
-  category members produced by Python's `unicodedata`, not the production
-  ranges. Artefact: `src/output/text/tests.rs`. Non-vacuity: exact counts; a
-  double omitting U+202E is rejected. `L-CONCAT`: `proptest` over strings and
-  split points, with tabs and zero-width runs required by classification.
+  category members from Python's `unicodedata` 15.0.0, with the 13
+  Prepended_Concatenation_Mark scalars listed separately: 65 Cc, and 155 of 170
+  Cf neutralized. Artefact: `src/output/text/tests.rs`. Non-vacuity: exact
+  counts; a double omitting U+202E is rejected. `L-CONCAT`, and `L-IDEM` for
+  runs: `proptest` over strings and split points, with tabs and zero-width runs
+  required by classification.
 - `L-PARTITION`, `L-WINDOW`, `L-GUTTER`. All 9,841 sequences to length eight
   over widths {0, 1, 2}, every focus including the end, limits 3 to 12, then
   `proptest` to length 2,000. Artefact: `src/output/text/fit_tests.rs`. Beyond
@@ -783,8 +801,9 @@ for an exhaustive Verus proof of introduced lemmas or contractual business
 logic; the task brief asks for selective use and excludes formatting and
 plumbing. The plan reads the rule through that criterion:
 
-- `resolve` and per-scalar neutralization are finite and enumerated in full, so
-  a proof would add nothing but a mirror to maintain;
+- per-scalar neutralization and the boolean kernel of `resolve` are enumerated
+  in full, and width resolution over the stated classes, so a proof would add
+  little but a mirror to maintain;
 - `wrap` and `window` are unbounded layout arithmetic. They are checked
   exhaustively to a stated bound and sampled beyond it. They are not proved,
   and a fault there could hide or misplace text.
@@ -795,13 +814,14 @@ already proved stable. Kani over the same bounds would repeat the enumeration.
 
 If the approver prefers a proof, insert `EP-M4V` after `EP-M4`: pin Verus and
 `rust-prover-tools` as 19.3.1 describes, add `make verus`, and prove
-`L-PARTITION` and `L-WINDOW` over `Seq<nat>` in `verus/column_fit.rs`, with an
-explicit refinement to the slices in `output/text/fit.rs` and a check that both
-paths exist. Acceptance: `make verus` runs
-`prover-tools verus run --repo-root . --proof-file verus/column_fit.rs` without
-`assume`, `admit`, or trusted bodies; weakening a limit by one fails; and the
-formatting, lint, and test gates pass. This would add about 400 lines of code
-and amend 19.3.1's dependency.
+`L-PARTITION` and `L-WINDOW` over `Seq<nat>` in `verus/column_fit.rs`. That
+proves a specification mirror: production `fit.rs` is not itself verified,
+correspondence rests on review plus the bounded enumeration, and that limit is
+recorded. Each `requires` has a satisfiable witness. Acceptance: `make verus`
+runs `prover-tools verus run --repo-root . --proof-file verus/column_fit.rs`
+without `assume`, `admit`, or trusted bodies; weakening a limit by one fails;
+and the formatting, lint, and test gates pass. This would add about 400 lines
+of code and amend 19.3.1's dependency.
 
 ### Suggested BDD features
 
@@ -814,8 +834,10 @@ milestone in which the scenario is added.
 ```gherkin
 Feature: Localized human output for definitions get
 
+  # Steps append --uri and --position. Background stores the payload; each When
+  # starts its own fake daemon, which accepts one connection.
   Background:
-    Given a running fake daemon emitting two definitions
+    Given a fake daemon prepared with two definitions
 
   # EP-M3
   Scenario: Plain output is labelled text
@@ -881,22 +903,28 @@ Feature: Localized human output for definitions get
 
   # EP-M4
   Scenario Outline: An invalid width is rejected before connecting
-    When the operator supplies width "5" through the <layer>
-    Then stderr names the accepted range and the <layer>
-    And no daemon command was sent
+    Given the fake daemon is expected to stay idle
+    When the operator supplies width "5" through <source>
+    Then stderr names "<source>" and the accepted range
+    And the fake daemon stayed idle
 
     Examples:
-      | layer        |
-      | command line |
-      | environment  |
-      | file         |
+      | source           |
+      | --width          |
+      | WEAVER_WIDTH     |
+      | the file's path  |
 
   # EP-M5
-  Scenario: NO_COLOR is respected and can be overridden explicitly
+  Scenario: NO_COLOR is respected
     Given standard output is a terminal 100 columns wide
     And NO_COLOR is set
     When the operator runs "definitions get"
     Then stdout contains no escape character
+
+  # EP-M5
+  Scenario: An explicit flag overrides NO_COLOR
+    Given standard output is a terminal 100 columns wide
+    And NO_COLOR is set
     When the operator runs "definitions get --color always"
     Then stdout contains a colour sequence
 
@@ -935,8 +963,8 @@ the digests in `Artefacts and notes`, and update the version statements in
 `docs/contents.md`. Write
 `docs/adrs/adr-0014-human-renderer-presentation-policy.md` (status Proposed)
 for D3 to D11 and D17 to D22, with the abstraction sweep, reuse policy, and
-proof-driven interface decisions, and amend ADR 0007 and design §§2.1.3 and
-2.1.10 for D4, D5, and D8.
+proof-driven interface decisions, and amend ADR 0007 for D4, D5, D8, and D15,
+and design §§2.1.3 and 2.1.10 for D4, D5, and D8.
 
 Red: the version change alone fails with a missing `renderer` field. Green: add
 it. Accept: `cargo nextest run -p weaver-cli command_ir` and the configuration
@@ -964,9 +992,14 @@ carets change. Users' guide: one paragraph on visible escapes.
 
 Discharges `REQ-L10N` and `REQ-LAYERED`. Add
 `weaver-config/src/presentation.rs` with `plain` only. Extend `ConfigLoader`
-with `load_presentation`; test loaders return fixed settings so no test reads
-the host. Extend `CommandArgument` with a value kind (string, boolean with
-optional value, enumeration, integer), possible values, and a default; project
+with `load_presentation`; most test loaders return fixed settings, and one calls
+`load_layered` with a `MapEnv` and a temporary file for the layer scenarios,
+so no test reads the host. A helper in `config.rs` extracts `--config-path`, in
+both spellings, from the configuration arguments; it is tested beside every
+other configuration flag, which the derived parser would reject. Extend
+`CommandArgument` with a value kind, beginning with string and optional-value
+boolean; `EP-M4` adds integer and `EP-M5` adds enumeration with possible
+values, so no variant precedes its first argument (C16). Add a default; project
 them; show optional flags in brackets in `command_signature`; and compare clap
 arguments with the tree in both directions, including arity and values. Add
 `HumanRenderArgs` with `--plain[=BOOL]` to `cli.rs`.
@@ -975,11 +1008,14 @@ Move `strip_bidi_isolates` to `localizer.rs` as the shared temporary adapter.
 Add `output/messages.rs`, one enumeration of messages with identifiers and
 English fallbacks; arguments are `SafeText`, and counts select plurals. Add
 `output/definitions/` with the labelled layout and `SourceProvider`. Split
-`read_daemon_messages` into collect, render, and deliver (D17), carrying
-`renderer: Option<&HumanRenderer>` in `OutputSettings`, where `None` means
-JSON. Make `render_human_output` crate-private and move the end-to-end test to
-the real binary and `FakeDaemon`. Move `CliRunner` and `IoStreams` out of
-`lib.rs`. Make `OutputStream` and `OutputCheck` shared test support.
+`read_daemon_messages` into collect, render, and deliver (D17), replacing the
+format in `OutputSettings` with `OutputMode`: `Json`, `Human` for other
+operations, or `Definitions(&HumanRenderer)`. Settings, policy, progress, and
+paging apply only to the third. Make `render_human_output` crate-private and
+move the end-to-end test to the real binary and `FakeDaemon`. Move `CliRunner`
+and `IoStreams` out of `lib.rs`. Make `OutputStream` and `OutputCheck` shared
+test support, and give the in-crate fake daemon a "stays idle" outcome, because
+waiting for an absent connection now fails after two seconds.
 
 Red: layer, message, projection, and `EP-M3` BDD tests. Green: the above.
 Accept: `cargo nextest run -p weaver-config presentation`, then
@@ -1041,10 +1077,13 @@ spinner text is localized and the static line is the same text.
 ### `EP-M7` pager and `--no-pager`
 
 Discharges `REQ-FLAGS` and the pager half of `REQ-CONTEXT`. Add the `Pager`
-port, injected on `CliRunner`, and `terminal/pager.rs`, which inherits real
-descriptors and is constructed only by `main.rs`. Flush standard output first.
-Page only when `may_page` holds, the document has more lines than rows, and the
-response completed with status zero. Hold signal handlers as D6 states.
+port and `terminal/pager.rs`, whose `ProcessPager` inherits real descriptors.
+The public `run` constructs it; `run_with_loader` and the test entry points
+receive a double. `execute_daemon_command` returns the collected output and
+status, and `CliRunner` delivers it, so no function gains a fifth parameter.
+Flush standard output first. Page only when `may_page` holds, the document has
+more lines than rows, and the response completed with status zero. Hold signal
+handlers as D6 states.
 
 | Claim                           | Presence                            | Absence, same long input        |
 | ------------------------------- | ----------------------------------- | ------------------------------- |
@@ -1052,29 +1091,34 @@ response completed with status zero. Hold signal handlers as D6 states.
 | `--no-pager`, `--plain`         | Neither given: probe ran            | Either given                    |
 | `PAGER` only from environment   | `PAGER=B`, file `pager=A`: B ran    | A did not                       |
 | Unusable `TERM`, zero rows      | `TERM=xterm`, 24 rows: probe ran    | Unset, `dumb`, or zero rows     |
-| Interrupt is survivable         | Pager and Weaver outlive `\x03`     | Terminal settings restored      |
+| Interrupt is survivable         | Probe records `\x03`; Weaver lives  | Terminal settings match at exit |
 | Colour follows D4               | PTY, or piped with `--color always` | Piped, `NO_COLOR`, `never`      |
 | Animation needs terminal stderr | PTY, delayed reply: erase seen      | Piped, JSON, `dumb`, fast reply |
 
 _Table 5: Paired terminal-context tests. Piped cases use `--output human`._
 
 The probe is a script named through `PAGER` that records a marker and copies
-its input. Further cases: a missing program, exit status 127, exit status 1,
-and a probe that closes early.
+its input. For the interrupt row it also disables canonical mode and echo while
+keeping signals, traps the interrupt to a second marker, and announces
+readiness before `\x03` is sent; after a normal exit the terminal settings must
+match those recorded beforehand. Further cases: a missing program, exit status
+127, exit status 1, and a probe that closes early.
 
 Red: pager rows of Table 5 and `INV-DELIVER`. Green: the above. Accept: as
 before, plus manual checks in `Validation and acceptance`.
 
 ### `EP-M8` renderer metadata and closure
 
-Discharges `REQ-META`. Add a `renderer` slot to `CommandNode` and declare, for
-`definitions get`: human supported, `tty` adapts, `closed_stdin` ignored;
-colour, progress, and pager auto; emoji never; width terminal; accessibility
-text_equivalent; plain available; stdout and stderr text;
-`subprocess_inheritance` allowed, because the pager inherits standard output;
-`progress_inheritance` forbidden; fields `path`, `line`, and `column`
-non-localized, and `label` localized. Leave the machine record undeclared until
-13.2.2, and note that agent context then reports machine support as false.
+Discharges `REQ-META`. Add a `Copy` renderer discriminant to `CommandNode`,
+whose tree is `const` and framework-independent, and convert it to
+`RendererMetadata` in `command_ir`. For `definitions get` declare: human
+supported, `tty` adapts, `closed_stdin` ignored; colour, progress, and pager
+auto; emoji never; width terminal; accessibility text_equivalent; plain
+available; stdout and stderr text; `subprocess_inheritance` allowed, because
+the pager inherits standard output; `progress_inheritance` forbidden; fields
+`path`, `line`, and `column` non-localized, and `label` localized. Leave the
+machine record undeclared until 13.2.2, and note that agent context then
+reports machine support as false.
 
 Complete `docs/users-guide.md`, `docs/developers-guide.md` (§§15, 21.4, and
 21.6, module map, the safe-text rule, adding a message, the PTY harness),
@@ -1234,22 +1278,27 @@ Questions for the approver, each with the default this plan assumes:
 `presentation` and `output` are pure and import no adapter. Ports: `Pager`,
 `SourceProvider`, `ConfigLoader`, and `ortho_config::Localizer`. Adapters: the
 process probe and `ProcessPager` in `terminal/`, and the `cap_std` source
-reader. They are chosen in `main.rs` and `lib.rs`.
+reader. The probe is called in `main.rs`; the other adapters are chosen in
+`run`.
 
 In `weaver-config`, public, with fields added by the milestone that uses them:
 
 ```rust
-#[derive(clap::ValueEnum)]
+// Both implement FromStr, Serialize, and Deserialize; ColorChoice also
+// implements clap::ValueEnum and Default.
 pub enum ColorChoice { Auto, Always, Never }
-pub struct OutputColumns(std::num::NonZeroU16); // 20..=65535
+pub struct OutputColumns(std::num::NonZeroU16); // 20..=65535, with get()
 pub struct PresentationConfig {
     pub plain: bool,                  // EP-M3
     pub width: Option<OutputColumns>, // EP-M4
     pub color: ColorChoice,           // EP-M5
     pub no_pager: bool,               // EP-M7
 }
-pub struct PresentationOverrides { /* the same fields, each Option */ }
-pub enum PresentationError { /* setting, accepted values, layer or path */ }
+pub struct PresentationOverrides { /* the same fields, each Option; Serialize */ }
+pub enum PresentationError {
+    InvalidSetting { /* setting, accepted values, layer or path */ },
+    Composition(std::sync::Arc<ortho_config::OrthoError>),
+}
 impl PresentationConfig {
     pub fn load_layered<I, T, E>(
         arguments: I,               // program name and --config-path only
@@ -1267,14 +1316,19 @@ Discovery is OrthoConfig's existing first-match order, which is shared with
 In `weaver-cli`:
 
 ```rust
-// public, because main.rs is a separate crate
-pub struct HostFacts { /* Facts, opaque */ }
+// public, because main.rs is a separate crate; opaque, and each fact is added
+// by the milestone that reads it: output and size in EP-M4, NO_COLOR in EP-M5,
+// standard error in EP-M6, standard input, rows, and pager in EP-M7
+pub struct HostFacts { /* Facts */ }
+pub trait StreamProbe { /* is_terminal and size, per stream */ }
+pub struct ProcessStreams;
 impl HostFacts {
-    pub fn probe(environment: &impl mockable::Env) -> Self;
+    pub fn probe(environment: &impl mockable::Env, streams: &impl StreamProbe) -> Self;
     pub const fn non_interactive() -> Self;
 }
 // IoStreams::new(stdin, stdout, stderr, facts: HostFacts)
-// OutputContext, ResolvedOutputFormat, and render_human_output become pub(crate)
+// OutputContext, ResolvedOutputFormat, OutputFormat::resolve, and
+// render_human_output become pub(crate) together
 
 pub(crate) trait Pager {
     fn page(&mut self, text: &str) -> PagerOutcome;
@@ -1289,6 +1343,9 @@ pub(crate) trait ConfigLoader {
         &self, args: &[OsString], overrides: &PresentationOverrides,
     ) -> Result<PresentationConfig, AppError>;
 }
+// Built from PresentationConfig and PresentationOverrides. Colour is Forced only
+// when overrides.color == Some(ColorChoice::Always).
+pub(crate) struct RenderSettings { /* Settings */ }
 pub(crate) fn resolve(
     settings: &RenderSettings, facts: &HostFacts, format: ResolvedOutputFormat,
 ) -> Policy;
@@ -1338,3 +1395,7 @@ with a `SAFETY` comment.
   request to track locale selection and Fluent isolation as issues. Milestones
   were reordered into vertical slices, invariants restated, budgets corrected,
   and locale selection removed from scope. All implementation work remains.
+- 2026-11-24: four reviewers rechecked the revision. Corrected the pager's route
+  to delivery, socket timeouts, signal scope, response and file bounds,
+  `L-WINDOW`, `L-CONCAT`, `INV-CONTEXT`, two BDD scenarios, and the public
+  interface list.
