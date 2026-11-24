@@ -15,7 +15,8 @@ use std::{
 #[cfg(unix)]
 use dirs::runtime_dir;
 #[cfg(unix)]
-use libc::geteuid;
+use rustix::process::geteuid;
+#[cfg(unix)]
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -243,10 +244,7 @@ fn default_runtime_directory() -> PathBuf {
         }
         let mut dir = env::temp_dir();
         dir.push("weaver");
-        // SAFETY: `geteuid` has no preconditions and simply returns the
-        // caller's effective UID, which we use to namespace per-user temp
-        // directories.
-        dir.push(format!("uid-{}", unsafe { geteuid() }));
+        dir.push(format!("uid-{}", geteuid().as_raw()));
         dir
     }
 

@@ -5,7 +5,7 @@
 //! of the CLI logic can remain transport agnostic.
 
 #[cfg(unix)]
-use std::os::fd::{FromRawFd, IntoRawFd, OwnedFd};
+use std::os::fd::OwnedFd;
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
 use std::{
@@ -159,9 +159,8 @@ fn connect_unix(path: &str) -> io::Result<Connection> {
     let socket = Socket::new(Domain::UNIX, Type::STREAM, None)?;
     let address = SockAddr::unix(path)?;
     socket.connect_timeout(&address, CONNECTION_TIMEOUT)?;
-    let fd = socket.into_raw_fd();
-    // SAFETY: `from_raw_fd` takes ownership of the file descriptor produced by
-    // `into_raw_fd`, so the resulting `OwnedFd` is valid and uniquely owned.
-    let owned = unsafe { OwnedFd::from_raw_fd(fd) };
+    // socket2 owns the descriptor transfer, so no raw descriptor is handled
+    // here and the conversion needs no `unsafe` block of its own.
+    let owned = OwnedFd::from(socket);
     Ok(Connection::Unix(UnixStream::from(owned)))
 }

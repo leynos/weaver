@@ -26,7 +26,7 @@ url = { version = "2.5", features = ["serde"] }
 
 [target.'cfg(unix)'.dependencies]
 dirs.workspace = true
-libc = "0.2"
+rustix = { workspace = true }
 
 [dev-dependencies]
 googletest.workspace = true

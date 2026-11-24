@@ -32,8 +32,7 @@ fn signal_daemon_fails_for_nonexistent_pid() {
 #[test]
 fn signal_daemon_fails_for_init_process_permission_denied() {
     // Skip this test when running as root to avoid sending SIGTERM to PID 1.
-    // SAFETY: geteuid() is always safe to call.
-    if unsafe { libc::geteuid() } == 0 {
+    if rustix::process::geteuid().as_raw() == 0 {
         tracing::info!("skipping test: running as root");
         return;
     }
