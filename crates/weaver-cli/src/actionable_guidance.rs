@@ -200,6 +200,11 @@ fn launch_daemon_guidance(binary: &OsStr, runtime_dir: &Path) -> ActionableGuida
     ActionableGuidance::new(problem, alternatives, next_command)
 }
 
+/// Builds the shared structure for "the daemon did not become ready" guidance.
+///
+/// The three readiness failures differ only in their problem statement,
+/// explanation, and advice, so the template and the health-snapshot hint live
+/// here rather than being repeated in each builder.
 fn startup_readiness_guidance(
     problem: String,
     explanation: &str,
@@ -207,16 +212,17 @@ fn startup_readiness_guidance(
     health_path: &Path,
 ) -> ActionableGuidance {
     let alternatives = vec![
-        explanation.to_string(),
+        explanation.to_owned(),
         String::new(),
-        "Valid alternatives:".to_string(),
+        "Valid alternatives:".to_owned(),
         format!("  - {advice}"),
         startup_socket_hint(Some(health_path)),
-        startup_output_hint().to_string(),
+        startup_output_hint().to_owned(),
     ];
     ActionableGuidance::new(problem, alternatives, startup_retry_command())
 }
 
+/// Builds guidance for a daemon that exited before reporting readiness.
 fn startup_failed_guidance(exit_status: Option<i32>, health_path: &Path) -> ActionableGuidance {
     startup_readiness_guidance(
         format!("daemon exited before reporting ready (status: {exit_status:?})"),
@@ -226,18 +232,20 @@ fn startup_failed_guidance(exit_status: Option<i32>, health_path: &Path) -> Acti
     )
 }
 
+/// Builds guidance for a daemon that missed its readiness deadline.
 fn startup_timeout_guidance(health_path: &Path) -> ActionableGuidance {
     startup_readiness_guidance(
-        "timed out waiting for daemon to become ready".to_string(),
+        "timed out waiting for daemon to become ready".to_owned(),
         "The daemon did not report ready within the timeout period.",
         "Check if the daemon is stuck or slow to start",
         health_path,
     )
 }
 
+/// Builds guidance for a daemon that reported `stopping` before readiness.
 fn startup_aborted_guidance(path: &Path) -> ActionableGuidance {
     startup_readiness_guidance(
-        "daemon reported 'stopping' before reaching ready".to_string(),
+        "daemon reported 'stopping' before reaching ready".to_owned(),
         "The daemon started but shut down before becoming ready.",
         "Check the health snapshot for shutdown reason",
         path,

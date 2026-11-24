@@ -48,7 +48,8 @@ pub struct ProcessTestWorld {
     health_history: RefCell<Vec<String>>,
     /// A listener occupying the configured endpoint, held so a launch cannot
     /// bind it. Dropping the world releases the endpoint.
-    _occupied_endpoint: Option<SocketListener>,
+    /// Listener held so a bound endpoint stays occupied for the scenario.
+    occupied_endpoint: Option<SocketListener>,
 }
 
 impl ProcessTestWorld {
@@ -71,7 +72,7 @@ impl ProcessTestWorld {
             result: None,
             wait_error: None,
             health_history: RefCell::new(Vec::new()),
-            _occupied_endpoint: None,
+            occupied_endpoint: None,
         };
         test_support::clear_health_events(world.health_path().as_path()).ok();
         Ok(world)
@@ -144,7 +145,7 @@ impl ProcessTestWorld {
             .map_err(|error| format!("load test configuration: {error}"))?;
         let listener = SocketListener::bind(config.daemon_socket())
             .map_err(|error| format!("occupy test endpoint: {error}"))?;
-        self._occupied_endpoint = Some(listener);
+        self.occupied_endpoint = Some(listener);
         Ok(())
     }
 

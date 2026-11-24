@@ -85,6 +85,7 @@ pub(super) struct StructuredDispatchEvent {
     endpoint: String,
     /// Runtime directory whose health snapshot accompanies the event.
     runtime_dir: std::path::PathBuf,
+    /// Health snapshot path recorded alongside the runtime directory.
     health_path: std::path::PathBuf,
     /// Optional request metadata attached to the event.
     metadata: StructuredEventMetadata,

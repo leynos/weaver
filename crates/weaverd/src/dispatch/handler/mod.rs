@@ -57,6 +57,7 @@ pub struct DispatchConnectionHandler {
     backends: BackendManager,
     /// Endpoint label recorded in structured log events.
     endpoint: String,
+    /// Endpoint-scoped paths recorded in structured log events.
     runtime_paths: RuntimePaths,
 }
 

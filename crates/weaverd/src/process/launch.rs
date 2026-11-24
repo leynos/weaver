@@ -161,8 +161,11 @@ mod launch_tests;
 
 /// Runtime state that must exist before the endpoint is bound.
 struct PreparedRuntime {
+    /// Configuration the daemon was started with.
     config: Config,
+    /// Guard owning the runtime lock and the artefacts written so far.
     guard: ProcessGuard,
+    /// Working directory captured before daemonizing.
     workspace_root: PathBuf,
 }
 

@@ -222,12 +222,13 @@ fn capture_events_records_server_thread_events(
 }
 
 #[test]
-fn request_too_large_serialization_maps_to_request_too_large_event() -> Result<(), String> {
+fn request_too_large_serialization_maps_to_request_too_large_event() {
     let temp_dir = std::env::temp_dir();
     let endpoint_path = temp_dir.join("weaverd.sock");
     let runtime_paths = runtime_paths(SocketEndpoint::unix(
         endpoint_path.to_string_lossy().into_owned(),
-    ))?;
+    ))
+    .expect("runtime paths should derive");
     let endpoint = endpoint_path.to_string_lossy().into_owned();
     let event = read_error_event(
         &DispatchError::request_too_large(
@@ -251,7 +252,6 @@ fn request_too_large_serialization_maps_to_request_too_large_event() -> Result<(
         value.get("max_size"),
         Some(&serde_json::json!(JSONL_REQUEST_MAX_LINE_BYTES))
     );
-    Ok(())
 }
 
 #[test]

@@ -90,96 +90,95 @@ fn setup_guard_with_health(
 }
 
 #[test]
-fn missing_pid_file_refuses_reacquire() -> Result<(), String> {
-    let (_dir, paths) = build_paths()?;
-    let runtime_dir = open_runtime_dir(&paths)?;
-    let _first_guard = ProcessGuard::acquire(runtime_dir, paths.clone())
-        .map_err(|error| format!("initial lock should be acquired: {error}"))?;
-    let runtime_dir = open_runtime_dir(&paths)?;
-    match ProcessGuard::acquire(runtime_dir, paths.clone()) {
+fn missing_pid_file_refuses_reacquire() {
+    let (_dir, paths) = build_paths().expect("runtime paths should build");
+    let first_dir = open_runtime_dir(&paths).expect("runtime directory should open");
+    let _first_guard =
+        ProcessGuard::acquire(first_dir, paths.clone()).expect("initial lock should be acquired");
+    let second_dir = open_runtime_dir(&paths).expect("runtime directory should open");
+
+    match ProcessGuard::acquire(second_dir, paths.clone()) {
         Err(LaunchError::StartupInProgress { .. }) => {
             assert!(
-                runtime_file_exists(&paths, paths.lock_file_name())?,
+                runtime_file_exists(&paths, paths.lock_file_name())
+                    .expect("lock file should be inspectable"),
                 "lock should remain whilst startup is in progress",
             );
-            Ok(())
         }
-        other => Err(format!("expected startup-in-progress error, got {other:?}")),
+        other => panic!("expected startup-in-progress error, got {other:?}"),
     }
 }
 
 #[test]
 #[cfg(not(target_os = "solaris"))]
-fn new_lock_race_reports_startup_in_progress() -> Result<(), String> {
-    let (_dir, paths) = build_paths()?;
-    let runtime_dir = open_runtime_dir(&paths)?;
-    let filename = runtime_filename(paths.lock_path()).map_err(|error| error.to_string())?;
+fn new_lock_race_reports_startup_in_progress() {
+    let (_dir, paths) = build_paths().expect("runtime paths should build");
+    let runtime_dir = open_runtime_dir(&paths).expect("runtime directory should open");
+    let filename = runtime_filename(paths.lock_path()).expect("lock path should name a file");
     let mut create_new = OpenOptions::new();
     create_new.write(true).create_new(true);
     let first_file = runtime_dir
         .open_with(filename, &create_new)
-        .map_err(|error| format!("first launch should create the lock: {error}"))?;
+        .expect("first launch should create the lock");
 
     let mut open_existing = OpenOptions::new();
     open_existing.write(true);
     let second_file = runtime_dir
         .open_with(filename, &open_existing)
-        .map_err(|error| format!("second launch should open the lock: {error}"))?;
-    let second_process_lock = acquire_process_lock(&paths)
-        .map_err(|error| format!("second launch should reserve its process lock: {error}"))?;
+        .expect("second launch should open the lock");
+    let second_process_lock =
+        acquire_process_lock(&paths).expect("second launch should reserve its process lock");
     let _second_lock = lock_file(second_file, &paths, second_process_lock)
-        .map_err(|error| format!("second launch should acquire the new lock: {error}"))?;
+        .expect("second launch should acquire the new lock");
 
-    let first_process_lock = acquire_process_lock(&paths)
-        .map_err(|error| format!("first launch should reserve its process lock: {error}"))?;
+    let first_process_lock =
+        acquire_process_lock(&paths).expect("first launch should reserve its process lock");
     match lock_file(first_file, &paths, first_process_lock) {
         Err(LaunchError::StartupInProgress { lock, pid }) => {
             assert_eq!(lock, paths.lock_path());
             assert_eq!(pid, paths.pid_path());
-            Ok(())
         }
-        other => Err(format!("expected startup-in-progress error, got {other:?}")),
+        other => panic!("expected startup-in-progress error, got {other:?}"),
     }
 }
 
 #[test]
 #[cfg(target_os = "solaris")]
-fn same_process_startup_race_reports_startup_in_progress() -> Result<(), String> {
-    let (_dir, paths) = build_paths()?;
-    let first_runtime_dir = open_runtime_dir(&paths)?;
-    let _first_lock = ProcessGuard::acquire(first_runtime_dir, paths.clone())
-        .map_err(|error| format!("first launch should acquire its lock: {error}"))?;
-    _first_lock
+fn same_process_startup_race_reports_startup_in_progress() {
+    let (_dir, paths) = build_paths().expect("runtime paths should build");
+    let first_runtime_dir = open_runtime_dir(&paths).expect("runtime directory should open");
+    let first_lock = ProcessGuard::acquire(first_runtime_dir, paths.clone())
+        .expect("first launch should acquire its lock");
+    first_lock
         .after_daemonize()
-        .map_err(|error| format!("daemon child should own the lock: {error}"))?;
+        .expect("daemon child should own the lock");
 
-    let second_runtime_dir = open_runtime_dir(&paths)?;
+    let second_runtime_dir = open_runtime_dir(&paths).expect("runtime directory should open");
     match ProcessGuard::acquire(second_runtime_dir, paths.clone()) {
-        Err(LaunchError::StartupInProgress { .. }) => Ok(()),
-        other => Err(format!("expected startup-in-progress error, got {other:?}")),
+        Err(LaunchError::StartupInProgress { .. }) => {}
+        other => panic!("expected startup-in-progress error, got {other:?}"),
     }
 }
 
 #[test]
-fn terminated_launch_before_pid_write_reclaims_lock() -> Result<(), String> {
-    let (_dir, paths) = build_paths()?;
-    let runtime_dir = open_runtime_dir(&paths)?;
-    let guard = ProcessGuard::acquire(runtime_dir, paths.clone())
-        .map_err(|error| format!("initial lock should be acquired: {error}"))?;
-    guard.terminate_before_pid_write();
+fn terminated_launch_before_pid_write_reclaims_lock() {
+    let (_dir, paths) = build_paths().expect("runtime paths should build");
+    let first_dir = open_runtime_dir(&paths).expect("runtime directory should open");
+    let abandoned =
+        ProcessGuard::acquire(first_dir, paths.clone()).expect("initial lock should be acquired");
+    abandoned.terminate_before_pid_write();
     assert!(
-        runtime_file_exists(&paths, paths.lock_file_name())?,
+        runtime_file_exists(&paths, paths.lock_file_name())
+            .expect("lock file should be inspectable"),
         "terminated launch should retain the persistent lock path",
     );
 
-    let runtime_dir = open_runtime_dir(&paths)?;
-    let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
-        .map_err(|error| format!("abandoned lock should be reclaimed: {error}"))?;
-    guard
+    let second_dir = open_runtime_dir(&paths).expect("runtime directory should open");
+    let mut recovered = ProcessGuard::acquire(second_dir, paths.clone())
+        .expect("abandoned lock should be reclaimed");
+    recovered
         .write_pid(42)
-        .map_err(|error| format!("pid write should succeed after recovery: {error}"))?;
-
-    Ok(())
+        .expect("pid write should succeed after recovery");
 }
 
 #[rstest]
@@ -189,59 +188,58 @@ fn stale_pid_is_reclaimed_only_after_binding(
     #[case] pid: &str,
     #[case] write_health: bool,
     #[with(pid)] seeded_runtime_paths: Result<(TempDir, RuntimePaths), String>,
-) -> Result<(), String> {
-    let (_dir, paths) = seeded_runtime_paths?;
-    let seeded_pid = read_runtime_file(&paths, paths.pid_file_name())?;
-    if seeded_pid != pid {
-        return Err(format!(
-            "unexpected seeded pid content: expected {:?}, got {:?}",
-            pid, seeded_pid
-        ));
-    }
+) {
+    let (_dir, paths) = seeded_runtime_paths.expect("seeded runtime paths should build");
+    let seeded_pid =
+        read_runtime_file(&paths, paths.pid_file_name()).expect("seeded pid should be readable");
+    assert_eq!(
+        seeded_pid, pid,
+        "unexpected seeded pid content should match the case",
+    );
     if write_health {
-        write_runtime_file(&paths, paths.health_file_name(), b"stale")?;
+        write_runtime_file(&paths, paths.health_file_name(), b"stale")
+            .expect("stale health file should be written");
     }
 
-    let runtime_dir = open_runtime_dir(&paths)?;
+    let runtime_dir = open_runtime_dir(&paths).expect("runtime directory should open");
     let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
-        .map_err(|error| format!("stale runtime should be reclaimed: {error}"))?;
+        .expect("stale runtime should be reclaimed");
     assert!(
-        runtime_file_exists(&paths, paths.pid_file_name())?,
+        runtime_file_exists(&paths, paths.pid_file_name()).expect("pid file should be inspectable"),
         "acquiring the lock must not remove artefacts a serving daemon may still own",
     );
 
     guard
         .reclaim_stale_artefacts()
-        .map_err(|error| format!("stale artefacts should be reclaimed after binding: {error}"))?;
+        .expect("stale artefacts should be reclaimed after binding");
     assert!(
-        !runtime_file_exists(&paths, paths.pid_file_name())?,
+        !runtime_file_exists(&paths, paths.pid_file_name())
+            .expect("pid file should be inspectable"),
         "stale pid file should be removed once the endpoint has bound",
     );
     if write_health {
         assert!(
-            !runtime_file_exists(&paths, paths.health_file_name())?,
+            !runtime_file_exists(&paths, paths.health_file_name())
+                .expect("health file should be inspectable"),
             "stale health file should be removed once the endpoint has bound",
         );
     }
-    guard
-        .write_pid(42)
-        .map_err(|error| format!("pid write should succeed: {error}"))?;
-    Ok(())
+    guard.write_pid(42).expect("pid write should succeed");
 }
 
 #[test]
-fn held_lock_with_live_pid_rejects_launch() -> Result<(), String> {
-    let (_dir, paths) = build_paths()?;
-    let runtime_dir = open_runtime_dir(&paths)?;
-    let mut first_guard = ProcessGuard::acquire(runtime_dir, paths.clone())
-        .map_err(|error| format!("initial lock should be acquired: {error}"))?;
+fn held_lock_with_live_pid_rejects_launch() {
+    let (_dir, paths) = build_paths().expect("runtime paths should build");
+    let first_dir = open_runtime_dir(&paths).expect("runtime directory should open");
+    let mut first_guard =
+        ProcessGuard::acquire(first_dir, paths.clone()).expect("initial lock should be acquired");
     let pid = std::process::id();
     first_guard
         .write_pid(pid)
-        .map_err(|error| format!("pid write should succeed: {error}"))?;
+        .expect("pid write should succeed");
 
-    let runtime_dir = open_runtime_dir(&paths)?;
-    assert_launch_rejected(ProcessGuard::acquire(runtime_dir, paths), pid)
+    let second_dir = open_runtime_dir(&paths).expect("runtime directory should open");
+    assert_launch_rejected(ProcessGuard::acquire(second_dir, paths), pid);
 }
 
 /// Asserts the platform's expected refusal for a duplicate launch.
@@ -250,105 +248,100 @@ fn held_lock_with_live_pid_rejects_launch() -> Result<(), String> {
 /// launch is refused by the process-local reservation before the OS lock is
 /// examined; elsewhere the held OS lock itself carries the refusal.
 #[cfg(target_os = "solaris")]
-fn assert_launch_rejected(
-    outcome: Result<ProcessGuard, LaunchError>,
-    _pid: u32,
-) -> Result<(), String> {
+fn assert_launch_rejected(outcome: Result<ProcessGuard, LaunchError>, _pid: u32) {
     match outcome {
-        Err(LaunchError::StartupInProgress { .. }) => Ok(()),
-        other => Err(format!("expected startup-in-progress error, got {other:?}")),
+        Err(LaunchError::StartupInProgress { .. }) => {}
+        other => panic!("expected startup-in-progress error, got {other:?}"),
     }
 }
 
 /// Asserts the platform's expected refusal for a duplicate launch.
 #[cfg(not(target_os = "solaris"))]
-fn assert_launch_rejected(
-    outcome: Result<ProcessGuard, LaunchError>,
-    pid: u32,
-) -> Result<(), String> {
+fn assert_launch_rejected(outcome: Result<ProcessGuard, LaunchError>, pid: u32) {
     match outcome {
         Err(LaunchError::AlreadyRunning { pid: recorded }) => {
             assert_eq!(recorded, pid, "pid should match recorded process");
-            Ok(())
         }
-        other => Err(format!("expected already-running error, got {other:?}")),
+        other => panic!("expected already-running error, got {other:?}"),
     }
 }
 
 #[test]
-fn unlocked_lock_with_live_pid_is_reclaimed() -> Result<(), String> {
-    let (_dir, paths) = build_paths()?;
-    write_runtime_file(&paths, paths.lock_file_name(), b"")?;
+fn unlocked_lock_with_live_pid_is_reclaimed() {
+    let (_dir, paths) = build_paths().expect("runtime paths should build");
+    write_runtime_file(&paths, paths.lock_file_name(), b"").expect("lock file should be written");
     let pid = std::process::id();
-    write_runtime_file(&paths, paths.pid_file_name(), format!("{pid}\n"))?;
+    write_runtime_file(&paths, paths.pid_file_name(), format!("{pid}\n"))
+        .expect("pid file should be written");
 
-    let runtime_dir = open_runtime_dir(&paths)?;
+    let runtime_dir = open_runtime_dir(&paths).expect("runtime directory should open");
     let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
-        .map_err(|error| format!("unlocked lock should be reclaimed: {error}"))?;
+        .expect("unlocked lock should be reclaimed");
     assert!(
-        runtime_file_exists(&paths, paths.pid_file_name())?,
+        runtime_file_exists(&paths, paths.pid_file_name()).expect("pid file should be inspectable"),
         "the recorded pid must survive until the endpoint is bound",
     );
     guard
         .reclaim_stale_artefacts()
-        .map_err(|error| format!("stale artefacts should be reclaimed: {error}"))?;
+        .expect("stale artefacts should be reclaimed");
     assert!(
-        !runtime_file_exists(&paths, paths.pid_file_name())?,
+        !runtime_file_exists(&paths, paths.pid_file_name())
+            .expect("pid file should be inspectable"),
         "stale pid file should be removed after the endpoint is bound",
     );
-    guard
-        .write_pid(pid)
-        .map_err(|error| format!("pid write should succeed: {error}"))?;
-    Ok(())
+    guard.write_pid(pid).expect("pid write should succeed");
 }
 
 #[test]
-fn failed_launch_preserves_previous_runtime_artefacts() -> Result<(), String> {
-    let (_dir, paths) = seeded_runtime_paths("4242\n")?;
-    write_runtime_file(&paths, paths.health_file_name(), b"{\"status\":\"ready\"}")?;
+fn failed_launch_preserves_previous_runtime_artefacts() {
+    let (_dir, paths) = seeded_runtime_paths("4242\n").expect("seeded runtime paths should build");
+    write_runtime_file(&paths, paths.health_file_name(), b"{\"status\":\"ready\"}")
+        .expect("health file should be written");
 
-    let runtime_dir = open_runtime_dir(&paths)?;
-    let guard = ProcessGuard::acquire(runtime_dir, paths.clone())
-        .map_err(|error| format!("stale lock should be reclaimed: {error}"))?;
+    let runtime_dir = open_runtime_dir(&paths).expect("runtime directory should open");
+    let guard =
+        ProcessGuard::acquire(runtime_dir, paths.clone()).expect("stale lock should be reclaimed");
     guard.terminate_before_pid_write();
 
     assert!(
-        runtime_file_exists(&paths, paths.pid_file_name())?,
+        runtime_file_exists(&paths, paths.pid_file_name()).expect("pid file should be inspectable"),
         "a launch that never bound the endpoint must keep the previous pid file",
     );
     assert!(
-        runtime_file_exists(&paths, paths.health_file_name())?,
+        runtime_file_exists(&paths, paths.health_file_name())
+            .expect("health file should be inspectable"),
         "a launch that never bound the endpoint must keep the previous health file",
     );
     assert!(
-        runtime_file_exists(&paths, paths.lock_file_name())?,
+        runtime_file_exists(&paths, paths.lock_file_name())
+            .expect("lock file should be inspectable"),
         "the persistent lock path should remain for the next launch",
     );
-    Ok(())
 }
 
 #[test]
-fn health_snapshot_is_written_with_newline() -> Result<(), String> {
-    let (_dir, paths) = build_paths()?;
-    let _guard = setup_guard_with_health(&paths, HealthState::Ready)?;
-    let content = read_runtime_file(&paths, paths.health_file_name())?;
-    if !content.ends_with('\n') {
-        return Err(String::from("health snapshot should end with newline"));
-    }
-    Ok(())
+fn health_snapshot_is_written_with_newline() {
+    let (_dir, paths) = build_paths().expect("runtime paths should build");
+    let _guard = setup_guard_with_health(&paths, HealthState::Ready)
+        .expect("guard with health should be set up");
+    let content = read_runtime_file(&paths, paths.health_file_name())
+        .expect("health snapshot should be readable");
+    assert!(
+        content.ends_with('\n'),
+        "health snapshot should end with newline"
+    );
 }
 
 #[test]
-fn health_snapshot_records_event() -> Result<(), String> {
-    let (_dir, paths) = build_paths()?;
-    let _guard = setup_guard_with_health(&paths, HealthState::Starting)?;
-    let events = test_support::health_events(paths.health_path());
-    if events != vec!["starting"] {
-        return Err(format!(
-            "health events should capture written statuses, got {events:?}"
-        ));
-    }
-    Ok(())
+fn health_snapshot_records_event() {
+    let (_dir, paths) = build_paths().expect("runtime paths should build");
+    let _guard = setup_guard_with_health(&paths, HealthState::Starting)
+        .expect("guard with health should be set up");
+    assert_eq!(
+        test_support::health_events(paths.health_path()),
+        vec!["starting"],
+        "health events should capture written statuses",
+    );
 }
 
 #[path = "pid_tests.rs"]

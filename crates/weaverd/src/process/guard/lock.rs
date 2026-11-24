@@ -24,20 +24,27 @@ use super::{LaunchError, PROCESS_TARGET};
 #[cfg(target_os = "solaris")]
 static PROCESS_LOCKS: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
 
+/// Open lock file plus the reservation that keeps this process's claim unique.
 #[derive(Debug)]
 pub(super) struct LockFile {
+    /// Handle kept open for the guard's lifetime; the OS lock lives on it.
     _file: File,
+    /// Process-local reservation, released when the guard is dropped.
     _process_lock: ProcessLock,
+    /// Path recorded for the Windows unlock on drop.
     #[cfg(windows)]
     path: PathBuf,
 }
 
+/// Process-local reservation for platforms whose locks are process-associated.
 #[cfg(target_os = "solaris")]
 #[derive(Debug)]
 pub(super) struct ProcessLock {
+    /// Lock path held in the process-wide set until this value is dropped.
     path: PathBuf,
 }
 
+/// Placeholder reservation where the OS lock alone provides exclusivity.
 #[cfg(not(target_os = "solaris"))]
 #[derive(Debug)]
 pub(super) struct ProcessLock;
@@ -82,6 +89,12 @@ impl Drop for LockFile {
     }
 }
 
+/// Acquires the daemon lock, creating the file or reclaiming an existing one.
+///
+/// # Errors
+///
+/// Returns [`LaunchError`] when the lock file cannot be created, an existing
+/// lock cannot be opened, or another launch already holds it.
 pub(super) fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<LockFile, LaunchError> {
     let process_lock = acquire_process_lock(paths)?;
     let mut options = OpenOptions::new();
@@ -127,17 +140,17 @@ fn handle_existing_lock(
     let lock = match lock_existing_file(dir, paths, process_lock) {
         Ok(lock) => lock,
         Err(error @ LaunchError::StartupInProgress { .. }) => {
-            return match live_recorded_pid(dir, paths)? {
-                Some(pid) => {
+            return live_recorded_pid(dir, paths)?.map_or_else(
+                || Err(error),
+                |pid| {
                     info!(
                         target: PROCESS_TARGET,
                         pid,
                         "refusing to start: existing daemon alive",
                     );
                     Err(LaunchError::AlreadyRunning { pid })
-                }
-                None => Err(error),
-            };
+                },
+            );
         }
         Err(other) => return Err(other),
     };
@@ -166,6 +179,12 @@ fn live_recorded_pid(dir: &Dir, paths: &RuntimePaths) -> Result<Option<u32>, Lau
     }
 }
 
+/// Opens an existing lock file and takes the OS lock on it.
+///
+/// # Errors
+///
+/// Returns [`LaunchError::LockCreate`] when the file cannot be opened, or a
+/// [`LaunchError`] from `lock_file` when the lock cannot be taken.
 fn lock_existing_file(
     dir: &Dir,
     paths: &RuntimePaths,
@@ -189,6 +208,12 @@ fn lock_existing_file(
     Ok(lock)
 }
 
+/// Takes the OS lock on `file` and pairs it with the process reservation.
+///
+/// # Errors
+///
+/// Returns [`LaunchError::StartupInProgress`] when another launch holds the
+/// lock, and [`LaunchError::LockCreate`] for any other locking failure.
 pub(super) fn lock_file(
     file: File,
     paths: &RuntimePaths,
@@ -209,6 +234,12 @@ pub(super) fn lock_file(
     }
 }
 
+/// Applies the platform's non-blocking exclusive lock to `file`.
+///
+/// # Errors
+///
+/// Returns the platform's locking error, or [`io::ErrorKind::Unsupported`] on
+/// targets with no exclusive file locking.
 fn lock_file_handle(file: &File) -> io::Result<()> {
     #[cfg(all(
         unix,
@@ -299,6 +330,7 @@ fn unlock_windows_file(file: &File) -> io::Result<()> {
     }
 }
 
+/// Reports whether `error` means the lock is held by another owner.
 fn is_lock_unavailable(error: &io::Error) -> bool {
     let is_would_block = error.kind() == io::ErrorKind::WouldBlock;
     #[cfg(target_os = "solaris")]
@@ -313,6 +345,25 @@ fn is_lock_unavailable(error: &io::Error) -> bool {
     }
 }
 
+/// Reserves this process's claim on the lock path.
+///
+/// Platforms whose locks are process-associated need a local reservation so a
+/// second launch in the same process is refused rather than silently sharing
+/// the lock. Elsewhere the OS lock is sufficient and the reservation is inert.
+///
+/// # Errors
+///
+/// On those platforms, returns [`LaunchError::StartupInProgress`] when this
+/// process already holds the lock path.
+#[cfg_attr(
+    not(target_os = "solaris"),
+    expect(
+        clippy::unnecessary_wraps,
+        clippy::missing_const_for_fn,
+        reason = "the signature is shared with Solaris, where the reservation can be refused; a \
+                  caller must not have to know which platform it is on"
+    )
+)]
 pub(super) fn acquire_process_lock(paths: &RuntimePaths) -> Result<ProcessLock, LaunchError> {
     #[cfg(target_os = "solaris")]
     {
@@ -334,6 +385,7 @@ pub(super) fn acquire_process_lock(paths: &RuntimePaths) -> Result<ProcessLock, 
     }
 }
 
+/// Builds the refusal reported when another launch holds the lock.
 fn startup_in_progress(paths: &RuntimePaths) -> LaunchError {
     info!(
         target: PROCESS_TARGET,

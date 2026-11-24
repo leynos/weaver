@@ -250,7 +250,7 @@ pub(crate) fn ensure(condition: bool, message: impl Into<String>) -> Result<(), 
 pub(crate) fn harness(
     backend_manager: Result<BackendManagerFixture, String>,
 ) -> Result<HandlerTestHarness, String> {
-    let backend_manager = backend_manager?.manager();
+    let manager = backend_manager?.manager();
     let temp_dir = TempDir::new().map_err(|error| format!("temporary directory: {error}"))?;
     let (listener, addr) = create_listener()?;
     let workspace_root = temp_dir.path().join("weaverd-test-workspace");
@@ -269,7 +269,7 @@ pub(crate) fn harness(
             .accept()
             .map_err(|error| format!("accept: {error}"))?;
         DispatchConnectionHandler::new(
-            backend_manager,
+            manager,
             workspace_root,
             endpoint.to_string_lossy().into_owned(),
             runtime_paths,

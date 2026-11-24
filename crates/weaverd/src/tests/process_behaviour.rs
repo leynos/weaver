@@ -89,8 +89,8 @@ fn given_endpoint_bound(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the daemon run fails because the endpoint is in use")]
 fn then_daemon_fails_endpoint_in_use(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    let binding = world.borrow();
+    let scenario = process_world(world)?;
+    let binding = scenario.borrow();
     match binding.last_error() {
         Some(LaunchError::Listener {
             source: ListenerError::UnixInUse { .. },
@@ -103,20 +103,20 @@ fn then_daemon_fails_endpoint_in_use(world: &ProcessWorld) -> Result<(), String>
 
 #[then("the previous runtime artefacts are preserved")]
 fn then_previous_artefacts_preserved(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    let world = world.borrow();
+    let binding = process_world(world)?;
+    let scenario = binding.borrow();
     assert_eq!(
-        world.read_pid()?,
+        scenario.read_pid()?,
         Some(0),
         "the previous daemon's pid file should survive a failed launch",
     );
     assert!(
-        test_fs::exists(world.health_path())
+        test_fs::exists(scenario.health_path())
             .map_err(|error| format!("check health file: {error}"))?,
         "the previous daemon's health file should survive a failed launch",
     );
     assert!(
-        world.lock_exists()?,
+        scenario.lock_exists()?,
         "the persistent lock path should remain available",
     );
     Ok(())
@@ -133,8 +133,8 @@ fn given_stale_runtime_invalid(world: &ProcessWorld) -> Result<(), String> {
 
 #[given("a prior launch terminated after acquiring the lock")]
 fn given_terminated_launch_before_pid_write(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    world.borrow().terminate_before_pid_write()?;
+    let scenario = process_world(world)?;
+    scenario.borrow().terminate_before_pid_write()?;
     Ok(())
 }
 
@@ -239,18 +239,19 @@ fn then_health_stopping(world: &ProcessWorld) -> Result<(), String> {
 
 #[then("the runtime state is cleaned up")]
 fn then_runtime_state_cleaned_up(world: &ProcessWorld) -> Result<(), String> {
-    let world = process_world(world)?;
-    let world = world.borrow();
+    let binding = process_world(world)?;
+    let scenario = binding.borrow();
     assert!(
-        world.lock_exists()?,
+        scenario.lock_exists()?,
         "lock file should remain available for the next launch",
     );
     assert!(
-        !test_fs::exists(world.pid_path()).map_err(|error| format!("check pid file: {error}"))?,
+        !test_fs::exists(scenario.pid_path())
+            .map_err(|error| format!("check pid file: {error}"))?,
         "pid file should be removed after shutdown",
     );
     assert!(
-        !test_fs::exists(world.health_path())
+        !test_fs::exists(scenario.health_path())
             .map_err(|error| format!("check health file: {error}"))?,
         "health file should be removed after shutdown",
     );

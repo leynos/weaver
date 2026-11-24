@@ -78,6 +78,7 @@ pub enum LifecycleError {
         exit_status: Option<i32>,
         /// The runtime directory the daemon was given.
         runtime_dir: PathBuf,
+        /// Endpoint-scoped health snapshot the daemon should have written.
         health_path: PathBuf,
     },
     /// The daemon reported `stopping` before it ever became ready.
