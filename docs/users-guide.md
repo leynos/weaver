@@ -1025,6 +1025,19 @@ The stable edge schema is already locked even though runtime edges are deferred
 to later milestones. When present, every edge will carry a `resolution_scope` of
 `full_symbol_table`, `partial_symbol_table`, or `lsp`.
 
+Diagnosing a slice that returned fewer cards than expected:
+
+Run the daemon with `--log-filter 'info,weaverd::dispatch=debug'` to keep the
+usual lifecycle logs and add the handler's decision boundaries. The `weaverd`
+target then logs the requested URI, position, detail levels, and `max_cards`
+budget when a slice starts; a budget-truncation event with `included_cards` and
+`frontier_candidates` when the budget excluded cards; a discovery-cap event
+with the file path, non-blank line count, and cap when discovery truncated the
+candidate list; and one enrichment event per card, naming its `symbol_id` and
+whether enrichment was `skipped`, `Enriched`, or `Degraded`. The discovery-cap
+and budget-truncation events are emitted only when they apply, so a quiet log
+means the slice was complete.
+
 #### observe grep
 
 Syntax:

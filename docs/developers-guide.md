@@ -1727,6 +1727,34 @@ for supplying a valid URI pointing to a readable file.
 `stable_card_order` imposes a deterministic total order over `SymbolCard`
 values so that slice responses are reproducible regardless of extraction order.
 
+### 18.7 Decision-boundary logging
+
+`graph_slice/trace.rs` owns the handler's `tracing::debug` events. It is a
+private helper module for `graph_slice` only; sibling handlers keep emitting
+their own events inline. Each event targets `DISPATCH_TARGET` and is emitted at
+exactly one decision boundary:
+
+- `handling graph-slice request` records the URI, line, column, entry and node
+  detail levels, and the `max_cards` budget on entry to `build_response`.
+  Detail levels are formatted with `Debug`, so their variant names appear in
+  the field.
+- `same-file discovery capped at maximum positions` fires only when
+  `candidate_positions` truncates, and records the file path, the
+  pre-truncation non-blank line count, and the cap.
+- `budget truncation produced spillover frontier` fires only when
+  `apply_card_budget` leaves a non-empty frontier, and records how many cards
+  were included alongside how many candidates were left out.
+- `enrichment skipped due to detail level` and `card enrichment completed`
+  record the symbol ID and outcome for every card considered by
+  `enrich_card_if_requested`. The skip event writes the literal `"skipped"`
+  outcome; the completion event writes the `EnrichmentOutcome` variant
+  (`Enriched` or `Degraded`).
+
+Keeping the events in one module pins field names and message text in a single
+place, so a log filter or dashboard change has one edit site. The unit tests in
+`graph_slice_tracing_tests.rs` assert on captured events through the shared
+`dispatch::trace_capture` harness rather than a bespoke subscriber.
+
 ## 19 E2E test support for graph-slice
 
 The end-to-end graph-slice test harness lives in

@@ -8,6 +8,8 @@ use std::{collections::BTreeMap, io::Write, path::Path};
 mod source;
 #[path = "graph_slice/status.rs"]
 mod status;
+#[path = "graph_slice/trace.rs"]
+mod trace;
 
 use url::Url;
 use weaver_cards::{
@@ -25,6 +27,13 @@ use weaver_cards::{
 use self::{
     source::{read_slice_source, resolve_file_path},
     status::{GRAPH_SLICE_SCHEMA_VERSION, exit_status, refusal},
+    trace::{
+        log_budget_spillover,
+        log_discovery_capped,
+        log_enrichment_completed,
+        log_enrichment_skipped,
+        log_request_received,
+    },
 };
 use super::enrich::{self, EnrichmentOutcome};
 use crate::{
@@ -87,6 +96,7 @@ fn build_response(
     source: &str,
     backends: &mut FusionBackends<SemanticBackendProvider>,
 ) -> Result<GraphSliceResponse, DispatchError> {
+    log_request_received(request);
     let extractor = backends.provider().card_extractor().clone();
     let mut entry_card = match extractor.extract(CardExtractionInput {
         path,
@@ -155,6 +165,9 @@ fn discover_same_file_cards(
     let extractor = backends.provider().card_extractor().clone();
     let mut cards = BTreeMap::new();
     let (candidate_positions, discovery_capped) = candidate_positions(document.source);
+    if discovery_capped {
+        log_discovery_capped(document.path, document.source);
+    }
     for (line, column) in candidate_positions {
         if (line, column) == (request.line(), request.column()) {
             continue;
@@ -273,13 +286,12 @@ fn apply_card_budget(
             depth: 1,
         }))
         .collect();
-        return (
-            Vec::new(),
-            SliceSpillover {
-                truncated: true,
-                frontier,
-            },
-        );
+        let spillover = SliceSpillover {
+            truncated: true,
+            frontier,
+        };
+        log_budget_spillover(0, spillover.frontier.len());
+        return (Vec::new(), spillover);
     }
     let remaining_capacity = max_cards.saturating_sub(1) as usize;
     let included_siblings = sibling_cards
@@ -310,6 +322,7 @@ fn apply_card_budget(
             frontier,
         }
     };
+    log_budget_spillover(cards.len(), spillover.frontier.len());
     (cards, spillover)
 }
 /// Applies LSP semantic enrichment to `card` when `detail` is at least `Semantic`.
@@ -328,11 +341,14 @@ fn enrich_card_if_requested(
     backends: &mut FusionBackends<SemanticBackendProvider>,
 ) {
     if detail < DetailLevel::Semantic {
+        log_enrichment_skipped(&card.symbol.symbol_id);
         return;
     }
-    if enrich::try_lsp_enrichment(card, source, backends) == EnrichmentOutcome::Enriched {
+    let outcome = enrich::try_lsp_enrichment(card, source, backends);
+    if outcome == EnrichmentOutcome::Enriched {
         normalize_lsp_provenance(card);
     }
+    log_enrichment_completed(&card.symbol.symbol_id, outcome);
 }
 /// Replaces degraded Tree-sitter provenance entries with `lsp_hover` after successful enrichment.
 fn normalize_lsp_provenance(card: &mut SymbolCard) {

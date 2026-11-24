@@ -319,6 +319,8 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
 mod argument_tests;
 #[path = "coverage_tests.rs"]
 mod coverage_tests;
+#[path = "graph_slice_tracing_tests.rs"]
+mod tracing_tests;
 
 #[rstest]
 #[case(("notes.txt", "plain text\n", "1:1", "unsupported_language", None))]
