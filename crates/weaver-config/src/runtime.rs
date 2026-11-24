@@ -26,8 +26,11 @@ use crate::{Config, SocketEndpoint};
 pub struct RuntimePaths {
     /// Directory holding the daemon lock, PID, and health snapshot.
     runtime_dir: PathBuf,
+    /// Filename of the lock file within the runtime directory.
     lock_file_name: PathBuf,
+    /// Filename of the PID file within the runtime directory.
     pid_file_name: PathBuf,
+    /// Filename of the health snapshot within the runtime directory.
     health_file_name: PathBuf,
     /// Path to the lock file guarding singleton startup.
     lock_path: PathBuf,
@@ -86,6 +89,7 @@ impl RuntimePaths {
     /// assert_eq!(paths.lock_file_name(), Path::new("weaverd.lock"));
     /// # Ok::<(), weaver_config::RuntimePathsError>(())
     /// ```
+    #[must_use]
     pub fn lock_file_name(&self) -> &Path { self.lock_file_name.as_path() }
 
     /// Path to the PID file.
@@ -105,6 +109,7 @@ impl RuntimePaths {
     /// assert_eq!(paths.pid_file_name(), Path::new("weaverd.pid"));
     /// # Ok::<(), weaver_config::RuntimePathsError>(())
     /// ```
+    #[must_use]
     pub fn pid_file_name(&self) -> &Path { self.pid_file_name.as_path() }
 
     /// Path to the health snapshot.
@@ -124,6 +129,7 @@ impl RuntimePaths {
     /// assert_eq!(paths.health_file_name(), Path::new("weaverd.health"));
     /// # Ok::<(), weaver_config::RuntimePathsError>(())
     /// ```
+    #[must_use]
     pub fn health_file_name(&self) -> &Path { self.health_file_name.as_path() }
 }
 
@@ -145,6 +151,10 @@ impl RuntimePaths {
     }
 }
 
+/// Chooses the lock, PID, and health filenames for `endpoint`.
+///
+/// The default endpoint keeps the legacy shared names so existing installations
+/// keep working; every other endpoint is distinguished by its identifier.
 fn runtime_file_names(endpoint: &SocketEndpoint) -> (PathBuf, PathBuf, PathBuf) {
     if endpoint == &crate::default_socket_endpoint() {
         return (
@@ -162,6 +172,17 @@ fn runtime_file_names(endpoint: &SocketEndpoint) -> (PathBuf, PathBuf, PathBuf) 
     )
 }
 
+/// Derives the stable hexadecimal identifier for `endpoint`.
+///
+/// The endpoint kind is written first, followed by the address, so a Unix path
+/// and a TCP host of the same text cannot collide. The port uses a fixed byte
+/// order because the identifier names a file on disk: native byte order would
+/// give one endpoint different filenames on little- and big-endian hosts.
+#[expect(
+    clippy::big_endian_bytes,
+    reason = "the hash must be identical on every host architecture, so the port is framed in a \
+              fixed order rather than native order"
+)]
 fn endpoint_identifier(endpoint: &SocketEndpoint) -> String {
     let mut hasher = Sha256::new();
     match endpoint {
@@ -185,6 +206,7 @@ fn endpoint_identifier(endpoint: &SocketEndpoint) -> String {
     identifier
 }
 
+/// Renders one hexadecimal digit, in lowercase, for a nibble of a digest byte.
 fn hexadecimal_digit(value: u8) -> char {
     match value {
         0..=9 => char::from(b'0' + value),

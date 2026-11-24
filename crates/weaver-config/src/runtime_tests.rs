@@ -9,57 +9,55 @@ use proptest::prelude::*;
 use super::*;
 
 #[test]
-fn default_endpoint_preserves_legacy_runtime_file_names() -> Result<(), RuntimePathsError> {
-    let paths = RuntimePaths::from_config_readonly(&Config::default())?;
+fn default_endpoint_preserves_legacy_runtime_file_names() {
+    let paths = RuntimePaths::from_config_readonly(&Config::default())
+        .expect("default runtime paths should derive");
 
     assert_eq!(paths.lock_file_name(), Path::new("weaverd.lock"));
     assert_eq!(paths.pid_file_name(), Path::new("weaverd.pid"));
     assert_eq!(paths.health_file_name(), Path::new("weaverd.health"));
-    Ok(())
 }
 
 #[test]
-fn unix_socket_paths_with_one_parent_have_distinct_runtime_files() -> Result<(), RuntimePathsError>
-{
-    let first = runtime_paths(SocketEndpoint::unix("/tmp/weaver/first.sock"))?;
-    let second = runtime_paths(SocketEndpoint::unix("/tmp/weaver/second.sock"))?;
+fn unix_socket_paths_with_one_parent_have_distinct_runtime_files() {
+    let first =
+        runtime_paths(SocketEndpoint::unix("/tmp/weaver/first.sock")).expect("first paths derive");
+    let second = runtime_paths(SocketEndpoint::unix("/tmp/weaver/second.sock"))
+        .expect("second paths derive");
 
     assert_eq!(first.runtime_dir(), second.runtime_dir());
     assert_distinct_runtime_files(&first, &second);
-    Ok(())
 }
 
 #[test]
-fn tcp_endpoints_with_different_hosts_have_distinct_runtime_files() -> Result<(), RuntimePathsError>
-{
-    let first = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000))?;
-    let second = runtime_paths(SocketEndpoint::tcp("127.0.0.2", 9000))?;
+fn tcp_endpoints_with_different_hosts_have_distinct_runtime_files() {
+    let first = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000)).expect("first paths derive");
+    let second =
+        runtime_paths(SocketEndpoint::tcp("127.0.0.2", 9000)).expect("second paths derive");
 
     assert_eq!(first.runtime_dir(), second.runtime_dir());
     assert_distinct_runtime_files(&first, &second);
-    Ok(())
 }
 
 #[test]
-fn tcp_endpoints_with_different_ports_have_distinct_runtime_files() -> Result<(), RuntimePathsError>
-{
-    let first = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000))?;
-    let second = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9001))?;
+fn tcp_endpoints_with_different_ports_have_distinct_runtime_files() {
+    let first = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000)).expect("first paths derive");
+    let second =
+        runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9001)).expect("second paths derive");
 
     assert_eq!(first.runtime_dir(), second.runtime_dir());
     assert_distinct_runtime_files(&first, &second);
-    Ok(())
 }
 
 #[test]
-fn identical_endpoints_have_identical_runtime_files() -> Result<(), RuntimePathsError> {
-    let first = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000))?;
-    let second = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000))?;
+fn identical_endpoints_have_identical_runtime_files() {
+    let first = runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000)).expect("first paths derive");
+    let second =
+        runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9000)).expect("second paths derive");
 
     assert_eq!(first.lock_path(), second.lock_path());
     assert_eq!(first.pid_path(), second.pid_path());
     assert_eq!(first.health_path(), second.health_path());
-    Ok(())
 }
 
 proptest! {
