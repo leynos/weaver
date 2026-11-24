@@ -510,22 +510,22 @@ The measuring lane was the one compile-heavy lane on the smaller shape, and
 that was a computed margin rather than an oversight. The workspace has four
 trybuild cases which spawn their own cargo builds:
 `public_api_contracts_compile` in `weaver-config` and in `weaver-docs-gate`, and
-`test_support_exports_compile_downstream` in `weaver-plugins` and in `weaverd`.
-The two older cases took 20.5 and 25.4 seconds of a 50.3-second suite on four
-vCPU. nextest terminates a test after three 60-second periods by default, and
-those cases then sat under half that kill. An instrumented trybuild build grows
-with the downstream crate's dependency tree rather than with the fixture. On
-2026-10-31 the `weaver-config` case exceeded the default kill on the developer
-lane once the fixture grew to cover the generated metadata: its instrumented
-build alone took almost two minutes, and the fixture then ran past the
-remaining budget. `.config/nextest.toml` therefore allows five 120-second
-periods for the `compile_time` binaries alone. That budget fits a from-scratch
-instrumented build and still terminates a hung test inside the job timeout. The
-`weaverd` case instruments the largest dependency tree of the four, so it is
-the one to watch if that budget is ever tightened. It is not a general deadline
-increase: the remedy for a slow lane stays `ubicloud-standard-4`, not a longer
-deadline for every test. Nobody waits on the main coverage lane, which is why a
-slower runner was acceptable there.
+`test_support_exports_compile_downstream` in `weaver-plugins` and in
+`weaverd`. The two older cases took 20.5 and 25.4 seconds of a 50.3-second
+suite on four vCPU. nextest terminates a test after three 60-second periods by
+default, and those cases then sat under half that kill. An instrumented
+trybuild build grows with the downstream crate's dependency tree rather than
+with the fixture. On 2026-10-31 the `weaver-config` case exceeded the default
+kill on the developer lane once the fixture grew to cover the generated
+metadata: its instrumented build alone took almost two minutes, and the fixture
+then ran past the remaining budget. `.config/nextest.toml` therefore allows
+five 120-second periods for the `compile_time` binaries alone. That budget fits
+a from-scratch instrumented build and still terminates a hung test inside the
+job timeout. The `weaverd` case instruments the largest dependency tree of the
+four, so it is the one to watch if that budget is ever tightened. It is not a
+general deadline increase: the remedy for a slow lane stays
+`ubicloud-standard-4`, not a longer deadline for every test. Nobody waits on
+the main coverage lane, which is why a slower runner was acceptable there.
 
 ### 7.3 The fork fallback
 
