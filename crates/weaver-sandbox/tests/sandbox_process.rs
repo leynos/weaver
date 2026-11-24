@@ -1,7 +1,7 @@
 //! Process-level behaviour of the sandbox: spawn preflight errors (relative,
 //! missing, unlisted and multi-threaded) and the parent environment's
-//! restoration. No case runs a program inside the sandbox, so file access and
-//! environment inheritance are not covered here.
+//! restoration. No case verifies that a program runs successfully inside the
+//! sandbox, so file access and environment inheritance are not covered here.
 //!
 //! `Sandbox::spawn` refuses a process with more than one thread, and
 //! `birdcage` rewrites the environment of the process that activates it, so
