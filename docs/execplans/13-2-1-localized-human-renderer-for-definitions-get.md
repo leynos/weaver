@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: DRAFT (design review applied; awaiting user approval)
+Status: DRAFT (approver's questions answered; awaiting approval to implement)
 
 Branch: `13-2-1-localized-human-renderer-for-definitions-get`
 
@@ -225,7 +225,7 @@ the main omissions in earlier estimates.
 ## Risks
 
 - R1. The work overruns. Severity: high. Likelihood: medium. Mitigation: eight
-  plateaus with separate limits, delivered as stacked pull requests.
+  plateaus with separate limits, each a run of commits that can be reverted.
 - R2. Claims of absence pass vacuously because no test reaches a terminal.
   Severity: high. Likelihood: high. Mitigation: `EP-M5` adds a pseudo-terminal
   harness; every absence test has a paired presence test using the same input.
@@ -263,6 +263,7 @@ the main omissions in earlier estimates.
   "revise". Four rechecked the revision, and their corrections were applied.
 - [x] (2026-11-24) leynos/weaver#451 and leynos/weaver#452 raised at the user's
   request.
+- [x] (2026-11-24) Approver's questions answered (D23, D24).
 - [ ] Plan approved by the user.
 - [ ] `EP-M0` baseline gates and settings probe recorded.
 - [ ] `EP-M1` OrthoConfig 0.11.0 and recorded decisions.
@@ -428,6 +429,11 @@ effective on user approval.
   §2.1.10 permits a renderer modelled on `miette`. It would replace only the
   context blocks, emits fixed English in its narrated form, and would need
   neutralized spans remapped.
+- D23. The user confirmed D1, D4, D6, D12, D13, and D16, and the reach of
+  `EP-M2`, on 2026-11-24. The contingent Verus milestone was removed.
+- D24. Deliver every milestone in one pull request, as the user directed on
+  2026-11-24. The per-milestone limits in Table 1 still apply and still stop
+  the work at the milestone that overruns. Date/Author: 2026-11-24, user.
 
 ## Outcomes & retrospective
 
@@ -453,8 +459,9 @@ builds `IoStreams`. `run` in `src/lib.rs` builds a localizer and calls
 (`daemon_output.rs`). Each response line is a stream message or an exit status.
 In human mode each payload, from either stream, passes through the public
 function `render_human_output` (`output/mod.rs`), which returns `None` for
-anything unrecognized; raw text is then written. The only other caller is
-`crates/weaver-e2e/tests/human_output.rs`, an ignored test.
+anything unrecognized; raw text is then written. Its other callers are three
+unit tests in `output/tests.rs` and the ignored
+`crates/weaver-e2e/tests/human_output.rs`.
 
 A definitions payload is a JSON array such as
 `[{"uri":"file:///work/a.rs","line":42,"column":8}]`. Lines and columns start
@@ -511,7 +518,9 @@ Clippy limits functions to four parameters, 70 lines, and four nesting levels;
 Whitaker limits cognitive complexity to nine. Examples in `weaver-config` do
 not run as doctests, so examples there are also exercised by unit tests. Kani
 0.67 and `cargo-mutants` are on the host but not configured; Verus is absent.
-The CodeGraph server was unavailable during planning.
+CodeGraph was unavailable while the plan was drafted. It was later used to
+confirm the callers of `render_human_output`, `wait_for_ready`, and
+`strip_bidi_isolates`.
 
 ### Budget evidence
 
@@ -547,8 +556,8 @@ Skills: `sdlc-implementation`, `execplans`, `rust-router`, then
 `domain-cli-and-daemons`, `rust-types-and-apis`, `rust-errors`,
 `rust-unit-testing`, `proptest`, and `rust-verification`;
 `hexagonal-architecture`; `arch-decision-records`; `localization-docs`;
-`addressing-whitaker-findings`; `nextest`; `github-stacks`;
-`en-gb-oxendict-style`; `commit-message`; `pr-creation`; and `pr-babysitting`.
+`addressing-whitaker-findings`; `nextest`; `en-gb-oxendict-style`;
+`commit-message`; `pr-creation`; and `pr-babysitting`.
 
 ## Conformance basis
 
@@ -812,16 +821,11 @@ ADR 0005's verified kernel does not include rendering, roadmap 19.3.1 owns the
 pinned tools and depends on 16.1.1, and 19.3.4 wants abstractions that have
 already proved stable. Kani over the same bounds would repeat the enumeration.
 
-If the approver prefers a proof, insert `EP-M4V` after `EP-M4`: pin Verus and
-`rust-prover-tools` as 19.3.1 describes, add `make verus`, and prove
-`L-PARTITION` and `L-WINDOW` over `Seq<nat>` in `verus/column_fit.rs`. That
-proves a specification mirror: production `fit.rs` is not itself verified,
-correspondence rests on review plus the bounded enumeration, and that limit is
-recorded. Each `requires` has a satisfiable witness. Acceptance: `make verus`
-runs `prover-tools verus run --repo-root . --proof-file verus/column_fit.rs`
-without `assume`, `admit`, or trusted bodies; weakening a limit by one fails;
-and the formatting, lint, and test gates pass. This would add about 400 lines
-of code and amend 19.3.1's dependency.
+The approver agreed to omit a Verus milestone if it adds no value. It adds none
+here: a proof would cover a specification mirror of `wrap` and `window`, not
+production `fit.rs`, so correspondence would still rest on review and the
+bounded enumeration. If these functions later become shared kernels, 19.3.4 is
+the place to prove them, using the lemma statements above.
 
 ### Suggested BDD features
 
@@ -1192,9 +1196,10 @@ cargo test -p weaver-docs-gate --test boundary_manifest          # EP-M8
 Expect each to fail for the stated red reason before the change and to report
 zero failures after it. Update `Progress` with both transcripts.
 
-Default delivery is one stacked pull request per milestone, except that `EP-M5`
-and `EP-M6` may share one. `EP-M7` is always separate so it can be reverted
-alone.
+All milestones are delivered in one pull request (D24). Each milestone is a
+separate run of commits ending at a gated plateau, and `EP-M7` in particular
+must be revertible alone, so later commits must not mix pager code with other
+changes.
 
 ## Validation and acceptance
 
@@ -1255,23 +1260,17 @@ and an explicit account of the Verus rule. The strongest alternative offered
 was to defer the pager. It is kept, isolated in `EP-M7`, because a `--no-pager`
 flag without a pager would be inert; see question 2.
 
-Questions for the approver, each with the default this plan assumes:
+Questions for the approver, and the user's answers of 2026-11-24:
 
-1. Is it acceptable that 13.2.1 makes output translatable while locale
-   selection waits for OrthoConfig 11.3 through leynos/weaver#451? Default:
-   yes. Alternative: a temporary Weaver adapter under ADR 0007.
-2. Should the pager be built now? Default: yes, in `EP-M7`. Alternative: ship
-   `--no-pager` as an accepted no-op and raise the pager separately.
-3. Is D4 acceptable, including amendments to ADR 0007 and design §2.1.3, so
-   that only `--color always` on the command line overrides `NO_COLOR`?
-   Default: yes.
-4. May the legacy `observe get-definition` output change with the new renderer
-   (D1), and may `EP-M2` change unsafe characters in other commands' human
-   output? Default: yes to both.
-5. Is the reading of the `AGENTS.md` Verus rule acceptable? Default: no Verus
-   milestone. Alternative: insert `EP-M4V`.
-6. Are the dependencies in Table 7 acceptable? Default: yes.
-7. One stacked pull request per milestone? Default: yes.
+1. 13.2.1 makes output translatable while locale selection waits for
+   OrthoConfig 11.3 through leynos/weaver#451: yes.
+2. Build the pager now, in `EP-M7`: yes.
+3. D4, with its amendments to ADR 0007 and design §2.1.3: yes.
+4. Let `observe get-definition` output change (D1), and let `EP-M2` replace
+   unsafe characters in other commands' human output: yes to both.
+5. Omit a Verus milestone: yes, if it adds no value.
+6. The dependencies in Table 7: yes.
+7. One stacked pull request per milestone: no; a single pull request.
 
 ## Interfaces and dependencies
 
@@ -1399,3 +1398,6 @@ with a `SAFETY` comment.
   to delivery, socket timeouts, signal scope, response and file bounds,
   `L-WINDOW`, `L-CONCAT`, `INV-CONTEXT`, two BDD scenarios, and the public
   interface list.
+- 2026-11-24: recorded the user's answers. Delivery becomes a single pull
+  request, the contingent Verus milestone is removed, and the callers of
+  `render_human_output` are corrected. The milestones are otherwise unchanged.
