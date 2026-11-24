@@ -126,10 +126,13 @@ fn spawn(profile: SandboxProfile, command: SandboxCommand) -> Result<weaver_sand
 ///
 /// On a merged-`/usr` host the new root holds `/usr/lib64` but not the
 /// `/lib64` symlink that names the ELF interpreter, so every dynamically linked
-/// program fails to start there. Only that known limitation skips the cases
-/// that launch one: the probe must fail with the sandbox's "No such file"
-/// start-up error *and* `/lib64` must be a symlink on this host. Any other
-/// probe failure is a regression and fails the case.
+/// program fails to start there. A host that forbids unprivileged user
+/// namespaces (hosted Ubuntu images do) fails every sandboxed start with
+/// "Operation not permitted". Only those two known limitations skip the cases
+/// that launch a program: the probe must fail with the sandbox's "No such file"
+/// start-up error *and* `/lib64` must be a symlink on this host, or with the
+/// "Operation not permitted" start-up error. Any other probe failure is a
+/// regression and fails the case.
 fn require_exec() -> Result<()> {
     let program = resolve_binary(&["/bin/true", "/usr/bin/true"])?;
     let mut command = SandboxCommand::new(&program);
