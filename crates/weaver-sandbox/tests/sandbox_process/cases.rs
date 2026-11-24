@@ -242,12 +242,16 @@ fn sorted_environment() -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
     vars
 }
 
-/// After a spawn `birdcage` has stripped the process environment; the
-/// sandbox's `EnvGuard` must have put every variable back. The case snapshots
-/// the whole environment before the spawn and requires the same set after it,
-/// and the scenario variables must be among them. The child's own outcome is
-/// irrelevant (the stripping happens in the parent before the fork), so this
-/// case does not need the host to exec in the sandbox.
+/// After a spawn attempt `birdcage` may have stripped the process environment;
+/// the sandbox's `EnvGuard` must have put every variable back. The case
+/// snapshots the whole environment before the attempt and requires the same set
+/// after it, and the scenario variables must be among them.
+///
+/// It asserts on the environment only. Whether the spawn succeeded and how the
+/// child fared belong to the other cases: a host that forbids the sandbox's
+/// namespaces refuses the spawn outright, and restoration must hold on that
+/// path too, so a refused spawn is reported after the comparison rather than
+/// instead of it, and does not need the host to exec in the sandbox.
 ///
 /// Not ported from the deleted `EnvGuard` tests: a variable created while the
 /// guard is live and removal on drop, which need the `pub(crate)` guard itself.
@@ -261,16 +265,20 @@ fn parent_environment_is_restored_after_spawn() -> Result<()> {
     }
     let program = resolve_binary(&["/bin/true", "/usr/bin/true"])?;
     let profile = SandboxProfile::new().allow_executable(&program);
+    // A refused spawn (for example a denied namespace) and a child that exits
+    // badly both leave the environment as it was; only the comparison below is
+    // this case's verdict.
     let spawned = spawn(profile, SandboxCommand::new(&program));
     let waited = spawned.map(weaver_sandbox::SandboxChild::wait_with_output);
-    // A refused spawn must leave the environment alone too, so compare before
-    // reporting how the spawn went.
     let after = sorted_environment();
+    let how = match &waited {
+        Ok(_) => String::from("the spawn ran"),
+        Err(err) => err.to_string(),
+    };
     ensure!(
         before == after,
-        "the environment changed across the spawn: {before:?} became {after:?}"
+        "the environment changed across the spawn ({how}): {before:?} became {after:?}"
     );
-    waited?.context("wait for the child")?;
     Ok(())
 }
 
