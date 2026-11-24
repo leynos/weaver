@@ -878,42 +878,13 @@ repository to carry a token, and the one here, `dependabot-automerge.yml`,
 merges Dependabot pull requests rather than building, so cancelling it
 mid-flight is a hazard with no minutes to win.
 
-### 9.1 The cancellation contract
+### 9.1 The pull-request workflows
 
 `ci.yml` and `release-dry-run.yml` carry the block above. The dry run calls
 `release.yml` through `workflow_call`, and a called workflow evaluates its own
 `release-${{ github.ref }}` group in the caller's context, where `github.ref` is
 `refs/pull/<n>/merge`; the caller's block makes the superseded dry run itself
 cancellable rather than leaving that to the callee.
-
-`tests/workflow_contracts/pr_concurrency_test.py` holds the rule. It discovers
-every workflow declaring a `pull_request` trigger, reading `on:` as a mapping,
-a list or a bare name under both the quoted key and PyYAML's boolean `True`,
-and refuses a workflow declaring both, since GitHub would read one trigger set
-and the contract another; a test drives that reader over each shape directly. A
-floor of the two workflows above keeps discovery from emptying into a vacuous
-pass. For each workflow it requires a group that, rendered by
-`pr_concurrency_groups.py`, keeps two pushes to one pull request together and
-keeps apart that pull request, a fork's pull request from a branch of the same
-name, two pushes to `main`, and two dispatches of another branch; and that uses
-`github.run_id` only as the fallback behind the pull-request number. A
-`github.ref` or `github.base_ref` fallback, a `github.head_ref`, `github.sha` or
-`github.run_id`-only group, the run identifier ahead of the number, or a
-constant group fails, and an expression the renderer does not model is refused
-rather than guessed at. It also requires exactly the event-conditioned
-`cancel-in-progress` expression, so the literal `true` fails. No two
-pull-request workflows may render the same group for one pull request, since
-whichever started last would cancel the others; each is rendered under its own
-name. The files are read at test setup, not at import, through
-`workflow_loader.py`, which refuses a duplicated mapping key because PyYAML
-keeps the last of two `concurrency:` blocks and says nothing; a file that
-cannot be read or parsed fails the tests that need it, with the reason. Scope
-is a pure function of the parsed documents, and a test drives it over a
-constructed directory. Each clause was proved by mutation: the cancel line
-removed, a literal `true`, a `ref` fallback, the run identifier ahead of the
-number, a constant group, a `head_ref` group, a `format()` group, the block
-removed, the trigger renamed to `pull_request_target`, a duplicated block, and
-an unquoted `on:` beside the quoted one each fail it.
 
 ## 10 The Ubicloud cache proxy
 
