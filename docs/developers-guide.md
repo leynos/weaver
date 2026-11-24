@@ -265,9 +265,9 @@ one: on a merged-`/usr` host the new root lacks the `/lib64` interpreter
 symlink, so `execve` fails with ENOENT, and on a host that forbids unprivileged
 user namespaces (hosted Ubuntu images) every sandboxed start fails with EPERM.
 Real exec coverage belongs with the runtime-mapping and runner-routing work.
-The environment restoration case spawns `/bin/true` but does not check
-whether it executes successfully: it passes only when the spawn call succeeded
-and the environment came back unchanged, and it fails with "restoration was not
+The environment restoration case spawns `/bin/true` but does not check whether
+it executes successfully: it passes only when the spawn call succeeded and the
+environment came back unchanged, and it fails with "restoration was not
 verified" when `birdcage` cannot activate (a denied namespace, say), because
 the runner has no outcome between pass and fail.
 
