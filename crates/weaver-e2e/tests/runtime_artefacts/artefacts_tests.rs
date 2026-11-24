@@ -40,7 +40,11 @@ fn process_is_alive_reports_an_absent_pid_as_dead() {
 /// The scanned range sits far above typical PID maxima, so the test does not
 /// depend on a fixed number that a busy host could allocate.
 fn find_nonexistent_pid() -> u32 {
+    let is_absent = |pid: u32| {
+        let raw = i32::try_from(pid).expect("the scanned range is below i32::MAX");
+        matches!(kill(Pid::from_raw(raw), None), Err(Errno::ESRCH))
+    };
     (4_000_000..=4_000_100)
-        .find(|&pid| matches!(kill(Pid::from_raw(pid as i32), None), Err(Errno::ESRCH)))
+        .find(|&pid| is_absent(pid))
         .expect("the scanned range should contain an unused pid")
 }
