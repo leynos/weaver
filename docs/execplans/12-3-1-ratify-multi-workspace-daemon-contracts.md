@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: DRAFT (design review applied; awaiting user approval)
+Status: DRAFT (design review and recheck applied; awaiting user approval)
 
 Branch: `12-3-1-ratify-multi-workspace-daemon-contracts`
 
@@ -30,7 +30,7 @@ are marked `Proposed`, and they contradict each other in places. Roadmap items
 
 This task settles the contract before that code is written. Afterwards:
 
-- a new design document holds each rule once, with a stable identifier, one
+- a new design document holds each rule once, with a stable identifier, an
   owning roadmap task, and one kind of evidence;
 - the RFC and the three ADRs are `Accepted`, agree with that document, and leave
   no open question that a later task must guess at; and
@@ -97,13 +97,13 @@ file counts. Each limit is enforced independently.
 | Milestone | Code estimate | Code limit | Configuration limit | Documentation limit |
 | --------- | ------------- | ---------- | ------------------- | ------------------- |
 | `EP-M0`   | 0             | 0          | 0                   | 0                   |
-| `EP-M1`   | 0             | 0          | 5                   | 850                 |
+| `EP-M1`   | 0             | 0          | 5                   | 950                 |
 | `EP-M2`   | 1,000         | 1,200      | 40                  | 70                  |
-| `EP-M3`   | 1,500         | 1,800      | 5                   | 60                  |
-| `EP-M4`   | 550           | 660        | 5                   | 20                  |
+| `EP-M3`   | 1,700         | 2,040      | 5                   | 60                  |
+| `EP-M4`   | 650           | 780        | 5                   | 20                  |
 | `EP-M5`   | 0             | 0          | 5                   | 350                 |
 | `EP-M6`   | 200           | 240        | 5                   | 80                  |
-| Total     | 3,250         | 3,900      | 65                  | 1,430               |
+| Total     | 3,550         | 4,260      | 65                  | 1,530               |
 
 _Table 1: Net-line estimates and limits._
 
@@ -120,7 +120,8 @@ Stop and escalate when any of these is reached:
 - a milestone above eight hours of active work, excluding compile queueing.
 
 `Budget evidence` explains the numbers. If `EP-M2` finishes above 1,000 code
-lines, re-estimate `EP-M3` before starting it.
+lines, re-estimate `EP-M3` before starting it. Measure the test time of `EP-M2`
+in the unoptimized profile before adding the larger scenarios.
 
 ## Risks
 
@@ -144,7 +145,7 @@ lines, re-estimate `EP-M3` before starting it.
 - R6. Pull request #260 (endpoint-scoped artefacts, ADR 0014) edits design
   §2.3.2, the users' and developers' guides, and `docs/contents.md`, and
   currently conflicts with `main`. Severity: low. Likelihood: medium.
-  Mitigation: allocate no ADR number, do not edit the artefact text in §2.3.2,
+  Mitigation: allocate no ADR number, limit any §2.3.2 edit to one sentence,
   and say in RFC 0002 only that the behaviour depends on #260.
 - R7. The host compile queue is long. Severity: low. Likelihood: high.
   Mitigation: start each gate once and wait.
@@ -158,8 +159,11 @@ lines, re-estimate `EP-M3` before starting it.
 - [x] (2026-11-24) Reconnaissance by a four-agent Wyvern team.
 - [x] (2026-11-24) Prior-art research, `rustup` probes, and first probe model.
 - [x] (2026-11-24) Initial draft (`b359866c`).
-- [x] (2026-11-24) Five-reviewer design review: four "revise" or equivalent, one
-  "conditions". Findings applied; replacement rules probed.
+- [x] (2026-11-24) Five-reviewer design review: four "revise" or equivalent,
+      one "conditions". Findings applied; replacement rules probed.
+- [x] (2026-11-24) All five rechecked the rewrite: four "conditions", one
+      "revise", with every remaining point described as wording. Conditions
+      applied; probes repeated with policy-independent monitors.
 - [ ] Plan approved by the user.
 - [ ] `EP-M0` baseline and drift check.
 - [ ] `EP-M1` contract document, proof sketches, and revised RFC and ADRs.
@@ -204,14 +208,22 @@ lines, re-estimate `EP-M3` before starting it.
   has several; its Linux command type also cannot set a working directory or
   environment. Evidence: by reading only. Impact: `LS-9` is a prerequisite of
   plugin work; `EP-M0` checks it and raises an issue.
+- Observation: a commit that replaces a file, fails, and cannot restore it must
+  still change the revision; otherwise another plan commits over a state it
+  never read. Evidence: the third probe's monitor compared file histories and
+  found two violations of the then-ratified rule, which no reviewer had
+  reported. Impact: `MU-12`.
+- Observation: workspace `rust-analyzer.toml` and `.cargo/config.toml` can name
+  programs that a server runs (reviewer's reading of upstream documentation).
+  Impact: `TR-1` and `TR-4` are worded accordingly.
 - Observation: the first draft's `L-INDEPENDENT`, `L-COMMIT`, `L-DOMAIN`,
   `INV-PIN`, and `INV-BASE` were false as stated, and its probe did not monitor
   several of them. Impact: `Verification plan` was rewritten.
 
 ## Decision log
 
-All dated 2026-11-24. D1 to D8 were proposed by the planning agent and revised
-after review. Approving the plan approves `Clauses`.
+All dated 2026-11-24. All were proposed by the planning agent and revised after
+review. Approving the plan approves `Clauses`.
 
 - D1. Decision: revise first, accept last, in one pull request. Documents stay
   `Proposed` until `EP-M6`. Rationale: the style guide forbids outstanding
@@ -229,10 +241,10 @@ after review. Approving the plan approves `Clauses`.
   five reviewers and the author all missed at least one that exploration found.
   Alternatives: review only; TLA+, Alloy, or Quint (a new toolchain);
   `stateright` (unauthorized dependency); Kani (not configured); one monolithic
-  model (the first probe: 1,664,258 states for three requests and all events,
-  with several rules unmodelled). Retirement: when 12.3.3 and 12.3.5 have pure
-  production kernels explored directly, they delete the corresponding model
-  kernel.
+  model (a reviewer ran the first probe's three-request case with all events:
+  1,664,258 states, with several rules unmodelled). Retirement: when 12.3.3 and
+  12.3.5 have pure production kernels explored directly, they delete the
+  corresponding model kernel.
 - D4. Decision: ratify the interlocking core only, and state constraints on
   matters owned elsewhere. Rationale: the reviewers' strongest alternative; it
   satisfies the roadmap text without binding exit codes, wire shapes, or
@@ -244,10 +256,11 @@ after review. Approving the plan approves `Clauses`.
   order, and a definition under which such a workspace could not edit its own
   files. An explicit marker also lets a user name an exact root while keeping
   roots a function of the filesystem.
-- D6. Decision: keep both the revision and digests as commit guards. Rationale:
-  the draft dropped the revision, which allowed write skew across the planning
-  gap (a rename planned, then another mutation adding a use elsewhere) and
-  contradicted RFC invariant 5, design §4.2.3, and RFC 0003 §6.9.
+- D6. Decision: keep both the revision and digests as commit guards for plans
+  Weaver makes, checked at exclusive grant, with digests rechecked per file.
+  Rationale: the draft dropped the revision, which allowed write skew across
+  the planning gap (a rename planned, then another mutation adding a use
+  elsewhere) and contradicted RFC invariant 5, design §4.2.3, and RFC 0003 §6.9.
 - D7. Decision: no cross-daemon lock. Isolation is per daemon (`MU-14`).
   Rationale: RFC §4.2 excludes coordination across daemons, and a lock in the
   runtime directory fails in exactly the multi-daemon cases. If wanted later,
@@ -262,6 +275,19 @@ after review. Approving the plan approves `Clauses`.
   documented risk for the first implementation (`TR-4`), and repository files
   may not choose what Weaver executes (`TR-1`). Rationale: opening a repository
   in an editor carries the first risk already; the second would be new.
+- D11. Decision: narrow RFC invariant 4 to "equals the identity observed at
+  grant, with inputs outside the workspace at most `identity_freshness` old",
+  and check it again before commit entry (`LS-4`, `MU-7`). Rationale: nothing
+  can hold an external identity still, so the absolute form cannot be met. Put
+  to the approver as question 10, as C6 requires.
+- D12. Decision: children inherit the daemon's startup environment minus a
+  scrub list. Rationale: reviewers disagreed. An allowlist breaks builds that
+  need variables it omits, and missing variables make diagnostics weaker, so a
+  mutation could pass wrongly; inheritance shares the first shell's `PATH` and
+  secrets with every repository's build. Put to the approver as question 5.
+
+Decision records: D5, `TR-2`, `TR-3`, and `CF-1` are recorded in ADR 0008; D10,
+D11, D12, `TR-1`, `TR-4`, and `TR-5` in ADR 0009; D6 and D7 in ADR 0010.
 
 ## Contract conflicts
 
@@ -293,13 +319,15 @@ Identity and trust:
 Lifecycle:
 
 - X9. An `Arc` obtained before eviction keeps memory alive but does not prevent
-  retirement. `LC-1`, `LC-4`.
+  retirement, and which state is workspace-owned is stated in three different
+  ways. `LC-1`, `LC-2`, `LC-4`, `LC-8`.
 - X10. "Already being retired" is called a bad locator, while creation is
   single-flight; failure, refusal, and re-creation have no transitions. `LC-3`,
   `LC-5`, `LC-6`.
 - X11. Open documents block eviction, against bounded retention. `LC-7`.
 - X12. Server states omit warming, failed start, backoff, and healthy draining;
-  `initialize` is treated as readiness. `LS-2`, `LS-3`, `LS-7`.
+  `initialize` is treated as readiness; server requests and watched-file
+  support are assumed. `LS-2`, `LS-3`, `LS-7`, `LS-8`.
 - X13. "Target workspace", "adapter-selected process root", and design §3.1.1
   disagree; one folder conflicts with an ordered list; "the current identity"
   is singular although roots nest. `LS-1`, `LS-2`.
@@ -322,7 +350,7 @@ Mutation:
   `MU-11`.
 - X20. Shutdown is bounded, yet a live commit is not abandoned; checks precede
   the commit, yet 16.1.6 compares immediately before replacement; "atomic"
-  overstates per-file replacement. `MU-8`, `MU-9`, `MU-13`.
+  overstates per-file replacement. `MU-4`, `MU-8`, `MU-9`, `MU-13`.
 - X21. Readers observe one committed revision, but nothing tells servers that
   files changed. `MU-10`, `MU-12`.
 - X22. Separate sockets are an escape hatch, but leases are per daemon. `MU-14`.
@@ -331,7 +359,7 @@ Admission, vocabulary, configuration:
 
 - X23. Independent limits let one workspace fill the daemon or the process
   budget, and waiting for a slot while holding one can deadlock. `AD-1` to
-  `AD-8`.
+  `AD-9`.
 - X24. Endpoint-scoped artefacts are described as existing. Corrected as a
   dependency on #260.
 - X25. Open questions ask for numeric defaults that RFC §4.2 excludes. `CF-3`,
@@ -350,48 +378,63 @@ Admission, vocabulary, configuration:
 
 Form: identifier (owner task; evidence): obligation. Evidence `model` also
 requires a conformance test in the owner task. These sentences are the proposed
-content of `docs/multi-workspace-daemon-design.md`.
+content of `docs/multi-workspace-daemon-design.md`; `EP-M1` replaces references
+to this plan's tables with section names. "Pinned" means reserved by the
+mutation in question. An instance is "outgoing" while draining or stopping.
 
 Workspace identity:
 
 - `WS-1` (12.3.2; integration): A locator is an absolute starting directory; the
   daemon canonicalizes it and never infers a workspace from its own directory.
+  On Unix the request also carries the start's device and file identifiers, and
+  a difference is refused as `workspace_view_mismatch`.
 - `WS-2` (12.3.2; model): The root is the nearest ancestor-or-self of the start
-  that contains a `.git` entry or a `.weaver-root` file; with neither, the
-  request is refused as `workspace_unmarked`.
-- `WS-3` (12.3.3; integration): The key is the canonical UTF-8 root; state holds
+  that contains a `.git` entry or a `.weaver-root` file. With neither, the
+  request is refused as `workspace_unmarked`; a lookup error other than absence
+  is `workspace_inaccessible`; a start inside `.git` or a bare repository is
+  `topology_unsupported`.
+- `WS-3` (12.3.3; integration): The key is the canonical UTF-8 root. State holds
   an open root handle for its life, performs workspace input/output relative to
-  it, and rechecks that the path still names it at lease grant and at commit
-  entry, refusing with `workspace_replaced`.
-- `WS-4` (12.3.3; model): A path is owned by its nearest marked ancestor; every
-  mutation target must be owned by the workspace at exclusive grant and at
-  commit entry, and may not be a marker or have a `.git` component in any
-  letter case.
+  it, and rechecks that the path still names it and is still marked: at lease
+  grant, where failure is `workspace_replaced`, and at commit entry, where
+  failure is `stale_base`.
+- `WS-4` (12.3.3; model): A path is owned by its nearest marked
+  ancestor-or-self. Every mutation target must be owned by the workspace at
+  exclusive grant and at commit entry, and may not be a marker or have a `.git`
+  component in any letter case; otherwise the refusal is `target_not_owned`.
 - `WS-5` (12.3.3; unit): If another path with the same root identity is active,
   an idle holder is retired; otherwise the request is refused as
   `workspace_alias`.
 - `WS-6` (12.3.2; integration): Every target names its base, and patch paths are
-  root-relative; reads outside the workspace are permitted, marked external,
-  and never stored in its caches.
+  root-relative. Reads outside the workspace are permitted, marked external,
+  and never stored in its caches; mutations through a symlink that leaves the
+  root are refused. A read target is a regular file opened without blocking and
+  read to a bound.
 - `WS-7` (12.3.2; end-to-end): An older daemon cannot parse the new envelope as
-  a routable request; a new daemon identifies its protocol before any result; a
-  missing identification is reported and never causes an automatic restart.
+  a routable request. A new daemon identifies its protocol before any result,
+  and refuses an older client in that client's framing. A missing
+  identification is reported and never causes an automatic restart.
 - `WS-8` (15.3.3; review): A durable workspace identifier is an equality hint
   and never grants authority.
 
 Trust:
 
-- `TR-1` (12.3.4; integration): Files inside a workspace may not select
-  executables, environment variables, or toolchain paths; only daemon or user
-  scope may.
-- `TR-2` (12.3.2; integration): The root, its marker, and every input found
-  above the root must be owned by the effective user or the superuser and not
-  be writable by others, unless user scope lists the root in
-  `allowed_workspace_roots`.
+- `TR-1` (12.3.4; integration): Weaver itself never starts a program, sets a
+  variable, or uses a toolchain path because a workspace file names it; only
+  daemon or user scope may. A workspace `path=` toolchain is
+  `toolchain_untrusted`.
+- `TR-2` (12.3.2; integration): The root and its marker must be owned by the
+  effective user or the superuser and not be writable by every user; a
+  group-writable root or marker also needs user scope to list the root in
+  `allowed_workspace_roots`, which can waive this clause and nothing else.
+  Otherwise the refusal is `workspace_untrusted`. Inputs Weaver itself reads
+  above the root follow the same rule without a waiver.
 - `TR-3` (12.3.2; integration): Requests that select a workspace are served only
-  on endpoints restricted to one user.
-- `TR-4` (12.3.4; review): Language servers may execute repository code such as
-  build scripts; this is an accepted and documented risk.
+  on an endpoint in an owner-only directory, or one with equivalent
+  authentication; otherwise the refusal is `endpoint_not_private`.
+- `TR-4` (12.3.4; review): Language servers may run any program named by
+  repository build or server configuration, during reads as well as mutations.
+  This is an accepted and documented risk.
 - `TR-5` (12.3.4; integration): Auxiliary processes start in a private directory
   with interpreter isolation where the interpreter offers it.
 
@@ -408,61 +451,80 @@ Workspace lifecycle:
 - `LC-5` (12.3.3; model): Creation belongs to the daemon and has a deadline; a
   client's cancellation does not end it, and failure or shutdown publishes
   nothing and gives every waiter the same outcome.
-- `LC-6` (12.3.3; model): A draining workspace grants no lease and refuses with
-  `workspace_draining`; a stopping daemon refuses with `daemon_stopping`.
-- `LC-7` (12.3.3; model): Only leases block retirement; a starting server holds
-  one; no document stays open after the lease that opened it.
+- `LC-6` (12.3.3; model): Entering `draining` stops starting and warming
+  instances. A draining workspace grants no lease and starts no server,
+  refusing with `workspace_draining`; a stopping daemon refuses with
+  `daemon_stopping`.
+- `LC-7` (12.3.3; model): Only leases block retirement. A starting or warming
+  instance holds one until it is ready or reaped. No document stays open after
+  the lease that opened it.
+- `LC-8` (12.3.3; integration): Every routed operation resolves exactly one key
+  first. Caches, servers, revisions, and coordination belong to exactly one
+  workspace; only immutable registries are daemon-wide.
 
 Language-server lifecycle:
 
 - `LS-1` (12.3.4; integration): A slot is a language and a project root owned by
-  the workspace; the working directory, `rootUri`, and exactly one
-  `workspaceFolders` entry equal that root.
-- `LS-2` (12.3.4; model): Server instances follow Table 6; a slot holds at most
-  one current and one draining instance.
-- `LS-3` (12.3.4; integration): An instance is ready only after the signal its
-  adapter declares; completing `initialize` is not enough.
-- `LS-4` (12.3.4; integration): Identity includes the file identities of the
-  resolved executables; inputs inside the workspace, including absent candidate
-  files, are re-read at lease grant, and inputs outside it may be at most
-  `identity_freshness` old.
+  the workspace; a nested toolchain file starts a project root. The working
+  directory, `rootUri`, and exactly one `workspaceFolders` entry equal that
+  root and are always sent.
+- `LS-2` (12.3.4; model): Server instances follow Table 6. A slot holds at most
+  one current and one outgoing instance; while one is outgoing, a stale current
+  instance grants nothing and requests receive `server_restarting`.
+- `LS-3` (12.3.4; integration): An instance is ready only after the healthy
+  signal its adapter declares; completing `initialize` is not enough. A
+  not-ready signal, or a committed project-model change, returns it to warming.
+- `LS-4` (12.3.4; integration): A lease is granted only if the running identity
+  equals the resolved one: language, command, arguments, configuration,
+  declared environment, project root, and the path, file identity, size, and
+  modification time of each resolved executable (for Rust: rust-analyzer,
+  rustc, and cargo). Inputs inside the workspace, including absent candidates,
+  are re-read at grant; inputs outside it may be at most `identity_freshness`
+  old. Identity that changes again during acquisition is `identity_unstable`.
 - `LS-5` (12.3.4; integration): Children receive the daemon's startup
   environment minus a scrub list (`RUSTUP_TOOLCHAIN`, `RUSTUP_TOOLCHAIN_SOURCE`,
-  `CARGO`, `RUSTC`, `RUST_RECURSION_COUNT`), with `RUSTUP_AUTO_INSTALL=0` and
-  an explicit `RUSTUP_TOOLCHAIN` for Rust; `PATH` contains absolute entries
-  only.
-- `LS-6` (12.3.4; integration): The Rust toolchain is resolved in the project
-  root under that environment; the executable is the path `rustup which` prints
-  with that toolchain set and is launched by that path; a missing toolchain or
-  component, or rustup older than 1.28.1, is `unavailable`.
+  `CARGO`, `RUSTC`, `RUST_RECURSION_COUNT`), plus `RUSTUP_AUTO_INSTALL=0`;
+  relative `PATH` entries are dropped.
+- `LS-6` (12.3.4; integration): The Rust toolchain is the parent of the `bin`
+  directory that `rustup which rustc` prints in the project root, run with that
+  environment and no `RUSTUP_TOOLCHAIN`. That absolute path is then set as
+  `RUSTUP_TOOLCHAIN` for `rustup which rust-analyzer`, whose result is launched
+  by path, and for the child. A missing toolchain or component, or rustup older
+  than 1.28.1, is `unavailable`. User scope may name an executable instead,
+  including on hosts without rustup.
 - `LS-7` (12.3.4; model): Every abnormal stop counts towards backoff and the
-  circuit, and no stop disables a language permanently.
+  circuit, and no stop disables a language permanently. A stop under `MU-10` is
+  abnormal only if it missed a deadline.
 - `LS-8` (12.3.4; integration): The client advertises only what it implements,
   in particular no dynamic watched-file registration without a watcher, and
-  answers every server request.
+  answers every server request. External edits a server does not watch may stay
+  unseen.
 - `LS-9` (12.3.4; integration): Auxiliary processes are never reused, have their
   own budget, run under a workspace lease, and receive an explicit directory,
-  environment, and execution identity.
+  environment, and execution identity from a single-threaded launcher.
 
 Mutation isolation:
 
 - `MU-1` (12.3.5; model): A plan made by Weaver records the revision and the
-  digests of everything it read, under a shared lease held only for that
-  snapshot.
-- `MU-2` (12.3.5; model): A request holds workspace coordination at most once at
-  a time and never upgrades it.
-- `MU-3` (16.1.6; model): At exclusive grant the plan's generation and revision
-  must be current, or its declared closed read set must match by digest;
-  otherwise it is replanned or refused as `stale_base`. Client-authored plans
-  match their expected content.
-- `MU-4` (16.1.6; model): Expected target state is either absent, or a file with
+  digests of everything it read. Reads and server queries during planning hold
+  shared coordination; a plugin given its content does not. Until `MU-3` is
+  implemented, the exclusive lease spans planning.
+- `MU-2` (12.3.5; model): A request waiting for workspace coordination holds
+  none, and never upgrades it.
+- `MU-3` (12.3.5; model): At exclusive grant the plan's generation and revision
+  must be current, and its digests must match; otherwise it is replanned at
+  most once, then refused as `stale_base`. A client-authored plan carries no
+  revision and matches its expected content.
+- `MU-4` (16.1.6; unit): Expected target state is either absent, or a file with
   digest, mode, and kind.
 - `MU-5` (12.3.5; model): A mutation reserves its whole server and formatter set
   under the exclusive lease, before staging, and pins it; a lost server or a
   changed identity before commit entry aborts it with no effect.
-- `MU-6` (16.1.5; model): A verdict is `inconclusive` if any server was
-  not ready throughout, or if the plan changes a project-model input, deletes,
-  or moves a file in a way its adapter cannot represent.
+- `MU-6` (16.1.5; model): Files no adapter claims need no semantic verdict. For
+  claimed files the verdict is `inconclusive` if a pinned server was not ready
+  throughout, or if the plan contains a deletion, move, or project-model change
+  its adapter cannot represent. 16.1.5 decides whether policy permits
+  committing on `inconclusive`; until then it refuses.
 - `MU-7` (12.3.5; model): Identity is resolved again after the last verification
   response and before commit entry; a later change does not invalidate the
   verdict.
@@ -472,18 +534,27 @@ Mutation isolation:
   its bytes; the outcome is committed, none, or unknown.
 - `MU-9` (16.1.6; review): Commit is per-file replacement with best-effort
   rollback and is not described as atomic across files.
-- `MU-10` (12.3.5; model): Before the exclusive lease is released, every server
-  instance that is not absent is either brought to the committed content, with
-  a barrier request answered within `restore_deadline`, or stopped.
+- `MU-10` (12.3.5; model): Before the exclusive lease is released, within one
+  `restore_deadline` for the whole set that also covers writes: on commit, each
+  serving instance holds an overlay equal to the committed bytes for each
+  created or replaced path, answers a barrier, and then closes it; on abort,
+  each instance the mutation staged is changed to the baseline, answers a
+  barrier, and then closes. Deletions, moves, and aborted creations need an
+  adapter witness that the content took effect. Starting and warming instances
+  queue the committed paths and grant no lease until this is done. Any instance
+  that cannot comply is stopped: its transport is closed and it serves nothing
+  more.
 - `MU-11` (12.3.5; unit): A committed mutation reports success even when `MU-10`
   stopped servers.
-- `MU-12` (12.3.3; unit): A revision is an opaque token of daemon nonce,
-  generation, and counter; it does not see external edits, so caches also key
-  on content.
+- `MU-12` (12.3.5; model): A revision is an opaque token of daemon nonce,
+  generation, and counter, and changes whenever a commit section may have
+  replaced anything, including one that failed. It does not see external edits,
+  so caches also key on content.
 - `MU-13` (12.3.5; model): `shutdown_deadline` cancels work before commit entry
   and waits for commit sections; forced termination is outside the guarantee.
-- `MU-14` (12.3.5; review): Isolation is guaranteed within one daemon; content
-  checks are the only guard between daemons.
+- `MU-14` (12.3.5; review): Isolation is guaranteed within one daemon and one
+  workspace. Content checks are the only guard between daemons, and servers of
+  an enclosing workspace may lag a nested workspace's commits.
 
 Bounded admission:
 
@@ -499,55 +570,62 @@ Bounded admission:
 - `AD-4` (12.3.5; model): Coordination is first in, first out; a later
   conflicting request never overtakes, and running requests stay within
   `workspace_max_running`.
-- `AD-5` (12.3.5; model): Waits follow the order in `Abstract model`, and every
-  wait has a deadline.
-- `AD-6` (12.3.5; model): Process slots for a phase are reserved all at once or
-  refused; idle victims are claimed with the reservation and reaped within
-  `kill_deadline`; a starting server counts as leased.
-- `AD-7` (12.3.5; model): One workspace cannot hold the whole process budget; a
-  set larger than its share is refused as `server_set_too_large`.
+- `AD-5` (12.3.5; model): A request waits only for a strictly higher rank than
+  any it holds, and every wait has a deadline.
+- `AD-6` (12.3.5; model): Process slots for a phase are claimed and leased in
+  one step, or refused; idle victims are part of the claim and are reaped within
+  `kill_deadline`; unreaped claims count against every budget and are released
+  if their owner leaves; a starting instance counts as leased.
+- `AD-7` (12.3.5; model): One key, including instances of its earlier
+  generations, cannot hold the whole process budget; a set larger than its
+  share is refused as `server_set_too_large`.
 - `AD-8` (12.3.5; integration): Only the connection permit is held while the
   response is written.
+- `AD-9` (12.3.5; unit): Each server has bounded queued and in-flight requests;
+  exhaustion is `server_capacity`.
 
 Reasons, configuration, and observability:
 
 - `RC-1` (12.3.2; unit): Every refusal has a class, a code, and an effects
   value; clients act on the class, tolerate unknown codes, and codes are never
   repurposed.
-- `RC-2` (12.3.5; model): A retryable class is produced only before staging,
-  with effects none.
+- `RC-2` (12.3.5; model): A retryable class is produced only by a run that never
+  staged, with effects none.
 - `RC-3` (12.3.5; unit): A retry hint is optional and at most `retry_hint_max`.
-- `RC-4` (12.3.2 and 13.2.2; review): Wire envelope, localization, and exit
-  status are decided by those tasks and preserve `RC-1` to `RC-3`.
+- `RC-4` (12.3.2; review): The wire form preserves `RC-1` to `RC-3`;
+  localization and exit status remain 13.2.2's.
 - `CF-1` (12.3.2; integration): Neither binary reads daemon-scope settings,
-  including `daemon_socket`, from a project file.
-- `CF-2` (12.3.3; integration): Workspace-scope settings are loaded per
-  workspace with the root as the project root; an invalid file affects that
+  including `daemon_socket`, from a project file or a file it extends.
+- `CF-2` (12.3.3; integration): Workspace-scope values layer the project file,
+  found with the root as the project root, over daemon-scope values of the same
+  name. Path selectors and other environment or command-line layers of the
+  daemon process do not apply per workspace. An invalid file affects that
   workspace only, as `workspace_config_invalid`.
 - `CF-3` (12.3.5; unit): The relations under `Configuration vocabulary` are
   validated before any request is admitted.
-- `CF-4` (12.3.3, 12.3.4, 12.3.5; review): The owning task chooses and justifies
-  each default.
-- `CF-5` (12.3.3; unit): Daemon-scope settings apply to every client; a client
+- `CF-4` (12.3.3, 12.3.4, and 12.3.5; review): The task that uses a setting
+  chooses and justifies its default, and decides whether it has a flag, with
+  localized help from the existing catalogues.
+- `CF-5` (12.3.2; unit): Daemon-scope settings apply to every client; a client
   cannot change them in a running daemon.
 - `OB-1` (12.3.5; unit): Transitions and saturation emit `tracing` events under
   provisional names until 13.4.1; 12.3 adds no metrics.
 - `OB-2` (12.3.3; unit): Telemetry identifies a workspace by a process-local
-  ordinal and generation, never by path; an error may repeat its own client's
-  locator.
+  ordinal and generation, never by path, and existing path-bearing events are
+  changed; an error may repeat its own client's locator.
 
 ### Reason vocabulary
 
-| Class             | Retryable | Codes                                                                                                                                                                                                       |
-| ----------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `invalid_request` | no        | `protocol_unsupported`, `workspace_missing`, `workspace_malformed`, `workspace_inaccessible`, `workspace_not_utf8`, `workspace_unmarked`, `workspace_untrusted`, `target_not_owned`, `topology_unsupported` |
-| `unavailable`     | no        | `toolchain_missing`, `component_missing`, `toolchain_untrusted`, `resolver_failed`, `workspace_create_failed`, `workspace_config_invalid`, `server_set_too_large`, `identity_unstable`                      |
-| `overloaded`      | yes       | `connection_capacity`, `daemon_capacity`, `workspace_capacity`, `workspace_limit`, `server_capacity`, `process_budget`, `auxiliary_budget`, `queue_deadline`                                                |
-| `transitional`    | yes       | `workspace_draining`, `workspace_alias`, `workspace_replaced`, `daemon_stopping`, `server_restarting`                                                                                                       |
-| `stale`           | no        | `stale_base`, `execution_identity_changed`, `server_lost`                                                                                                                                                   |
-| `cancelled`       | no        | `client_disconnected`, `shutdown`, `request_deadline`                                                                                                                                                       |
-| `commit`          | no        | `commit_rolled_back` (effects none), `commit_incomplete` (effects unknown)                                                                                                                                  |
-| `internal`        | no        | `internal`                                                                                                                                                                                                  |
+| Class             | Retryable | Codes                                                                                                                                                                                                                                                          |
+| ----------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invalid_request` | no        | `protocol_unsupported`, `workspace_missing`, `workspace_malformed`, `workspace_inaccessible`, `workspace_not_utf8`, `workspace_unmarked`, `workspace_untrusted`, `workspace_view_mismatch`, `topology_unsupported`, `target_not_owned`, `endpoint_not_private` |
+| `unavailable`     | no        | `toolchain_missing`, `component_missing`, `toolchain_untrusted`, `resolver_failed`, `server_start_failed`, `server_circuit_open`, `workspace_create_failed`, `workspace_config_invalid`, `server_set_too_large`, `identity_unstable`                           |
+| `overloaded`      | yes       | `connection_capacity`, `daemon_capacity`, `workspace_capacity`, `workspace_limit`, `server_capacity`, `process_budget`, `auxiliary_budget`, `queue_deadline`                                                                                                   |
+| `transitional`    | yes       | `workspace_draining`, `workspace_alias`, `workspace_replaced`, `daemon_stopping`, `server_restarting`                                                                                                                                                          |
+| `stale`           | no        | `stale_base`, `execution_identity_changed`, `server_lost` (mutations; a read receives `server_restarting`)                                                                                                                                                     |
+| `cancelled`       | no        | `client_disconnected`, `shutdown`, `request_deadline`                                                                                                                                                                                                          |
+| `commit`          | no        | `commit_rolled_back` (effects none), `commit_incomplete` (effects unknown)                                                                                                                                                                                     |
+| `internal`        | no        | `internal`                                                                                                                                                                                                                                                     |
 
 _Table 2: Reason classes and codes._
 
@@ -570,12 +648,14 @@ task fixes spelling. Limits: `connection_max`, `daemon_max_admitted`,
 `timeout_limit`, `healthy_reset`. Trust: `allowed_workspace_roots`, adapter
 commands, additional environment, toolchain override. Workspace scope holds
 only settings that select no program: capability overrides and adapter options
-of that kind.
+of that kind. The existing `daemon_socket`, `log_filter`, and `log_format` are
+daemon scope, and `locale` belongs to the client.
 
 Relations: `workspace_max <= daemon_max_admitted < connection_max`;
-`1 <= workspace_max_running <= workspace_max_admitted <= daemon_max_admitted`;
-`1 <= workspace_process_max < process_budget`; every duration is positive and
-finite; `queue_deadline < request_deadline`; and
+`1 <= workspace_max_running <= workspace_max_admitted`;
+`workspace_max_admitted <= daemon_max_admitted - workspace_max + 1`, which
+`AD-2` implies anyway; `1 <= workspace_process_max < process_budget`; every
+duration is positive and finite; `queue_deadline < request_deadline`; and
 `restore_deadline + kill_deadline <= shutdown_deadline`.
 
 ### Dispositions
@@ -593,7 +673,7 @@ finite; `queue_deadline < request_deadline`; and
 | ADR 0009: related nested project roots     | `LS-1`: one server per project root in the first implementation                                               |
 | ADR 0010: fairness, cancellation           | `AD-4`, `MU-8`, `MU-13`                                                                                       |
 | RFC §6.8: eviction order                   | Least recently used, ties by slot order; 12.3.4                                                               |
-| RFC §6.9: symlink policy                   | Canonicalize the start; below the root, resolve beneath the handle; 12.3.2                                    |
+| RFC §6.9: symlink policy                   | Canonicalize the start; below the root, `WS-6`; 12.3.2                                                        |
 | RFC §8.1: vocabulary                       | Table 2, `Configuration vocabulary`, Tables 5 and 6; wire shape is 12.3.2's                                   |
 | RFC invariants 3 and 6                     | `LC-2`; `AD-1`, `AD-2`                                                                                        |
 
@@ -647,7 +727,7 @@ the startup directory (`crates/weaver-config/src/lib.rs:107`).
   `docs/adrs/adr-0009-workspace-scoped-language-server-lifecycle.md`, and
   `docs/adrs/adr-0010-workspace-local-concurrency.md`.
 - `docs/weaver-design.md` §§2.1.12, 2.3.1, 2.3.3 and the workspace-manager text
-  that follows it, 3.1, 3.1.1, 4.2.3, 4.3.6, and 4.3.7.
+  that follows it, 2.1.7, 3.1, 3.1.1, 4.2.2, 4.2.3, 4.3.6, and 4.3.7.
 - `docs/rfcs/rfc-0003-sempai-query-to-selector-vertical-slice.md` §6.9 and
   `docs/adrs/adr-0012-versioned-selector-streams.md`, for cross-references only.
 - `docs/roadmap.md`, `docs/contents.md`, `docs/repository-layout.md`,
@@ -676,9 +756,9 @@ Earlier plans under-counted tests, behavioural steps, and private-item
 documentation; 12.1.2 also recorded a 116-file pull request as a breach. The
 first probe was 184 dense Python lines that omitted six areas. Two reviewers
 judged the draft's 2,000-line model estimate too low (2,800 to 3,800). The
-estimate is now 3,250 over four milestones with 20 per cent contingency, and
+estimate is now 3,550 over four milestones with 20 per cent contingency, and
 splitting the model into kernels allows a stop after any of them. Documentation
-is estimated at about four lines for each of 62 clauses, plus the tables, proof
+is estimated at about five lines for each of 64 clauses, plus the tables, proof
 sketches, and the dependent documents. 12.1.1's checking crate, with files of
 530 and 401 lines, shows that the 400-line limit needs early decomposition.
 
@@ -754,7 +834,8 @@ Five kernels, each a small transition system with pure decision functions.
 There are no threads, files, or clocks. A deadline is a step that is always
 enabled once its wait has begun. Environment steps, each bounded: execution
 identity change, file edit, server exit, server hang, client disconnection,
-root replacement, commit input/output failure, rollback failure, and shutdown.
+root replacement, marker addition or removal, adapter loading, commit
+input/output failure, rollback failure, and shutdown.
 
 - `K-REGISTRY`: entries, generations, counts, and the set of leases as ghost
   state (state used only to state properties).
@@ -766,38 +847,48 @@ root replacement, commit input/output failure, rollback failure, and shutdown.
   as the specification that `K-COORDINATION` establishes.
 - `K-OWNERSHIP`: path component sequences and a set of marked directories.
 
-| From       | To         | When                                                            |
-| ---------- | ---------- | --------------------------------------------------------------- |
-| `absent`   | `creating` | first request; daemon not stopping                              |
-| `creating` | `ready`    | initialized; published under the registry lock                  |
-| `creating` | `absent`   | failure, deadline, shutdown, or root replaced; all waiters told |
-| `ready`    | `absent`   | count zero, and idle, over limit, root replaced, or shutdown    |
-| `ready`    | `draining` | count above zero, and root replaced or shutdown                 |
-| `draining` | `absent`   | last lease released                                             |
+History that a property needs is an explicit ghost field: lease grants, queue
+arrivals, the writer of each file version, when an adapter really finished
+loading, the last identity and target observations, and whether a run ever
+staged. A fault is one field of `Policy`, and `steps` calls the decision
+functions rather than repeating them. Kernels are composed only through the
+assumption that `K-MUTATION` makes about coordination; that is a residual gap of
+`T-RANK`.
+
+| From       | To         | When                                                                 |
+| ---------- | ---------- | -------------------------------------------------------------------- |
+| `absent`   | `creating` | first request; daemon not stopping                                   |
+| `creating` | `ready`    | initialized; published under the registry lock                       |
+| `creating` | `absent`   | failure, deadline, shutdown, replaced, or unmarked; all waiters told |
+| `ready`    | `absent`   | count zero, and idle, over limit, replaced, unmarked, or shutdown    |
+| `ready`    | `draining` | count above zero, and replaced, unmarked, or shutdown                |
+| `draining` | `absent`   | last lease released                                                  |
 
 _Table 5: Workspace transitions. A later `creating` is a new generation._
 
-| From                  | To         | When                                                               |
-| --------------------- | ---------- | ------------------------------------------------------------------ |
-| `absent`              | `starting` | slot reserved; not in backoff; circuit closed                      |
-| `starting`            | `warming`  | `initialize` completed                                             |
-| `warming`             | `ready`    | the adapter's readiness signal                                     |
-| `starting`, `warming` | `stopping` | deadline, exit, identity change, workspace retirement, or shutdown |
-| `ready`               | `draining` | identity stale, idle eviction, workspace retirement, or shutdown   |
-| `ready`, `draining`   | `stopping` | exit, transport failure, `timeout_limit`, or `MU-10`               |
-| `draining`            | `stopping` | last lease released                                                |
-| `stopping`            | `absent`   | child reaped; only now is the process slot free                    |
+| From                  | To         | When                                                                      |
+| --------------------- | ---------- | ------------------------------------------------------------------------- |
+| `absent`              | `starting` | slot reserved; not in backoff; circuit closed                             |
+| `starting`            | `warming`  | `initialize` completed                                                    |
+| `warming`             | `ready`    | the adapter's healthy readiness signal, and `MU-10` queue applied         |
+| `ready`               | `warming`  | not-ready signal, or a committed project-model change                     |
+| `starting`, `warming` | `stopping` | deadline, exit, identity change, workspace draining, shutdown, or `MU-10` |
+| `ready`               | `draining` | identity stale, idle eviction, workspace retirement, or shutdown          |
+| `ready`, `draining`   | `stopping` | exit, transport failure, `timeout_limit`, or `MU-10`                      |
+| `draining`            | `stopping` | no leases remain                                                          |
+| `stopping`            | `absent`   | child reaped; only now is the process slot free                           |
 
 _Table 6: Server instance transitions. An abnormal stop increments the slot's
 failure count; `healthy_reset` completions clear it; `restart_limit` failures
 open the circuit for `circuit_delay`._
 
-Wait order. A request waits only for something ordered above all it holds, by
-(rank, position): 0 connection permit; 1 daemon and workspace permits (refused,
-not awaited); 2 workspace lease, including creation; 3 coordination, by queue
-ticket; 4 server set, by reservation. Waits for the supervisor (start, reap,
-barrier, resolver) are bounded by their own deadlines and never depend on a
-request. The registry lock is a leaf.
+Wait order. A request waits only for a rank strictly higher than any it holds:
+0 connection permit; 1 daemon and workspace permits (refused, not awaited); 2
+workspace lease, including creation; 3 coordination; 4 server set, by
+reservation. Queue positions order grants within rank 3 and never justify a
+wait. Waits for the supervisor (start, reap, barrier, resolver) are bounded by
+their own deadlines and never depend on a request; only requests cause starts,
+and a request ends when its start fails. The registry lock is a leaf.
 
 Mutation phases: `planning`, `planned` (no coordination held), `queued`, `held`,
 `reserved`, `baseline`, `staged`, `verified`, `committing`, `rolling_back`,
@@ -809,74 +900,83 @@ violation is a configuration error reported before admission.
 
 ### Representation relationships
 
-| Model                      | Production state (later task)                | Relationship to establish there                          |
-| -------------------------- | -------------------------------------------- | -------------------------------------------------------- |
-| entry generation and count | registry entry (12.3.3)                      | count equals live lease guards; a guard names one entry  |
-| ghost lease set            | lease guard values                           | each guard decrements once, on drop, under the lock      |
-| permits per workspace      | admission counters (12.3.5)                  | the sum equals requests past parsing and not answered    |
-| queue and holders          | coordinator (12.3.5)                         | position is arrival order; cancelled entries are removed |
-| server instance state      | supervised child (12.3.4)                    | `absent` exactly when the child has been reaped          |
-| staged flag                | overlay known to the session (12.3.5)        | clear exactly when a barrier followed restoration        |
-| file version               | digest, mode, kind, or absence (16.1.6)      | equal versions imply equal expected state                |
-| revision                   | token of nonce, generation, counter (12.3.3) | changes with every Weaver commit                         |
-| marked directory           | `.git` or `.weaver-root` entry (12.3.2)      | evaluated beneath the held root handle                   |
+| Model                      | Production state (later task)                | Relationship to establish there                            |
+| -------------------------- | -------------------------------------------- | ---------------------------------------------------------- |
+| entry generation and count | registry entry (12.3.3)                      | count equals live lease guards; a guard names one entry    |
+| ghost lease set            | lease guard values                           | each guard decrements once, on drop, under the lock        |
+| permits per workspace      | admission counters (12.3.5)                  | the sum equals requests past parsing and not answered      |
+| queue and holders          | coordinator (12.3.5)                         | position is arrival order; cancelled entries are removed   |
+| server instance state      | supervised child (12.3.4)                    | `absent` exactly when the child has been reaped            |
+| staged flag                | overlay known to the session (12.3.5)        | clear exactly when `MU-10` completed or the server stopped |
+| file version               | digest, mode, kind, or absence (16.1.6)      | equal versions imply equal expected state                  |
+| revision                   | token of nonce, generation, counter (12.3.3) | changes with every Weaver commit                           |
+| marked directory           | `.git` or `.weaver-root` entry (12.3.2)      | evaluated beneath the held root handle                     |
 
 _Table 7: What later conformance tests must relate._
 
 ### Invariants and lemmas
 
-Every `INV` is checked by a monitor that reads state and history, not the
-policy.
+Every `INV` is checked by a monitor that reads state, steps, and ghost fields,
+not the policy.
 
 - `INV-COUNT` (`LC-1`): the count equals the number of outstanding leases.
-- `INV-GEN` (`LC-3`, `LC-4`, `LC-6`, `LC-7`): one live generation per key;
-  every lease is on it and was granted while it was ready; a starting server's
-  lease counts.
-- `INV-WAIT` (`LC-5`): creation waiters all receive one outcome, and no entry is
-  visible before it is initialized.
+- `INV-GEN` (`LC-1`, `LC-3`, `LC-4`, `LC-6`, `LC-7`): one live generation per
+  key; every lease is on it and was granted while it was ready; a starting or
+  warming instance belongs to a generation that is live.
+- `INV-WAIT` (`LC-5`): creation waiters all receive one outcome, independent of
+  any client, and no entry is visible before it is initialized.
 - `INV-PERMIT` (`AD-2`): with limit `D`, `N` workspaces allowed, `F` free
   permits, and `A` workspaces holding any, `F >= N - A` and `F >= 0`.
-- `INV-EXCL` (`MU-2`): an exclusive holder is alone.
+- `INV-EXCL` (`AD-4`): an exclusive holder is alone.
+- `INV-RUN` (`AD-4`): running requests stay within their limit.
 - `INV-FIFO` (`AD-4`): no grant precedes an earlier, uncancelled, conflicting
   arrival.
-- `INV-RANK` (`AD-5`): each wait is above everything held, by the order above.
-- `INV-BUDGET` (`AD-6`, `AD-7`): instances not `absent` never exceed the budget,
-  nor a workspace's share.
-- `INV-SERVER` (`LS-2`, `LS-7`): a slot has at most one current and one
-  draining instance, follows Table 6, and can always reach `starting` again.
-- `INV-READY` (`MU-6`): a passing verdict uses servers ready throughout.
-- `INV-STAGE` (`MU-10`): no read is served by an instance holding another
-  request's staged content, and none holds any after its exclusive lease ends.
+- `INV-RANK` (`AD-5`, `AD-6`, `MU-2`): each wait is for a rank strictly above
+  everything held, and the explicit wait-for graph is acyclic.
+- `INV-BUDGET` (`AD-6`, `AD-7`): instances not `absent` plus unreaped claims
+  never exceed the budget, nor a key's share.
+- `INV-SERVER` (`LS-2`, `LS-7`): a slot has at most one current and one outgoing
+  instance, only Table 6 transitions occur, and `starting` stays reachable.
+- `INV-READY` (`MU-6`): a passing verdict uses servers that had really loaded
+  throughout, and no passing verdict covers a plan its adapter cannot represent.
+- `INV-STAGE` (`MU-1`, `MU-10`): no query is answered by an instance holding
+  another request's staged content, and no serving instance holds any after its
+  exclusive lease ends.
 - `INV-SYNC` (`MU-10`): a read served after a commit is served by an instance
-  that was notified or started after it.
-- `INV-PIN` (`MU-5`, `MU-7`): identity at the post-verification check equals the
-  identity at baseline, for the whole set.
-- `INV-READ` (`MU-1`, `MU-3`): at exclusive grant, everything the plan read is
-  unchanged by Weaver since planning, or is declared and unchanged by digest.
-- `INV-BASE` (`MU-4`, `MU-8`): each replaced target equalled its expected state
-  at its recheck, and rollback overwrites only this commit's bytes; only an
-  edit inside `AXIOM-WINDOW` can be lost.
-- `INV-RETRY` (`RC-2`): a retryable outcome has effects none.
+  that held the committed content at a barrier, or started after it.
+- `INV-OWN` (`WS-4`): at commit entry the workspace owns every target.
+- `INV-PIN` (`MU-5`, `MU-7`): every commit entry is preceded, after the last
+  verification response, by an observation of the whole set equal to baseline.
+- `INV-READ` (`MU-3`, `MU-12`): at exclusive grant, no other Weaver mutation has
+  written anything the plan read since it was read.
+- `INV-BASE` (`MU-8`): every replacement is immediately preceded by an
+  observation equal to the expected state, and rollback overwrites only this
+  commit's bytes; only an edit inside `AXIOM-WINDOW` can be lost.
+- `INV-RETRY` (`MU-5`, `RC-2`): a retryable outcome has effects none and its run
+  never entered `staged`.
 - `INV-EFFECT` (`MU-8`, `MU-13`): before `committing`, effects are none; after
   it, cancellation and shutdown do not change the outcome, and effects are none
   only if every replaced file was restored.
 - `L-FIRST` (`AD-2`): while fewer than `N` workspaces hold permits, a workspace
-  holding none is not refused at daemon or workspace scope; otherwise the
-  refusal is `workspace_limit`. Sketch: from `INV-PERMIT`, `A < N` gives
-  `F >= 1`. The invariant holds initially because `D >= N`; a first permit
-  lowers both sides by one; a later permit is granted only if `F - 1 >= N - A`;
-  releases raise `F` and raise `N - A` by at most as much.
-- `L-TERMINATE` (`AD-5`): with environment steps exhausted, the system graph is
-  acyclic apart from backoff, and every state without a successor is quiescent:
-  no leases, no staged content, every request done. This is inevitability, not
-  mere possibility.
-- `L-SAFE-RETRY` (`RC-2`): repeating a retryable request cannot repeat an effect
-  of the first attempt, from `INV-RETRY` and `INV-EFFECT`.
-- `L-OWNER` (`WS-2`, `WS-4`): the owner is marked, is an ancestor or the path
-  itself, and no marked path lies strictly between; it is undefined exactly
-  when no ancestor is marked.
-- `L-REFINE` (`WS-4`): adding a marker `m` changes the owner only of paths under
-  `m` whose owner was above `m` or undefined, and changes it to `m`.
+  holding none is not refused a daemon or workspace permit. It may still be
+  refused as `workspace_limit` while every registry entry is pinned. Sketch:
+  from `INV-PERMIT`, `A < N` gives `F >= 1`. The invariant holds initially
+  because `D >= N`; a first permit lowers both sides by one; a later permit is
+  granted only if `F - 1 >= N - A`; a release raises `F` by one and `N - A` by
+  at most one.
+- `L-TERMINATE` (`AD-5`, `MU-10`): with environment steps exhausted, the system
+  graph is acyclic, and in every sink each request is done, each entry and
+  instance is `absent` or `ready`, and nothing is staged. It is checked twice:
+  with deadline steps, and again with them disabled and no hang or exit, so
+  that a deadline cannot hide a deadlock.
+- `L-SAFE-RETRY` (`RC-2`): repeating a retryable request cannot repeat an
+  effect of the first attempt, from `INV-RETRY` and `INV-EFFECT`.
+- `L-OWNER` (`WS-2`, `WS-4`): the owner is marked, is the path or an ancestor,
+  and no marked path lies strictly between; it is undefined exactly when
+  neither the path nor any ancestor is marked.
+- `L-REFINE` (`WS-4`): adding a marker `m` changes the owner only of `m` and
+  paths beneath it whose owner was above `m` or undefined, and changes it to
+  `m`.
 
 Connection capacity and process budget have no per-workspace first-come
 guarantee beyond `AD-7`, and refused requests have no retry fairness. These are
@@ -892,8 +992,12 @@ stated limits, not lemmas.
   1.29.3). 12.3.4 exercises the real tool.
 - `AXIOM-FS`: renaming one file is atomic for observers on one filesystem; a
   held directory handle prevents reuse of its identity.
-- `AXIOM-WINDOW`: an external edit between a recheck and its rename cannot be
-  detected.
+- `AXIOM-BARRIER`: a barrier response implies that earlier overlay
+  notifications on that transport were applied. Conformance-tested per adapter
+  in 12.3.4; an adapter that fails is stopped instead. It says nothing about
+  reloads from disk.
+- `AXIOM-WINDOW`: an external edit, or a marker change, between a recheck and
+  its rename cannot be detected.
 - `AXIOM-KILL`: a reaped child holds no documents.
 - `AXIOM-SCOPE`: small scenarios are representative. This is a hypothesis and
   the main residual gap of bounded exploration.
@@ -901,7 +1005,7 @@ stated limits, not lemmas.
 ### Methods per obligation
 
 - Obligation: `INV-COUNT`, `INV-GEN`, `INV-WAIT`, `INV-PERMIT`, `L-FIRST`,
-  `INV-EXCL`, `INV-FIFO`, and `INV-RANK`. Method: exhaustive exploration of
+  `INV-EXCL`, `INV-RUN`, and `INV-FIFO`. Method: exhaustive exploration of
   reachable states, and an inductiveness check over _every_ state in a bounded
   domain that satisfies the invariant. Rationale: the second finds invariants
   too weak to support a later proof; `INV-GEN` without `INV-COUNT` fails it.
@@ -931,38 +1035,54 @@ stated limits, not lemmas.
 - Obligation: `integration`, `unit`, and `end-to-end` clauses. Method: none
   here; the owner task supplies them. `review` clauses are read by the approver.
 
-| Fault (one rule changed)                   | Invariant that must fail    |
-| ------------------------------------------ | --------------------------- |
-| look up, then count                        | `INV-GEN`                   |
-| release a lease twice                      | `INV-COUNT`                 |
-| publish before initialization              | `INV-WAIT`                  |
-| reserve measured before the grant          | `INV-PERMIT`                |
-| no reserve                                 | `INV-PERMIT`, `L-FIRST`     |
-| readers ignore an exclusive holder         | `INV-EXCL`                  |
-| readers overtake a waiting mutation        | `INV-FIFO`                  |
-| upgrade shared to exclusive                | `INV-RANK`                  |
-| wait for process slots one at a time       | `INV-RANK`                  |
-| free the slot before reaping               | `INV-BUDGET`                |
-| `initialize` means ready                   | `INV-READY`                 |
-| close without restoring                    | `INV-STAGE`                 |
-| release the lease while a server hangs     | `INV-STAGE`                 |
-| notify only ready servers                  | `INV-SYNC`                  |
-| no check after verification                | `INV-PIN`                   |
-| digests of targets only, no revision       | `INV-READ`                  |
-| check once before the section              | `INV-BASE`                  |
-| reserve formatter slots after staging      | `INV-RETRY`                 |
-| cancellable commit                         | `INV-EFFECT`                |
-| roll back without checking bytes           | `INV-BASE`                  |
-| report a failed rollback as none           | `INV-EFFECT`                |
-| a draining workspace grants a lease        | `INV-GEN`                   |
-| an exited server stays current for ever    | `INV-SERVER`                |
-| `overloaded` after staging                 | `INV-RETRY`, `L-SAFE-RETRY` |
-| hold the lease until a hung server answers | `L-TERMINATE`               |
-| outermost marker                           | `L-OWNER`                   |
-| starting directory as root                 | `L-OWNER`                   |
-| new marker applied to the whole tree       | `L-REFINE`                  |
+| Clause  | Fault (one rule negated)                   | Must fail                   |
+| ------- | ------------------------------------------ | --------------------------- |
+| `WS-2`  | outermost marker                           | `L-OWNER`                   |
+| `WS-2`  | starting directory as root                 | `L-OWNER`                   |
+| `WS-4`  | new marker applied to the whole tree       | `L-REFINE`                  |
+| `WS-4`  | ownership checked only at grant            | `INV-OWN`                   |
+| `LC-1`  | look up, then count                        | `INV-GEN`                   |
+| `LC-1`  | release a lease twice                      | `INV-COUNT`                 |
+| `LC-3`  | new generation while draining              | `INV-GEN`                   |
+| `LC-4`  | retire without reading the count           | `INV-GEN`                   |
+| `LC-5`  | publish before initialization              | `INV-WAIT`                  |
+| `LC-5`  | creator's disconnection fails the waiters  | `INV-WAIT`                  |
+| `LC-6`  | a draining workspace grants a lease        | `INV-GEN`                   |
+| `LC-7`  | a starting instance holds no lease         | `INV-GEN`                   |
+| `LS-2`  | replace again while one is outgoing        | `INV-SERVER`                |
+| `LS-7`  | an exited server stays current for ever    | `INV-SERVER`                |
+| `MU-1`  | planning query without coordination        | `INV-STAGE`                 |
+| `MU-2`  | upgrade shared to exclusive                | `INV-RANK`                  |
+| `MU-3`  | no revision check                          | `INV-READ`                  |
+| `MU-5`  | reserve formatter slots after staging      | `INV-RETRY`                 |
+| `MU-5`  | identity read per step, not pinned         | `INV-PIN`                   |
+| `MU-6`  | `initialize` means ready                   | `INV-READY`                 |
+| `MU-6`  | pass a plan the adapter cannot represent   | `INV-READY`                 |
+| `MU-7`  | no check after verification                | `INV-PIN`                   |
+| `MU-8`  | check once before the section              | `INV-BASE`                  |
+| `MU-8`  | roll back without checking bytes           | `INV-BASE`                  |
+| `MU-8`  | cancellable commit                         | `INV-EFFECT`                |
+| `MU-8`  | report a failed rollback as none           | `INV-EFFECT`                |
+| `MU-10` | close without restoring                    | `INV-STAGE`                 |
+| `MU-10` | release the lease while a server hangs     | `INV-STAGE`                 |
+| `MU-10` | notify only ready servers                  | `INV-SYNC`                  |
+| `MU-10` | barrier without an overlay                 | `INV-SYNC`                  |
+| `MU-10` | hold the lease until a hung server answers | `L-TERMINATE`               |
+| `MU-12` | a failed commit keeps the revision         | `INV-READ`                  |
+| `MU-13` | shutdown abandons a commit                 | `INV-EFFECT`                |
+| `AD-2`  | reserve measured before the grant          | `INV-PERMIT`                |
+| `AD-2`  | no reserve                                 | `INV-PERMIT`, `L-FIRST`     |
+| `AD-4`  | readers ignore an exclusive holder         | `INV-EXCL`                  |
+| `AD-4`  | readers overtake a waiting mutation        | `INV-FIFO`                  |
+| `AD-4`  | ignore the running limit                   | `INV-RUN`                   |
+| `AD-5`  | no deadline on a start                     | `L-TERMINATE`               |
+| `AD-6`  | wait for process slots one at a time       | `INV-RANK`                  |
+| `AD-6`  | free the slot before reaping               | `INV-BUDGET`                |
+| `AD-7`  | ignore the key's share                     | `INV-BUDGET`                |
+| `RC-2`  | retryable `commit_incomplete`              | `INV-RETRY`, `L-SAFE-RETRY` |
 
-_Table 8: Fault matrix. Every invariant and lemma has at least one row._
+_Table 8: Fault matrix, keyed by the clause each fault negates. Every `model`
+clause, invariant, and lemma has at least one row._
 
 `googletest` matchers and `pretty_assertions` are used for traces and tables. No
 `insta` snapshot is planned: there is no output format. No end-to-end test is
@@ -985,21 +1105,33 @@ No lemma is selected for Verus or Kani in this task:
 `AGENTS.md` asks for an exhaustive Verus proof of introduced lemmas or
 contractual business logic. The task brief asks for selective use, with theorem
 statements left in design documents until implementation reaches them. This
-plan reads the first through the second; question 6 asks the approver to
+plan reads the first through the second; question 8 asks the approver to
 confirm. `EP-M1` writes, for each theorem, the ghost state, preconditions,
 strengthened invariant, measure, and key cases. These are hypotheses about
 proof structure; no `assume`, `admit`, or external proof body is introduced.
 
-| Theorem          | Statement                                      | Strengthening or measure                      | First kernel |
-| ---------------- | ---------------------------------------------- | --------------------------------------------- | ------------ |
-| `T-OWNER`        | `L-OWNER`, `L-REFINE` for any path length      | induction on path length                      | 12.3.2       |
-| `T-LIFECYCLE`    | `INV-GEN` inductive for any keys and requests  | conjoin `INV-COUNT`                           | 12.3.3       |
-| `T-PERMIT`       | `INV-PERMIT` inductive, hence `L-FIRST`        | none needed                                   | 12.3.5       |
-| `T-COORDINATION` | `INV-EXCL`, `INV-FIFO` inductive for any queue | queue sorted by ticket; holders conflict-free | 12.3.5       |
-| `T-RANK`         | the wait graph is acyclic                      | lexicographic (rank, position)                | 12.3.5       |
-| `T-COMMIT`       | `INV-EFFECT` for any number of files           | prefix replaced, suffix untouched             | 16.1.6       |
+| Theorem          | Statement                                      | Contract and strengthening                                     | Kernel | Tested by                  | Not covered by tests       |
+| ---------------- | ---------------------------------------------- | -------------------------------------------------------------- | ------ | -------------------------- | -------------------------- |
+| `T-OWNER`        | `L-OWNER`, `L-REFINE` for any path length      | post of `owner`: the set-based definition; induction on length | 12.3.2 | exhaustive, `proptest`     | paths beyond the bound     |
+| `T-LIFECYCLE`    | `INV-GEN` inductive for any keys and requests  | conjoin `INV-COUNT`; sketch below                              | 12.3.3 | inductiveness check        | unbounded keys             |
+| `T-PERMIT`       | `INV-PERMIT` inductive, hence `L-FIRST`        | pre `D >= N`; post of `admit` preserves it                     | 12.3.5 | exhaustive, `proptest`     | unbounded limits           |
+| `T-COORDINATION` | `INV-EXCL`, `INV-FIFO` inductive for any queue | queue sorted by ticket; holders conflict-free                  | 12.3.5 | inductiveness check        | longer queues              |
+| `T-RANK`         | the wait graph is acyclic                      | measure: rank, strictly increasing                             | 12.3.5 | `INV-RANK` in `K-MUTATION` | composition across kernels |
+| `T-COMMIT`       | `INV-EFFECT` for any number of files           | per-file status: untouched, replaced, restored, or abandoned   | 16.1.6 | `tests/mutation.rs`        | more than two files        |
 
-_Table 9: Theorem statements and the task that creates each kernel._
+_Table 9: Theorem statements, and how they relate to tests._
+
+Sketch of `T-LIFECYCLE`. Ghost state: a finite set `L` of leases, each with a
+key and a generation, and the greatest generation ever used per key. Invariant:
+at most one entry per key; its count is the number of leases in `L` with that
+key; each of those has the entry's generation; no lease has a key without an
+entry; and no entry exceeds the greatest generation. Lookup requires a ready
+entry and adds one lease of its generation and one to the count. Release
+requires membership and removes both. Retirement and the end of draining
+require a count of zero, so by the invariant no lease has that key, and
+removing the entry preserves it. Draining changes no lease. Creation requires
+no entry, so no lease has the key, and uses a greater generation. Without the
+count conjunct, retirement's step does not follow; the probe exhibits it.
 
 Verus is warranted for `T-OWNER` and `T-LIFECYCLE` if their kernels stay pure,
 and Kani first for `T-COMMIT`, as 19.3.3 says. The others are adequately served
@@ -1084,10 +1216,11 @@ Feature: Multi-workspace daemon contract
 Record the revision and each gate's result. Re-check every "today" claim whose
 file changed since `fe56d226`, and the state of pull requests #260 and #453.
 With scratch tests that are not committed, determine whether the sandbox
-refuses plugins from the multi-threaded daemon, and whether a cold
-`rust-analyzer` returns empty diagnostics. Raise an issue for each confirmed
-defect and record its number. Correct any falsified conflict here and escalate
-if a clause changes. If the baseline is red, stop.
+refuses plugins from the multi-threaded daemon, whether a cold `rust-analyzer`
+returns empty diagnostics, and whether closing a staged document leaves staged
+content visible to a later read. Raise an issue for each confirmed defect and
+record its number. Correct any falsified conflict here and escalate if a clause
+changes. If the baseline is red, stop.
 
 ### `EP-M1` contract document and revised decisions
 
@@ -1095,8 +1228,9 @@ Create `docs/multi-workspace-daemon-design.md`: purpose, terms, clauses, Tables
 2, 3, 5, 6, and 7, wait order, configuration vocabulary, axioms, theorem
 sketches, and how a clause is amended (a pull request that changes the clause,
 its evidence, and any ADR whose decision it alters). Before freezing the text,
-repeat the inductiveness probes described in `Artefacts and notes` for any
-strengthened invariant.
+check any invariant whose statement changes by enumerating every state of its
+small domain that satisfies it and confirming that each step preserves it; a
+scratch script is enough, because `EP-M2` and `EP-M3` make the check permanent.
 
 Revise RFC 0002: correct §§3 and 6.1; rewrite §§6.1 to 6.9 and 7 where a
 conflict applies, citing clauses; drop the metrics requirement; replace §11
@@ -1135,15 +1269,20 @@ if its obligation changes.
 ### `EP-M4` behavioural scenarios and the full fault matrix
 
 Add the feature file and steps, complete Table 8, and add a test that every
-invariant has at least one fault row that kills it.
+`model` clause, invariant, and lemma has at least one fault row that is killed
+for the stated reason.
 
 ### `EP-M5` dependent documents
 
-- `docs/weaver-design.md`: align the listed sections and cite clauses. Do not
-  edit the artefact text in §2.3.2 (R6).
+- `docs/weaver-design.md`: align the listed sections and cite clauses. If #260
+  has merged, leave §2.3.2 alone; otherwise add one sentence saying that its
+  artefact text awaits #260.
 - `docs/roadmap.md`: add clause references to the success text of 12.3.2 to
   12.3.6, 15.3.4 (content-keyed cache), 16.1.5, and 16.1.6; add conformance to
-  12.3.3 and 12.3.5. Do not renumber or add tasks.
+  12.3.3 and 12.3.5; note in 13.2.2 and 15.3.3 the constraints `RC-4` and
+  `WS-8`; add the new document to 12.3's list; and replace "remains internal to
+  the daemon protocol and runtime" with the user-visible effects of `WS-2`,
+  `TR-2`, `TR-3`, and `CF-1`. Do not renumber or add tasks.
 - RFC 0003 §6.9 and ADR 0012: cite `MU-12` and `WS-8`. Their status is
   unchanged.
 - `docs/developers-guide.md`: where clauses live, how to amend one, the model's
@@ -1161,11 +1300,16 @@ Search for stale claims with
 Add `tests/references.rs`: clause identifiers are unique; every identifier
 cited in live documents is defined; each clause has an owner that exists in the
 roadmap and a kind of evidence; and the set of clauses marked `model` equals
-the set reached from killed fault rows through the invariants they kill.
-Include synthetic documents with a duplicate, an undefined citation, and an
-unknown owner, which must be rejected. The check shows that references resolve.
-It cannot show that prose agrees, and it does not pin status text; a test that
-pinned text was removed in pull request #449.
+the set of clauses that killed fault rows negate. When a kernel is retired
+(D3), its rows move to the owner crate and its clauses change from `model` to
+`production` in the same pull request. Include synthetic documents with a
+duplicate, an undefined citation, and an unknown owner, which must be rejected.
+The check shows that references resolve. It cannot show that prose agrees, and
+it does not pin status text; a test that pinned text was removed in pull
+request #449.
+
+If question 7 drops the model, this test is dropped too, and the references are
+checked by the reviewer with `git grep`.
 
 Then change the RFC and ADRs to `Accepted, <date>. <summary>`, update the ADR
 dates and `docs/contents.md`, and mark 12.3.1 done. The approver accepts by
@@ -1255,23 +1399,33 @@ that exploration is feasible and nothing more.
 
 _Table 11: First probe._
 
-Second probe, after review, of the replacement rules:
+Later probes, after review, of the replacement rules. The second probe's
+registry result was definitional, and its mutation controls could not fail,
+because they compared revisions instead of file histories. These are the
+results of repeating them with real transitions and history monitors:
 
-| Rule                                      | Result                                                                       |
-| ----------------------------------------- | ---------------------------------------------------------------------------- |
-| `AD-2`, reserve measured after the grant  | Inductive in all 1,235 states (`N <= 4`, `D <= 8`); no first request refused |
-| `AD-2`, reserve measured before, or none  | 778 non-inductive steps each                                                 |
-| `INV-GEN` alone                           | 12 of 54 states satisfying it can break it                                   |
-| `INV-GEN` with `INV-COUNT`                | 0 of 18                                                                      |
-| Nearest marker                            | 0 violations of `L-OWNER` and `L-REFINE` in 896 cases                        |
-| Outermost marker                          | 320 violations of `L-OWNER`, 1,088 of `L-REFINE`                             |
-| Starting directory                        | 448 violations of `L-OWNER`; `L-REFINE` does not reject it                   |
-| `MU-3` with revision, `MU-8` with recheck | 386 states, no violation, `stale_base` reached                               |
-| `MU-3` without revision                   | write skew                                                                   |
-| `MU-8` without per-file recheck           | lost update                                                                  |
-| Failed rollback                           | effects unknown reached, no violation                                        |
+| Rule                                     | Result                                                                             |
+| ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| `AD-2`, reserve measured after the grant | Inductive in all 1,235 states (`N <= 4`, `D <= 8`); no first request refused       |
+| `AD-2`, reserve measured before, or none | 778 non-inductive steps each                                                       |
+| `INV-GEN` alone                          | 12 steps from 54 satisfying states break it                                        |
+| `INV-GEN` with `INV-COUNT`               | no step from 18 satisfying states breaks either                                    |
+| Nearest marker                           | no violation of `L-OWNER` or `L-REFINE` in 896 cases                               |
+| Outermost marker                         | 320 violations of `L-OWNER`, 1,088 of `L-REFINE`                                   |
+| Starting directory                       | 448 violations of `L-OWNER`; `L-REFINE` does not reject it                         |
+| `MU-3`, `MU-8`, `MU-12` together         | 362 states, no violation; stale, none, unknown, and committed outcomes all reached |
+| A failed commit keeps the revision       | 2 violations of `INV-READ`                                                         |
+| No revision check                        | 14 violations of `INV-READ`                                                        |
+| No per-file recheck                      | 8 violations of `INV-BASE`                                                         |
+| Rollback without checking bytes          | 6 violations of `INV-BASE`                                                         |
+| Failed rollback reported as none         | 6 violations of `INV-EFFECT`                                                       |
+| Upgrade                                  | deadlock, and 4 waits at a rank already held                                       |
+| Release, then acquire                    | no deadlock, and no such wait                                                      |
 
-_Table 12: Second probe._
+_Table 12: Repeated probes. They cover two mutations, two files, one external
+edit, and one input/output failure. `MU-5` to `MU-7`, `MU-10`, `MU-13`, `AD-4`,
+`AD-6`, `AD-7`, and `LS-2` have not been probed in their present form; `EP-M2`
+and `EP-M3` are their first test._
 
 Design review, 2026-11-24. Five reviewers covered concurrency, identity and
 security, language servers and mutation, verification, and contracts and
@@ -1283,25 +1437,40 @@ one with a proof; commit section corrected; false lemmas replaced; kernels,
 representation table, inductiveness checks, and fault matrix added; estimates
 raised. Two suggestions were not taken: deferring `TR-2` and `LS-9` wholesale,
 because both close contradictions in the four documents, and committing a
-formal proof now. The revised text has not been reviewed again by the whole
-panel.
+formal proof now. All five reviewers then rechecked the rewrite. Their
+remaining points were applied: a strictly increasing rank order, separate
+deadlock and deadline checks, a fault matrix keyed by clause, ghost state,
+overlay-based synchronization, rustup resolution without a circular
+environment, truthful trust clauses, group-writable roots, retryable codes
+never raised after staging, an ownership clause, and `MU-3` owned by 12.3.5.
+Nobody has reviewed the result of that last pass, except by the probes above.
 
 Questions for the approver:
 
-1. D5, `WS-2`: are `.git` and `.weaver-root` the only root markers, with every
-   other directory refused?
-2. `TR-2`, `TR-3`: refuse roots or markers that others can write unless listed,
-   and refuse workspace selection on endpoints that are not per-user? The
-   second leaves non-Unix defaults unusable until 12.3.2 adds authentication.
-3. D10, `TR-1`, `TR-4`: accept that servers run repository code, while
-   repository files may not choose programs?
-4. `CF-1`: stop reading `daemon_socket` and other daemon settings from project
+1. D5, `WS-2`: are `.git` and `.weaver-root` the only markers, with every other
+   directory refused? Users of Mercurial, Jujutsu without Git, and unpacked
+   archives must add `.weaver-root`, and existing end-to-end fixtures need a
+   marker when 12.3.2 lands.
+2. `TR-2`: refuse roots and markers that every user can write, and
+   group-writable ones unless listed? Shared checkouts and some containers must
+   then be listed.
+3. `TR-3`: refuse workspace selection on endpoints that are not private? This
+   makes non-Unix defaults and explicit TCP unusable, and no scheduled task
+   adds authentication.
+4. D10: is `TR-4` (servers may run any program a repository's own build or
+   server configuration names) acceptable? And is `TR-1` (Weaver itself never
+   runs a program because a workspace file names it) wanted?
+5. D12, `LS-5`: inherit the daemon's startup environment, so that the first
+   shell's `PATH` and variables reach every repository's build, or use an
+   allowlist?
+6. `CF-1`: stop reading `daemon_socket` and other daemon settings from project
    `weaver.toml` files? This changes documented behaviour when 12.3.2 lands.
-5. D3: build the model at this size, or ratify with review alone, which drops
-   `EP-M2` to `EP-M4`?
-6. D8: leave Verus to 19.3.4, or move 19.3.1 earlier so that `T-OWNER` and
+7. D3: build the model at this size, or ratify on review alone, which drops
+   `EP-M2` to `EP-M4` and the reference test?
+8. D8: leave Verus to 19.3.4, or move 19.3.1 earlier so that `T-OWNER` and
    `T-LIFECYCLE` are proved with their kernels?
-7. D7, `MU-14`: is a per-daemon guarantee enough?
+9. D7, `MU-14`: is a guarantee within one daemon enough?
+10. D11: is the narrower form of invariant 4 acceptable?
 
 ## Interfaces and dependencies
 
@@ -1310,17 +1479,28 @@ development dependencies in C4. Provisional surface:
 
 ```rust,ignore
 pub trait Kernel {
-    type State: Clone + Ord;
-    type Step: Clone;
+    type State: Clone + Ord; // includes ghost fields
+    type Step: Clone + Ord;
     fn initial(&self) -> Vec<Self::State>;
     fn steps(&self, state: &Self::State) -> Vec<(Self::Step, Self::State)>;
 }
-pub struct Monitor<S> { pub name: &'static str, pub holds: fn(&S) -> bool }
-pub fn explore<K: Kernel>(kernel: &K, monitors: &[Monitor<K::State>]) -> Exploration<K>;
-pub fn is_inductive<K: Kernel>(kernel: &K, all: &[K::State], m: &Monitor<K::State>) -> Vec<K::State>;
+pub enum Monitor<K: Kernel> {
+    State(fn(&K::State) -> bool),
+    Step(fn(&K::State, &K::Step, &K::State) -> bool),
+    Graph(fn(&Graph<K>) -> bool),
+}
+pub struct Policy { /* one field per ratified rule; a fault changes one */ }
+pub fn explore<K: Kernel>(kernel: &K, monitor: &Monitor<K>) -> Exploration<K>;
+/// Every step from a state satisfying all hypotheses that breaks the goal.
+pub fn inductive_failures<K: Kernel>(
+    kernel: &K,
+    domain: &[K::State],
+    hypotheses: &[fn(&K::State) -> bool],
+    goal: fn(&K::State) -> bool,
+) -> Vec<(K::State, K::Step, K::State)>;
 
 // Decision functions that conformance tests compare with production.
-pub fn admit(permits: &Permits, workspace: Key) -> Admission;
+pub fn admit(permits: &Permits, workspace: Key, policy: &Policy) -> Admission;
 pub fn may_retire(entry: &Entry) -> bool;
 pub fn grant(queue: &Coordination) -> Vec<Ticket>;
 pub fn reserve(budget: &Budget, set: &ServerSet) -> Reservation;
@@ -1342,5 +1522,7 @@ the dependency rule forbids the policy from naming them.
 
 2026-11-24: initial draft, then rewritten after a five-reviewer design review.
 The rewrite narrowed scope, moved clauses to a design document, wrote them out,
-replaced false lemmas and their probes, and raised the estimates. No
-implementation work has started.
+replaced false lemmas and their probes, and raised the estimates. A recheck by
+the same reviewers led to a further revision of the clauses, monitors, fault
+matrix, probes, and questions, and to one clause (`MU-12`) that a probe found.
+No implementation work has started.
