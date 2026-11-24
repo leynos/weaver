@@ -594,7 +594,7 @@ finite; `queue_deadline < request_deadline`; and
 | ADR 0010: fairness, cancellation           | `AD-4`, `MU-8`, `MU-13`                                                                                       |
 | RFC §6.8: eviction order                   | Least recently used, ties by slot order; 12.3.4                                                               |
 | RFC §6.9: symlink policy                   | Canonicalize the start; below the root, resolve beneath the handle; 12.3.2                                    |
-| RFC §8.1: vocabulary                       | Table 2, `Configuration vocabulary`, Tables 5 and 7; wire shape is 12.3.2's                                   |
+| RFC §8.1: vocabulary                       | Table 2, `Configuration vocabulary`, Tables 5 and 6; wire shape is 12.3.2's                                   |
 | RFC invariants 3 and 6                     | `LC-2`; `AD-1`, `AD-2`                                                                                        |
 
 _Table 3: Disposition of every open item._
