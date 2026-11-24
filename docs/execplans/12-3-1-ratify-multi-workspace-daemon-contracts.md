@@ -235,9 +235,9 @@ approves them. All are dated 2026-11-24 and were proposed by the planning agent.
 ## Contract conflicts and proposed resolutions
 
 Each entry gives the conflict, the resolution, and the clauses that will carry
-it. "Today" refers to `fe56d226`. Terms: a *workspace* is one repository root
-served by the daemon; a *lease* is a counted right to use something; an
-*exclusive lease* is held by one mutation at a time.
+it. "Today" refers to `fe56d226`. Terms: a _workspace_ is one repository root
+served by the daemon; a _lease_ is a counted right to use something; an
+_exclusive lease_ is held by one mutation at a time.
 
 ### Workspace identity
 
@@ -261,7 +261,7 @@ served by the daemon; a *lease* is a counted right to use something; an
   identity, retire the old state first. Prior art: `lspmux` compares roots only
   by device and inode.
 - X3 (D7). Two workspaces may mutate concurrently, yet nested roots share files.
-  Resolution (`WS-4`, `MU-9`): a workspace's *domain* is every path whose
+  Resolution (`WS-4`, `MU-9`): a workspace's _domain_ is every path whose
   nearest root is that workspace. Domains are disjoint. A mutation target must
   be in the domain when the exclusive lease is held and again at commit. Two
   markerless roots where one contains the other cannot be active together; the
@@ -323,13 +323,13 @@ served by the daemon; a *lease* is a counted right to use something; an
 - X12 (D16). "Target workspace", "adapter-selected process root", and design
   §3.1.1's "does not rely on the target workspace" disagree; §6.5 allows one
   workspace folder while the fingerprint has an ordered list. Resolution
-  (`LS-4`, `LS-5`): a *project root* is a directory in the workspace's domain
+  (`LS-4`, `LS-5`): a _project root_ is a directory in the workspace's domain
   chosen by the adapter, by default the workspace root. The working directory,
   `rootUri`, and exactly one `workspaceFolders` entry all equal it. `rootUri`
   is deprecated in LSP 3.17 and kept for older servers.
 - X13 (D17). "Only the current identity may receive new leases" assumes one
   server per language, but nested project roots need several. Resolution
-  (`LS-6`): currency is per *slot*, meaning language plus project root.
+  (`LS-6`): currency is per _slot_, meaning language plus project root.
 - X14 (D18). Invariant 4 says a server is reused only while its identity
   matches, but §6.4 allows bounded staleness, and §6.4 relies on watched files
   although nothing watches files. Resolution (`LS-7`): inputs inside the
@@ -343,7 +343,7 @@ served by the daemon; a *lease* is a counted right to use something; an
 - X16 (D20). Plugins start processes outside the pool: the rope plugin starts
   `python3`, and the rust-analyzer plugin starts its own server in a temporary
   stub crate, both from the daemon's directory and environment. Resolution
-  (`LS-9`, `CF-4`): these are *auxiliary processes*. They are never reused,
+  (`LS-9`, `CF-4`): these are _auxiliary processes_. They are never reused,
   have their own budget, run under a workspace lease, and receive an explicit
   working directory, environment, and execution identity. Relative plugin paths
   resolve against the configuration file that named them.
