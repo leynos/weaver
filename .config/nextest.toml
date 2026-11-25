@@ -93,6 +93,10 @@ slow-timeout = { period = "300s", terminate-after = 3 }
 command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaver-cli", "--test", "missing_docs_policy"]
 slow-timeout = { period = "300s", terminate-after = 3 }
 
+[scripts.setup.warm-weaverd-compile]
+command = ["cargo", "test", "--frozen", "--all-features", "-p", "weaverd", "--test", "compile_time"]
+slow-timeout = { period = "300s", terminate-after = 3 }
+
 [[profile.default.scripts]]
 filter = 'package(weaver-e2e)'
 setup = "weaver-binary"
@@ -121,3 +125,7 @@ setup = "warm-plugins-compile"
 [[profile.default.scripts]]
 filter = 'binary_id(=weaver-cli::missing_docs_policy)'
 setup = "warm-cli-docs-policy"
+
+[[profile.default.scripts]]
+filter = 'binary_id(=weaverd::compile_time)'
+setup = "warm-weaverd-compile"

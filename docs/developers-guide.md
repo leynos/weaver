@@ -149,13 +149,13 @@ which does not touch the lock). Run `cargo fetch --locked` once before running
 the e2e tests offline.
 
 Some tests start a child `cargo` or `rustc` of their own: the `weaver-docs-gate`
-`load_manifest` binary runs the renderer example through `cargo`, and both
-`compile_time` binaries (`weaver-docs-gate` and `weaver-plugins`) build
-fixtures. Run beside each other they contend for Cargo's package-cache and
-build-directory locks, and a cold build then looks like a hang.
-`.config/nextest.toml` therefore puts those binaries in the
-`nested-cargo-builds` test group, which runs one test at a time, and gives them
-a longer allowance than the default:
+`load_manifest` binary runs the renderer example through `cargo`, and the
+`compile_time` binaries (`weaver-config`, `weaver-docs-gate`, `weaver-plugins`
+and `weaverd`, each with its own warm-up script) build fixtures. Run beside
+each other they contend for Cargo's package-cache and build-directory locks,
+and a cold build then looks like a hang. `.config/nextest.toml` therefore puts
+those binaries in the `nested-cargo-builds` test group, which runs one test at
+a time, and gives them a longer allowance than the default:
 
 - The default profile warns after 60 seconds and terminates a test after 180
   seconds (three periods), and the whole run after 15 minutes, which is below
