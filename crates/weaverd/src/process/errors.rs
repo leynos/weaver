@@ -81,6 +81,23 @@ pub enum LaunchError {
         #[source]
         source: io::Error,
     },
+    /// Reading the PID file failed.
+    #[error("failed to read pid file '{path}': {source}")]
+    PidRead {
+        /// PID file path.
+        path: PathBuf,
+        /// Underlying IO error.
+        #[source]
+        source: io::Error,
+    },
+    /// The PID file did not contain a decimal process identifier.
+    #[error("pid file '{path}' contains an invalid process identifier: '{value}'")]
+    PidParse {
+        /// PID file path.
+        path: PathBuf,
+        /// Content that could not be parsed.
+        value: String,
+    },
     /// Writing the PID file failed.
     #[error("failed to write pid file '{path}': {source}")]
     PidWrite {

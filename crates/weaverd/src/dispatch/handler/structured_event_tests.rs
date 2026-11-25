@@ -4,20 +4,34 @@
 //! or environment data. These tests pin both the emitted field set and the
 //! redaction behaviour of the structured-event builders.
 
+use weaver_config::SocketEndpoint;
+
 use super::*;
 use crate::dispatch::handler::structured_event::{
     format_structured_event,
     serialize_structured_event,
 };
 
+/// Derives the runtime paths for `endpoint`, panicking with a clear message.
+fn runtime_paths(endpoint: SocketEndpoint) -> RuntimePaths {
+    let config = Config {
+        daemon_socket: endpoint,
+        ..Config::default()
+    };
+    RuntimePaths::from_config_readonly(&config).expect("runtime paths should derive")
+}
+
 #[test]
 fn serialize_structured_dispatch_event_omits_sensitive_fields() {
     let temp_dir = std::env::temp_dir();
     let endpoint = temp_dir.join("weaverd.sock");
+    let runtime_paths = runtime_paths(SocketEndpoint::unix(
+        endpoint.to_string_lossy().into_owned(),
+    ));
     let event = StructuredDispatchEvent::new(
         "dispatching_request",
         endpoint.to_string_lossy().to_string(),
-        &temp_dir,
+        &runtime_paths,
         StructuredEventMetadata::new("observe", "get-card").with_size(42),
     );
     let value = serialize_structured_event(&event);
@@ -34,15 +48,14 @@ fn serialize_structured_dispatch_event_omits_sensitive_fields() {
     assert_eq!(value.get("size"), Some(&serde_json::json!(42)));
     assert_eq!(
         value.get("runtime_dir"),
-        Some(&serde_json::json!(temp_dir.to_string_lossy().to_string()))
+        Some(&serde_json::json!(
+            runtime_paths.runtime_dir().to_string_lossy().to_string()
+        ))
     );
     assert_eq!(
         value.get("weaverd.health"),
         Some(&serde_json::json!(
-            temp_dir
-                .join("weaverd.health")
-                .to_string_lossy()
-                .to_string()
+            runtime_paths.health_path().to_string_lossy().to_string()
         ))
     );
 }
@@ -52,7 +65,7 @@ fn serialize_dispatching_request_event_snapshot() {
     let event = StructuredDispatchEvent::new(
         "dispatching_request",
         "tcp://127.0.0.1:9779",
-        std::path::Path::new("/run/user/1000/weaver"),
+        &runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9779)),
         StructuredEventMetadata::new("observe", "get-card").with_size(128),
     );
     insta::with_settings!({
@@ -75,7 +88,7 @@ fn serialize_request_too_large_event_snapshot() {
     let mut event = StructuredDispatchEvent::new(
         "request_too_large",
         "tcp://127.0.0.1:9779",
-        std::path::Path::new("/run/user/1000/weaver"),
+        &runtime_paths(SocketEndpoint::tcp("127.0.0.1", 9779)),
         StructuredEventMetadata::none()
             .with_size(2048)
             .with_max_size(1024),
@@ -104,10 +117,13 @@ fn serialize_request_too_large_event_snapshot() {
 fn emit_structured_event_returns_payload_without_sensitive_request_data() {
     let temp_dir = std::env::temp_dir();
     let endpoint = temp_dir.join("weaverd.sock");
+    let runtime_paths = runtime_paths(SocketEndpoint::unix(
+        endpoint.to_string_lossy().into_owned(),
+    ));
     let mut event = StructuredDispatchEvent::new(
         "request_too_large",
         endpoint.to_string_lossy().to_string(),
-        &temp_dir,
+        &runtime_paths,
         StructuredEventMetadata::new("observe", "apply-patch")
             .with_size(JSONL_REQUEST_MAX_LINE_BYTES + 1)
             .with_max_size(JSONL_REQUEST_MAX_LINE_BYTES),

@@ -11,14 +11,7 @@ use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
 use super::{
     error::LifecycleError,
-    monitoring::{
-        HEALTH_FILENAME,
-        HealthSnapshot,
-        PID_FILENAME,
-        read_health,
-        read_pid,
-        wait_for_ready,
-    },
+    monitoring::{HealthSnapshot, read_health, read_pid, wait_for_ready},
     shutdown::{signal_daemon, wait_for_shutdown},
     socket::{ensure_socket_available, socket_is_reachable},
     spawning::spawn_daemon,
@@ -106,7 +99,7 @@ impl SystemLifecycle {
         let paths = prepare_runtime(context)?;
         let dir = open_runtime_dir(&paths)?;
 
-        match read_pid(&dir, PID_FILENAME, paths.pid_path())? {
+        match read_pid(&dir, paths.pid_file_name(), paths.pid_path())? {
             Some(pid) => stop_daemon(pid, &paths, context, output),
             None => report_missing_pid(&paths, context, output),
         }
@@ -150,8 +143,10 @@ impl SystemLifecycle {
     ) -> Result<(), LifecycleError> {
         output.stdout_line(format_args!(
             concat!(
-                "daemon socket {} is listening but runtime files are missing; consider ",
-                "'weaver daemon stop' or removing {}"
+                "daemon socket {} is listening but endpoint-scoped runtime files are missing \
+                 under ",
+                "{}; if this daemon predates endpoint-scoped filenames, stop it with the previous ",
+                "version or its known PID before upgrading"
             ),
             runtime.endpoint,
             runtime.paths.runtime_dir().display()
@@ -204,7 +199,7 @@ impl SystemLifecycle {
         }
 
         let dir = open_runtime_dir(&paths)?;
-        let health = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
+        let health = read_health(&dir, paths.health_file_name(), paths.health_path())?;
         let runtime = RuntimeStatusContext {
             paths: &paths,
             endpoint: context.config.daemon_socket(),
@@ -215,7 +210,7 @@ impl SystemLifecycle {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
+        let pid = read_pid(&dir, paths.pid_file_name(), paths.pid_path())?;
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
         Self::report_degraded_status(RuntimeProbe { reachable, pid }, runtime, output)?;
         Ok(ExitCode::SUCCESS)
@@ -233,8 +228,8 @@ fn stop_daemon<W: Write, E: Write>(
     wait_for_shutdown(paths, context.config.daemon_socket())?;
     output.stdout_line(format_args!("daemon pid {pid} stopped cleanly"))?;
     output.stderr_line(format_args!(
-        "removed runtime artefacts from {}",
-        paths.runtime_dir().display()
+        "retained persistent runtime lock at {}",
+        paths.lock_path().display()
     ))?;
     Ok(ExitCode::SUCCESS)
 }
@@ -260,4 +255,33 @@ fn report_missing_pid<W: Write, E: Write>(
         paths.pid_path().display()
     ))?;
     Ok(ExitCode::SUCCESS)
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for lifecycle status reporting.
+
+    use weaver_config::Config;
+
+    use super::*;
+
+    #[test]
+    fn status_guides_operators_away_from_unverified_legacy_processes() {
+        let config = Config::default();
+        let paths = RuntimePaths::from_config_readonly(&config)
+            .expect("default runtime paths should derive without filesystem access");
+        let runtime = RuntimeStatusContext {
+            paths: &paths,
+            endpoint: config.daemon_socket(),
+        };
+        let mut output = LifecycleOutput::new(Vec::new(), Vec::new());
+
+        SystemLifecycle::report_socket_without_pid(runtime, &mut output)
+            .expect("status message should be written");
+
+        let stdout = String::from_utf8(output.stdout).expect("status output should be UTF-8");
+        assert!(stdout.contains("endpoint-scoped runtime files are missing"));
+        assert!(stdout.contains("stop it with the previous version or its known PID"));
+        assert!(!stdout.contains("removing"));
+    }
 }

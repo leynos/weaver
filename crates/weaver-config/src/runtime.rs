@@ -1,8 +1,10 @@
 //! Derives runtime artefact paths shared by the CLI and daemon.
 //!
 //! The runtime directory houses the daemon lock, pid, and health snapshots.
-//! Both binaries need to agree on the directory layout so lifecycle commands
-//! can interact with the files written by the daemon supervisor.
+//! [`RuntimePaths`] is the single resolver both `weaver` and `weaverd` use, so
+//! lifecycle commands operate on the exact files the daemon supervisor writes.
+//! The default endpoint keeps the legacy filenames; any other endpoint adds a
+//! SHA-256 identifier derived from the endpoint kind and its complete address.
 
 use std::{
     env,
@@ -14,6 +16,7 @@ use std::{
 use dirs::runtime_dir;
 #[cfg(unix)]
 use libc::geteuid;
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{Config, SocketEndpoint};
@@ -23,6 +26,12 @@ use crate::{Config, SocketEndpoint};
 pub struct RuntimePaths {
     /// Directory holding the daemon lock, PID, and health snapshot.
     runtime_dir: PathBuf,
+    /// Filename of the lock file within the runtime directory.
+    lock_file_name: PathBuf,
+    /// Filename of the PID file within the runtime directory.
+    pid_file_name: PathBuf,
+    /// Filename of the health snapshot within the runtime directory.
+    health_file_name: PathBuf,
     /// Path to the lock file guarding singleton startup.
     lock_path: PathBuf,
     /// Path to the PID file.
@@ -67,25 +76,142 @@ impl RuntimePaths {
     #[must_use]
     pub fn lock_path(&self) -> &Path { self.lock_path.as_path() }
 
+    /// Filename of the lock file within the runtime directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use weaver_config::{Config, RuntimePaths};
+    ///
+    /// let paths = RuntimePaths::from_config_readonly(&Config::default())?;
+    /// assert_eq!(paths.lock_file_name(), Path::new("weaverd.lock"));
+    /// # Ok::<(), weaver_config::RuntimePathsError>(())
+    /// ```
+    #[must_use]
+    pub fn lock_file_name(&self) -> &Path { self.lock_file_name.as_path() }
+
     /// Path to the PID file.
     #[must_use]
     pub fn pid_path(&self) -> &Path { self.pid_path.as_path() }
 
+    /// Filename of the PID file within the runtime directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use weaver_config::{Config, RuntimePaths};
+    ///
+    /// let paths = RuntimePaths::from_config_readonly(&Config::default())?;
+    /// assert_eq!(paths.pid_file_name(), Path::new("weaverd.pid"));
+    /// # Ok::<(), weaver_config::RuntimePathsError>(())
+    /// ```
+    #[must_use]
+    pub fn pid_file_name(&self) -> &Path { self.pid_file_name.as_path() }
+
     /// Path to the health snapshot.
     #[must_use]
     pub fn health_path(&self) -> &Path { self.health_path.as_path() }
+
+    /// Filename of the health snapshot within the runtime directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    ///
+    /// use weaver_config::{Config, RuntimePaths};
+    ///
+    /// let paths = RuntimePaths::from_config_readonly(&Config::default())?;
+    /// assert_eq!(paths.health_file_name(), Path::new("weaverd.health"));
+    /// # Ok::<(), weaver_config::RuntimePathsError>(())
+    /// ```
+    #[must_use]
+    pub fn health_file_name(&self) -> &Path { self.health_file_name.as_path() }
 }
 
 impl RuntimePaths {
     /// Derives the four runtime artefact paths from the configuration.
     fn derive_paths(config: &Config) -> Result<Self, RuntimePathsError> {
         let runtime_dir = runtime_directory(config)?;
+        let (lock_file_name, pid_file_name, health_file_name) =
+            runtime_file_names(config.daemon_socket());
         Ok(Self {
-            lock_path: runtime_dir.join("weaverd.lock"),
-            pid_path: runtime_dir.join("weaverd.pid"),
-            health_path: runtime_dir.join("weaverd.health"),
+            lock_path: runtime_dir.join(&lock_file_name),
+            pid_path: runtime_dir.join(&pid_file_name),
+            health_path: runtime_dir.join(&health_file_name),
             runtime_dir,
+            lock_file_name,
+            pid_file_name,
+            health_file_name,
         })
+    }
+}
+
+/// Chooses the lock, PID, and health filenames for `endpoint`.
+///
+/// The default endpoint keeps the legacy shared names so existing installations
+/// keep working; every other endpoint is distinguished by its identifier.
+fn runtime_file_names(endpoint: &SocketEndpoint) -> (PathBuf, PathBuf, PathBuf) {
+    if endpoint == &crate::default_socket_endpoint() {
+        return (
+            PathBuf::from("weaverd.lock"),
+            PathBuf::from("weaverd.pid"),
+            PathBuf::from("weaverd.health"),
+        );
+    }
+
+    let identifier = endpoint_identifier(endpoint);
+    (
+        PathBuf::from(format!("weaverd-{identifier}.lock")),
+        PathBuf::from(format!("weaverd-{identifier}.pid")),
+        PathBuf::from(format!("weaverd-{identifier}.health")),
+    )
+}
+
+/// Derives the stable hexadecimal identifier for `endpoint`.
+///
+/// The endpoint kind is written first, followed by the address, so a Unix path
+/// and a TCP host of the same text cannot collide. The port uses a fixed byte
+/// order because the identifier names a file on disk: native byte order would
+/// give one endpoint different filenames on little- and big-endian hosts.
+#[expect(
+    clippy::big_endian_bytes,
+    reason = "the hash must be identical on every host architecture, so the port is framed in a \
+              fixed order rather than native order"
+)]
+fn endpoint_identifier(endpoint: &SocketEndpoint) -> String {
+    let mut hasher = Sha256::new();
+    match endpoint {
+        SocketEndpoint::Unix { path } => {
+            hasher.update(b"unix\0");
+            hasher.update(path.as_str().as_bytes());
+        }
+        SocketEndpoint::Tcp { host, port } => {
+            hasher.update(b"tcp\0");
+            hasher.update(host.as_bytes());
+            hasher.update(b"\0");
+            hasher.update(port.to_be_bytes());
+        }
+    }
+    let digest = hasher.finalize();
+    let mut identifier = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        identifier.push(hexadecimal_digit(byte >> 4));
+        identifier.push(hexadecimal_digit(byte & 0x0f));
+    }
+    identifier
+}
+
+/// Renders one hexadecimal digit, in lowercase, for a nibble of a digest byte.
+fn hexadecimal_digit(value: u8) -> char {
+    match value {
+        0..=9 => char::from(b'0' + value),
+        10..=15 => char::from(b'a' + (value - 10)),
+        _ => '0',
     }
 }
 
@@ -153,44 +279,5 @@ pub enum RuntimePathsError {
 }
 
 #[cfg(test)]
-mod tests {
-    //! Unit tests for runtime path derivation from configuration.
-
-    use super::*;
-    use crate::Config;
-
-    #[test]
-    fn derives_paths_for_tcp_socket() {
-        let config = Config {
-            daemon_socket: SocketEndpoint::tcp("127.0.0.1", 9000),
-            ..Config::default()
-        };
-        let paths = RuntimePaths::from_config(&config).expect("paths should derive for tcp");
-        let tail = paths
-            .runtime_dir()
-            .file_name()
-            .and_then(|name| name.to_str())
-            .expect("runtime dir should have trailing component");
-        assert!(
-            tail == "weaver" || tail.starts_with("uid-"),
-            "unexpected runtime tail: {tail}"
-        );
-        assert!(paths.lock_path().ends_with("weaverd.lock"));
-        assert!(paths.pid_path().ends_with("weaverd.pid"));
-        assert!(paths.health_path().ends_with("weaverd.health"));
-    }
-
-    #[test]
-    fn rejects_unix_socket_without_parent() {
-        let config = Config {
-            daemon_socket: SocketEndpoint::unix("weaver.sock"),
-            ..Config::default()
-        };
-        let error = RuntimePaths::from_config(&config)
-            .expect_err("paths should fail for sockets without parents");
-        assert!(matches!(
-            error,
-            RuntimePathsError::MissingSocketParent { .. }
-        ));
-    }
-}
+#[path = "runtime_tests.rs"]
+mod tests;

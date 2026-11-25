@@ -5,9 +5,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-#[cfg(unix)]
-use cap_std::fs::OpenOptionsExt;
-use cap_std::fs::{Dir, File, OpenOptions};
+use cap_std::fs::Dir;
 use nix::{errno::Errno, sys::signal::kill, unistd::Pid};
 use serde::Serialize;
 use tracing::{info, warn};
@@ -17,8 +15,14 @@ use super::{PROCESS_TARGET, errors::LaunchError, files::atomic_write};
 
 #[cfg(test)]
 mod health_events;
+
+mod lock;
 #[cfg(test)]
 use health_events::record_health_event;
+
+use self::lock::{LockFile, acquire_lock};
+#[cfg(test)]
+use self::lock::{acquire_process_lock, lock_file};
 
 /// Owns the daemon's runtime lock and records its PID and health snapshots.
 ///
@@ -31,7 +35,7 @@ pub(super) struct ProcessGuard {
     /// Capability handle to the runtime directory holding the artefacts.
     runtime_dir: Dir,
     /// Held lock file marking an active launch; released when dropped.
-    _lock: File,
+    _lock: LockFile,
     /// PID recorded by `write_pid`, required before health updates.
     pid: Option<u32>,
 }
@@ -51,6 +55,11 @@ impl ProcessGuard {
             _lock: lock,
             pid: None,
         })
+    }
+
+    #[cfg(target_os = "solaris")]
+    pub(super) fn after_daemonize(&self) -> Result<(), LaunchError> {
+        self._lock.after_daemonize(&self.paths)
     }
 
     /// Atomically records `pid` in the daemon's PID file.
@@ -120,16 +129,40 @@ impl ProcessGuard {
         Ok(())
     }
 
+    /// Removes runtime artefacts left behind by an earlier daemon.
+    ///
+    /// The caller must invoke this only once the endpoint has been bound. A
+    /// launch that fails to bind has proven that some other process still
+    /// serves the endpoint, and that process may be an older release whose
+    /// only record of its own PID is these files. Deleting them before the
+    /// bind would strip `weaver daemon stop` of the last way to reach it.
+    ///
+    /// # Errors
+    /// Returns [`LaunchError::Cleanup`] when an artefact exists but cannot be
+    /// removed.
+    pub(super) fn reclaim_stale_artefacts(&self) -> Result<(), LaunchError> {
+        for path in [self.paths.pid_path(), self.paths.health_path()] {
+            remove_file(&self.runtime_dir, path)?;
+        }
+        Ok(())
+    }
+
     /// Borrows the runtime paths resolved for this daemon instance.
     pub(super) const fn paths(&self) -> &RuntimePaths { &self.paths }
 
-    /// Removes the lock, PID, and health artefacts, ignoring absent files.
+    #[cfg(test)]
+    fn terminate_before_pid_write(self) { drop(self); }
+
+    /// Removes only the artefacts this guard wrote.
+    ///
+    /// A launch that fails before `write_pid` must leave a previous daemon's
+    /// PID and health files untouched; removing them unconditionally would
+    /// orphan a process that is still serving the endpoint.
     fn cleanup(&self) {
-        for path in [
-            self.paths.lock_path(),
-            self.paths.pid_path(),
-            self.paths.health_path(),
-        ] {
+        if self.pid.is_none() {
+            return;
+        }
+        for path in [self.paths.pid_path(), self.paths.health_path()] {
             remove_runtime_file(&self.runtime_dir, path);
         }
     }
@@ -214,100 +247,35 @@ impl HealthSnapshot<'_> {
     }
 }
 
-/// Creates the daemon lock file, recovering stale artefacts from prior runs.
+/// Reads the recorded daemon PID.
 ///
-/// # Errors
-///
-/// Returns [`LaunchError`] if the lock file cannot be created or an existing
-/// lock cannot be resolved.
-fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        options.mode(0o600);
+/// A missing or empty file reports `Ok(None)`: the launch holds the lock but
+/// has not published its PID yet. Other I/O failures and unparseable content
+/// are returned as errors so the caller can distinguish an absent PID from a
+/// PID file it cannot trust.
+pub(super) fn read_pid(dir: &Dir, path: &Path) -> Result<Option<u32>, LaunchError> {
+    let filename = runtime_filename(path)?;
+    let content = match dir.read_to_string(filename) {
+        Ok(content) => content,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => {
+            return Err(LaunchError::PidRead {
+                path: path.to_path_buf(),
+                source,
+            });
+        }
+    };
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
     }
-    let filename = runtime_filename(paths.lock_path())?;
-    match dir.open_with(filename, &options) {
-        Ok(file) => {
-            info!(
-                target: PROCESS_TARGET,
-                file = %paths.lock_path().display(),
-                "acquired daemon lock"
-            );
-            Ok(file)
-        }
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-            handle_existing_lock(dir, paths)
-        }
-        Err(source) => Err(LaunchError::LockCreate {
-            path: paths.lock_path().to_path_buf(),
-            source,
-        }),
-    }
-}
-
-/// Decides whether an existing lock denotes a live daemon or a stale launch.
-///
-/// # Errors
-///
-/// Returns [`LaunchError::StartupInProgress`] when a launch holds the lock
-/// without a PID file, [`LaunchError::AlreadyRunning`] when the recorded
-/// process is alive, and propagates probe and cleanup failures.
-fn handle_existing_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
-    if !runtime_file_exists(dir, paths.pid_path())? {
-        info!(
-            target: PROCESS_TARGET,
-            lock = %paths.lock_path().display(),
-            "refusing to start: launch already in progress",
-        );
-        return Err(LaunchError::StartupInProgress {
-            lock: paths.lock_path().to_path_buf(),
-            pid: paths.pid_path().to_path_buf(),
-        });
-    }
-
-    match read_pid(dir, paths.pid_path()) {
-        Some(0) => {
-            warn!(
-                target: PROCESS_TARGET,
-                "existing daemon recorded zero pid; cleaning stale files",
-            );
-        }
-        Some(pid) => {
-            if check_process(pid)? {
-                info!(
-                    target: PROCESS_TARGET,
-                    pid,
-                    "refusing to start: existing daemon alive",
-                );
-                return Err(LaunchError::AlreadyRunning { pid });
-            }
-            warn!(
-                target: PROCESS_TARGET,
-                pid,
-                "existing daemon not detected; cleaning stale files",
-            );
-        }
-        None => {
-            warn!(
-                target: PROCESS_TARGET,
-                "pid file unreadable; cleaning stale files",
-            );
-        }
-    }
-
-    remove_file(dir, paths.lock_path())?;
-    remove_file(dir, paths.pid_path())?;
-    remove_file(dir, paths.health_path())?;
-    acquire_lock(dir, paths)
-}
-
-/// Reads and parses the PID file, returning `None` when it is absent or
-/// unparseable.
-fn read_pid(dir: &Dir, path: &Path) -> Option<u32> {
-    let content = dir.read_to_string(runtime_filename(path).ok()?).ok()?;
-    content.trim().parse::<u32>().ok()
+    trimmed
+        .parse::<u32>()
+        .map(Some)
+        .map_err(|_| LaunchError::PidParse {
+            path: path.to_path_buf(),
+            value: trimmed.to_owned(),
+        })
 }
 
 /// Runs `op` against the runtime file name, substituting `not_found_value`
@@ -345,16 +313,6 @@ fn remove_file(dir: &Dir, path: &Path) -> Result<(), LaunchError> {
     with_runtime_file(dir, path, (), |d, name| d.remove_file(name))
 }
 
-/// Reports whether the runtime artefact exists.
-///
-/// # Errors
-///
-/// Returns [`LaunchError::Cleanup`] if the path is invalid or metadata lookup
-/// fails for a reason other than absence.
-fn runtime_file_exists(dir: &Dir, path: &Path) -> Result<bool, LaunchError> {
-    with_runtime_file(dir, path, false, |d, name| d.metadata(name).map(|_| true))
-}
-
 /// Extracts the file name used to address `path` within the runtime directory.
 ///
 /// # Errors
@@ -379,7 +337,10 @@ fn runtime_filename(path: &Path) -> Result<&Path, LaunchError> {
 /// Returns [`LaunchError::CheckProcess`] if the signal probe fails for an
 /// unexpected reason.
 fn check_process(pid: u32) -> Result<bool, LaunchError> {
-    if pid == 0 {
+    // `kill` takes a signed PID. Zero and values above `i32::MAX` would be
+    // interpreted as a process group or as every process, so neither can name
+    // the process recorded in a PID file.
+    if pid == 0 || pid > i32::MAX as u32 {
         return Ok(false);
     }
     match kill(Pid::from_raw(pid.cast_signed()), None) {
