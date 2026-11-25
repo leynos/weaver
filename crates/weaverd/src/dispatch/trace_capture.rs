@@ -109,20 +109,17 @@ where
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         let mut visitor = FieldVisitor::default();
         event.record(&mut visitor);
-        // `event_context` yields the enclosing spans outermost first, which is
-        // what lets a test assert that an event really sits inside the span
-        // that promises to give it request context.
-        let span_path = event
-            .is_contextual()
-            .then(|| {
-                ctx.event_scope(event).map(|scope| {
-                    scope
-                        .from_root()
-                        .map(|span| span.name().to_owned())
-                        .collect::<Vec<_>>()
-                })
+        // `event_scope` already resolves contextual, explicitly parented and
+        // root events, so no `is_contextual` gate is needed: gating would
+        // record an empty path for an event whose parent is known.
+        let span_path = ctx
+            .event_scope(event)
+            .map(|scope| {
+                scope
+                    .from_root()
+                    .map(|span| span.name().to_owned())
+                    .collect::<Vec<_>>()
             })
-            .flatten()
             .unwrap_or_default();
         if let Ok(mut trace) = self.trace.lock() {
             trace.events.push(CapturedEvent {
@@ -237,4 +234,59 @@ fn second_dispatcher_keeps_a_callsite_registered_under_capture() {
         captured,
         "expected the emission through the recording dispatcher to be captured"
     );
+}
+
+/// Emits one event nested, explicitly parented, and at the root.
+///
+/// The three forms are separate macro invocations because each is its own
+/// callsite; sharing one helper keeps the surrounding test readable.
+fn emit_nested_event() {
+    tracing::info!(target: "capture", event = "nested", "nested");
+}
+
+fn emit_explicitly_parented_event(parent: &tracing::Span) {
+    tracing::info!(target: "capture", parent: parent, event = "parented", "parented");
+}
+
+fn emit_root_event() {
+    tracing::info!(target: "capture", parent: None, event = "root", "root");
+}
+
+/// Proves a captured event records the parent it was given, however it named it.
+///
+/// An explicitly parented event is not contextual, so recording its scope only
+/// for contextual events would leave its path empty and make a future test
+/// report sound instrumentation as missing.
+#[rstest::rstest]
+#[case::nested("nested", &["outer"])]
+#[case::explicitly_parented("parented", &["outer"])]
+#[case::root("root", &[])]
+fn captured_event_records_its_enclosing_spans(
+    #[case] event_name: &str,
+    #[case] expected_path: &[&str],
+) {
+    let trace = capture_trace(|| {
+        emit_root_event();
+        let outer = tracing::info_span!(target: "capture", "outer");
+        let _guard = outer.enter();
+        emit_nested_event();
+        emit_explicitly_parented_event(&outer);
+    });
+
+    let event = trace
+        .events
+        .iter()
+        .find(|event| {
+            event
+                .fields
+                .get("event")
+                .is_some_and(|name| name == event_name)
+        })
+        .unwrap_or_else(|| panic!("expected a `{event_name}` event"));
+
+    let expected = expected_path
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(event.span_path, expected, "span path for `{event_name}`");
 }
