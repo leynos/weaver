@@ -308,7 +308,7 @@ project:
 ## Markdown guidance
 
 - Validate Markdown files using `make markdownlint`. It depends on the complete
-  `make spelling` gate.
+  spelling gate.
 - Shared `[phrases.corrections]` policy is enforced by the gate's phrase stage
   before Typos. Correct genuine maintained prose rather than masking or
   excluding it.
