@@ -34,6 +34,11 @@ pub(crate) struct CapturedEvent {
     pub(crate) level: Level,
     pub(crate) target: String,
     pub(crate) fields: BTreeMap<String, String>,
+    /// Names of the spans enclosing the event, outermost first.
+    ///
+    /// Recorded so a test can prove an event belongs to the span that promises
+    /// to give it request context, rather than only that the span exists.
+    pub(crate) span_path: Vec<String>,
 }
 
 /// Captured tracing span recorded during a dispatch test.
@@ -101,14 +106,30 @@ where
         }
     }
 
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         let mut visitor = FieldVisitor::default();
         event.record(&mut visitor);
+        // `event_context` yields the enclosing spans outermost first, which is
+        // what lets a test assert that an event really sits inside the span
+        // that promises to give it request context.
+        let span_path = event
+            .is_contextual()
+            .then(|| {
+                ctx.event_scope(event).map(|scope| {
+                    scope
+                        .from_root()
+                        .map(|span| span.name().to_owned())
+                        .collect::<Vec<_>>()
+                })
+            })
+            .flatten()
+            .unwrap_or_default();
         if let Ok(mut trace) = self.trace.lock() {
             trace.events.push(CapturedEvent {
                 level: *event.metadata().level(),
                 target: event.metadata().target().to_owned(),
                 fields: visitor.fields,
+                span_path,
             });
         }
     }

@@ -1761,6 +1761,9 @@ place, so a log filter or dashboard change has one edit site. The unit tests in
 `graph_slice_tracing_tests.rs` assert on captured events and spans through the
 shared `dispatch::trace_capture` harness rather than a bespoke subscriber;
 `capture_trace` returns both, and `capture_events` is the events-only view.
+Each captured event also records its enclosing span names, so
+`request_span_carries_the_request_location` can assert that a decision event
+really sits inside the request span rather than merely that the span exists.
 
 ## 19 E2E test support for graph-slice
 
