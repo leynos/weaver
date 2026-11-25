@@ -28,6 +28,7 @@ use super::{
         request_for,
         sole_event,
         with_captured_events,
+        with_captured_trace,
     },
 };
 use crate::{
@@ -330,5 +331,67 @@ fn enrichment_completion_logs_enriched_outcome_with_lsp_server() -> Result<(), S
         field_of(done_event, "outcome")?,
         "Enriched",
         "enriched outcome",
+    )
+}
+
+#[rstest]
+fn request_span_carries_the_request_location(
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = backends_fixture?;
+    let request = request_for(
+        &temp_dir,
+        "spanned.rs",
+        "struct Alpha(u32);\n\nimpl Alpha {\n    fn first(&self) -> u32 { self.0 }\n}\n",
+        &["--position", "4:8"],
+    )?;
+
+    let (outcome, trace) = with_captured_trace(|| dispatch_payload(&request, &mut backends));
+    let (status, payload) = outcome?;
+    assert_success_response(status, &payload);
+
+    // The span is what lets a reader attribute the count-only discovery-cap and
+    // budget-truncation events to one concurrent request. `#[instrument]` names
+    // the span after the function and targets the defining module, not
+    // `DISPATCH_TARGET`, so both are asserted explicitly.
+    let span = trace
+        .spans
+        .iter()
+        .find(|span| span.name == "build_response")
+        .ok_or_else(|| {
+            let names = trace
+                .spans
+                .iter()
+                .map(|span| span.name.as_str())
+                .collect::<Vec<_>>();
+            format!("expected a build_response span, captured {names:?}")
+        })?;
+    ensure_same_ref(
+        span.target.as_str(),
+        "weaverd::dispatch::observe::graph_slice",
+        "request span target",
+    )?;
+    ensure_same(span.level, tracing::Level::DEBUG, "request span level")?;
+    ensure_true(
+        span.fields
+            .get("uri")
+            .is_some_and(|uri| uri.ends_with("spanned.rs")),
+        "request span to carry the request URI",
+    )?;
+    ensure_same_ref(
+        span.fields
+            .get("line")
+            .map(String::as_str)
+            .unwrap_or_default(),
+        "4",
+        "request span line",
+    )?;
+    ensure_same_ref(
+        span.fields
+            .get("column")
+            .map(String::as_str)
+            .unwrap_or_default(),
+        "8",
+        "request span column",
     )
 }

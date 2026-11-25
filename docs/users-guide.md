@@ -1036,7 +1036,8 @@ with the file path, non-blank line count, and cap when discovery truncated the
 candidate list; and one enrichment event per card, naming its `symbol_id` and
 whether enrichment was `skipped`, `Enriched`, or `Degraded`. The discovery-cap
 and budget-truncation events are emitted only when they apply, so a quiet log
-means the slice was complete.
+means the slice was complete. Each slice runs inside a `build_response` span
+carrying its URI and position, so concurrent requests remain distinguishable.
 
 #### observe grep
 

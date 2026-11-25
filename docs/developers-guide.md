@@ -1750,10 +1750,17 @@ exactly one decision boundary:
   outcome; the completion event writes the `EnrichmentOutcome` variant
   (`Enriched` or `Degraded`).
 
+`build_response` also carries a `debug` span recording the request's `uri`,
+`line`, and `column`. The discovery-cap and budget-truncation events are
+count-only by design, so the span is what attributes them to a request when
+several slices are handled concurrently. `#[instrument]` names the span after
+the function and targets the defining module rather than `DISPATCH_TARGET`.
+
 Keeping the events in one module pins field names and message text in a single
 place, so a log filter or dashboard change has one edit site. The unit tests in
-`graph_slice_tracing_tests.rs` assert on captured events through the shared
-`dispatch::trace_capture` harness rather than a bespoke subscriber.
+`graph_slice_tracing_tests.rs` assert on captured events and spans through the
+shared `dispatch::trace_capture` harness rather than a bespoke subscriber;
+`capture_trace` returns both, and `capture_events` is the events-only view.
 
 ## 19 E2E test support for graph-slice
 

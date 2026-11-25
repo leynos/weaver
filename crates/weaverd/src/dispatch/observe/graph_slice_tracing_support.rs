@@ -16,7 +16,7 @@ use super::support::{SourceRequest, prepare_request};
 use crate::dispatch::{
     request::CommandRequest,
     router::DISPATCH_TARGET,
-    trace_capture::{CapturedEvent, capture_events},
+    trace_capture::{CapturedEvent, CapturedTrace, capture_events, capture_trace},
 };
 
 /// Message attached to the handler-entry event.
@@ -88,6 +88,18 @@ pub(crate) fn with_captured_events<T>(action: impl FnOnce() -> T) -> (T, Vec<Cap
     let events = capture_events(|| slot = Some(action()));
     let value = slot.expect("capture action should run exactly once");
     (value, events)
+}
+
+/// Runs `action`, returning its value alongside every event and span created.
+///
+/// Use this when the assertion is about request-scoped instrumentation rather
+/// than about one event; the span a request creates is visible here even
+/// though it emits no event of its own.
+pub(crate) fn with_captured_trace<T>(action: impl FnOnce() -> T) -> (T, CapturedTrace) {
+    let mut slot = None;
+    let trace = capture_trace(|| slot = Some(action()));
+    let value = slot.expect("capture action should run exactly once");
+    (value, trace)
 }
 
 /// Builds a request against a fixture file, using the shared support helper so

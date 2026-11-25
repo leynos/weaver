@@ -36,9 +36,29 @@ pub(crate) struct CapturedEvent {
     pub(crate) fields: BTreeMap<String, String>,
 }
 
+/// Captured tracing span recorded during a dispatch test.
+///
+/// A span is captured when it is created, so a test can assert that request
+/// handling is instrumented even when the event it explains is only emitted on
+/// a conditional branch.
 #[derive(Debug)]
+pub(crate) struct CapturedSpan {
+    pub(crate) level: Level,
+    pub(crate) target: String,
+    pub(crate) name: String,
+    pub(crate) fields: BTreeMap<String, String>,
+}
+
+/// Everything a recording layer captured during one `capture` call.
+#[derive(Debug, Default)]
+pub(crate) struct CapturedTrace {
+    pub(crate) events: Vec<CapturedEvent>,
+    pub(crate) spans: Vec<CapturedSpan>,
+}
+
+#[derive(Debug, Default)]
 struct RecordingLayer {
-    events: Arc<Mutex<Vec<CapturedEvent>>>,
+    trace: Arc<Mutex<CapturedTrace>>,
 }
 
 #[derive(Default)]
@@ -62,11 +82,30 @@ impl<S> Layer<S> for RecordingLayer
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
+    fn on_new_span(
+        &self,
+        attributes: &tracing::span::Attributes<'_>,
+        _id: &tracing::span::Id,
+        _ctx: Context<'_, S>,
+    ) {
+        let mut visitor = FieldVisitor::default();
+        attributes.record(&mut visitor);
+        let metadata = attributes.metadata();
+        if let Ok(mut trace) = self.trace.lock() {
+            trace.spans.push(CapturedSpan {
+                level: *metadata.level(),
+                target: metadata.target().to_owned(),
+                name: metadata.name().to_owned(),
+                fields: visitor.fields,
+            });
+        }
+    }
+
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
         let mut visitor = FieldVisitor::default();
         event.record(&mut visitor);
-        if let Ok(mut events) = self.events.lock() {
-            events.push(CapturedEvent {
+        if let Ok(mut trace) = self.trace.lock() {
+            trace.events.push(CapturedEvent {
                 level: *event.metadata().level(),
                 target: event.metadata().target().to_owned(),
                 fields: visitor.fields,
@@ -116,16 +155,25 @@ static SECOND_DISPATCHER: LazyLock<Dispatch> = LazyLock::new(|| Dispatch::new(Re
 /// assert_eq!(events.len(), 1);
 /// ```
 pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
+    capture_trace(action).events
+}
+
+/// Runs `action` while recording every emitted event and created span.
+///
+/// This is the full-fidelity sibling of [`capture_events`], for tests that
+/// assert on instrumentation rather than on a single event. See
+/// [`capture_events`] for the dispatcher scope and its consequences.
+pub(crate) fn capture_trace(action: impl FnOnce()) -> CapturedTrace {
     LazyLock::force(&SECOND_DISPATCHER);
-    let events = Arc::new(Mutex::new(Vec::new()));
+    let trace = Arc::new(Mutex::new(CapturedTrace::default()));
     let subscriber = Registry::default().with(RecordingLayer {
-        events: Arc::clone(&events),
+        trace: Arc::clone(&trace),
     });
     dispatcher::with_default(&Dispatch::new(subscriber), action);
-    let mut recorded_events = events
+    let mut recorded = trace
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    recorded_events.drain(..).collect()
+    std::mem::take(&mut *recorded)
 }
 
 /// Emits the callsite that [`second_dispatcher_keeps_a_callsite_registered_under_capture`]
