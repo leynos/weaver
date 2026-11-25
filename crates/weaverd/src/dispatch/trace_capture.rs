@@ -82,9 +82,9 @@ where
 /// dispatcher, it asks only the rebuilding thread's current dispatcher. When a
 /// daemon test thread performs that rebuild, the answer comes from the global
 /// telemetry subscriber, which filters dispatch events out and so marks the
-/// callsites `never`. Events emitted later by a handler thread are then
-/// discarded before any subscriber sees them, which makes capture assertions
-/// fail intermittently depending on test scheduling.
+/// callsites `never`. Events emitted later while a recording dispatcher is
+/// installed are then discarded before any subscriber sees them, which makes
+/// capture assertions fail intermittently depending on test scheduling.
 ///
 /// Holding a second dispatcher alive keeps the dispatcher count above one, so
 /// every rebuild takes the general path and folds in the recording layer's
@@ -97,9 +97,15 @@ static SECOND_DISPATCHER: LazyLock<Dispatch> = LazyLock::new(|| Dispatch::new(Re
 /// subscriber in each test. The recording layer is installed as a scoped
 /// dispatcher rather than the process-wide default, so parallel tests (and the
 /// daemon's own telemetry initialization) never contend for the global
-/// dispatcher. Threads spawned inside `action` inherit the recording
-/// dispatcher, so events emitted by a server thread are captured as well as
-/// events emitted on the calling thread.
+/// dispatcher.
+///
+/// **Scope:** `dispatcher::with_default` sets a thread-local default, so only
+/// events emitted on the calling thread are captured. A thread spawned inside
+/// `action` does not inherit it and falls back to the global dispatcher. A test
+/// that needs events from a spawned thread must propagate the dispatcher
+/// explicitly, as [`harness`](crate::dispatch::handler::tests_helpers::harness)
+/// does with `dispatcher::get_default` before the spawn and
+/// `dispatcher::set_default` inside the closure.
 ///
 /// # Examples
 ///

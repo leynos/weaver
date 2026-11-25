@@ -136,8 +136,13 @@ pub(crate) fn ensure(condition: bool, message: impl Into<String>) -> Result<(), 
 ///
 /// The returned harness owns the temporary directory for the listener,
 /// workspace root, and runtime socket path so tests can interact with the
-/// handler over a real TCP connection. The server thread inherits the
-/// spawning thread's tracing dispatcher, so a harness created inside
+/// handler over a real TCP connection.
+///
+/// The server thread does **not** inherit the spawning thread's tracing
+/// dispatcher: `dispatcher::with_default` is thread-local. The fixture
+/// therefore captures the current dispatcher with `dispatcher::get_default`
+/// before spawning and installs it with `dispatcher::set_default` inside the
+/// closure, so a harness created inside
 /// [`capture_events`](crate::dispatch::trace_capture::capture_events) records
 /// events emitted while handling the connection.
 #[fixture]
