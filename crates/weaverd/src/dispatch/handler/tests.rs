@@ -7,14 +7,18 @@ use std::{
 };
 
 use rstest::rstest;
+use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 use weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES;
 
 #[path = "read_error_event_tests.rs"]
 mod read_error_event_tests;
+
 #[path = "receive_request_tests.rs"]
 mod receive_request_tests;
+
 #[path = "structured_event_tests.rs"]
 mod structured_event_tests;
+
 #[path = "tests_helpers.rs"]
 mod tests_helpers;
 
@@ -33,6 +37,15 @@ use crate::dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};
 /// Reads a nested JSON field, returning `None` when any level is absent.
 fn json_at<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
     path.iter().try_fold(value, |node, key| node.get(*key))
+}
+
+fn runtime_paths(endpoint: SocketEndpoint) -> Result<RuntimePaths, String> {
+    let config = Config {
+        daemon_socket: endpoint,
+        ..Config::default()
+    };
+    RuntimePaths::from_config_readonly(&config)
+        .map_err(|error| format!("derive runtime paths: {error}"))
 }
 
 #[rstest]
@@ -211,15 +224,19 @@ fn capture_events_records_server_thread_events(
 #[test]
 fn request_too_large_serialization_maps_to_request_too_large_event() {
     let temp_dir = std::env::temp_dir();
-    let socket_path = temp_dir.join("weaverd.sock");
-    let endpoint = socket_path.to_string_lossy().into_owned();
+    let endpoint_path = temp_dir.join("weaverd.sock");
+    let runtime_paths = runtime_paths(SocketEndpoint::unix(
+        endpoint_path.to_string_lossy().into_owned(),
+    ))
+    .expect("runtime paths should derive");
+    let endpoint = endpoint_path.to_string_lossy().into_owned();
     let event = read_error_event(
         &DispatchError::request_too_large(
             JSONL_REQUEST_MAX_LINE_BYTES + 1,
             JSONL_REQUEST_MAX_LINE_BYTES,
         ),
         &endpoint,
-        &temp_dir,
+        &runtime_paths,
     );
     let value = serialize_structured_event(&event);
 

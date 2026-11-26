@@ -1,14 +1,16 @@
 //! Supervises daemon launch sequencing and runtime orchestration.
 
 use std::{
+    env,
     io,
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
 use mockable::{DefaultEnv, Env};
 use tracing::info;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
-use weaver_config::RuntimePaths;
+use weaver_config::{Config, RuntimePaths};
 
 use super::{
     FOREGROUND_ENV_VAR,
@@ -132,49 +134,13 @@ where
         ?mode,
         "starting daemon runtime"
     );
-    let config = loader.load()?;
-    config.daemon_socket().prepare_filesystem()?;
-    let runtime_paths = RuntimePaths::from_config(&config)?;
-    let runtime_dir =
-        super::files::open_runtime_dir(runtime_paths.runtime_dir()).map_err(|source| {
-            LaunchError::RuntimeDirectory {
-                path: runtime_paths.runtime_dir().to_path_buf(),
-                source,
-            }
-        })?;
-    let mut guard = ProcessGuard::acquire(runtime_dir, runtime_paths)?;
-    // The working directory is process state rather than an environment
-    // variable, so `Env` has no accessor for it and this stays a direct call.
-    let workspace_root =
-        std::env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
-    if matches!(mode, LaunchMode::Background) {
-        daemonizer.daemonize(guard.paths())?;
-    }
-    let pid = std::process::id();
-    guard.write_pid(pid)?;
-    guard.write_health(HealthState::Starting)?;
-    let listener = SocketListener::bind(config.daemon_socket())?;
-
-    // Create a single provider and backends instance shared by daemon and dispatch
-    let provider =
-        SemanticBackendProvider::new(config.capability_matrix().clone(), DEFAULT_CACHE_CAPACITY);
-    let static_loader = StaticConfigLoader::new(config.clone());
-    let daemon = bootstrap_with(&static_loader, reporter, provider)?;
-
-    // Create backend manager using the same backends from the daemon
-    let backends = Arc::new(Mutex::new(daemon.into_backends()));
-    let backend_manager = BackendManager::new(backends);
-    let handler = Arc::new(
-        DispatchConnectionHandler::new(
-            backend_manager,
-            workspace_root,
-            config.daemon_socket().to_string(),
-            guard.paths().runtime_dir().to_path_buf(),
-        )
-        .map_err(|error| LaunchError::WorkspaceRoot {
-            source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),
-        })?,
-    );
+    let PreparedRuntime {
+        config,
+        mut guard,
+        workspace_root,
+    } = prepare_runtime(&loader, mode, &daemonizer)?;
+    let listener = bind_endpoint(&config, &mut guard)?;
+    let handler = Arc::new(build_handler(&config, reporter, &guard, workspace_root)?);
 
     let listener_handle = listener.start(handler)?;
     guard.write_health(HealthState::Ready)?;
@@ -192,3 +158,102 @@ where
 #[cfg(test)]
 #[path = "launch_tests.rs"]
 mod launch_tests;
+
+/// Runtime state that must exist before the endpoint is bound.
+struct PreparedRuntime {
+    /// Configuration the daemon was started with.
+    config: Config,
+    /// Guard owning the runtime lock and the artefacts written so far.
+    guard: ProcessGuard,
+    /// Working directory captured before daemonizing.
+    workspace_root: PathBuf,
+}
+
+/// Loads configuration and takes ownership of the runtime artefacts.
+///
+/// The lock is acquired, and the process daemonized, before the caller binds
+/// the endpoint. `workspace_root` is captured before daemonizing so the child
+/// process inherits the directory the caller intended to serve.
+fn prepare_runtime<L, D>(
+    loader: &L,
+    mode: LaunchMode,
+    daemonizer: &D,
+) -> Result<PreparedRuntime, LaunchError>
+where
+    L: ConfigLoader,
+    D: Daemonizer,
+{
+    let config = loader.load()?;
+    config.daemon_socket().prepare_filesystem()?;
+    let runtime_paths = RuntimePaths::from_config(&config)?;
+    let runtime_dir =
+        super::files::open_runtime_dir(runtime_paths.runtime_dir()).map_err(|source| {
+            LaunchError::RuntimeDirectory {
+                path: runtime_paths.runtime_dir().to_path_buf(),
+                source,
+            }
+        })?;
+    let guard = ProcessGuard::acquire(runtime_dir, runtime_paths)?;
+    // The working directory is process state rather than an environment
+    // variable, so `Env` has no accessor for it and this stays a direct call.
+    let workspace_root =
+        env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
+    // Only the Solaris acquisition path mutates the guard after daemonizing;
+    // elsewhere an unconditional `mut` would trigger the unused_mut lint.
+    #[cfg(target_os = "solaris")]
+    let mut guard = guard;
+    if matches!(mode, LaunchMode::Background) {
+        daemonizer.daemonize(guard.paths())?;
+        #[cfg(target_os = "solaris")]
+        guard.after_daemonize()?;
+    }
+    Ok(PreparedRuntime {
+        config,
+        guard,
+        workspace_root,
+    })
+}
+
+/// Binds the configured endpoint and records the new daemon's runtime state.
+///
+/// Binding happens while the lock is held and before any runtime artefact is
+/// written or replaced. Binding can fail because another daemon — possibly an
+/// older release that knows nothing of the lock — still serves the endpoint; in
+/// that case its PID and health files are the only way to reach it, so they
+/// must survive this failed launch untouched. For the same reason, stale
+/// artefacts are reclaimed only after the bind succeeds.
+fn bind_endpoint(config: &Config, guard: &mut ProcessGuard) -> Result<SocketListener, LaunchError> {
+    let listener = SocketListener::bind(config.daemon_socket())?;
+    guard.reclaim_stale_artefacts()?;
+    let pid = std::process::id();
+    guard.write_pid(pid)?;
+    guard.write_health(HealthState::Starting)?;
+    Ok(listener)
+}
+
+/// Builds the dispatch handler that will serve the bound endpoint.
+///
+/// A single provider and backend set is shared between the daemon and the
+/// dispatch connection handler.
+fn build_handler(
+    config: &Config,
+    reporter: Arc<dyn HealthReporter>,
+    guard: &ProcessGuard,
+    workspace_root: PathBuf,
+) -> Result<DispatchConnectionHandler, LaunchError> {
+    let provider =
+        SemanticBackendProvider::new(config.capability_matrix().clone(), DEFAULT_CACHE_CAPACITY);
+    let static_loader = StaticConfigLoader::new(config.clone());
+    let daemon = bootstrap_with(&static_loader, reporter, provider)?;
+
+    let backends = Arc::new(Mutex::new(daemon.into_backends()));
+    DispatchConnectionHandler::new(
+        BackendManager::new(backends),
+        workspace_root,
+        config.daemon_socket().to_string(),
+        guard.paths().clone(),
+    )
+    .map_err(|error| LaunchError::WorkspaceRoot {
+        source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),
+    })
+}

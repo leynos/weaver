@@ -95,7 +95,11 @@ fn apply_passthrough_help(
     let mut output = String::from("Commands:\n\n");
     append_structured_commands(&mut output, node, &[], localizer);
     output.push_str("\nDomains and operations:\n");
-    debug_assert_eq!(domains, crate::command_tree::domain_operations());
+    debug_assert_eq!(
+        domains,
+        crate::command_tree::domain_operations(),
+        "passthrough domains must match the command tree's domain list"
+    );
     for domain in crate::command_tree::domain_operations() {
         let summary = localizer.message(domain.summary_id, None, domain.summary);
         output.push_str("\n  ");

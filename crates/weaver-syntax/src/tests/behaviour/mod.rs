@@ -270,6 +270,10 @@ fn then_failure_has_line(world: &RefCell<TestWorld>, line: u32) {
 fn then_only_file_has_failures(world: &RefCell<TestWorld>, filename: String) {
     let w = world.borrow();
     let fname = strip_quotes(&filename);
+    assert!(
+        !w.validation_failures.is_empty(),
+        "Expected at least one validation failure for {fname}"
+    );
     for failure in &w.validation_failures {
         assert!(
             failure.path.to_string_lossy().contains(fname),
@@ -346,4 +350,17 @@ fn then_rewrite_unchanged(world: &RefCell<TestWorld>) {
         panic!("rewrite result should be set");
     };
     assert!(!result.has_changes(), "Expected rewrite to make no changes");
+}
+
+#[cfg(test)]
+mod tests {
+    //! Regression tests for behavioural step assertions.
+
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "Expected at least one validation failure for valid.rs")]
+    fn only_file_has_failures_rejects_empty_validation_results() {
+        then_only_file_has_failures(&world(), String::from("\"valid.rs\""));
+    }
 }
