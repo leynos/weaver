@@ -18,12 +18,13 @@ use super::{
     assert_success_response,
     support::{backends_fixture, detail_value, dispatch_payload, render_functions},
     tracing_support::{
-        BUDGET_MESSAGE,
-        DISCOVERY_CAP_MESSAGE,
-        ENRICHMENT_DONE_MESSAGE,
-        ENRICHMENT_SKIP_MESSAGE,
-        REQUEST_MESSAGE,
-        events_with_message,
+        BUDGET_EVENT,
+        DISCOVERY_CAP_EVENT,
+        DecisionEvent,
+        ENRICHMENT_DONE_EVENT,
+        ENRICHMENT_SKIP_EVENT,
+        REQUEST_EVENT,
+        events_matching,
         field_of,
         request_for,
         sole_event,
@@ -80,7 +81,7 @@ fn handler_entry_logs_request_fields(
     let (status, payload) = outcome?;
     assert_success_response(status, &payload);
 
-    let entry_event = sole_event(&events, REQUEST_MESSAGE)?;
+    let entry_event = sole_event(&events, REQUEST_EVENT)?;
     ensure_same(
         entry_event.level,
         tracing::Level::DEBUG,
@@ -135,7 +136,7 @@ fn discovery_cap_logs_path_and_non_blank_line_count(
     let (status, payload) = outcome?;
     assert_success_response(status, &payload);
 
-    let cap_event = sole_event(&events, DISCOVERY_CAP_MESSAGE)?;
+    let cap_event = sole_event(&events, DISCOVERY_CAP_EVENT)?;
     ensure_true(
         field_of(cap_event, "path")?.ends_with("large.rs"),
         "cap event to carry the file path",
@@ -151,29 +152,6 @@ fn discovery_cap_logs_path_and_non_blank_line_count(
         field_of(cap_event, "cap")?,
         expected_cap.as_str(),
         "discovery cap",
-    )
-}
-
-#[rstest]
-fn discovery_cap_event_is_absent_below_the_cap(
-    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
-) -> Result<(), String> {
-    let (mut backends, temp_dir) = backends_fixture?;
-    let request = request_for(
-        &temp_dir,
-        "small.rs",
-        "fn alpha() {}\n\nfn beta() {}\n",
-        &["--position", "1:4"],
-    )?;
-
-    let (outcome, events) = with_captured_events(|| dispatch_payload(&request, &mut backends));
-    let (status, payload) = outcome?;
-    assert_success_response(status, &payload);
-
-    ensure_same(
-        events_with_message(&events, DISCOVERY_CAP_MESSAGE).len(),
-        0,
-        "discovery cap events",
     )
 }
 
@@ -200,7 +178,7 @@ fn budget_truncation_logs_included_and_frontier_counts(
     let (status, payload) = outcome?;
     assert_success_response(status, &payload);
 
-    let truncation_event = sole_event(&events, BUDGET_MESSAGE)?;
+    let truncation_event = sole_event(&events, BUDGET_EVENT)?;
     ensure_same_ref(
         field_of(truncation_event, "included_cards")?,
         "2",
@@ -220,15 +198,23 @@ fn budget_truncation_logs_included_and_frontier_counts(
     )
 }
 
+/// A file that fits both the discovery cap and the card budget.
+///
+/// The two conditional events are the only instrumentation that would explain
+/// missing cards, so their absence is the contract for a complete slice.
 #[rstest]
-fn budget_truncation_event_is_absent_without_spillover(
+#[case::discovery_cap(DISCOVERY_CAP_EVENT, "discovery cap events")]
+#[case::budget_truncation(BUDGET_EVENT, "budget truncation events")]
+fn complete_slice_emits_no_truncation_event(
     backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
+    #[case] expected: DecisionEvent,
+    #[case] what: &str,
 ) -> Result<(), String> {
     let (mut backends, temp_dir) = backends_fixture?;
     let request = request_for(
         &temp_dir,
-        "untruncated.rs",
-        "fn solo() {}\n",
+        "complete.rs",
+        "fn alpha() {}\n\nfn beta() {}\n",
         &["--position", "1:4"],
     )?;
 
@@ -236,11 +222,7 @@ fn budget_truncation_event_is_absent_without_spillover(
     let (status, payload) = outcome?;
     assert_success_response(status, &payload);
 
-    ensure_same(
-        events_with_message(&events, BUDGET_MESSAGE).len(),
-        0,
-        "budget truncation events",
-    )
+    ensure_same(events_matching(&events, expected).len(), 0, what)
 }
 
 #[rstest]
@@ -259,7 +241,7 @@ fn enrichment_skip_logs_symbol_id_and_outcome(
     let (status, payload) = outcome?;
     assert_success_response(status, &payload);
 
-    let skip_event = sole_event(&events, ENRICHMENT_SKIP_MESSAGE)?;
+    let skip_event = sole_event(&events, ENRICHMENT_SKIP_EVENT)?;
     ensure_same_ref(
         field_of(skip_event, "symbol_id")?,
         entry_symbol_id(&payload)?,
@@ -289,7 +271,7 @@ fn enrichment_completion_logs_degraded_outcome_without_lsp_server(
     let (status, payload) = outcome?;
     assert_success_response(status, &payload);
 
-    let done_event = sole_event(&events, ENRICHMENT_DONE_MESSAGE)?;
+    let done_event = sole_event(&events, ENRICHMENT_DONE_EVENT)?;
     ensure_same_ref(
         field_of(done_event, "outcome")?,
         "Degraded",
@@ -325,7 +307,7 @@ fn enrichment_completion_logs_enriched_outcome_with_lsp_server() -> Result<(), S
     let (status, payload) = outcome?;
     assert_success_response(status, &payload);
 
-    let done_event = sole_event(&events, ENRICHMENT_DONE_MESSAGE)?;
+    let done_event = sole_event(&events, ENRICHMENT_DONE_EVENT)?;
     ensure_same_ref(
         field_of(done_event, "outcome")?,
         "Enriched",

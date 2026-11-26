@@ -13,7 +13,7 @@ use super::{
     SemanticBackendProvider,
     assert_success_response,
     support::{backends_fixture, dispatch_payload},
-    tracing_support::{REQUEST_MESSAGE, request_for, sole_event, with_captured_trace},
+    tracing_support::{REQUEST_EVENT, request_for, sole_event, with_captured_trace},
 };
 use crate::{
     dispatch::trace_capture::CapturedSpan,
@@ -75,7 +75,7 @@ fn request_span_carries_the_request_location(
 
     // Creating a span is not enough: the decision events must sit inside it, or
     // the correlation promised to operators would be absent from real logs.
-    let decision_event = sole_event(&trace.events, REQUEST_MESSAGE)?;
+    let decision_event = sole_event(&trace.events, REQUEST_EVENT)?;
     ensure_same_ref(
         decision_event.span_path.as_slice(),
         [String::from("build_response")].as_slice(),
