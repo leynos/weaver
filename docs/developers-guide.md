@@ -1209,7 +1209,7 @@ per-language query plans for later execution.
 - Semantic validation (`crates/sempai/src/semantic_check/mod.rs`):
   - `InvalidNotInOr`
   - `MissingPositiveTermInAnd`
-  - Span precedence rules: node span -> first child -> fallback
+  - Diagnostic span selection: see Section 27 for the per-diagnostic rules
 - Engine wiring (`crates/sempai/src/engine.rs`):
   - Parse -> validate modes -> normalize -> validate semantics -> compile
     per-language `QueryPlan`
