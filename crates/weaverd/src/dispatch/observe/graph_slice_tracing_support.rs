@@ -64,10 +64,10 @@ fn event_message(event: &CapturedEvent) -> Option<&str> {
 }
 
 /// Returns the dispatch-target events recording `expected`.
-pub(crate) fn events_matching<'a>(
-    events: &'a [CapturedEvent],
+pub(crate) fn events_matching(
+    events: &[CapturedEvent],
     expected: DecisionEvent,
-) -> Vec<&'a CapturedEvent> {
+) -> Vec<&CapturedEvent> {
     events
         .iter()
         .filter(|event| expected.is_recorded_as(event))
@@ -78,10 +78,10 @@ pub(crate) fn events_matching<'a>(
 ///
 /// Zero or several matches both fail, because every caller knows which single
 /// boundary it expected to observe.
-pub(crate) fn sole_event<'a>(
-    events: &'a [CapturedEvent],
+pub(crate) fn sole_event(
+    events: &[CapturedEvent],
     expected: DecisionEvent,
-) -> Result<&'a CapturedEvent, String> {
+) -> Result<&CapturedEvent, String> {
     let matches = events_matching(events, expected);
     if matches.len() != 1 {
         return Err(format!(
