@@ -145,8 +145,14 @@ fn formula_tree() -> BoxedStrategy<Decorated<Formula>> {
 }
 
 fn tree_with_not() -> BoxedStrategy<Decorated<Formula>> {
-    (deep_atom(MIN_PROPERTY_DEPTH - 1), span_strategy())
-        .prop_map(|(child, span)| decorated(Formula::Not(Box::new(child)), span))
+    // Keep the negation at least one level below the `Or` branch, so the
+    // disjunction check is proven to reach through an enclosing node rather
+    // than only matching a direct `Not` child.
+    (deep_atom(MIN_PROPERTY_DEPTH - 2), span_strategy())
+        .prop_map(|(child, span)| {
+            let negation = decorated(Formula::Not(Box::new(child)), span.clone());
+            decorated(Formula::Inside(Box::new(negation)), span)
+        })
         .boxed()
 }
 
@@ -179,14 +185,11 @@ fn or_with_not_descendant() -> BoxedStrategy<Decorated<Formula>> {
 }
 
 /// Builds a constraint chain (`Not`/`Inside`/`Anywhere`) ending in a real
-/// atom, beneath `min_layers` additional unary wrappers.
-///
-/// `min_layers == 0` yields `Not(atom)`; larger values push the negation
-/// further below the node that has to reject it. Atoms reached through a
-/// constraint are not positive terms, so a conjunction built only from these
-/// must be rejected even though it contains atoms. Contrast with
-/// [`deep_atomless`], whose leaves carry no atom at all and so never exercise
-/// that distinction.
+/// atom, beneath `min_layers` extra unary wrappers: `0` yields `Not(atom)`,
+/// larger values push the negation further below the node that must reject
+/// it. Atoms reached through a constraint are not positive terms, so a
+/// conjunction of these must be rejected despite containing atoms; contrast
+/// [`deep_atomless`], whose leaves carry no atom at all.
 fn deep_negation(min_layers: usize) -> BoxedStrategy<Decorated<Formula>> {
     if min_layers == 0 {
         return (atom_strategy(), span_strategy())
@@ -204,8 +207,7 @@ fn deep_negation(min_layers: usize) -> BoxedStrategy<Decorated<Formula>> {
 }
 
 /// A valid root `And` holding a positive atom beside an `Or` whose negation
-/// sits several levels below it. Nothing at the root can satisfy the expected
-/// diagnostic, so only the nested disjunction violation can be reported.
+/// sits several levels below it, so only that nested violation is reported.
 fn nested_invalid_or() -> BoxedStrategy<Decorated<Formula>> {
     (0_u8..3, span_strategy())
         .prop_flat_map(|(extra_layers, span)| {
@@ -224,9 +226,8 @@ fn nested_invalid_or() -> BoxedStrategy<Decorated<Formula>> {
         .boxed()
 }
 
-/// A valid root `And` holding a positive atom beside a unary-wrapped `And`
-/// whose branches only restrict real atoms. The inner conjunction is the sole
-/// violation, and it proves constrained atoms do not count as positive terms.
+/// A valid root `And` beside a unary-wrapped `And` whose branches only
+/// restrict real atoms: the inner conjunction is the sole violation.
 fn nested_invalid_and() -> BoxedStrategy<Decorated<Formula>> {
     (
         atom_strategy(),
