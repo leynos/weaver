@@ -78,8 +78,10 @@ pedantic = { level = "warn", priority = -1 }
 allow_attributes = "deny"
 allow_attributes_without_reason = "deny"
 blanket_clippy_restriction_lints = "deny"
+disallowed_methods = "deny"
 needless_pass_by_value = "deny"
 implicit_hasher = "deny"
+missing_assert_message = "deny"
 missing_docs_in_private_items = "deny"
 
 # 2. debugging leftovers
@@ -136,6 +138,12 @@ result_large_err = "deny"
 [workspace.lints.rust]
 unknown_lints = "deny"
 renamed_and_removed_lints = "deny"
+# §13 of the training document specifies `forbid`. `birdcage` 0.8.1 exposes
+# only `restrict_env_variables`, with no per-child environment API, so the
+# sandbox's environment guard cannot restore the parent environment without a
+# process-wide mutation. `deny` keeps the rule enforceable while allowing that
+# one reasoned, item-scoped `#[expect]`; `forbid` would reject it outright.
+unsafe_code = "deny"
 missing_docs = "deny"
 
 [workspace.lints.rustdoc]

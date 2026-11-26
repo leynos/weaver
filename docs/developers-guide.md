@@ -226,7 +226,54 @@ Do not reintroduce a crate-local `[lints.rust]` or `[lints.clippy]` table in a
 member manifest. Cargo refuses to combine one with the opt-in, and a member
 that drops the opt-in to keep a local table falls outside the policy entirely.
 
-### 4.1 Pinning `const` on public accessors
+### 4.1 Effective level of each table entry
+
+Cargo passes table entries to the compiler as command-line flags, so a `deny`
+in the table behaves exactly like `-D <lint>` and a later `-D warnings` cannot
+relax it. Two entries deserve a note because their enforcement is easy to
+misread:
+
+- `clippy::disallowed_methods` denies the methods listed under
+  `disallowed-methods` in `clippy.toml`, which names
+  `std::env::{set_var, remove_var, set_current_dir}`. The lint is
+  warn-by-default once that list exists, but the explicit `deny` is what pins
+  the policy here, so deleting the list and the table entry has to be a
+  deliberate act.
+- `clippy::missing_assert_message` denies `assert!`, `assert_eq!` and
+  `debug_assert*` calls that carry no message. It applies to test bodies too,
+  so a new assertion needs a message wherever it lives, not only in production
+  code.
+
+Cognitive complexity is no longer a Clippy table entry. `dylint.toml` opts in
+to the experimental `macro_aware_cognitive_complexity` lint at
+`max_complexity = 9`, which skips the branching a macro generated; Clippy's
+`cognitive_complexity` cannot see inside one. Whitaker loads it through
+`make lint`, so the ceiling still binds every target.
+
+### 4.2 `unsafe_code` is `deny`, not §13's `forbid`
+
+The training baseline specifies `unsafe_code = "forbid"`. Weaver uses `deny`,
+with one item-scoped, reasoned `#[expect(unsafe_code)]` in
+`crates/weaver-sandbox/src/env_guard.rs`.
+
+The reason is a dependency limitation, not a preference. `birdcage` 0.8.1
+strips the parent process environment before forking and exposes only
+`restrict_env_variables`; it has no per-child environment API, so the sandbox's
+guard can only undo the stripping by mutating its own process environment.
+`set_var` and `remove_var` are unsafe on this toolchain because a process-wide
+mutation races concurrent readers. `forbid` cannot be overridden by an
+`#[expect]`, so `forbid` would forbid the workspace from building its sandbox
+at all.
+
+`deny` keeps the rule enforceable everywhere else: any new `unsafe` block fails
+`make lint`, and the single exception is visible in the file it applies to,
+with its reason. Every other crate in the workspace is `unsafe`-free, and
+`crates/weaver-cli`'s descriptor transfer, signal delivery and effective-UID
+probes use safe APIs (`socket2`, `rustix`) rather than raw `libc` calls. If a
+future `birdcage` release accepts a per-child environment, the exception can be
+deleted and this section reduced to `forbid`.
+
+### 4.3 Pinning `const` on public accessors
 
 Cargo cannot express "this accessor must stay a `const fn`", so the crates that
 promise it pin the property with a compile-time witness: a `const fn` wrapper
@@ -271,7 +318,7 @@ environment came back unchanged, and it fails with "restoration was not
 verified" when `birdcage` cannot activate (a denied namespace, say), because
 the runner has no outcome between pass and fail.
 
-### 4.2 Environment access and injection seams
+### 4.4 Environment access and injection seams
 
 Process environment reads go through an injected `mockable::Env` reader, never
 through `std::env` directly. The workspace's eventual ban on ambient
@@ -317,9 +364,17 @@ snapshots and restores the parent environment around `birdcage`'s own
 environment stripping. It calls `unsafe { env::set_var / env::remove_var }`
 because `birdcage` 0.8.1 mutates the parent process environment before forking
 and offers no per-child environment API. Any replacement for that guard has to
-change the sandbox API, not the call-site. Its two calls carry an item-scoped
-`#[expect(clippy::disallowed_methods, reason = ...)]`, so any other call still
-fails the lint.
+change the sandbox API, not the call-site. Its two calls carry item-scoped
+`#[expect(clippy::disallowed_methods, reason = ...)]` and
+`#[expect(unsafe_code, reason = ...)]` attributes — see §4.2 for why the
+workspace denies rather than forbids `unsafe_code` — so any other call, and any
+other `unsafe` block, still fails the lint.
+
+The process-level sandbox tests no longer sit near that exception:
+`crates/weaver-sandbox/tests/sandbox_process.rs` runs each case in a child copy
+of the binary, so `Command::env` and `Command::current_dir` replace every
+`set_var` the old undeclared `src/tests/` tree used. The guard's two calls are
+the only process-wide environment mutations left in the workspace.
 
 ## 5 Workflow pins and Dependabot
 
