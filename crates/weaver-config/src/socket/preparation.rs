@@ -4,7 +4,7 @@ use std::{fs, fs::DirBuilder};
 
 use camino::{Utf8Path, Utf8PathBuf};
 #[cfg(unix)]
-use libc::geteuid;
+use rustix::process::geteuid;
 use thiserror::Error;
 
 use super::SocketEndpoint;
@@ -224,10 +224,7 @@ fn create_socket_directory(parent: &Utf8Path) -> Result<(), SocketPreparationErr
 /// Ensures the socket directory is secure (Unix-only).
 #[cfg(unix)]
 pub fn ensure_secure_directory(parent: &Utf8Path) -> Result<(), SocketPreparationError> {
-    // SAFETY: `geteuid` is a read-only libc FFI call with no pointer
-    // arguments or side effects. We cast its return value to `u32`
-    // immediately and use it only for ownership checks.
-    let expected_uid = unsafe { geteuid() } as u32;
+    let expected_uid = geteuid().as_raw();
     let mut current = Utf8PathBuf::new();
 
     for component in parent.components() {

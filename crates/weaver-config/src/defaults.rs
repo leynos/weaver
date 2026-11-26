@@ -13,7 +13,7 @@ use camino::Utf8PathBuf;
 #[cfg(unix)]
 use dirs::runtime_dir;
 #[cfg(unix)]
-use libc::geteuid;
+use rustix::process::geteuid;
 
 use crate::socket::SocketEndpoint;
 
@@ -69,7 +69,7 @@ fn fallback_base_directory() -> Utf8PathBuf {
 /// Namespaces the fallback directory by effective user identifier.
 #[cfg(unix)]
 fn user_namespace() -> String {
-    let uid = unsafe { geteuid() };
+    let uid = geteuid().as_raw();
     format!("uid-{uid}")
 }
 

@@ -4,14 +4,14 @@
 //! shutdown sequence to complete.
 
 use std::{
-    io::{self, ErrorKind},
+    io::ErrorKind,
     thread,
     time::{Duration, Instant},
 };
 
 use cap_std::fs::Dir;
 #[cfg(unix)]
-use libc::{SIGTERM, kill};
+use rustix::process::{Pid, Signal, kill_process};
 use weaver_config::{RuntimePaths, SocketEndpoint};
 
 use super::{error::LifecycleError, socket::socket_is_reachable, utils::open_runtime_dir};
@@ -115,33 +115,33 @@ pub(super) fn signal_daemon(pid: u32) -> Result<(), LifecycleError> {
             reason: "PID 0 would signal the process group",
         });
     }
-    // Reject PIDs that exceed pid_t range (i32::MAX on most platforms).
-    // Casting a u32 > i32::MAX to pid_t would produce a negative value,
-    // which has special meaning in kill(2).
-    if pid > i32::MAX as u32 {
-        return Err(LifecycleError::InvalidPid {
-            pid,
-            reason: "PID exceeds maximum valid process ID",
-        });
-    }
+    // Reject PIDs that exceed the `pid_t` range (i32::MAX on most platforms)
+    // before converting: a negative value has special meaning in kill(2).
+    // A fallible conversion states that intent without a wrapping cast.
+    let raw_pid = i32::try_from(pid).map_err(|_| LifecycleError::InvalidPid {
+        pid,
+        reason: "PID exceeds maximum valid process ID",
+    })?;
     #[cfg(unix)]
     {
-        // SAFETY: `kill(2)` is memory-safe even when the PID is invalid; the
-        // kernel simply returns an error. We validated that pid fits in pid_t
-        // and is not 0 or negative.
-        let result = unsafe { kill(pid as libc::pid_t, SIGTERM) };
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(LifecycleError::SignalFailed {
+        // The checks above already exclude the values `Pid::from_raw`
+        // rejects, but the constructor still owns the invariant: an unexpected
+        // zero must never become `kill(0, …)`, which signals the whole process
+        // group.
+        let Some(target) = Pid::from_raw(raw_pid) else {
+            return Err(LifecycleError::InvalidPid {
                 pid,
-                source: io::Error::last_os_error(),
-            })
-        }
+                reason: "PID must be a positive process identifier",
+            });
+        };
+        kill_process(target, Signal::TERM).map_err(|source| LifecycleError::SignalFailed {
+            pid,
+            source: source.into(),
+        })
     }
     #[cfg(not(unix))]
     {
-        let _ = pid;
+        let _ = raw_pid;
         Err(LifecycleError::UnsupportedPlatform)
     }
 }
