@@ -124,15 +124,8 @@ fn deep_atomless(min_depth: usize) -> BoxedStrategy<Decorated<Formula>> {
 fn formula_tree() -> BoxedStrategy<Decorated<Formula>> {
     atom_strategy()
         .prop_recursive(MAX_DEPTH, MAX_SIZE, MAX_BRANCHES, |inner| {
-            let unary =
-                (0_u8..3, inner.clone(), span_strategy()).prop_map(|(variant, child, span)| {
-                    let node = match variant {
-                        0 => Formula::Not(Box::new(child)),
-                        1 => Formula::Inside(Box::new(child)),
-                        _ => Formula::Anywhere(Box::new(child)),
-                    };
-                    decorated(node, span)
-                });
+            let unary = (0_u8..3, inner.clone(), span_strategy())
+                .prop_map(|(variant, child, span)| decorated(unary_node(variant, child), span));
             let nary = (
                 any::<bool>(),
                 vec(inner, 0..=MAX_BRANCHES as usize),
@@ -185,20 +178,82 @@ fn or_with_not_descendant() -> BoxedStrategy<Decorated<Formula>> {
     nary_with_required_branch(formula_tree(), tree_with_not(), Formula::Or)
 }
 
+/// Builds a constraint chain (`Not`/`Inside`/`Anywhere`) ending in a real
+/// atom, beneath `min_layers` additional unary wrappers.
+///
+/// `min_layers == 0` yields `Not(atom)`; larger values push the negation
+/// further below the node that has to reject it. Atoms reached through a
+/// constraint are not positive terms, so a conjunction built only from these
+/// must be rejected even though it contains atoms. Contrast with
+/// [`deep_atomless`], whose leaves carry no atom at all and so never exercise
+/// that distinction.
+fn deep_negation(min_layers: usize) -> BoxedStrategy<Decorated<Formula>> {
+    if min_layers == 0 {
+        return (atom_strategy(), span_strategy())
+            .prop_map(|(atom, span)| decorated(Formula::Not(Box::new(atom)), span))
+            .boxed();
+    }
+
+    (
+        any::<bool>(),
+        deep_negation(min_layers - 1),
+        span_strategy(),
+    )
+        .prop_map(|(is_inside, child, span)| decorated(valid_unary_node(is_inside, child), span))
+        .boxed()
+}
+
+/// A valid root `And` holding a positive atom beside an `Or` whose negation
+/// sits several levels below it. Nothing at the root can satisfy the expected
+/// diagnostic, so only the nested disjunction violation can be reported.
+fn nested_invalid_or() -> BoxedStrategy<Decorated<Formula>> {
+    (0_u8..3, span_strategy())
+        .prop_flat_map(|(extra_layers, span)| {
+            (atom_strategy(), deep_negation(1 + extra_layers as usize)).prop_map(
+                move |(positive, negation)| {
+                    decorated(
+                        Formula::And(vec![
+                            positive,
+                            decorated(Formula::Or(vec![negation]), span.clone()),
+                        ]),
+                        span.clone(),
+                    )
+                },
+            )
+        })
+        .boxed()
+}
+
+/// A valid root `And` holding a positive atom beside a unary-wrapped `And`
+/// whose branches only restrict real atoms. The inner conjunction is the sole
+/// violation, and it proves constrained atoms do not count as positive terms.
+fn nested_invalid_and() -> BoxedStrategy<Decorated<Formula>> {
+    (
+        atom_strategy(),
+        vec(deep_constraint_atom(2), 1..=3),
+        span_strategy(),
+    )
+        .prop_map(|(positive, branches, span)| {
+            let inner = decorated(Formula::And(branches), span.clone());
+            decorated(
+                Formula::And(vec![
+                    positive,
+                    decorated(Formula::Inside(Box::new(inner)), span),
+                ]),
+                None,
+            )
+        })
+        .boxed()
+}
+
 fn atomless_tree_without_not_in_or() -> BoxedStrategy<Decorated<Formula>> {
     let leaf = span_strategy()
         .prop_map(|span| decorated(Formula::And(vec![]), span))
         .boxed();
 
     leaf.prop_recursive(MAX_DEPTH, MAX_SIZE, MAX_BRANCHES, |inner| {
-        let unary = (0_u8..3, inner.clone(), span_strategy()).prop_map(|(variant, child, span)| {
-            let node = match variant {
-                0 => Formula::Not(Box::new(child)),
-                1 => Formula::Inside(Box::new(child)),
-                _ => Formula::Anywhere(Box::new(child)),
-            };
-            decorated(node, span)
-        });
+        let unary = (0_u8..3, inner.clone(), span_strategy())
+            .prop_map(|(variant, child, span)| decorated(unary_node(variant, child), span));
         let and = (vec(inner, 0..=MAX_BRANCHES as usize), span_strategy())
             .prop_map(|(branches, span)| decorated(Formula::And(branches), span));
         prop_oneof![unary, and]
@@ -237,16 +292,8 @@ fn valid_no_not_tree() -> BoxedStrategy<Decorated<Formula>> {
 fn positive_tree() -> BoxedStrategy<Decorated<Formula>> {
     deep_positive_atom(MIN_PROPERTY_DEPTH)
         .prop_recursive(MAX_DEPTH, MAX_SIZE, MAX_BRANCHES, |inner| {
-            let constraint = (0_u8..3, deep_constraint_atom(2), span_strategy()).prop_map(
-                |(variant, child, span)| {
-                    let node = match variant {
-                        0 => Formula::Not(Box::new(child)),
-                        1 => Formula::Inside(Box::new(child)),
-                        _ => Formula::Anywhere(Box::new(child)),
-                    };
-                    decorated(node, span)
-                },
-            );
+            let constraint = (0_u8..3, deep_constraint_atom(2), span_strategy())
+                .prop_map(|(variant, child, span)| decorated(unary_node(variant, child), span));
             let and = (
                 vec(prop_oneof![inner.clone(), constraint], 0..=2),
                 inner.clone(),
@@ -332,5 +379,21 @@ proptest! {
         prop_assert!(tree_depth(&formula) >= MIN_PROPERTY_DEPTH);
 
         prop_assert!(validate_formula(&formula).is_ok());
+    }
+
+    #[test]
+    fn prop_nested_negation_below_or_is_rejected(formula in nested_invalid_or()) {
+        prop_assert!(tree_depth(&formula) >= MIN_PROPERTY_DEPTH);
+
+        let code = first_diagnostic_code(&formula).expect("formula should fail validation");
+        prop_assert_eq!(code, DiagnosticCode::ESempaiInvalidNotInOr);
+    }
+
+    #[test]
+    fn prop_and_of_restricted_atoms_is_rejected(formula in nested_invalid_and()) {
+        prop_assert!(tree_depth(&formula) >= MIN_PROPERTY_DEPTH);
+
+        let code = first_diagnostic_code(&formula).expect("formula should fail validation");
+        prop_assert_eq!(code, DiagnosticCode::ESempaiMissingPositiveTermInAnd);
     }
 }
