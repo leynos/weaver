@@ -127,10 +127,11 @@ jobs:
       - name: Boundary manifest gate
         # setup-rust exports `RUSTFLAGS`, which displaces the configuration's
         # sources, so the step composes the standard flags onto it as the
-        # Makefile does.
+        # Makefile does. `--workspace` selects every member, as the gate-scope
+        # rule requires; only weaver-docs-gate has the `boundary_manifest` test.
         run: >-
           RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-Zthreads=8 -Clink-arg=-fuse-ld=mold"
-          cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
+          cargo test --workspace --test boundary_manifest -- --nocapture
       - name: Install Whitaker
         uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2 # shared-actions 0eabb6bc (whitaker-installer 0.2.12)
         with:
