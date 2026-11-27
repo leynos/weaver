@@ -52,6 +52,12 @@ pub(super) fn log_request_received(request: &GraphSliceRequest) {
 /// only when the cap actually triggered, and both are gathered in one traversal
 /// so a capped file is never scanned twice just to describe it.
 pub(super) fn log_discovery_capped(path: &Path, source: &str) {
+    // The counts cost a full traversal, and `debug!` would not evaluate them
+    // when the event is disabled. Check first so a capped request under the
+    // default `info` filter pays nothing for instrumentation it will not emit.
+    if !tracing::enabled!(target: DISPATCH_TARGET, tracing::Level::DEBUG) {
+        return;
+    }
     let (total_lines, total_non_blank_lines) = line_counts(source);
     debug!(
         target: DISPATCH_TARGET,

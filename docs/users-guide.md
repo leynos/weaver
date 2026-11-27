@@ -1036,9 +1036,16 @@ with the file path, total and non-blank line counts, and cap when discovery
 truncated the candidate list; and one enrichment event per card, naming its
 `symbol_id` and whether enrichment was `skipped`, `Enriched`, or `Degraded`.
 The discovery-cap and budget-truncation events are emitted only when they
-apply, so a quiet log means the slice was complete. Each slice runs inside a
-`build_response` span carrying its URI and position, so concurrent requests
-remain distinguishable.
+apply, so on a successful response their absence means neither the cap nor the
+budget cut the slice short.
+
+Those events describe a slice that was produced, not every request: a request
+refused during entry extraction logs the handler-entry event and then reports
+the refusal in its response, while a request that fails while resolving the URI
+or reading the file logs no graph-slice event at all. Check the response status
+for a refusal or error before reading a quiet log as a complete slice. Each
+slice runs inside a `build_response` span carrying its URI and position, so
+concurrent requests remain distinguishable.
 
 #### observe grep
 
