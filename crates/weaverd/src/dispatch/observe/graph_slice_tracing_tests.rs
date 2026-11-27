@@ -267,11 +267,23 @@ fn enrichment_skip_event_is_absent_at_semantic_detail(
     assert_success_response(status, &payload);
 
     // Semantic detail must attempt enrichment, so an implementation that logged
-    // the skip event unconditionally would fail here.
+    // the skip event unconditionally would fail here. Exactly one completion
+    // event proves the alternative path actually ran, rather than neither
+    // event firing.
     ensure_same(
         events_matching(&events, ENRICHMENT_SKIP_EVENT).len(),
         0,
         "enrichment skip events",
+    )?;
+    ensure_same(
+        events_matching(&events, ENRICHMENT_DONE_EVENT).len(),
+        1,
+        "enrichment completion events",
+    )?;
+    ensure_same_ref(
+        field_of(sole_event(&events, ENRICHMENT_DONE_EVENT)?, "outcome")?,
+        "Degraded",
+        "semantic-detail outcome without an LSP server",
     )
 }
 

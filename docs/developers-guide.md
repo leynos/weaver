@@ -1680,6 +1680,13 @@ The `observe graph-slice` command handler lives in
 `crates/weaverd/src/dispatch/observe/graph_slice.rs`. It is the sole
 implementation of the stable same-file slice contract.
 
+The handler is split across colocated submodules once a concern grows enough to
+be read on its own. `graph_slice.rs` had reached the repository's 400-line
+limit, so the card partition moved to `graph_slice/budget.rs`, the tracing
+events to `graph_slice/trace.rs`, and file-partitioning arithmetic stayed with
+the request orchestration it serves. Each submodule owns one concern and is
+tested beside it; `graph_slice.rs` keeps the control flow that composes them.
+
 ### 18.1 Entry point
 
 `handle(request, writer, backends)` is the public entry point wired by the
@@ -1773,6 +1780,11 @@ exactly one decision boundary:
 count-only by design, so the span is what attributes them to a request when
 several slices are handled concurrently. `#[instrument]` names the span after
 the function and targets the defining module rather than `DISPATCH_TARGET`.
+
+`graph_slice/budget.rs` invokes `trace::log_budget_spillover` at the point it
+decides the partition, so the event is emitted beside the decision rather than
+reconstructed by the caller. The other events are called from `graph_slice.rs`
+at their own boundaries.
 
 Keeping the events in one module pins field names and message text in a single
 place, so a log filter or dashboard change has one edit site. The unit tests in
