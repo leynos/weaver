@@ -14,11 +14,14 @@
 use proptest::prelude::*;
 use weaver_cards::{SourcePosition, SymbolCard, graph_slice::SliceSpillover};
 
-use super::super::{
-    MAX_SAME_FILE_DISCOVERY_POSITIONS,
-    budget::apply_card_budget,
-    candidate_positions,
-    trace::count_non_blank_lines,
+use super::{
+    super::{
+        MAX_SAME_FILE_DISCOVERY_POSITIONS,
+        budget::apply_card_budget,
+        candidate_positions,
+        trace::count_non_blank_lines,
+    },
+    support::render_padded_functions,
 };
 use crate::dispatch::observe::enrich::enrich_test_utils::test_symbol_card_with_pos;
 
@@ -74,13 +77,57 @@ fn frontier_ids(spillover: &SliceSpillover) -> Vec<String> {
 /// Sampling each line independently would almost never produce more than 256
 /// non-blank lines, leaving the capped branch effectively untested. Choosing the
 /// non-blank count explicitly puts the interesting sizes on the same footing as
-/// small ones.
+/// small ones, and a blank inserted every `stride` lines keeps the fixture
+/// interleaved rather than clustering every blank at the end.
 fn line_layout() -> impl Strategy<Value = Vec<bool>> {
-    (0..=(MAX_SAME_FILE_DISCOVERY_POSITIONS + 32), 0..=32usize).prop_map(|(non_blank, blank)| {
-        let mut lines = vec![true; non_blank];
-        lines.extend(std::iter::repeat_n(false, blank));
-        lines
-    })
+    (0..=(MAX_SAME_FILE_DISCOVERY_POSITIONS + 2), 1usize..=8usize).prop_map(interleave_blanks)
+}
+
+/// Places a blank line after every `stride` non-blank lines.
+///
+/// Interleaving keeps every generated layout's total line count different from
+/// its non-blank count, so the two fields cannot be confused by accident.
+fn interleave_blanks((non_blank, stride): (usize, usize)) -> Vec<bool> {
+    // Capacity is only a hint; over-allocating avoids integer division here.
+    let mut lines = Vec::with_capacity(non_blank.saturating_add(stride));
+    let mut placed = 0;
+    while placed < non_blank {
+        let chunk = stride.min(non_blank - placed);
+        lines.extend(std::iter::repeat_n(true, chunk));
+        placed += chunk;
+        lines.push(false);
+    }
+    lines
+}
+
+/// The cap must engage exactly above `MAX_SAME_FILE_DISCOVERY_POSITIONS`.
+///
+/// The property strategy can reach the boundary, but only as one of hundreds of
+/// possible counts, so an off-by-one at the cap could escape a run. These cases
+/// are deterministic and interleave blank lines, which also distinguishes the
+/// non-blank count from the file's total line count.
+#[rstest::rstest]
+#[case::below_cap(MAX_SAME_FILE_DISCOVERY_POSITIONS - 1, false)]
+#[case::at_cap(MAX_SAME_FILE_DISCOVERY_POSITIONS, false)]
+#[case::above_cap(MAX_SAME_FILE_DISCOVERY_POSITIONS + 1, true)]
+fn capping_begins_only_above_the_cap(#[case] non_blank: usize, #[case] expected_capped: bool) {
+    let blanks_between = 2;
+    let source = render_padded_functions(non_blank, blanks_between);
+
+    let (positions, capped) = candidate_positions(&source);
+
+    assert_eq!(count_non_blank_lines(&source), non_blank, "non-blank count");
+    assert_ne!(
+        source.lines().count(),
+        non_blank,
+        "fixture must distinguish total from non-blank lines"
+    );
+    assert_eq!(
+        positions.len(),
+        non_blank.min(MAX_SAME_FILE_DISCOVERY_POSITIONS),
+        "retained positions"
+    );
+    assert_eq!(capped, expected_capped, "capping flag");
 }
 
 proptest! {
