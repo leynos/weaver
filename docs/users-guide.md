@@ -1032,12 +1032,13 @@ usual lifecycle logs and add the handler's decision boundaries. The `weaverd`
 target then logs the requested URI, position, detail levels, and `max_cards`
 budget when a slice starts; a budget-truncation event with `included_cards` and
 `frontier_candidates` when the budget excluded cards; a discovery-cap event
-with the file path, non-blank line count, and cap when discovery truncated the
-candidate list; and one enrichment event per card, naming its `symbol_id` and
-whether enrichment was `skipped`, `Enriched`, or `Degraded`. The discovery-cap
-and budget-truncation events are emitted only when they apply, so a quiet log
-means the slice was complete. Each slice runs inside a `build_response` span
-carrying its URI and position, so concurrent requests remain distinguishable.
+with the file path, total and non-blank line counts, and cap when discovery
+truncated the candidate list; and one enrichment event per card, naming its
+`symbol_id` and whether enrichment was `skipped`, `Enriched`, or `Degraded`.
+The discovery-cap and budget-truncation events are emitted only when they
+apply, so a quiet log means the slice was complete. Each slice runs inside a
+`build_response` span carrying its URI and position, so concurrent requests
+remain distinguishable.
 
 #### observe grep
 

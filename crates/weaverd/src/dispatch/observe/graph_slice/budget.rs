@@ -40,15 +40,15 @@ pub(super) fn apply_card_budget(
         return (Vec::new(), spillover);
     }
 
-    let remaining_capacity = max_cards.saturating_sub(1) as usize;
+    let (included_count, _) = partition_counts(sibling_cards.len(), max_cards);
     let included_siblings = sibling_cards
         .iter()
-        .take(remaining_capacity)
+        .take(included_count)
         .cloned()
         .collect::<Vec<_>>();
     let frontier = sibling_cards
         .iter()
-        .skip(remaining_capacity)
+        .skip(included_count)
         .map(|card| SpilloverCandidate {
             symbol_id: card.symbol.symbol_id.clone(),
             depth: 1,
@@ -72,4 +72,19 @@ pub(super) fn apply_card_budget(
     };
     log_budget_spillover(cards.len(), spillover.frontier.len());
     (cards, spillover)
+}
+
+/// Splits `sibling_count` siblings into included and frontier counts.
+///
+/// The entry card always consumes one unit of `max_cards`, so siblings may take
+/// at most `max_cards - 1` slots. The two returned counts always sum to
+/// `sibling_count`, which the property tests in `graph_slice_properties.rs`
+/// assert over arbitrary inputs.
+///
+/// `max_cards == 0` is handled before this helper is called, by the branch that
+/// reports every candidate as spillover.
+pub(super) fn partition_counts(sibling_count: usize, max_cards: u32) -> (usize, usize) {
+    let capacity = max_cards.saturating_sub(1) as usize;
+    let included = sibling_count.min(capacity);
+    (included, sibling_count - included)
 }

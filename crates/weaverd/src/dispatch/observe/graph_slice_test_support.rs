@@ -140,3 +140,21 @@ pub(crate) fn render_functions(count: usize) -> String {
         source
     })
 }
+
+/// Renders `count` single-symbol functions separated by blank lines.
+///
+/// A fixture built this way has `count` non-blank lines and
+/// `count * (1 + blanks_between)` lines in total, so a test can tell a reported
+/// total line count apart from a reported non-blank count. With
+/// `blanks_between == 0` this is exactly [`render_functions`].
+pub(crate) fn render_padded_functions(count: usize, blanks_between: usize) -> String {
+    (0..count).fold(String::new(), |mut source, index| {
+        source.push_str("fn item_");
+        source.push_str(&index.to_string());
+        source.push_str("() {}\n");
+        for _ in 0..blanks_between {
+            source.push('\n');
+        }
+        source
+    })
+}

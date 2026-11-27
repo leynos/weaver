@@ -1683,7 +1683,11 @@ implementation of the stable same-file slice contract.
 ### 18.1 Entry point
 
 `handle(request, writer, backends)` is the public entry point wired by the
-router. It delegates to `build_response` which owns all domain logic.
+router. It delegates to `build_response`, which owns request orchestration:
+entry-card extraction, sibling discovery, budget application, and enrichment
+ordering. The file-partitioning arithmetic those steps depend on lives in the
+submodules described below; `graph_slice.rs` keeps the control flow, not every
+helper it calls.
 
 ### 18.2 Same-file discovery
 
@@ -1701,12 +1705,23 @@ sibling discovery:
 
 ### 18.3 Budget and spillover
 
-`apply_card_budget(entry_card, sibling_cards, max_cards)` partitions the sorted
-sibling list into an included set (up to `max_cards − 1` siblings plus the
-entry card) and a `SliceSpillover` frontier. The `apply_card_budget` branch for
-`max_cards == 0` is only a defensive internal check; the public request parser
-rejects `--max-cards 0` before dispatch, so callers cannot reach the zero-budget
-`SliceSpillover` path through the CLI.
+`graph_slice/budget.rs` owns the card partition. Its
+`apply_card_budget(entry_card, sibling_cards, max_cards, discovery_capped)`
+splits the sorted sibling list into an included set (up to `max_cards − 1`
+siblings plus the entry card) and a `SliceSpillover` frontier, and emits the
+budget-truncation event next to the decision that produced it.
+
+The sibling split is delegated to `partition_counts(sibling_count, max_cards)`,
+a pure function whose contract — the two counts sum to `sibling_count`, the
+included count never exceeds `max_cards − 1`, and the frontier is non-empty
+exactly when capacity was exceeded — is asserted by the property tests in
+`graph_slice_properties.rs`.
+
+The `max_cards == 0` branch is only a defensive internal check; the public
+request parser rejects `--max-cards 0` before dispatch, so callers cannot reach
+the zero-budget `SliceSpillover` path through the CLI. It still reports every
+candidate as spillover rather than panicking, because a future caller may build
+the budget directly.
 
 ### 18.4 Enrichment ordering
 
@@ -1739,8 +1754,11 @@ exactly one decision boundary:
   Detail levels are formatted with `Debug`, so their variant names appear in
   the field.
 - `same-file discovery capped at maximum positions` fires only when
-  `candidate_positions` truncates, and records the file path, the
-  pre-truncation non-blank line count, and the cap.
+  `candidate_positions` truncates, and records the file path, the file's
+  `total_lines`, the pre-truncation `total_non_blank_lines`, and the `cap`. The
+  two counts answer different questions and diverge on a file padded with blank
+  lines; a property test asserts the non-blank count agrees with the positions
+  discovery considers.
 - `budget truncation produced spillover frontier` fires only when
   `apply_card_budget` leaves a non-empty frontier, and records how many cards
   were included alongside how many candidates were left out.

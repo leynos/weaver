@@ -16,7 +16,7 @@ use super::{
     MAX_SAME_FILE_DISCOVERY_POSITIONS,
     SemanticBackendProvider,
     assert_success_response,
-    support::{backends_fixture, detail_value, dispatch_payload, render_functions},
+    support::{backends_fixture, detail_value, dispatch_payload, render_padded_functions},
     tracing_support::{
         BUDGET_EVENT,
         DISCOVERY_CAP_EVENT,
@@ -58,6 +58,10 @@ fn entry_symbol_id(payload: &Value) -> Result<&str, String> {
         .ok_or_else(|| "entry card should carry a symbol_id".to_owned())
 }
 
+/// Blank lines interleaved with each rendered function in the discovery-cap
+/// fixture, so its total line count differs from its non-blank count.
+const BLANK_LINES_PER_FUNCTION: usize = 2;
+
 #[rstest]
 fn handler_entry_logs_request_fields(
     backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
@@ -70,6 +74,10 @@ fn handler_entry_logs_request_fields(
         &[
             "--position",
             "4:8",
+            // A non-default budget: asserting the default would pass even if
+            // the event logged a hard-coded constant.
+            "--max-cards",
+            "7",
             "--entry-detail",
             detail_value(DetailLevel::Structure),
             "--node-detail",
@@ -103,11 +111,7 @@ fn handler_entry_logs_request_fields(
         "Semantic",
         "node detail",
     )?;
-    ensure_same_ref(
-        field_of(entry_event, "max_cards")?,
-        "30",
-        "max_cards budget",
-    )
+    ensure_same_ref(field_of(entry_event, "max_cards")?, "7", "max_cards budget")
 }
 
 #[rstest]
@@ -115,7 +119,8 @@ fn discovery_cap_logs_path_and_non_blank_line_count(
     backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
 ) -> Result<(), String> {
     let (mut backends, temp_dir) = backends_fixture?;
-    let source = render_functions(MAX_SAME_FILE_DISCOVERY_POSITIONS + 1);
+    let non_blank_lines = MAX_SAME_FILE_DISCOVERY_POSITIONS + 1;
+    let source = render_padded_functions(non_blank_lines, BLANK_LINES_PER_FUNCTION);
     let request = request_for(
         &temp_dir,
         "large.rs",
@@ -141,11 +146,24 @@ fn discovery_cap_logs_path_and_non_blank_line_count(
         field_of(cap_event, "path")?.ends_with("large.rs"),
         "cap event to carry the file path",
     )?;
-    let expected_lines = (MAX_SAME_FILE_DISCOVERY_POSITIONS + 1).to_string();
+    // The fixture interleaves blank lines, so the file's total line count and
+    // its non-blank count differ. Asserting both catches an implementation that
+    // reports either one for the other.
+    let expected_non_blank = non_blank_lines.to_string();
     ensure_same_ref(
         field_of(cap_event, "total_non_blank_lines")?,
-        expected_lines.as_str(),
-        "discovery input size",
+        expected_non_blank.as_str(),
+        "non-blank line count",
+    )?;
+    let expected_total = (non_blank_lines * (1 + BLANK_LINES_PER_FUNCTION)).to_string();
+    ensure_same_ref(
+        field_of(cap_event, "total_lines")?,
+        expected_total.as_str(),
+        "total line count",
+    )?;
+    ensure_true(
+        expected_total != expected_non_blank,
+        "fixture must distinguish total from non-blank line counts",
     )?;
     let expected_cap = MAX_SAME_FILE_DISCOVERY_POSITIONS.to_string();
     ensure_same_ref(
@@ -223,6 +241,38 @@ fn complete_slice_emits_no_truncation_event(
     assert_success_response(status, &payload);
 
     ensure_same(events_matching(&events, expected).len(), 0, what)
+}
+
+#[rstest]
+fn enrichment_skip_event_is_absent_at_semantic_detail(
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = backends_fixture?;
+    let request = request_for(
+        &temp_dir,
+        "semantic.rs",
+        "fn solo() {}\n",
+        &[
+            "--position",
+            "1:4",
+            "--entry-detail",
+            detail_value(DetailLevel::Semantic),
+            "--node-detail",
+            detail_value(DetailLevel::Semantic),
+        ],
+    )?;
+
+    let (outcome, events) = with_captured_events(|| dispatch_payload(&request, &mut backends));
+    let (status, payload) = outcome?;
+    assert_success_response(status, &payload);
+
+    // Semantic detail must attempt enrichment, so an implementation that logged
+    // the skip event unconditionally would fail here.
+    ensure_same(
+        events_matching(&events, ENRICHMENT_SKIP_EVENT).len(),
+        0,
+        "enrichment skip events",
+    )
 }
 
 #[rstest]

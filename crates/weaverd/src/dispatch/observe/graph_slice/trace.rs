@@ -42,13 +42,19 @@ pub(super) fn log_request_received(request: &GraphSliceRequest) {
 /// Emits the discovery-cap event, including how much input the cap discarded.
 ///
 /// Without this event a capped file is indistinguishable from a file that
-/// genuinely holds only the cards returned. The non-blank line count is
-/// computed here rather than by the caller so the cost is paid only when the
-/// cap actually triggered.
+/// genuinely holds only the cards returned. Both counts are recorded because
+/// they answer different questions: `total_lines` is the size of the file the
+/// issue asks for, while `total_non_blank_lines` is the number of positions
+/// discovery actually considered before the cap. A file padded with blank
+/// lines has a large `total_lines` but few candidates.
+///
+/// The counts are computed here rather than by the caller so the cost is paid
+/// only when the cap actually triggered.
 pub(super) fn log_discovery_capped(path: &Path, source: &str) {
     debug!(
         target: DISPATCH_TARGET,
         path = %path.display(),
+        total_lines = source.lines().count(),
         total_non_blank_lines = count_non_blank_lines(source),
         cap = MAX_SAME_FILE_DISCOVERY_POSITIONS,
         "same-file discovery capped at maximum positions"
@@ -97,8 +103,9 @@ pub(super) fn log_enrichment_completed(symbol_id: &str, outcome: EnrichmentOutco
 ///
 /// Blankness is decided by [`first_non_whitespace_column`], the same predicate
 /// `candidate_positions` uses, so the reported total matches the positions that
-/// discovery actually considered.
-fn count_non_blank_lines(source: &str) -> usize {
+/// discovery actually considered. A property test in
+/// `graph_slice_properties.rs` asserts that agreement.
+pub(super) fn count_non_blank_lines(source: &str) -> usize {
     source
         .lines()
         .filter(|line| first_non_whitespace_column(line).is_some())
