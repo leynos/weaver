@@ -130,6 +130,25 @@ pub(crate) fn with_captured_trace<T>(action: impl FnOnce() -> T) -> (T, Captured
     (value, trace)
 }
 
+/// Returns the exact URI the handler receives for `filename` in `temp_dir`.
+///
+/// Comparing against the whole URI, rather than a filename suffix, means a field
+/// that carried only the basename would not satisfy the assertion.
+pub(crate) fn expected_uri(temp_dir: &TempDir, filename: &str) -> Result<String, String> {
+    url::Url::from_file_path(temp_dir.path().join(filename))
+        .map(|url| url.to_string())
+        .map_err(|()| format!("fixture path for {filename} should form a file URI"))
+}
+
+/// Returns the exact path the handler reports for `filename` in `temp_dir`.
+pub(crate) fn expected_path(temp_dir: &TempDir, filename: &str) -> String {
+    temp_dir
+        .path()
+        .join(filename)
+        .to_string_lossy()
+        .into_owned()
+}
+
 /// Builds a request against a fixture file, using the shared support helper so
 /// these tests exercise the same request shape as the behaviour tests.
 pub(crate) fn request_for(

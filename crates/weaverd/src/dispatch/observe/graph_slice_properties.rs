@@ -19,7 +19,7 @@ use super::{
         MAX_SAME_FILE_DISCOVERY_POSITIONS,
         budget::apply_card_budget,
         candidate_positions,
-        trace::count_non_blank_lines,
+        trace::line_counts,
     },
     support::render_padded_functions,
 };
@@ -116,7 +116,7 @@ fn capping_begins_only_above_the_cap(#[case] non_blank: usize, #[case] expected_
 
     let (positions, capped) = candidate_positions(&source);
 
-    assert_eq!(count_non_blank_lines(&source), non_blank, "non-blank count");
+    assert_eq!(line_counts(&source).1, non_blank, "non-blank count");
     assert_ne!(
         source.lines().count(),
         non_blank,
@@ -137,7 +137,7 @@ proptest! {
     fn non_blank_count_agrees_with_candidate_positions(lines in line_layout()) {
         let source = render_source(&lines);
         let expected_non_blank = lines.iter().filter(|is_non_blank| **is_non_blank).count();
-        prop_assert_eq!(count_non_blank_lines(&source), expected_non_blank);
+        prop_assert_eq!(line_counts(&source).1, expected_non_blank);
 
         let (positions, capped) = candidate_positions(&source);
         prop_assert_eq!(positions.len(), expected_non_blank.min(MAX_SAME_FILE_DISCOVERY_POSITIONS));

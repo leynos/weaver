@@ -25,6 +25,8 @@ use super::{
         ENRICHMENT_SKIP_EVENT,
         REQUEST_EVENT,
         events_matching,
+        expected_path,
+        expected_uri,
         field_of,
         request_for,
         sole_event,
@@ -62,6 +64,15 @@ fn entry_symbol_id(payload: &Value) -> Result<&str, String> {
 /// fixture, so its total line count differs from its non-blank count.
 const BLANK_LINES_PER_FUNCTION: usize = 2;
 
+/// Cards the truncation fixture keeps: the entry card plus one sibling.
+const EXPECTED_INCLUDED: usize = 2;
+
+/// Candidates the truncation fixture leaves out.
+///
+/// Deliberately different from [`EXPECTED_INCLUDED`], so a test cannot pass by
+/// reading one count where the other belongs.
+const EXPECTED_FRONTIER: usize = 5;
+
 #[rstest]
 fn handler_entry_logs_request_fields(
     backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
@@ -95,9 +106,10 @@ fn handler_entry_logs_request_fields(
         tracing::Level::DEBUG,
         "entry event level",
     )?;
-    ensure_true(
-        field_of(entry_event, "uri")?.ends_with("entry.rs"),
-        "entry event to carry the request URI",
+    ensure_same_ref(
+        field_of(entry_event, "uri")?,
+        expected_uri(&temp_dir, "entry.rs")?.as_str(),
+        "entry event request URI",
     )?;
     ensure_same_ref(field_of(entry_event, "line")?, "4", "entry line")?;
     ensure_same_ref(field_of(entry_event, "column")?, "8", "entry column")?;
@@ -142,9 +154,10 @@ fn discovery_cap_logs_path_and_non_blank_line_count(
     assert_success_response(status, &payload);
 
     let cap_event = sole_event(&events, DISCOVERY_CAP_EVENT)?;
-    ensure_true(
-        field_of(cap_event, "path")?.ends_with("large.rs"),
-        "cap event to carry the file path",
+    ensure_same_ref(
+        field_of(cap_event, "path")?,
+        expected_path(&temp_dir, "large.rs").as_str(),
+        "cap event file path",
     )?;
     // The fixture interleaves blank lines, so the file's total line count and
     // its non-blank count differ. Asserting both catches an implementation that
@@ -181,12 +194,17 @@ fn budget_truncation_logs_included_and_frontier_counts(
     let request = request_for(
         &temp_dir,
         "truncate.rs",
+        // Seven symbols so the included and frontier counts differ: two cards
+        // fit the budget, leaving five candidates out.
         concat!(
             "struct Alpha(u32);\n\n",
             "impl Alpha {\n",
             "    fn first(&self) -> u32 { self.0 }\n",
             "    fn second(&self) -> u32 { self.0 + 1 }\n",
             "    fn third(&self) -> u32 { self.0 + 2 }\n",
+            "    fn fourth(&self) -> u32 { self.0 + 3 }\n",
+            "    fn fifth(&self) -> u32 { self.0 + 4 }\n",
+            "    fn sixth(&self) -> u32 { self.0 + 5 }\n",
             "}\n"
         ),
         &["--position", "4:8", "--max-cards", "2"],
@@ -199,19 +217,23 @@ fn budget_truncation_logs_included_and_frontier_counts(
     let truncation_event = sole_event(&events, BUDGET_EVENT)?;
     ensure_same_ref(
         field_of(truncation_event, "included_cards")?,
-        "2",
+        EXPECTED_INCLUDED.to_string().as_str(),
         "included card count",
     )?;
-    ensure_same(cards_of(&payload)?.len(), 2, "emitted card count")?;
-    let frontier = payload
-        .get("spillover")
-        .and_then(|spillover| spillover.get("frontier"))
-        .and_then(Value::as_array)
-        .ok_or_else(|| "frontier should be an array".to_owned())?;
-    let expected_frontier = frontier.len().to_string();
+    ensure_same(
+        cards_of(&payload)?.len(),
+        EXPECTED_INCLUDED,
+        "emitted card count",
+    )?;
+    // Deriving the expectation from the response would accept an event that
+    // reported `included_cards` where `frontier_candidates` belongs.
+    ensure_true(
+        EXPECTED_FRONTIER != EXPECTED_INCLUDED,
+        "fixture must not make the two counts indistinguishable",
+    )?;
     ensure_same_ref(
         field_of(truncation_event, "frontier_candidates")?,
-        expected_frontier.as_str(),
+        EXPECTED_FRONTIER.to_string().as_str(),
         "frontier candidate count",
     )
 }

@@ -13,11 +13,11 @@ use super::{
     SemanticBackendProvider,
     assert_success_response,
     support::{backends_fixture, dispatch_payload},
-    tracing_support::{REQUEST_EVENT, request_for, sole_event, with_captured_trace},
+    tracing_support::{REQUEST_EVENT, expected_uri, request_for, sole_event, with_captured_trace},
 };
 use crate::{
     dispatch::trace_capture::CapturedSpan,
-    test_helpers::{ensure_same, ensure_same_ref, ensure_true},
+    test_helpers::{ensure_same, ensure_same_ref},
 };
 
 /// Returns the value of `field` in a captured span, or an empty string.
@@ -64,11 +64,10 @@ fn request_span_carries_the_request_location(
         "request span target",
     )?;
     ensure_same(span.level, tracing::Level::DEBUG, "request span level")?;
-    ensure_true(
-        span.fields
-            .get("uri")
-            .is_some_and(|uri| uri.ends_with("spanned.rs")),
-        "request span to carry the request URI",
+    ensure_same_ref(
+        span_field(span, "uri"),
+        expected_uri(&temp_dir, "spanned.rs")?.as_str(),
+        "request span URI",
     )?;
     ensure_same_ref(span_field(span, "line"), "4", "request span line")?;
     ensure_same_ref(span_field(span, "column"), "8", "request span column")?;

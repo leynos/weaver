@@ -49,13 +49,15 @@ pub(super) fn log_request_received(request: &GraphSliceRequest) {
 /// lines has a large `total_lines` but few candidates.
 ///
 /// The counts are computed here rather than by the caller so the cost is paid
-/// only when the cap actually triggered.
+/// only when the cap actually triggered, and both are gathered in one traversal
+/// so a capped file is never scanned twice just to describe it.
 pub(super) fn log_discovery_capped(path: &Path, source: &str) {
+    let (total_lines, total_non_blank_lines) = line_counts(source);
     debug!(
         target: DISPATCH_TARGET,
         path = %path.display(),
-        total_lines = source.lines().count(),
-        total_non_blank_lines = count_non_blank_lines(source),
+        total_lines,
+        total_non_blank_lines,
         cap = MAX_SAME_FILE_DISCOVERY_POSITIONS,
         "same-file discovery capped at maximum positions"
     );
@@ -99,15 +101,18 @@ pub(super) fn log_enrichment_completed(symbol_id: &str, outcome: EnrichmentOutco
     );
 }
 
-/// Counts the non-blank lines same-file discovery would probe before its cap.
+/// Returns the file's total and non-blank line counts in a single pass.
 ///
-/// Blankness is decided by [`first_non_whitespace_column`], the same predicate
-/// `candidate_positions` uses, so the reported total matches the positions that
-/// discovery actually considered. A property test in
+/// The non-blank count is the number of positions same-file discovery would
+/// probe before its cap: blankness is decided by [`first_non_whitespace_column`],
+/// the same predicate `candidate_positions` uses. A property test in
 /// `graph_slice_properties.rs` asserts that agreement.
-pub(super) fn count_non_blank_lines(source: &str) -> usize {
-    source
-        .lines()
-        .filter(|line| first_non_whitespace_column(line).is_some())
-        .count()
+///
+/// Counting both together matters on the capped path: a large file would
+/// otherwise be traversed once per field while debug logging is enabled.
+pub(super) fn line_counts(source: &str) -> (usize, usize) {
+    source.lines().fold((0, 0), |(total, non_blank), line| {
+        let is_non_blank = usize::from(first_non_whitespace_column(line).is_some());
+        (total + 1, non_blank + is_non_blank)
+    })
 }
