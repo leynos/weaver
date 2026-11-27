@@ -1680,10 +1680,21 @@ The `observe graph-slice` command handler lives in
 `crates/weaverd/src/dispatch/observe/graph_slice.rs`. It is the sole
 implementation of the stable same-file slice contract.
 
+The handler is split across colocated submodules once a concern grows enough to
+be read on its own. `graph_slice.rs` had reached the repository's 400-line
+limit, so the card partition moved to `graph_slice/budget.rs`, the tracing
+events to `graph_slice/trace.rs`, and file-partitioning arithmetic stayed with
+the request orchestration it serves. Each submodule owns one concern and is
+tested beside it; `graph_slice.rs` keeps the control flow that composes them.
+
 ### 18.1 Entry point
 
 `handle(request, writer, backends)` is the public entry point wired by the
-router. It delegates to `build_response` which owns all domain logic.
+router. It delegates to `build_response`, which owns request orchestration:
+entry-card extraction, sibling discovery, budget application, and enrichment
+ordering. The file-partitioning arithmetic those steps depend on lives in the
+submodules described below; `graph_slice.rs` keeps the control flow, not every
+helper it calls.
 
 ### 18.2 Same-file discovery
 
@@ -1701,12 +1712,23 @@ sibling discovery:
 
 ### 18.3 Budget and spillover
 
-`apply_card_budget(entry_card, sibling_cards, max_cards)` partitions the sorted
-sibling list into an included set (up to `max_cards − 1` siblings plus the
-entry card) and a `SliceSpillover` frontier. The `apply_card_budget` branch for
-`max_cards == 0` is only a defensive internal check; the public request parser
-rejects `--max-cards 0` before dispatch, so callers cannot reach the zero-budget
-`SliceSpillover` path through the CLI.
+`graph_slice/budget.rs` owns the card partition. Its
+`apply_card_budget(entry_card, sibling_cards, max_cards, discovery_capped)`
+splits the sorted sibling list into an included set (up to `max_cards − 1`
+siblings plus the entry card) and a `SliceSpillover` frontier, and emits the
+budget-truncation event next to the decision that produced it.
+
+The sibling split is delegated to `partition_counts(sibling_count, max_cards)`,
+a pure function whose contract — the two counts sum to `sibling_count`, the
+included count never exceeds `max_cards − 1`, and the frontier is non-empty
+exactly when capacity was exceeded — is asserted by the property tests in
+`graph_slice_properties.rs`.
+
+The `max_cards == 0` branch is only a defensive internal check; the public
+request parser rejects `--max-cards 0` before dispatch, so callers cannot reach
+the zero-budget `SliceSpillover` path through the CLI. It still reports every
+candidate as spillover rather than panicking, because a future caller may build
+the budget directly.
 
 ### 18.4 Enrichment ordering
 
@@ -1726,6 +1748,52 @@ for supplying a valid URI pointing to a readable file.
 
 `stable_card_order` imposes a deterministic total order over `SymbolCard`
 values so that slice responses are reproducible regardless of extraction order.
+
+### 18.7 Decision-boundary logging
+
+`graph_slice/trace.rs` owns the handler's `tracing::debug` events. It is a
+private helper module for `graph_slice` only; sibling handlers keep emitting
+their own events inline. Each event targets `DISPATCH_TARGET` and is emitted at
+exactly one decision boundary:
+
+- `handling graph-slice request` records the URI, line, column, entry and node
+  detail levels, and the `max_cards` budget on entry to `build_response`.
+  Detail levels are formatted with `Debug`, so their variant names appear in
+  the field.
+- `same-file discovery capped at maximum positions` fires only when
+  `candidate_positions` truncates, and records the file path, the file's
+  `total_lines`, the pre-truncation `total_non_blank_lines`, and the `cap`. The
+  two counts answer different questions and diverge on a file padded with blank
+  lines; a property test asserts the non-blank count agrees with the positions
+  discovery considers.
+- `budget truncation produced spillover frontier` fires only when
+  `apply_card_budget` leaves a non-empty frontier, and records how many cards
+  were included alongside how many candidates were left out.
+- `enrichment skipped due to detail level` and `card enrichment completed`
+  record the symbol ID and outcome for every card considered by
+  `enrich_card_if_requested`. The skip event writes the literal `"skipped"`
+  outcome; the completion event writes the `EnrichmentOutcome` variant
+  (`Enriched` or `Degraded`).
+
+`build_response` also carries a `debug` span recording the request's `uri`,
+`line`, and `column`. The discovery-cap and budget-truncation events are
+count-only by design, so the span is what attributes them to a request when
+several slices are handled concurrently. `#[instrument]` names the span after
+the function and targets the defining module rather than `DISPATCH_TARGET`.
+
+`graph_slice/budget.rs` invokes `trace::log_budget_spillover` at the point it
+decides the partition, so the event is emitted beside the decision rather than
+reconstructed by the caller. The other events are called from `graph_slice.rs`
+at their own boundaries.
+
+Keeping the events in one module pins field names and message text in a single
+place, so a log filter or dashboard change has one edit site. The unit tests in
+`graph_slice_tracing_tests.rs` assert on captured events and spans through the
+shared `dispatch::trace_capture` harness rather than a bespoke subscriber;
+`capture_trace` returns both, and `capture_events` is the events-only view.
+Each captured event also records its enclosing span names, so
+`request_span_carries_the_request_location` can assert that a decision event
+really sits inside the request span rather than merely that the span exists.
 
 ## 19 E2E test support for graph-slice
 

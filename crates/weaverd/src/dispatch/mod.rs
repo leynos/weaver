@@ -42,6 +42,8 @@ pub use self::backend_manager::BackendManager;
 #[doc(hidden)]
 pub use self::handler::DispatchConnectionHandler;
 #[cfg(test)]
+pub(crate) mod trace_capture;
+#[cfg(test)]
 pub(crate) use self::response::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};
 #[cfg(feature = "test-support")]
 pub(crate) use self::router::routing_catalogue;

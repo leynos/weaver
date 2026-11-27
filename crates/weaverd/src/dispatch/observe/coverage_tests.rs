@@ -17,6 +17,7 @@ use super::{
         dispatch_payload,
         dispatch_source,
         prepare_request,
+        render_functions,
     },
 };
 use crate::{
@@ -57,16 +58,6 @@ fn symbol_ids(cards: &[Value]) -> Result<Vec<&str>, String> {
         .iter()
         .map(|card| field(card, "symbol").and_then(|symbol| string_field(symbol, "symbol_id")))
         .collect()
-}
-
-/// Renders `count` distinct single-symbol functions as Rust source.
-fn render_functions(count: usize) -> String {
-    (0..count).fold(String::new(), |mut source, index| {
-        source.push_str("fn item_");
-        source.push_str(&index.to_string());
-        source.push_str("() {}\n");
-        source
-    })
 }
 
 #[rstest]

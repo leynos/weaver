@@ -4,10 +4,14 @@
 
 use std::{collections::BTreeMap, io::Write, path::Path};
 
+#[path = "graph_slice/budget.rs"]
+mod budget;
 #[path = "graph_slice/source.rs"]
 mod source;
 #[path = "graph_slice/status.rs"]
 mod status;
+#[path = "graph_slice/trace.rs"]
+mod trace;
 
 use url::Url;
 use weaver_cards::{
@@ -16,15 +20,21 @@ use weaver_cards::{
     DetailLevel,
     GraphSliceRequest,
     GraphSliceResponse,
-    SliceSpillover,
     SymbolCard,
     TreeSitterCardExtractor,
-    graph_slice::{SliceConstraints, SliceEntry, SliceRefusalReason, SpilloverCandidate},
+    graph_slice::{SliceConstraints, SliceEntry, SliceRefusalReason},
 };
 
 use self::{
+    budget::apply_card_budget,
     source::{read_slice_source, resolve_file_path},
     status::{GRAPH_SLICE_SCHEMA_VERSION, exit_status, refusal},
+    trace::{
+        log_discovery_capped,
+        log_enrichment_completed,
+        log_enrichment_skipped,
+        log_request_received,
+    },
 };
 use super::enrich::{self, EnrichmentOutcome};
 use crate::{
@@ -81,12 +91,20 @@ pub fn handle<W: Write>(
 ///
 /// **Error contract:** returns `Ok(GraphSliceResponse::Refusal { … })` for client-attributable
 /// extraction errors; returns `Err(DispatchError)` only for unexpected internal failures.
+///
+/// The span attributes the count-only budget and discovery events to one request.
+#[tracing::instrument(
+    level = "debug",
+    skip_all,
+    fields(uri = %request.uri(), line = request.line(), column = request.column())
+)]
 fn build_response(
     request: &GraphSliceRequest,
     path: &Path,
     source: &str,
     backends: &mut FusionBackends<SemanticBackendProvider>,
 ) -> Result<GraphSliceResponse, DispatchError> {
+    log_request_received(request);
     let extractor = backends.provider().card_extractor().clone();
     let mut entry_card = match extractor.extract(CardExtractionInput {
         path,
@@ -155,6 +173,9 @@ fn discover_same_file_cards(
     let extractor = backends.provider().card_extractor().clone();
     let mut cards = BTreeMap::new();
     let (candidate_positions, discovery_capped) = candidate_positions(document.source);
+    if discovery_capped {
+        log_discovery_capped(document.path, document.source);
+    }
     for (line, column) in candidate_positions {
         if (line, column) == (request.line(), request.column()) {
             continue;
@@ -256,62 +277,6 @@ fn stable_card_order(left: &SymbolCard, right: &SymbolCard) -> std::cmp::Orderin
             right_ref.range.end.column,
         ))
 }
-/// Partitions cards into an included set and a spillover frontier according to `max_cards`.
-fn apply_card_budget(
-    entry_card: SymbolCard,
-    sibling_cards: &[SymbolCard],
-    max_cards: u32,
-    discovery_capped: bool,
-) -> (Vec<SymbolCard>, SliceSpillover) {
-    if max_cards == 0 {
-        let frontier = std::iter::once(SpilloverCandidate {
-            symbol_id: entry_card.symbol.symbol_id.clone(),
-            depth: 0,
-        })
-        .chain(sibling_cards.iter().map(|card| SpilloverCandidate {
-            symbol_id: card.symbol.symbol_id.clone(),
-            depth: 1,
-        }))
-        .collect();
-        return (
-            Vec::new(),
-            SliceSpillover {
-                truncated: true,
-                frontier,
-            },
-        );
-    }
-    let remaining_capacity = max_cards.saturating_sub(1) as usize;
-    let included_siblings = sibling_cards
-        .iter()
-        .take(remaining_capacity)
-        .cloned()
-        .collect::<Vec<_>>();
-    let frontier = sibling_cards
-        .iter()
-        .skip(remaining_capacity)
-        .map(|card| SpilloverCandidate {
-            symbol_id: card.symbol.symbol_id.clone(),
-            depth: 1,
-        })
-        .collect::<Vec<_>>();
-
-    let mut cards = Vec::with_capacity(1 + included_siblings.len());
-    cards.push(entry_card);
-    cards.extend(included_siblings);
-    let spillover = if frontier.is_empty() {
-        SliceSpillover {
-            truncated: discovery_capped,
-            frontier,
-        }
-    } else {
-        SliceSpillover {
-            truncated: true,
-            frontier,
-        }
-    };
-    (cards, spillover)
-}
 /// Applies LSP semantic enrichment to `card` when `detail` is at least `Semantic`.
 ///
 /// Enrichment is **best-effort**: if the LSP backend is unavailable or returns
@@ -328,11 +293,14 @@ fn enrich_card_if_requested(
     backends: &mut FusionBackends<SemanticBackendProvider>,
 ) {
     if detail < DetailLevel::Semantic {
+        log_enrichment_skipped(&card.symbol.symbol_id);
         return;
     }
-    if enrich::try_lsp_enrichment(card, source, backends) == EnrichmentOutcome::Enriched {
+    let outcome = enrich::try_lsp_enrichment(card, source, backends);
+    if outcome == EnrichmentOutcome::Enriched {
         normalize_lsp_provenance(card);
     }
+    log_enrichment_completed(&card.symbol.symbol_id, outcome);
 }
 /// Replaces degraded Tree-sitter provenance entries with `lsp_hover` after successful enrichment.
 fn normalize_lsp_provenance(card: &mut SymbolCard) {

@@ -1025,6 +1025,28 @@ The stable edge schema is already locked even though runtime edges are deferred
 to later milestones. When present, every edge will carry a `resolution_scope` of
 `full_symbol_table`, `partial_symbol_table`, or `lsp`.
 
+Diagnosing a slice that returned fewer cards than expected:
+
+Run the daemon with `--log-filter 'info,weaverd::dispatch=debug'` to keep the
+usual lifecycle logs and add the handler's decision boundaries. The `weaverd`
+target then logs the requested URI, position, detail levels, and `max_cards`
+budget when a slice starts; a budget-truncation event with `included_cards` and
+`frontier_candidates` when the budget excluded cards; a discovery-cap event
+with the file path, total and non-blank line counts, and cap when discovery
+truncated the candidate list; and one enrichment event per card, naming its
+`symbol_id` and whether enrichment was `skipped`, `Enriched`, or `Degraded`.
+The discovery-cap and budget-truncation events are emitted only when they
+apply, so on a successful response their absence means neither the cap nor the
+budget cut the slice short.
+
+Those events describe a slice that was produced, not every request: a request
+refused during entry extraction logs the handler-entry event and then reports
+the refusal in its response, while a request that fails while resolving the URI
+or reading the file logs no graph-slice event at all. Check the response status
+for a refusal or error before reading a quiet log as a complete slice. Each
+slice runs inside a `build_response` span carrying its URI and position, so
+concurrent requests remain distinguishable.
+
 #### observe grep
 
 Syntax:
