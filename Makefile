@@ -52,20 +52,31 @@ MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 NIXIE ?= nixie
 NIXIE_FLAGS ?= --no-sandbox
 WHITAKER ?= whitaker
-UV ?= uv
-UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
+# Every uv call but the spelling builder's goes through the vendored helper,
+# which cleans the environment, uses the global uv cache, runs offline first and
+# goes online at most once. The builder runs directly at its release tag,
+# because the spelling baseline requires that form and the helper accepts only
+# a full commit. See
+# https://github.com/leynos/shared-actions/tree/main/uv_gate for the contract.
+# `scripts/uv_gate.py` is the shared-actions helper, vendored byte for byte, so
+# update it by copying the canonical file, never by editing it here. The helper
+# finds uv on PATH (outside ~/.lody, which it removes), so there is no UV
+# override: put the uv you want first. It needs python3 3.9 or newer. A uv
+# that reports only `Git operation failed` for a Git source missing from the
+# cache is not retried online: warm the cache once with `uv tool run`.
+UV_GATE ?= python3 scripts/uv_gate.py
 
 # The CV-005 CodeScene contracts live in shared-actions and run from a full
 # commit, so a fix is a pin bump. `.github/cv005.toml` holds this repository's
 # only parameters.
 CV005_CONTRACTS_REF ?= f84a7def5646a6fc7ba77c1f486906f66a0fed96
-CV005_CONTRACTS = $(UV_ENV) $(UV) tool run --python 3.13 \
+CV005_CONTRACTS = $(UV_GATE) tool --python 3.13 \
 	--from 'git+https://github.com/leynos/shared-actions@$(CV005_CONTRACTS_REF)\#subdirectory=packages/cv005-contracts' \
-	cv005-contracts
+	-- cv005-contracts
 
 TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.3
 # CI pins uv to Python 3.11, so ask for the interpreter the builder requires.
-TYPOS_CONFIG_BUILDER = $(UV_ENV) $(UV) tool run --python 3.14 --from \
+TYPOS_CONFIG_BUILDER = uv tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
 
@@ -84,7 +95,7 @@ test: ## Run tests with warnings treated as errors
 
 test-workflow-contracts: ## Validate workflow caller and runner-placement contracts
 	$(CV005_CONTRACTS) check --repository .
-	uv run --with 'pytest>=8' --with 'pyyaml>=6' --with 'hypothesis>=6' pytest tests/workflow_contracts -q
+	$(UV_GATE) tool --python 3.13 --from 'pytest==9.2.0' --with 'pyyaml==6.0.3' --with 'hypothesis==6.155.2' -- pytest tests/workflow_contracts -q
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(if $(filter release,$*),$(RELEASE_RUSTFLAGS),$(DEBUG_RUSTFLAGS)) $(CARGO) build $(BUILD_JOBS) $(if $(filter release,$*),--release) --bin $(TARGET)
@@ -106,15 +117,16 @@ check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check
 	$(MDTABLEFIX) --check $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 
-# The repository's Python is the workflow contract tests under tests/.
-# Interrogate scans each target recursively, subject to its default exclusions.
+# The repository's Python is the workflow contract tests under tests/ and the
+# vendored uv helper under scripts/. Interrogate scans each target recursively,
+# subject to its default exclusions.
 INTERROGATE_VERSION ?= 1.7.0
-INTERROGATE_TARGETS ?= tests
+INTERROGATE_TARGETS ?= scripts tests
 # Level 2 prints a MISSED row per undocumented definition, which the
 # `interrogate` recipe below looks for: the rounded percentage alone can pass a
 # lone gap.
 INTERROGATE_FLAGS ?= -vv --fail-under 100
-INTERROGATE ?= $(UV_ENV) $(UV) tool run --python 3.13 --from 'interrogate==$(INTERROGATE_VERSION)' interrogate
+INTERROGATE ?= $(UV_GATE) tool --python 3.13 --from 'interrogate==$(INTERROGATE_VERSION)' -- interrogate
 
 # Interrogate rounds its percentage to one decimal, so `--fail-under 100` alone
 # can pass a lone gap in a large repository. This recipe also fails when `grep`
