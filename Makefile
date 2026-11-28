@@ -117,8 +117,9 @@ check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check
 	$(MDTABLEFIX) --check $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 
-# The repository's Python is the workflow contract tests under tests/.
-# Interrogate scans each target recursively, subject to its default exclusions.
+# The repository's Python is the workflow contract tests under tests/ and the
+# vendored uv helper under scripts/. Interrogate scans each target recursively,
+# subject to its default exclusions.
 INTERROGATE_VERSION ?= 1.7.0
 INTERROGATE_TARGETS ?= scripts tests
 # Level 2 prints a MISSED row per undocumented definition, which the
