@@ -1047,9 +1047,14 @@ matching, preserving ordinary newlines as command boundaries. Bounded
 Hypothesis properties compare both detectors with a reference model.
 
 `make test-workflow-contracts` runs the shared CV-005 check and invokes
-`pytest tests/workflow_contracts -q` through `uv`, with `pytest>=8`,
-`pyyaml>=6` and `hypothesis>=6`. Hypothesis generates the cases used by the
-source-build properties.
+`pytest tests/workflow_contracts -q` through the vendored `scripts/uv_gate.py`
+helper (`UV_GATE`, overridable), with `pytest==9.2.0`, `pyyaml==6.0.3` and
+`hypothesis==6.155.2` on Python 3.13. The helper needs `python3` 3.9 or newer,
+finds `uv` on `PATH`, selects the global uv cache and runs offline first with
+at most one online attempt; a `uv` that reports only `Git operation failed` for
+a source missing from the cache is not retried, so warm the cache once with
+`uv tool run`. There is no `UV` override. Hypothesis generates the cases used
+by the source-build properties.
 
 ## 12 Adding or renaming public commands
 
